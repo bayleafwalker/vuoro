@@ -1,0 +1,26 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v8.3.2
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --all-packages --all-extras
+      - run: uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests
+      - run: uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests
+      - run: uv build --package vuoro-client --wheel --out-dir dist/vuoro-client
+      - run: uv build --package vuoro-service --wheel --out-dir dist/vuoro-service
+      - run: uv run pytest
+      - run: python -m json.tool vuoro.dispatch.json >/dev/null

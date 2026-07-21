@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "repo_id": "1deb57d0-af6f-479c-811a-b5b7254841f9",
+  "adoption_level": "guidance-only",
+  "routing": {
+    "default_harness": "codex",
+    "default_model_alias": "fast-build",
+    "action_classes": {
+      "plan": { "enabled": true, "model_alias": "frontier-plan" },
+      "build": { "enabled": true, "model_alias": "fast-build", "review_required": true },
+      "review": { "enabled": true, "model_alias": "review-synthesis" },
+      "verify": { "enabled": true, "model_alias": "review-synthesis", "review_required": true },
+      "reconcile": { "enabled": true, "model_alias": "review-synthesis" }
+    }
+  },
+  "skills": {
+    "template_root": "/projects/dev/agentops/templates/dispatch/skills",
+    "selected": [
+      "dispatch-plan",
+      "dispatch-build",
+      "dispatch-review",
+      "code-change-verification",
+      "backlog-refinement",
+      "item-done",
+      "verify-state-protocols",
+      "reconcile-project-contracts"
+    ],
+    "overlays": [".agents/overlays/vuoro.boundaries.md"]
+  },
+  "scope": {
+    "allowed_path_roots": [
+      "packages/",
+      "tests/",
+      "docs/",
+      "deploy/",
+      ".agents/",
+      ".claude/",
+      ".github/",
+      ".gitignore",
+      ".python-version",
+      "AGENTS.md",
+      "README.md",
+      "CHANGELOG.md",
+      "pyproject.toml",
+      "uv.lock",
+      "vuoro.dispatch.json"
+    ],
+    "out_of_scope": [
+      "domain state-machine reimplementation",
+      "appservice-specific deployment configuration or production mutation",
+      "automatic service-startup migrations"
+    ]
+  },
+  "risk_surfaces": [
+    {
+      "id": "client-authority-boundary",
+      "paths": ["packages/vuoro-client/**", "tests/test_distribution_boundaries.py"],
+      "skills": ["verify-state-protocols", "reconcile-project-contracts"],
+      "default_depth": 2,
+      "required_on_change": true
+    },
+    {
+      "id": "service-compatibility-and-migrations",
+      "paths": ["packages/vuoro-service/**", "deploy/**"],
+      "skills": ["verify-state-protocols", "reconcile-project-contracts"],
+      "default_depth": 2,
+      "required_on_change": true
+    }
+  ],
+  "verification": {
+    "command_families": ["unit", "architecture", "docs", "full-suite"],
+    "targeted_first": true,
+    "commands": [
+      "uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests",
+      "uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests",
+      "uv build --package vuoro-client --wheel --out-dir dist/vuoro-client",
+      "uv build --package vuoro-service --wheel --out-dir dist/vuoro-service",
+      "uv run pytest",
+      "python /projects/dev/agentops/templates/dispatch/scripts/validate_verification_artifacts.py --root ."
+    ]
+  },
+  "hooks": {
+    "level": "verification",
+    "publishers": ["git", "dispatcher-gate", "github"]
+  }
+}
