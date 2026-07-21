@@ -59,12 +59,12 @@ def test_built_client_wheel_contains_only_transport_package() -> None:
         assert python_modules
         assert all(name.startswith("vuoro_client/") for name in python_modules)
         assert not any(
-            term in name.lower()
-            for name in names
-            for term in FORBIDDEN_CLIENT_TERMS
+            term in name.lower() for name in names for term in FORBIDDEN_CLIENT_TERMS
         )
 
-        metadata_name = next(name for name in names if name.endswith(".dist-info/METADATA"))
+        metadata_name = next(
+            name for name in names if name.endswith(".dist-info/METADATA")
+        )
         metadata = BytesParser().parsebytes(wheel.read(metadata_name))
         runtime_requires = metadata.get_all("Requires-Dist", failobj=[])
         normalized = "\n".join(runtime_requires).lower()

@@ -11,7 +11,9 @@ from vuoro_service import __version__
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="vuoro-service")
-    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {__version__}"
+    )
     commands = parser.add_subparsers(dest="command")
 
     serve = commands.add_parser("serve", help="Run the reusable HTTP service")
@@ -54,7 +56,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps({"compatible": False, "reason": "no adapters registered"}))
         return 3
     if args.command in {"migrate", "admin"}:
-        parser.error(f"{args.command} is not available until an owning adapter is registered")
+        parser.error(
+            f"{args.command} is not available until an owning adapter is registered"
+        )
     parser.print_help()
     return 0
 

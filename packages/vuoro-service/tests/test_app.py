@@ -8,7 +8,9 @@ def test_bootstrap_exposes_only_operational_probes() -> None:
     paths = {route.path for route in create_app().routes}
     assert "/health/live" in paths
     assert "/health/ready" in paths
-    assert not any(path.startswith("/api/") for path in paths)
+    assert "/api/meta/v1/handshake" in paths
+    assert "/api/catalog/v1" in paths
+    assert "/api/invoke/v1" in paths
 
 
 def test_service_commands_are_process_scoped(capsys) -> None:

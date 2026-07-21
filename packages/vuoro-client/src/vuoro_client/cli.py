@@ -13,7 +13,9 @@ def build_parser() -> argparse.ArgumentParser:
         prog="vuoro",
         description="Invoke schema-described operations on a Vuoro service.",
     )
-    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {__version__}"
+    )
     return parser
 
 

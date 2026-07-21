@@ -7,3 +7,5 @@ recorded here.
 
 - Bootstrap the public repository and independent `vuoro-client` and
   `vuoro-service` package boundaries.
+- Add protocol-v1 handshake, ETag catalog, safe JSON Schema registration,
+  identity-derived generic invocation, and dynamic operation discovery.

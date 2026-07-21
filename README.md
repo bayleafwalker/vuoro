@@ -36,4 +36,6 @@ uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests
 ```
 
 See [`docs/architecture/packaging.md`](docs/architecture/packaging.md) for the
-enforced dependency and ownership boundaries.
+enforced dependency and ownership boundaries and
+[`docs/architecture/protocol-v1.md`](docs/architecture/protocol-v1.md) for the
+handshake, catalog, and generic invocation contract.

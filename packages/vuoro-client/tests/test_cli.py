@@ -12,7 +12,9 @@ def test_parser_is_transport_generic() -> None:
     assert "schema-described operations" in parser.description
 
 
-def test_version_is_available_without_service_imports(capsys: pytest.CaptureFixture[str]) -> None:
+def test_version_is_available_without_service_imports(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     with pytest.raises(SystemExit, match="0"):
         main(["--version"])
     assert capsys.readouterr().out.strip() == f"vuoro {__version__}"
