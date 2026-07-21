@@ -42,3 +42,7 @@ python /projects/dev/agentops/templates/dispatch/scripts/validate_verification_a
 
 Inspect `vuoro.dispatch.json` risk surfaces before changing compatibility,
 migration, identity, authority, invocation, or adapter-composition paths.
+
+<!-- agentops-project-pointer:start -->
+See `.agents/project.generated.md` for cross-repo project context (agentops-managed; do not hand-edit).
+<!-- agentops-project-pointer:end -->
