@@ -21,6 +21,7 @@ def definition(
     *,
     required_features: list[str] | None = None,
 ) -> OperationDefinition:
+    features = ["json-schema-draft-2020-12", *(required_features or [])]
     return OperationDefinition(
         name=name,
         owning_domain=name.split(".", 1)[0],
@@ -40,7 +41,7 @@ def definition(
         },
         execution_semantics="read",
         idempotency="optional",
-        required_client_schema_features=required_features or [],
+        required_client_schema_features=features,
     )
 
 
@@ -49,6 +50,7 @@ async def test_installed_protocol_v1_client_invokes_new_operation_without_reinst
     None
 ):
     registry = CatalogRegistry()
+    observed_context = None
     registry.register(
         definition("work.pilot.existing"),
         lambda arguments, context: {"echo": arguments["message"]},
@@ -81,14 +83,26 @@ async def test_installed_protocol_v1_client_invokes_new_operation_without_reinst
             "work.pilot.existing"
         ]
 
-        registry.register(
-            definition("work.pilot.new-command"),
-            lambda arguments, context: {"echo": arguments["message"]},
-        )
+        def invoke_new_command(arguments, context):
+            nonlocal observed_context
+            observed_context = context
+            return {"echo": arguments["message"]}
 
-        result = await client.invoke("work.pilot.new-command", {"message": "available"})
+        registry.register(definition("work.pilot.new-command"), invoke_new_command)
+
+        result = await client.invoke(
+            "work.pilot.new-command",
+            {"message": "available"},
+            request_id="client-request-1",
+            basis_revision="work-basis-1",
+            idempotency_key="new-command-1",
+        )
         assert result == {"echo": "available"}
         assert client.active_environment == "vuoro-dev"
+        assert observed_context is not None
+        assert observed_context.request_id == "client-request-1"
+        assert observed_context.basis_revision == "work-basis-1"
+        assert observed_context.idempotency_key == "new-command-1"
 
 
 @pytest.mark.anyio

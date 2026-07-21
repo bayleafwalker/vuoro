@@ -111,6 +111,7 @@ async def test_invocation_derives_identity_and_enforces_contract() -> None:
     registry, app = configured_service()
     request = {
         "schema_version": "invocation/v1",
+        "request_id": "request-7",
         "operation": "work.pilot.transition",
         "arguments": {"value": 7},
         "catalog_revision": registry.revision,
@@ -157,6 +158,7 @@ async def test_invocation_derives_identity_and_enforces_contract() -> None:
         )
         assert accepted.status_code == 200
         assert accepted.json()["status"] == "accepted"
+        assert accepted.json()["request_id"] == "request-7"
         assert accepted.json()["result"] == {"accepted": 7}
 
         stale = await client.post(
@@ -177,6 +179,7 @@ async def test_invalid_adapter_result_stays_in_envelope_without_leaking_details(
     )
     request = {
         "schema_version": "invocation/v1",
+        "request_id": "invalid-adapter-result",
         "operation": "work.pilot.transition",
         "arguments": {"value": 7},
         "catalog_revision": registry.revision,
@@ -207,6 +210,7 @@ async def test_domain_rejection_is_distinct_from_transport_or_handler_failure() 
     registry, app = configured_service(reject)
     request = {
         "schema_version": "invocation/v1",
+        "request_id": "domain-rejection",
         "operation": "work.pilot.transition",
         "arguments": {"value": 7},
         "catalog_revision": registry.revision,
@@ -229,3 +233,90 @@ async def test_domain_rejection_is_distinct_from_transport_or_handler_failure() 
         "code": "stale-basis",
         "message": "basis revision has advanced",
     }
+
+
+@pytest.mark.anyio
+async def test_invalid_invocation_body_uses_stable_result_envelope() -> None:
+    registry, app = configured_service()
+    valid = {
+        "schema_version": "invocation/v1",
+        "request_id": "spoof-attempt",
+        "operation": "work.pilot.transition",
+        "arguments": {"value": 7},
+        "catalog_revision": registry.revision,
+        "idempotency_key": "transition-7",
+        "actor": "forged:administrator",
+    }
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        extra_field = await client.post(
+            "/api/invoke/v1",
+            headers={"X-Vuoro-Client-Protocol": "1"},
+            json=valid,
+        )
+        malformed = await client.post(
+            "/api/invoke/v1",
+            headers={
+                "X-Vuoro-Client-Protocol": "1",
+                "Content-Type": "application/json",
+            },
+            content=b"{",
+        )
+
+    assert extra_field.status_code == 422
+    assert extra_field.json() == {
+        "schema_version": "invocation-result/v1",
+        "request_id": "spoof-attempt",
+        "operation": "work.pilot.transition",
+        "catalog_revision": registry.revision,
+        "status": "rejected",
+        "result": None,
+        "error": {
+            "code": "invalid-invocation-envelope",
+            "message": "invocation envelope is invalid",
+        },
+    }
+    assert malformed.status_code == 422
+    assert malformed.json()["schema_version"] == "invocation-result/v1"
+    assert malformed.json()["request_id"] == "invalid-request"
+    assert malformed.json()["error"]["code"] == "invalid-invocation-envelope"
+
+
+@pytest.mark.anyio
+async def test_invocation_context_contains_transport_and_idempotency_metadata() -> None:
+    observed = None
+
+    def handler(arguments, context):
+        nonlocal observed
+        observed = context
+        return {"accepted": arguments["value"]}
+
+    registry, app = configured_service(handler)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/api/invoke/v1",
+            headers={
+                "X-Vuoro-Client-Protocol": "1",
+                "Authorization": "Bearer dev-token",
+            },
+            json={
+                "schema_version": "invocation/v1",
+                "request_id": "caller-request-id",
+                "operation": "work.pilot.transition",
+                "arguments": {"value": 8},
+                "catalog_revision": registry.revision,
+                "basis_revision": "work-basis-42",
+                "idempotency_key": "transition-8",
+            },
+        )
+
+    assert response.status_code == 200
+    assert observed is not None
+    assert observed.request_id == "caller-request-id"
+    assert observed.basis_revision == "work-basis-42"
+    assert observed.catalog_revision == registry.revision
+    assert observed.idempotency_requirement == "required"
+    assert observed.idempotency_key == "transition-8"

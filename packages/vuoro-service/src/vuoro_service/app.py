@@ -7,9 +7,10 @@ from dataclasses import dataclass, field
 import inspect
 import logging
 from typing import Literal
-from uuid import uuid4
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.responses import JSONResponse, Response
 
 from vuoro_service import __version__
@@ -121,6 +122,33 @@ def create_app(
     app.state.settings = settings
     app.state.registry = registry
 
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request_envelope(
+        request: Request, error: RequestValidationError
+    ) -> JSONResponse:
+        if request.url.path != "/api/invoke/v1":
+            return await request_validation_exception_handler(request, error)
+        body = error.body if isinstance(error.body, dict) else {}
+        request_id = body.get("request_id")
+        operation = body.get("operation")
+        return _invocation_response(
+            request_id=(
+                request_id
+                if isinstance(request_id, str) and request_id
+                else "invalid-request"
+            ),
+            operation=(
+                operation
+                if isinstance(operation, str) and operation
+                else "invalid-operation"
+            ),
+            revision=registry.revision,
+            status="rejected",
+            error_code="invalid-invocation-envelope",
+            error_message="invocation envelope is invalid",
+            http_status=422,
+        )
+
     @app.get("/health/live", include_in_schema=False)
     async def live() -> dict[str, str]:
         return {"status": "live"}
@@ -181,7 +209,7 @@ def create_app(
 
     @app.post("/api/invoke/v1")
     async def invoke(request: Request, invocation: InvocationRequest) -> JSONResponse:
-        request_id = str(uuid4())
+        request_id = invocation.request_id
         revision = registry.revision
         if not _protocol_supported(settings, request):
             return _invocation_response(
@@ -280,7 +308,14 @@ def create_app(
             result = await registry.invoke(
                 operation,
                 invocation.arguments,
-                InvocationContext(identity, request_id, invocation.idempotency_key),
+                InvocationContext(
+                    identity=identity,
+                    request_id=request_id,
+                    basis_revision=invocation.basis_revision,
+                    catalog_revision=revision,
+                    idempotency_requirement=operation.definition.idempotency,
+                    idempotency_key=invocation.idempotency_key,
+                ),
             )
         except InvocationInputValidationError as error:
             return _invocation_response(

@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
+from uuid import uuid4
 
 import httpx
 from jsonschema import Draft202012Validator
@@ -148,6 +149,8 @@ class AsyncVuoroClient:
         operation_name: str,
         arguments: Any,
         *,
+        request_id: str | None = None,
+        basis_revision: str | None = None,
         idempotency_key: str | None = None,
     ) -> Any:
         catalog, operation = await self._operation(operation_name)
@@ -157,9 +160,11 @@ class AsyncVuoroClient:
             headers=self._headers(authenticated=True),
             json={
                 "schema_version": "invocation/v1",
+                "request_id": request_id or str(uuid4()),
                 "operation": operation_name,
                 "arguments": arguments,
                 "catalog_revision": catalog["revision"],
+                "basis_revision": basis_revision,
                 "idempotency_key": idempotency_key,
             },
         )

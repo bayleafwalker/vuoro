@@ -59,7 +59,9 @@ class OperationDefinition(StrictModel):
     execution_semantics: Literal["read", "write", "enqueue", "admin"]
     idempotency: Literal["not-allowed", "optional", "required"]
     deprecation: DeprecationMetadata = Field(default_factory=DeprecationMetadata)
-    required_client_schema_features: list[str] = Field(default_factory=list)
+    required_client_schema_features: list[str] = Field(
+        default_factory=lambda: ["json-schema-draft-2020-12"]
+    )
 
 
 class CatalogResponse(StrictModel):
@@ -70,9 +72,11 @@ class CatalogResponse(StrictModel):
 
 class InvocationRequest(StrictModel):
     schema_version: Literal["invocation/v1"] = "invocation/v1"
+    request_id: str = Field(min_length=1, max_length=256)
     operation: str = Field(min_length=1)
     arguments: Any
     catalog_revision: str | None = None
+    basis_revision: str | None = Field(default=None, min_length=1, max_length=256)
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=256)
 
 

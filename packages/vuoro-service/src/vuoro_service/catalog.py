@@ -23,7 +23,13 @@ DEFAULT_SCHEMA_FEATURES = frozenset(
         "local-defs-ref",
     }
 )
+SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema"
 _SAFE_REF = re.compile(r"^#/\$defs/(?:[^~/]|~0|~1)+(?:/(?:[^~/]|~0|~1)+)*$")
+_FEATURE_KEYWORDS = {
+    "$ref": "local-defs-ref",
+    "unevaluatedItems": "unevaluated-properties",
+    "unevaluatedProperties": "unevaluated-properties",
+}
 
 OperationHandler = Callable[[Any, InvocationContext], Any | Awaitable[Any]]
 
@@ -94,7 +100,23 @@ def _validate_local_ref_targets(value: Any, root: dict[str, Any], label: str) ->
             _validate_local_ref_targets(child, root, label)
 
 
-def validate_schema(schema: dict[str, Any], label: str) -> None:
+def _required_schema_features(value: Any) -> set[str]:
+    required = {"json-schema-draft-2020-12"}
+    if isinstance(value, dict):
+        for key, child in value.items():
+            feature = _FEATURE_KEYWORDS.get(key)
+            if feature is not None:
+                required.add(feature)
+            required.update(_required_schema_features(child))
+    elif isinstance(value, list):
+        for child in value:
+            required.update(_required_schema_features(child))
+    return required
+
+
+def validate_schema(schema: dict[str, Any], label: str) -> set[str]:
+    if schema.get("$schema") != SCHEMA_DIALECT:
+        raise CatalogRegistrationError(f"{label}: $schema must be {SCHEMA_DIALECT}")
     try:
         Draft202012Validator.check_schema(schema)
     except SchemaError as error:
@@ -103,6 +125,7 @@ def validate_schema(schema: dict[str, Any], label: str) -> None:
         ) from error
     _validate_references(schema, label)
     _validate_local_ref_targets(schema, schema, label)
+    return _required_schema_features(schema)
 
 
 class CatalogRegistry:
@@ -123,15 +146,22 @@ class CatalogRegistry:
             raise CatalogRegistrationError(
                 f"{definition.name}: owning_domain must match the operation-name prefix"
             )
-        unsupported = sorted(
-            set(definition.required_client_schema_features) - self.schema_features
+        required_features = validate_schema(
+            definition.input_schema, f"{definition.name}.input_schema"
+        ) | validate_schema(
+            definition.result_schema, f"{definition.name}.result_schema"
         )
+        declared_features = set(definition.required_client_schema_features)
+        undeclared = sorted(required_features - declared_features)
+        if undeclared:
+            raise CatalogRegistrationError(
+                f"{definition.name}: schemas use undeclared client features: {undeclared}"
+            )
+        unsupported = sorted(declared_features - self.schema_features)
         if unsupported:
             raise CatalogRegistrationError(
                 f"{definition.name}: service does not support declared schema features: {unsupported}"
             )
-        validate_schema(definition.input_schema, f"{definition.name}.input_schema")
-        validate_schema(definition.result_schema, f"{definition.name}.result_schema")
         self._operations[definition.name] = RegisteredOperation(definition, handler)
 
     @property
@@ -186,4 +216,5 @@ __all__ = [
     "InvocationInputValidationError",
     "InvocationResultValidationError",
     "OperationRejectedError",
+    "SCHEMA_DIALECT",
 ]

@@ -59,7 +59,12 @@ def test_external_and_dynamic_schema_references_are_rejected() -> None:
         ("$dynamicRef", "#node"),
     ):
         definition = operation(f"work.schema.{reference_key[1:].lower()}").model_copy(
-            update={"input_schema": {reference_key: reference}}
+            update={
+                "input_schema": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    reference_key: reference,
+                }
+            }
         )
         with pytest.raises(
             CatalogRegistrationError, match="references are not supported|only local"
@@ -75,7 +80,11 @@ def test_local_defs_reference_is_accepted() -> None:
                 "$schema": "https://json-schema.org/draft/2020-12/schema",
                 "$defs": {"identifier": {"type": "string"}},
                 "$ref": "#/$defs/identifier",
-            }
+            },
+            "required_client_schema_features": [
+                "json-schema-draft-2020-12",
+                "local-defs-ref",
+            ],
         }
     )
     registry.register(definition, lambda arguments, context: arguments)
@@ -92,4 +101,39 @@ def test_missing_local_reference_target_is_rejected_during_registration() -> Non
         }
     )
     with pytest.raises(CatalogRegistrationError, match="target does not exist"):
+        registry.register(definition, lambda arguments, context: arguments)
+
+
+@pytest.mark.parametrize(
+    "dialect",
+    [None, "http://json-schema.org/draft-07/schema#"],
+)
+def test_schema_dialect_must_be_explicitly_2020_12(dialect: str | None) -> None:
+    registry = CatalogRegistry()
+    schema = dict(OBJECT_SCHEMA)
+    if dialect is None:
+        schema.pop("$schema")
+    else:
+        schema["$schema"] = dialect
+    definition = operation("work.schema.wrong-dialect").model_copy(
+        update={"input_schema": schema}
+    )
+    with pytest.raises(CatalogRegistrationError, match=r"\$schema must be"):
+        registry.register(definition, lambda arguments, context: arguments)
+
+
+def test_schema_features_cannot_be_omitted_from_catalog_metadata() -> None:
+    registry = CatalogRegistry(
+        schema_features=CatalogRegistry().schema_features
+        | frozenset({"unevaluated-properties"})
+    )
+    definition = operation("work.schema.undeclared-feature").model_copy(
+        update={
+            "input_schema": {
+                **OBJECT_SCHEMA,
+                "unevaluatedProperties": False,
+            }
+        }
+    )
+    with pytest.raises(CatalogRegistrationError, match="undeclared client features"):
         registry.register(definition, lambda arguments, context: arguments)

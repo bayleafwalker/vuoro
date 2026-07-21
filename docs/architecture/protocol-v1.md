@@ -31,27 +31,32 @@ Schemas use JSON Schema 2020-12. The first supported client feature set is:
 - `json-schema-draft-2020-12`;
 - `local-defs-ref`.
 
-Only local `#/$defs/...` references are accepted. Dynamic and remote references
-are rejected during registration. New schema features must be declared in
-`required_client_schema_features`. A protocol-v1 client that does not support a
-declared feature reports client incompatibility before invocation; it does not
-mislabel the operation as unknown.
+Every schema root must identify the JSON Schema 2020-12 dialect. Only local
+`#/$defs/...` references are accepted. Dynamic and remote references are
+rejected during registration. The registry detects required dialect, local
+reference, and unevaluated-keyword capabilities and refuses schemas whose
+features are omitted from `required_client_schema_features`. A protocol-v1
+client that does not support a declared feature reports client incompatibility
+before invocation; it does not mislabel the operation as unknown.
 
 ## Invocation
 
 `POST /api/invoke/v1` takes an `invocation/v1` envelope with operation name,
-arguments, catalog revision, and optional idempotency key. Actor, environment,
-and authorities come from the configured identity resolver; none are accepted
-from the request body. The reusable service defaults to denying every identity
-until a resolver is configured.
+arguments, client-generated request ID, catalog revision, optional basis
+revision, and optional idempotency key. Actor, environment, and authorities
+come from the configured identity resolver; none are accepted from the request
+body. The reusable service defaults to denying every identity until a resolver
+is configured.
 
-Successful and domain-rejected calls return an `invocation-result/v1`
-envelope. Stable error codes distinguish incompatible clients, stale catalogs,
-unknown operations, identity/environment/authority failures, idempotency
-violations, bad caller input, bad adapter output, and handler failure. Internal
-handler details are not returned to clients.
+All syntactically reachable invocation outcomes, including malformed or
+extra-field request bodies, return an `invocation-result/v1` envelope. Stable
+error codes distinguish incompatible clients, invalid envelopes, stale
+catalogs, unknown operations, identity/environment/authority failures,
+idempotency violations, bad caller input, bad adapter output, and handler
+failure. Internal handler details are not returned to clients.
 
-Idempotency metadata and the key are passed to the owning adapter through the
+The request ID, optional basis revision, resolved catalog revision,
+idempotency requirement, and key are passed to the owning adapter through the
 invocation context. The service shell enforces whether a key is required,
 optional, or forbidden; the domain adapter remains responsible for durable
 deduplication semantics.

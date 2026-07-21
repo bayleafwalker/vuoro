@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
+from typing import Literal
 
 from fastapi import Request
 
@@ -19,6 +20,9 @@ class Identity:
 class InvocationContext:
     identity: Identity
     request_id: str
+    basis_revision: str | None
+    catalog_revision: str
+    idempotency_requirement: Literal["not-allowed", "optional", "required"]
     idempotency_key: str | None
 
 
