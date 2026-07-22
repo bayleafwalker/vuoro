@@ -1,0 +1,71 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.neutral-service-packaging",
+  "contract_ref": {
+    "doc_id": "vuoro-served-substrate",
+    "revision": "git:84ed7c2e414bf16730aa41d31c7ed466df2844fd"
+  },
+  "implementation_sha": "afeda159dc7d60be591c6b05c102a7b574a7c473",
+  "depth": 2,
+  "environment": {
+    "backend": "local-worktree-and-published-pinned-adapter-wheels",
+    "isolation": "all tests and wheel construction ran in the isolated Vuoro packaging worktree; adapter downloads were SHA-256 checked against the immutable composition manifest",
+    "tool_versions": {
+      "python": "3.12.13",
+      "pytest": "8.4.2",
+      "vuoro-service": "0.1.0"
+    }
+  },
+  "execution": {
+    "seed": null,
+    "histories": 4,
+    "bounds": {
+      "domains": 4,
+      "suspended_migration_jobs": 4,
+      "runtime_dsn_secret_keys": 4,
+      "migration_dsn_secret_keys": 4,
+      "full_suite_tests": 30
+    },
+    "faults_exercised": [
+      "missing-runtime-and-migration-secret-separation",
+      "attempted-mutable-or-unpinned-image-use",
+      "unsuspended-migration-job-template",
+      "adapter-wheel-checksum-mismatch"
+    ]
+  },
+  "claims": [
+    {
+      "property": "the public repository provides both a disposable local Compose stack and a neutral Kustomize base without appservice credentials, endpoints, CNPG resources, or environment overlays",
+      "result": "example-tested",
+      "evidence": [
+        "tests/test_deployment_assets.py requires the Compose stack, PostgreSQL initialization, Kustomize base, service deployment, and migration templates",
+        "the base README identifies concrete overlays, credentials, endpoints, namespaces, and backup policy as appservice-owned"
+      ]
+    },
+    {
+      "property": "the runtime deployment receives only four runtime DSNs while four suspended per-domain migration jobs receive migration-only DSNs",
+      "result": "example-tested",
+      "evidence": [
+        "deployment.yaml references vuoro-runtime-dsns and never vuoro-migration-dsns",
+        "migration-jobs.yaml contains four suspend:true Job templates using vuoro-migration-dsns",
+        "the checked packaged sprintctl, actionq, kctl, and auditctl migration commands each accepted --help invocation"
+      ]
+    },
+    {
+      "property": "service packaging remains bound to immutable owner artifacts and demands an immutable OCI digest before an overlay can deploy it",
+      "result": "example-tested",
+      "evidence": [
+        "all four release wheels downloaded from the checked-in composition manifest and matched its SHA-256 values",
+        "the service and client wheels built successfully, then the complete 30-test Vuoro suite passed",
+        "the Kustomize deployment and migration templates use an @sha256 placeholder that appservice must replace with the verified release digest"
+      ]
+    }
+  ],
+  "counterexamples": [],
+  "notes": [
+    "Command sequence: uv sync --all-packages --all-extras; uv build --package vuoro-client --wheel --out-dir dist/vuoro-client; uv build --package vuoro-service --wheel --out-dir dist/vuoro-service; uv run pytest; result: 30 passed.",
+    "The four pinned release wheels were fetched with scripts/fetch_pinned_adapters.py and their SHA-256 values exactly matched packages/vuoro-service/composition/adapter-pins.json.",
+    "Docker CLI is unavailable in this workstation, so a container build was not claimed. No Kubernetes command, cluster, deployment, endpoint, or credential was accessed.",
+    "The implementation commit was created before this evidence packet so implementation_sha identifies the tested package implementation without self-reference. Independent verification and appservice rollout remain separate gates."
+  ]
+}
