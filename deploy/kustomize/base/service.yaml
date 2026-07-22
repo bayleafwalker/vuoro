@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: vuoro-service
+  labels:
+    app.kubernetes.io/name: vuoro-service
+spec:
+  selector:
+    app.kubernetes.io/name: vuoro-service
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

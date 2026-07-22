@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: vuoro
+      POSTGRES_USER: vuoro_admin
+      POSTGRES_PASSWORD: local-evaluation-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vuoro_admin -d vuoro"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/10-vuoro-roles.sql:ro
+
+  vuoro-service:
+    build:
+      context: ../..
+    image: vuoro-service:local
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      VUORO_ENVIRONMENT_NAME: vuoro-compose
+      VUORO_ENVIRONMENT_CLASS: development
+      VUORO_IDENTITIES_FILE: /run/vuoro/identities.json
+      VUORO_WORK_REPOSITORY_ID: local-evaluation
+      VUORO_WORK_RUNTIME_DSN: postgresql://work_runtime:local-evaluation-only@postgres:5432/vuoro
+      VUORO_EXECUTION_RUNTIME_DSN: postgresql://execution_runtime:local-evaluation-only@postgres:5432/vuoro
+      VUORO_EXECUTION_SCHEMA: execution
+      VUORO_KNOWLEDGE_RUNTIME_DSN: postgresql://knowledge_runtime:local-evaluation-only@postgres:5432/vuoro
+      VUORO_KNOWLEDGE_SCHEMA: knowledge
+      VUORO_AUDIT_RUNTIME_DSN: postgresql://audit_runtime:local-evaluation-only@postgres:5432/vuoro
+      VUORO_AUDIT_SCHEMA: audit
+    ports:
+      - "8080:8080"
+    volumes:
+      - ${VUORO_COMPOSE_IDENTITIES_FILE:?set VUORO_COMPOSE_IDENTITIES_FILE to a local development identity registry}:/run/vuoro/identities.json:ro

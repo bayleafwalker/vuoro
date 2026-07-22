@@ -1,0 +1,13 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vuoro-service-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vuoro-service
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8080

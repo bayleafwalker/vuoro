@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vuoro-service
+  labels:
+    app.kubernetes.io/name: vuoro-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vuoro-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vuoro-service
+    spec:
+      serviceAccountName: vuoro-service
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: service
+          # An appservice overlay must replace this with the immutable digest
+          # that passed the development gate. Never promote a mutable tag.
+          image: ghcr.io/bayleafwalker/vuoro-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: vuoro-runtime-config
+          env:
+            - name: VUORO_IDENTITIES_FILE
+              value: /run/vuoro/identities/registry.json
+            - name: VUORO_WORK_RUNTIME_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: vuoro-runtime-dsns
+                  key: work
+            - name: VUORO_EXECUTION_RUNTIME_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: vuoro-runtime-dsns
+                  key: execution
+            - name: VUORO_KNOWLEDGE_RUNTIME_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: vuoro-runtime-dsns
+                  key: knowledge
+            - name: VUORO_AUDIT_RUNTIME_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: vuoro-runtime-dsns
+                  key: audit
+          volumeMounts:
+            - name: identities
+              mountPath: /run/vuoro/identities
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+      volumes:
+        - name: identities
+          secret:
+            secretName: vuoro-identities

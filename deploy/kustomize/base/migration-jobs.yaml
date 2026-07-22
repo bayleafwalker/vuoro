@@ -1,0 +1,131 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vuoro-migrate-work
+  labels:
+    app.kubernetes.io/name: vuoro-service
+    vuoro.dev/domain: work
+spec:
+  # Appservice enables one job at a time after supplying a migration-only DSN.
+  suspend: true
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate-work
+          image: ghcr.io/bayleafwalker/vuoro-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          command: ["sprintctl", "remote-schema", "migrate", "--url", "$(VUORO_WORK_MIGRATION_DSN)", "--json"]
+          env:
+            - name: VUORO_WORK_MIGRATION_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: vuoro-migration-dsns
+                  key: work
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vuoro-migrate-execution
+  labels:
+    app.kubernetes.io/name: vuoro-service
+    vuoro.dev/domain: execution
+spec:
+  suspend: true
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate-execution
+          image: ghcr.io/bayleafwalker/vuoro-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          command: ["/bin/sh", "-ec", "ACTIONQ_URL=\"$VUORO_EXECUTION_MIGRATION_DSN\" ACTIONQ_SCHEMA=\"$VUORO_EXECUTION_SCHEMA\" actionctl migrate --json-output"]
+          env:
+            - name: VUORO_EXECUTION_MIGRATION_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: vuoro-migration-dsns
+                  key: execution
+            - name: VUORO_EXECUTION_SCHEMA
+              valueFrom:
+                configMapKeyRef:
+                  name: vuoro-runtime-config
+                  key: VUORO_EXECUTION_SCHEMA
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vuoro-migrate-knowledge
+  labels:
+    app.kubernetes.io/name: vuoro-service
+    vuoro.dev/domain: knowledge
+spec:
+  suspend: true
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate-knowledge
+          image: ghcr.io/bayleafwalker/vuoro-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          command: ["/bin/sh", "-ec", "python -m kctl.central_schema migrate --dsn-env VUORO_KNOWLEDGE_MIGRATION_DSN --schema \"$VUORO_KNOWLEDGE_SCHEMA\" --migration-role \"$VUORO_KNOWLEDGE_MIGRATION_ROLE\" --runtime-role \"$VUORO_KNOWLEDGE_RUNTIME_ROLE\""]
+          env:
+            - name: VUORO_KNOWLEDGE_MIGRATION_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: vuoro-migration-dsns
+                  key: knowledge
+            - name: VUORO_KNOWLEDGE_MIGRATION_ROLE
+              valueFrom:
+                secretKeyRef:
+                  name: vuoro-migration-roles
+                  key: knowledge-migration-role
+            - name: VUORO_KNOWLEDGE_RUNTIME_ROLE
+              valueFrom:
+                secretKeyRef:
+                  name: vuoro-runtime-roles
+                  key: knowledge-runtime-role
+            - name: VUORO_KNOWLEDGE_SCHEMA
+              valueFrom:
+                configMapKeyRef:
+                  name: vuoro-runtime-config
+                  key: VUORO_KNOWLEDGE_SCHEMA
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vuoro-migrate-audit
+  labels:
+    app.kubernetes.io/name: vuoro-service
+    vuoro.dev/domain: audit
+spec:
+  suspend: true
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate-audit
+          image: ghcr.io/bayleafwalker/vuoro-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          command: ["/bin/sh", "-ec", "auditctl-central-schema migrate --dsn-env VUORO_AUDIT_MIGRATION_DSN --schema \"$VUORO_AUDIT_SCHEMA\" --migration-role \"$VUORO_AUDIT_MIGRATION_ROLE\" --runtime-role \"$VUORO_AUDIT_RUNTIME_ROLE\""]
+          env:
+            - name: VUORO_AUDIT_MIGRATION_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: vuoro-migration-dsns
+                  key: audit
+            - name: VUORO_AUDIT_MIGRATION_ROLE
+              valueFrom:
+                secretKeyRef:
+                  name: vuoro-migration-roles
+                  key: audit-migration-role
+            - name: VUORO_AUDIT_RUNTIME_ROLE
+              valueFrom:
+                secretKeyRef:
+                  name: vuoro-runtime-roles
+                  key: audit-runtime-role
+            - name: VUORO_AUDIT_SCHEMA
+              valueFrom:
+                configMapKeyRef:
+                  name: vuoro-runtime-config
+                  key: VUORO_AUDIT_SCHEMA

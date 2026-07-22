@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vuoro-runtime-config
+data:
+  # Concrete values are owned by the appservice development and production overlays.
+  VUORO_ENVIRONMENT_NAME: REPLACE_IN_OVERLAY
+  VUORO_ENVIRONMENT_CLASS: REPLACE_IN_OVERLAY
+  VUORO_WORK_REPOSITORY_ID: REPLACE_IN_OVERLAY
+  VUORO_EXECUTION_SCHEMA: execution
+  VUORO_KNOWLEDGE_SCHEMA: knowledge
+  VUORO_AUDIT_SCHEMA: audit

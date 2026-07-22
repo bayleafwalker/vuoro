@@ -1,0 +1,10 @@
+{
+  "schema_version": "vuoro-identities/v1",
+  "identities": {
+    "replace-with-a-unique-local-development-token": {
+      "actor": "local-evaluation",
+      "environment": "vuoro-compose",
+      "authorities": ["work.read", "execution.read", "knowledge.read", "audit.read"]
+    }
+  }
+}
