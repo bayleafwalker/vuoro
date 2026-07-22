@@ -1,7 +1,7 @@
 """Pinned four-domain Vuoro service composition.
 
 The service accepts domain adapters only through the checked-in composition
-manifest.  Deployment supplies runtime DSNs and the development identity
+manifest. Deployment supplies runtime DSNs and an environment-bound identity
 registry, but cannot add, replace, or remove catalog operations.
 """
 
@@ -24,6 +24,7 @@ from vuoro_service.identity import Identity, StaticBearerIdentityResolver
 
 
 _REQUIRED_DOMAINS = frozenset({"work", "execution", "knowledge", "audit"})
+_DEPLOYABLE_ENVIRONMENT_CLASSES = frozenset({"development", "production"})
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 
@@ -118,8 +119,8 @@ def verify_adapter_artifacts(manifest: CompositionManifest, wheel_dir: Path) -> 
             raise CompositionError(f"{pin.domain}: pinned artifact checksum mismatch")
 
 
-def load_development_identities(path: Path, *, environment: str) -> StaticBearerIdentityResolver:
-    """Load opaque development bearer identities from a mounted secret file."""
+def load_identities(path: Path, *, environment: str) -> StaticBearerIdentityResolver:
+    """Load opaque environment-bound bearer identities from a mounted secret file."""
 
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -154,6 +155,12 @@ def load_development_identities(path: Path, *, environment: str) -> StaticBearer
     if not identities:
         raise CompositionError("identity registry must contain at least one identity")
     return StaticBearerIdentityResolver(identities)
+
+
+def load_development_identities(path: Path, *, environment: str) -> StaticBearerIdentityResolver:
+    """Compatibility alias for callers of the former development-only loader."""
+
+    return load_identities(path, environment=environment)
 
 
 def _runtime_env(name: str, environ: Mapping[str, str]) -> str:
@@ -216,15 +223,15 @@ def create_composed_app(
     import os
 
     environ = environ or os.environ
+    environment_name = _runtime_env("VUORO_ENVIRONMENT_NAME", environ)
+    environment_class = _runtime_env("VUORO_ENVIRONMENT_CLASS", environ)
+    if environment_class not in _DEPLOYABLE_ENVIRONMENT_CLASSES:
+        raise CompositionError("this composition requires a deployable environment class")
     manifest = CompositionManifest.load(
         manifest_path or Path(_runtime_env("VUORO_COMPOSITION_MANIFEST", environ))
     )
     verify_adapter_artifacts(manifest, wheel_dir or Path(_runtime_env("VUORO_ADAPTER_WHEEL_DIR", environ)))
-    environment_name = _runtime_env("VUORO_ENVIRONMENT_NAME", environ)
-    environment_class = _runtime_env("VUORO_ENVIRONMENT_CLASS", environ)
-    if environment_class != "development":
-        raise CompositionError("this composition is restricted to a development environment")
-    resolver = load_development_identities(
+    resolver = load_identities(
         identity_path or Path(_runtime_env("VUORO_IDENTITIES_FILE", environ)),
         environment=environment_name,
     )
@@ -289,7 +296,7 @@ def create_composed_app(
     return create_app(
         settings=ServiceSettings(
             environment_name=environment_name,
-            environment_class="development",
+            environment_class=environment_class,
             domains=domains,
             compatibility_state="compatible",
         ),
@@ -304,5 +311,6 @@ __all__ = [
     "CompositionManifest",
     "create_composed_app",
     "load_development_identities",
+    "load_identities",
     "verify_adapter_artifacts",
 ]

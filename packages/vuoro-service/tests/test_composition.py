@@ -9,7 +9,8 @@ import pytest
 from vuoro_service.composition import (
     CompositionError,
     CompositionManifest,
-    load_development_identities,
+    create_composed_app,
+    load_identities,
     verify_adapter_artifacts,
 )
 
@@ -60,6 +61,42 @@ def test_identity_registry_is_environment_bound_and_never_accepts_short_tokens(t
         ),
         encoding="utf-8",
     )
-    assert load_development_identities(path, environment="vuoro-dev")
+    assert load_identities(path, environment="vuoro-dev")
     with pytest.raises(CompositionError, match="not bound"):
-        load_development_identities(path, environment="production")
+        load_identities(path, environment="production")
+
+
+def test_identity_registry_supports_a_production_environment_binding(tmp_path: Path) -> None:
+    path = tmp_path / "identities.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "vuoro-identities/v1",
+                "identities": {
+                    "y" * 32: {
+                        "actor": "test:operator",
+                        "environment": "vuoro-shared",
+                        "authorities": ["work.read"],
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert load_identities(path, environment="vuoro-shared")
+
+
+def test_composition_allows_production_but_rejects_non_deployable_classes() -> None:
+    production = {
+        "VUORO_ENVIRONMENT_NAME": "vuoro-shared",
+        "VUORO_ENVIRONMENT_CLASS": "production",
+    }
+    with pytest.raises(CompositionError, match="VUORO_COMPOSITION_MANIFEST"):
+        create_composed_app(environ=production)
+    with pytest.raises(CompositionError, match="deployable environment class"):
+        create_composed_app(
+            environ={
+                "VUORO_ENVIRONMENT_NAME": "vuoro-recovery",
+                "VUORO_ENVIRONMENT_CLASS": "recovery",
+            }
+        )
