@@ -5,7 +5,7 @@
     "doc_id": "vuoro-served-substrate",
     "revision": "git:84ed7c2e414bf16730aa41d31c7ed466df2844fd"
   },
-  "implementation_sha": "afeda159dc7d60be591c6b05c102a7b574a7c473",
+  "implementation_sha": "7ad12fe606ae412456839ec0bf1802bd65512602",
   "depth": 2,
   "environment": {
     "backend": "local-worktree-and-published-pinned-adapter-wheels",
@@ -66,6 +66,7 @@
     "Command sequence: uv sync --all-packages --all-extras; uv build --package vuoro-client --wheel --out-dir dist/vuoro-client; uv build --package vuoro-service --wheel --out-dir dist/vuoro-service; uv run pytest; result: 30 passed.",
     "The four pinned release wheels were fetched with scripts/fetch_pinned_adapters.py and their SHA-256 values exactly matched packages/vuoro-service/composition/adapter-pins.json.",
     "Docker CLI is unavailable in this workstation, so a container build was not claimed. No Kubernetes command, cluster, deployment, endpoint, or credential was accessed.",
-    "The implementation commit was created before this evidence packet so implementation_sha identifies the tested package implementation without self-reference. Independent verification and appservice rollout remain separate gates."
+    "The implementation commit was created before this evidence packet so implementation_sha identifies the tested package implementation without self-reference. Independent verification and appservice rollout remain separate gates.",
+    "A Kustomize render review found missing knowledge migration environment arguments and an execution runtime-role grant input before publication; fix commit 7ad12fe supplies both and tests/test_deployment_assets.py plus kustomize build deploy/kustomize/base passed afterward."
   ]
 }
