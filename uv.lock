@@ -624,7 +624,7 @@ provides-extras = ["test"]
 
 [[package]]
 name = "vuoro-service"
-version = "0.1.0.dev0"
+version = "0.1.0"
 source = { editable = "packages/vuoro-service" }
 dependencies = [
     { name = "fastapi" },

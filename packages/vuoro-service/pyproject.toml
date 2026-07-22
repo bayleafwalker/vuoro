@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "vuoro-service"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Modular service runtime for Vuoro governed-work adapters"
 readme = "../../README.md"
 requires-python = ">=3.12"

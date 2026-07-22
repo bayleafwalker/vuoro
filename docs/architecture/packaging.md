@@ -23,10 +23,12 @@ Importing or starting the service does not run migrations. Domain adapters and
 their migration entrypoints will be consumed as pinned releases from the four
 owner repositories.
 
-One service image will eventually expose all commands. Image, Compose, and
-Kustomize work is intentionally deferred to the deployment-packaging item so
-this bootstrap does not couple packaging boundaries to an unreviewed runtime
-contract.
+The released service image contains the checked-in composition manifest and
+the four downloaded adapter wheels. Each wheel is checked against the
+manifest's SHA-256 before it is installed; the running process checks the same
+bundled wheels before importing an adapter. Deployment must pin the resulting
+OCI image digest. Configuration may provide runtime DSNs and an identity
+registry, but cannot change the catalog composition.
 
 ## Versioning
 

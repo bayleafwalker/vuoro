@@ -46,7 +46,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         import uvicorn
 
         uvicorn.run(
-            "vuoro_service.app:create_app",
+            "vuoro_service.composition:create_composed_app",
             factory=True,
             host=args.host,
             port=args.port,

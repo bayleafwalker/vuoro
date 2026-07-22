@@ -1,0 +1,61 @@
+{
+  "schema_version": "vuoro-composition/v1",
+  "adapters": [
+    {
+      "domain": "work",
+      "source_repository": "https://github.com/bayleafwalker/sprintctl",
+      "source_revision": "f750d63f43ad5c45426b23383737807cb57d9fdd",
+      "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/vuoro-adapter-v1-f750d63/sprintctl-0.2.0-py3-none-any.whl",
+      "artifact_sha256": "698a769422ed0a2797ee787182ab4a01df327671de4f06fa6d62a631824616e0",
+      "distribution": "sprintctl",
+      "distribution_version": "0.2.0",
+      "adapter_module": "sprintctl.vuoro_adapter",
+      "register": "register_work_catalog",
+      "migration_entrypoint": "sprintctl remote-schema migrate",
+      "api_version": "work-api/v1",
+      "schema_version": "work-schema/v1"
+    },
+    {
+      "domain": "execution",
+      "source_repository": "https://github.com/bayleafwalker/actionq",
+      "source_revision": "a50de53edac3d606b282b2577003b996269f2a35",
+      "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/vuoro-adapter-v1-a50de53/actionq-0.1.1-py3-none-any.whl",
+      "artifact_sha256": "7ab25bcc04c0e2111ae2f913b227aa8450e0d53fb2e22b41073e6f3aa4c61edd",
+      "distribution": "actionq",
+      "distribution_version": "0.1.1",
+      "adapter_module": "actionq.vuoro",
+      "register": "register_operations",
+      "migration_entrypoint": "actionctl migrate --json-output",
+      "api_version": "execution/v1",
+      "schema_version": "actionq-schema/v1"
+    },
+    {
+      "domain": "knowledge",
+      "source_repository": "https://github.com/bayleafwalker/kctl",
+      "source_revision": "c60fe3863c863e12bc30e1f4fc48f604f5ea89ae",
+      "artifact_url": "https://github.com/bayleafwalker/kctl/releases/download/vuoro-adapter-v1-c60fe38/kctl-0.1.0-py3-none-any.whl",
+      "artifact_sha256": "d4e50d3943c380cfd07acc1e3fc2a7a5d9e1b516c0875d0c7c81318c95995b5d",
+      "distribution": "kctl",
+      "distribution_version": "0.1.0",
+      "adapter_module": "kctl.vuoro",
+      "register": "register_operations",
+      "migration_entrypoint": "python -m kctl.central_schema migrate",
+      "api_version": "knowledge/v1",
+      "schema_version": "knowledge-schema/v1"
+    },
+    {
+      "domain": "audit",
+      "source_repository": "https://github.com/bayleafwalker/auditctl",
+      "source_revision": "571d9b4d609a217f0f9b3210e9045219762adcbf",
+      "artifact_url": "https://github.com/bayleafwalker/auditctl/releases/download/vuoro-adapter-v1-571d9b4/auditctl-0.1.0-py3-none-any.whl",
+      "artifact_sha256": "f103c00c72c7049571c31eda13cba9519b0e409d3f60ebd2f63cb357e8527d76",
+      "distribution": "auditctl",
+      "distribution_version": "0.1.0",
+      "adapter_module": "auditctl.vuoro_adapter",
+      "register": "VuoroAuditAdapter.register",
+      "migration_entrypoint": "auditctl-central-schema migrate",
+      "api_version": "audit/v1",
+      "schema_version": "audit-schema/v1"
+    }
+  ]
+}
