@@ -22,6 +22,9 @@ def test_base_keeps_runtime_and_migration_credentials_separate() -> None:
     assert "vuoro-migration-dsns" not in deployment
     assert "vuoro-migration-dsns" in jobs
     assert jobs.count("suspend: true") == 4
+    assert "ACTIONQ_RUNTIME_ROLE" in jobs
+    assert "--environment-name" in jobs
+    assert "--environment-class" in jobs
 
 
 def test_base_requires_an_immutable_image_replacement() -> None:

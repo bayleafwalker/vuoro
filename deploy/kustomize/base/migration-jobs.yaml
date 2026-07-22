@@ -39,7 +39,7 @@ spec:
       containers:
         - name: migrate-execution
           image: ghcr.io/bayleafwalker/vuoro-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
-          command: ["/bin/sh", "-ec", "ACTIONQ_URL=\"$VUORO_EXECUTION_MIGRATION_DSN\" ACTIONQ_SCHEMA=\"$VUORO_EXECUTION_SCHEMA\" actionctl migrate --json-output"]
+          command: ["/bin/sh", "-ec", "ACTIONQ_URL=\"$VUORO_EXECUTION_MIGRATION_DSN\" ACTIONQ_SCHEMA=\"$VUORO_EXECUTION_SCHEMA\" ACTIONQ_RUNTIME_ROLE=\"$VUORO_EXECUTION_RUNTIME_ROLE\" actionctl migrate --json-output"]
           env:
             - name: VUORO_EXECUTION_MIGRATION_DSN
               valueFrom:
@@ -51,6 +51,11 @@ spec:
                 configMapKeyRef:
                   name: vuoro-runtime-config
                   key: VUORO_EXECUTION_SCHEMA
+            - name: VUORO_EXECUTION_RUNTIME_ROLE
+              valueFrom:
+                secretKeyRef:
+                  name: vuoro-runtime-roles
+                  key: execution-runtime-role
 ---
 apiVersion: batch/v1
 kind: Job
@@ -68,7 +73,7 @@ spec:
       containers:
         - name: migrate-knowledge
           image: ghcr.io/bayleafwalker/vuoro-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
-          command: ["/bin/sh", "-ec", "python -m kctl.central_schema migrate --dsn-env VUORO_KNOWLEDGE_MIGRATION_DSN --schema \"$VUORO_KNOWLEDGE_SCHEMA\" --migration-role \"$VUORO_KNOWLEDGE_MIGRATION_ROLE\" --runtime-role \"$VUORO_KNOWLEDGE_RUNTIME_ROLE\""]
+          command: ["/bin/sh", "-ec", "python -m kctl.central_schema migrate --dsn-env VUORO_KNOWLEDGE_MIGRATION_DSN --schema \"$VUORO_KNOWLEDGE_SCHEMA\" --migration-role \"$VUORO_KNOWLEDGE_MIGRATION_ROLE\" --runtime-role \"$VUORO_KNOWLEDGE_RUNTIME_ROLE\" --environment-name \"$VUORO_ENVIRONMENT_NAME\" --environment-class \"$VUORO_ENVIRONMENT_CLASS\""]
           env:
             - name: VUORO_KNOWLEDGE_MIGRATION_DSN
               valueFrom:
@@ -90,6 +95,16 @@ spec:
                 configMapKeyRef:
                   name: vuoro-runtime-config
                   key: VUORO_KNOWLEDGE_SCHEMA
+            - name: VUORO_ENVIRONMENT_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: vuoro-runtime-config
+                  key: VUORO_ENVIRONMENT_NAME
+            - name: VUORO_ENVIRONMENT_CLASS
+              valueFrom:
+                configMapKeyRef:
+                  name: vuoro-runtime-config
+                  key: VUORO_ENVIRONMENT_CLASS
 ---
 apiVersion: batch/v1
 kind: Job
