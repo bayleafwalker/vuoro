@@ -81,6 +81,8 @@ async def test_handshake_and_etag_catalog_contract() -> None:
         assert handshake["environment"] == {
             "name": "vuoro-dev",
             "environment_class": "development",
+            "constraints": [],
+            "runbook_refs": [],
         }
         assert handshake["client_protocol"] == {"minimum": 1, "maximum": 1}
         assert handshake["catalog_revision"] == registry.revision

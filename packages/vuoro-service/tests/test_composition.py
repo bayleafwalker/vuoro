@@ -100,3 +100,30 @@ def test_composition_allows_production_but_rejects_non_deployable_classes() -> N
                 "VUORO_ENVIRONMENT_CLASS": "recovery",
             }
         )
+
+
+def test_composition_rejects_environment_record_class_mismatch(tmp_path: Path) -> None:
+    record_path = tmp_path / "record.json"
+    record_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "environment-record/v1",
+                "id": "vuoro-shared",
+                "environment_class": "development",
+                "revision": 1,
+                "roles": [],
+                "constraints": [],
+                "capabilities": [],
+                "runbook_refs": [],
+                "identity_bindings": [],
+            }
+        )
+    )
+    with pytest.raises(CompositionError, match="does not match"):
+        create_composed_app(
+            environ={
+                "VUORO_ENVIRONMENT_NAME": "vuoro-shared",
+                "VUORO_ENVIRONMENT_CLASS": "production",
+                "VUORO_ENVIRONMENT_RECORD_PATH": str(record_path),
+            }
+        )

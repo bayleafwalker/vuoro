@@ -20,6 +20,7 @@ from typing import Any, Callable
 from vuoro_service.app import ServiceSettings, create_app
 from vuoro_service.catalog import CatalogRegistry
 from vuoro_service.contracts import DomainCompatibility
+from vuoro_service.environment_record import load_environment_record
 from vuoro_service.identity import Identity, StaticBearerIdentityResolver
 
 
@@ -227,6 +228,20 @@ def create_composed_app(
     environment_class = _runtime_env("VUORO_ENVIRONMENT_CLASS", environ)
     if environment_class not in _DEPLOYABLE_ENVIRONMENT_CLASSES:
         raise CompositionError("this composition requires a deployable environment class")
+
+    environment_constraints: tuple[str, ...] = ()
+    environment_runbook_refs: tuple[str, ...] = ()
+    environment_record_path = environ.get("VUORO_ENVIRONMENT_RECORD_PATH")
+    if environment_record_path:
+        record = load_environment_record(Path(environment_record_path))
+        if record.environment_class != environment_class:
+            raise CompositionError(
+                "environment record environment_class "
+                f"{record.environment_class!r} does not match "
+                f"VUORO_ENVIRONMENT_CLASS {environment_class!r}"
+            )
+        environment_constraints = record.constraints
+        environment_runbook_refs = record.runbook_refs
     manifest = CompositionManifest.load(
         manifest_path or Path(_runtime_env("VUORO_COMPOSITION_MANIFEST", environ))
     )
@@ -297,6 +312,8 @@ def create_composed_app(
         settings=ServiceSettings(
             environment_name=environment_name,
             environment_class=environment_class,
+            environment_constraints=environment_constraints,
+            environment_runbook_refs=environment_runbook_refs,
             domains=domains,
             compatibility_state="compatible",
         ),

@@ -50,6 +50,8 @@ class ServiceSettings:
     environment_class: Literal["local", "development", "production", "recovery"] = (
         "local"
     )
+    environment_constraints: tuple[str, ...] = ()
+    environment_runbook_refs: tuple[str, ...] = ()
     api_versions: Mapping[str, str] = field(
         default_factory=lambda: {"meta": "v1", "catalog": "v1", "invoke": "v1"}
     )
@@ -179,6 +181,8 @@ def create_app(
             environment=EnvironmentMetadata(
                 name=settings.environment_name,
                 environment_class=settings.environment_class,
+                constraints=list(settings.environment_constraints),
+                runbook_refs=list(settings.environment_runbook_refs),
             ),
             service_version=__version__,
             api_versions=dict(settings.api_versions),

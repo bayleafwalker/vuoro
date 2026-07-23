@@ -24,6 +24,8 @@ class ClientProtocolRange(StrictModel):
 class EnvironmentMetadata(StrictModel):
     name: str = Field(min_length=1)
     environment_class: Literal["local", "development", "production", "recovery"]
+    constraints: list[str] = Field(default_factory=list)
+    runbook_refs: list[str] = Field(default_factory=list)
 
 
 class DomainCompatibility(StrictModel):

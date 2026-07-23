@@ -53,6 +53,9 @@ class AsyncVuoroClient:
         self._catalog: dict[str, Any] | None = None
         self._catalog_etag: str | None = None
         self.active_environment: str | None = None
+        self.active_environment_class: str | None = None
+        self.active_environment_constraints: tuple[str, ...] = ()
+        self.active_environment_runbook_refs: tuple[str, ...] = ()
         self.invocation_schema_versions: list[str] = ["invocation/v1"]
 
     async def __aenter__(self) -> AsyncVuoroClient:
@@ -94,10 +97,33 @@ class AsyncVuoroClient:
                 f"profile expects environment {self.profile.expected_environment!r}, got {environment!r}"
             )
         self.active_environment = environment
+        self.active_environment_class = handshake["environment"]["environment_class"]
+        self.active_environment_constraints = tuple(
+            handshake["environment"].get("constraints", [])
+        )
+        self.active_environment_runbook_refs = tuple(
+            handshake["environment"].get("runbook_refs", [])
+        )
         self.invocation_schema_versions = handshake.get(
             "invocation_schema_versions", ["invocation/v1"]
         )
         return handshake
+
+    def describe_active_environment(self) -> str:
+        """Render the currently active environment for display in a session.
+
+        Must be called after `handshake()`. Only surfaces the bounded,
+        non-secret fields the service chooses to serve.
+        """
+        if self.active_environment is None:
+            raise RuntimeError("describe_active_environment() called before handshake()")
+        lines = [f"environment: {self.active_environment} ({self.active_environment_class})"]
+        if self.active_environment_constraints:
+            lines.append("constraints: " + ", ".join(self.active_environment_constraints))
+        if self.active_environment_runbook_refs:
+            lines.append("runbook refs:")
+            lines.extend(f"  - {ref}" for ref in self.active_environment_runbook_refs)
+        return "\n".join(lines)
 
     async def catalog(self, *, force_refresh: bool = False) -> dict[str, Any]:
         headers = self._headers(authenticated=False)
