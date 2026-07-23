@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+_TRANSIENT_CREDENTIAL_KEY = re.compile(r"^sha256:[0-9a-f]{64}$")
+MAX_TRANSIENT_CREDENTIALS = 8
 
 
 class ClientProtocolRange(StrictModel):
@@ -39,6 +44,9 @@ class HandshakeResponse(StrictModel):
     service_version: str
     api_versions: dict[str, str]
     schema_versions: dict[str, str]
+    invocation_schema_versions: list[str] = Field(
+        default_factory=lambda: ["invocation/v1"]
+    )
     client_protocol: ClientProtocolRange
     catalog_revision: str
     compatibility: CompatibilityState
@@ -78,6 +86,48 @@ class InvocationRequest(StrictModel):
     catalog_revision: str | None = None
     basis_revision: str | None = Field(default=None, min_length=1, max_length=256)
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=256)
+
+
+class InvocationRequestV2(StrictModel):
+    """Additive invocation envelope carrying transient, out-of-band credentials.
+
+    ``transient_credentials`` is a transport facility, not a work-domain
+    argument: keys are non-secret ``sha256:<64-lowercase-hex>`` references and
+    values are the proof strings they resolve to. The service passes bindings
+    through the in-memory invocation context only; they are never persisted,
+    cataloged, or logged.
+    """
+
+    schema_version: Literal["invocation/v2"] = "invocation/v2"
+    request_id: str = Field(min_length=1, max_length=256)
+    operation: str = Field(min_length=1)
+    arguments: Any
+    catalog_revision: str | None = None
+    basis_revision: str | None = Field(default=None, min_length=1, max_length=256)
+    idempotency_key: str | None = Field(default=None, min_length=1, max_length=256)
+    transient_credentials: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("transient_credentials")
+    @classmethod
+    def _validate_transient_credentials(
+        cls, value: dict[str, str]
+    ) -> dict[str, str]:
+        if len(value) > MAX_TRANSIENT_CREDENTIALS:
+            raise ValueError(
+                "transient_credentials accepts at most "
+                f"{MAX_TRANSIENT_CREDENTIALS} bindings"
+            )
+        for key, binding_value in value.items():
+            if not _TRANSIENT_CREDENTIAL_KEY.fullmatch(key):
+                raise ValueError(
+                    "transient_credentials key must match "
+                    f"sha256:<64-lowercase-hex>: {key!r}"
+                )
+            if not isinstance(binding_value, str) or not binding_value:
+                raise ValueError(
+                    f"transient_credentials value for {key!r} must be a non-empty string"
+                )
+        return value
 
 
 class InvocationError(StrictModel):

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 from uuid import uuid4
@@ -53,6 +53,7 @@ class AsyncVuoroClient:
         self._catalog: dict[str, Any] | None = None
         self._catalog_etag: str | None = None
         self.active_environment: str | None = None
+        self.invocation_schema_versions: list[str] = ["invocation/v1"]
 
     async def __aenter__(self) -> AsyncVuoroClient:
         return self
@@ -93,6 +94,9 @@ class AsyncVuoroClient:
                 f"profile expects environment {self.profile.expected_environment!r}, got {environment!r}"
             )
         self.active_environment = environment
+        self.invocation_schema_versions = handshake.get(
+            "invocation_schema_versions", ["invocation/v1"]
+        )
         return handshake
 
     async def catalog(self, *, force_refresh: bool = False) -> dict[str, Any]:
@@ -152,20 +156,69 @@ class AsyncVuoroClient:
         request_id: str | None = None,
         basis_revision: str | None = None,
         idempotency_key: str | None = None,
+        transient_credentials: Mapping[str, str] | None = None,
     ) -> Any:
+        if not transient_credentials:
+            catalog, operation = await self._operation(operation_name)
+            Draft202012Validator(operation["input_schema"]).validate(arguments)
+            response = await self._http.post(
+                "/api/invoke/v1",
+                headers=self._headers(authenticated=True),
+                json={
+                    "schema_version": "invocation/v1",
+                    "request_id": request_id or str(uuid4()),
+                    "operation": operation_name,
+                    "arguments": arguments,
+                    "catalog_revision": catalog["revision"],
+                    "basis_revision": basis_revision,
+                    "idempotency_key": idempotency_key,
+                },
+            )
+            envelope = response.json()
+            if (
+                response.status_code == 409
+                and envelope.get("error", {}).get("code") == "stale-catalog"
+            ):
+                self._catalog = None
+                self._catalog_etag = None
+            if response.status_code == 426:
+                raise ClientIncompatibleError(envelope["error"]["message"])
+            if response.is_error or envelope.get("status") != "accepted":
+                error = envelope.get("error") or {
+                    "code": "transport-error",
+                    "message": response.text,
+                }
+                raise InvocationRejectedError(
+                    error["code"],
+                    error["message"],
+                    status_code=response.status_code,
+                )
+            Draft202012Validator(operation["result_schema"]).validate(
+                envelope["result"]
+            )
+            return envelope["result"]
+
+        if self.active_environment is None:
+            await self.handshake()
+        if "invocation/v2" not in self.invocation_schema_versions:
+            raise ClientIncompatibleError(
+                "server does not advertise invocation/v2; transient credentials "
+                "cannot be transported"
+            )
         catalog, operation = await self._operation(operation_name)
         Draft202012Validator(operation["input_schema"]).validate(arguments)
         response = await self._http.post(
-            "/api/invoke/v1",
+            "/api/invoke/v2",
             headers=self._headers(authenticated=True),
             json={
-                "schema_version": "invocation/v1",
+                "schema_version": "invocation/v2",
                 "request_id": request_id or str(uuid4()),
                 "operation": operation_name,
                 "arguments": arguments,
                 "catalog_revision": catalog["revision"],
                 "basis_revision": basis_revision,
                 "idempotency_key": idempotency_key,
+                "transient_credentials": dict(transient_credentials),
             },
         )
         envelope = response.json()
