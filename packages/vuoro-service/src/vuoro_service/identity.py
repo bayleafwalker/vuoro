@@ -14,6 +14,7 @@ class Identity:
     actor: str
     environment: str
     authorities: frozenset[str] = frozenset()
+    repo_id: str = ""
 
 
 class TransientCredentials:

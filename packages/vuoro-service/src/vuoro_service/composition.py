@@ -135,23 +135,32 @@ def load_identities(path: Path, *, environment: str) -> StaticBearerIdentityReso
     for token, identity in raw["identities"].items():
         if not isinstance(token, str) or len(token) < 32 or not isinstance(identity, dict):
             raise CompositionError("identity registry contains an invalid identity")
-        if set(identity) != {"actor", "environment", "authorities"}:
+        allowed_fields = {"actor", "environment", "authorities", "repo_id"}
+        required_fields = {"actor", "environment", "authorities"}
+        if not required_fields <= set(identity) <= allowed_fields:
             raise CompositionError("identity registry contains unsupported identity fields")
         actor = identity["actor"]
         bound_environment = identity["environment"]
         authorities = identity["authorities"]
+        repo_id = identity.get("repo_id", "")
         if (
             not isinstance(actor, str)
             or not actor
             or bound_environment != environment
             or not isinstance(authorities, list)
             or not all(isinstance(authority, str) and authority for authority in authorities)
+            or not isinstance(repo_id, str)
         ):
             raise CompositionError("identity registry is not bound to this environment")
+        if any(authority.startswith("work:") for authority in authorities) and not repo_id:
+            raise CompositionError(
+                "identity registry entries with a work: authority must set repo_id"
+            )
         identities[token] = Identity(
             actor=actor,
             environment=bound_environment,
             authorities=frozenset(authorities),
+            repo_id=repo_id,
         )
     if not identities:
         raise CompositionError("identity registry must contain at least one identity")
@@ -257,6 +266,11 @@ def create_composed_app(
     from sprintctl import pg_migrations as work_migrations
     from sprintctl.application import WorkApplication
 
+    # VUORO_WORK_REPOSITORY_ID only seeds this template instance; every served
+    # invocation re-scopes to the calling identity's own repo_id (sprintctl
+    # WorkApplication.invoke / _scoped_for), so this application can serve
+    # every repository tenant a bound identity is authorized for -- not only
+    # this one.
     work_store = work_pg.get_connection(_runtime_env("VUORO_WORK_RUNTIME_DSN", environ))
     work_store.repo_id = _runtime_env("VUORO_WORK_REPOSITORY_ID", environ)
     work_application = WorkApplication.postgres(work_store)
