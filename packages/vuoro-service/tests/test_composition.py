@@ -86,6 +86,50 @@ def test_identity_registry_supports_a_production_environment_binding(tmp_path: P
     assert load_identities(path, environment="vuoro-shared")
 
 
+def test_identity_registry_requires_repo_id_for_work_authorities(tmp_path: Path) -> None:
+    path = tmp_path / "identities.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "vuoro-identities/v1",
+                "identities": {
+                    "z" * 32: {
+                        "actor": "test:worker",
+                        "environment": "vuoro-dev",
+                        "authorities": ["work:read"],
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(CompositionError, match="repo_id"):
+        load_identities(path, environment="vuoro-dev")
+
+
+def test_identity_registry_scopes_a_work_authority_to_its_repo_id(tmp_path: Path) -> None:
+    path = tmp_path / "identities.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "vuoro-identities/v1",
+                "identities": {
+                    "z" * 32: {
+                        "actor": "test:worker",
+                        "environment": "vuoro-dev",
+                        "authorities": ["work:read"],
+                        "repo_id": "sprintctl",
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    resolver = load_identities(path, environment="vuoro-dev")
+    identity = resolver._identities["z" * 32]
+    assert identity.repo_id == "sprintctl"
+
+
 def test_composition_allows_production_but_rejects_non_deployable_classes() -> None:
     production = {
         "VUORO_ENVIRONMENT_NAME": "vuoro-shared",
