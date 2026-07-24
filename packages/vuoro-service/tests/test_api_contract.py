@@ -322,3 +322,182 @@ async def test_invocation_context_contains_transport_and_idempotency_metadata() 
     assert observed.catalog_revision == registry.revision
     assert observed.idempotency_requirement == "required"
     assert observed.idempotency_key == "transition-8"
+
+
+def _repo_scoped_service(handler=None) -> tuple[CatalogRegistry, object]:
+    registry = CatalogRegistry()
+    registry.register(
+        OperationDefinition(
+            name="work.pilot.transition",
+            owning_domain="work",
+            input_schema={
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "required": ["value"],
+                "properties": {"value": {"type": "integer"}},
+                "additionalProperties": False,
+            },
+            result_schema={
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "required": ["accepted"],
+                "properties": {"accepted": {"type": "integer"}},
+                "additionalProperties": False,
+            },
+            required_authority="work.transition",
+            execution_semantics="write",
+            idempotency="required",
+            repo_scoped=True,
+        ),
+        handler or (lambda arguments, context: {"accepted": arguments["value"]}),
+    )
+    settings = ServiceSettings(
+        environment_name="vuoro-dev",
+        environment_class="development",
+        compatibility_state="compatible",
+        domains={
+            "work": DomainCompatibility(
+                api_version="work/v1",
+                schema_version="work-schema/1",
+                state="compatible",
+            )
+        },
+    )
+    resolver = StaticBearerIdentityResolver(
+        {
+            "scoped-token": Identity(
+                actor="human:developer",
+                environment="vuoro-dev",
+                authorities=frozenset({"work.transition"}),
+                repo_ids=frozenset({"sprintctl"}),
+            ),
+            "wildcard-token": Identity(
+                actor="human:operator",
+                environment="vuoro-dev",
+                authorities=frozenset({"work.transition"}),
+                repo_ids=frozenset({"*"}),
+            ),
+        }
+    )
+    return registry, create_app(
+        settings=settings, registry=registry, identity_resolver=resolver
+    )
+
+
+@pytest.mark.anyio
+async def test_repo_scoped_operation_rejects_a_missing_repo_id() -> None:
+    registry, app = _repo_scoped_service()
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/api/invoke/v1",
+            headers={
+                "X-Vuoro-Client-Protocol": "1",
+                "Authorization": "Bearer scoped-token",
+            },
+            json={
+                "schema_version": "invocation/v1",
+                "request_id": "req-1",
+                "operation": "work.pilot.transition",
+                "arguments": {"value": 1},
+                "catalog_revision": registry.revision,
+                "idempotency_key": "req-1",
+            },
+        )
+    assert response.status_code == 400
+    body = response.json()
+    assert body["error"]["code"] == "repo-id-required"
+
+
+@pytest.mark.anyio
+async def test_repo_scoped_operation_rejects_an_unauthorized_repo_id() -> None:
+    registry, app = _repo_scoped_service()
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/api/invoke/v1",
+            headers={
+                "X-Vuoro-Client-Protocol": "1",
+                "Authorization": "Bearer scoped-token",
+            },
+            json={
+                "schema_version": "invocation/v1",
+                "request_id": "req-2",
+                "operation": "work.pilot.transition",
+                "arguments": {"value": 1},
+                "catalog_revision": registry.revision,
+                "idempotency_key": "req-2",
+                "repo_id": "some-other-repo",
+            },
+        )
+    assert response.status_code == 403
+    body = response.json()
+    assert body["error"]["code"] == "repo-unauthorized"
+
+
+@pytest.mark.anyio
+async def test_repo_scoped_operation_passes_repo_id_through_to_the_handler() -> None:
+    observed = None
+
+    def handler(arguments, context):
+        nonlocal observed
+        observed = context.repo_id
+        return {"accepted": arguments["value"]}
+
+    registry, app = _repo_scoped_service(handler)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/api/invoke/v1",
+            headers={
+                "X-Vuoro-Client-Protocol": "1",
+                "Authorization": "Bearer scoped-token",
+            },
+            json={
+                "schema_version": "invocation/v1",
+                "request_id": "req-3",
+                "operation": "work.pilot.transition",
+                "arguments": {"value": 1},
+                "catalog_revision": registry.revision,
+                "idempotency_key": "req-3",
+                "repo_id": "sprintctl",
+            },
+        )
+    assert response.status_code == 200
+    assert observed == "sprintctl"
+
+
+@pytest.mark.anyio
+async def test_repo_scoped_operation_honors_the_wildcard_authorization() -> None:
+    observed = None
+
+    def handler(arguments, context):
+        nonlocal observed
+        observed = context.repo_id
+        return {"accepted": arguments["value"]}
+
+    registry, app = _repo_scoped_service(handler)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/api/invoke/v1",
+            headers={
+                "X-Vuoro-Client-Protocol": "1",
+                "Authorization": "Bearer wildcard-token",
+            },
+            json={
+                "schema_version": "invocation/v1",
+                "request_id": "req-4",
+                "operation": "work.pilot.transition",
+                "arguments": {"value": 1},
+                "catalog_revision": registry.revision,
+                "idempotency_key": "req-4",
+                "repo_id": "any-repo-at-all",
+            },
+        )
+    assert response.status_code == 200
+    assert observed == "any-repo-at-all"

@@ -86,7 +86,7 @@ def test_identity_registry_supports_a_production_environment_binding(tmp_path: P
     assert load_identities(path, environment="vuoro-shared")
 
 
-def test_identity_registry_requires_repo_id_for_work_authorities(tmp_path: Path) -> None:
+def test_identity_registry_requires_repo_ids_for_work_authorities(tmp_path: Path) -> None:
     path = tmp_path / "identities.json"
     path.write_text(
         json.dumps(
@@ -103,11 +103,13 @@ def test_identity_registry_requires_repo_id_for_work_authorities(tmp_path: Path)
         ),
         encoding="utf-8",
     )
-    with pytest.raises(CompositionError, match="repo_id"):
+    with pytest.raises(CompositionError, match="repo_ids"):
         load_identities(path, environment="vuoro-dev")
 
 
-def test_identity_registry_scopes_a_work_authority_to_its_repo_id(tmp_path: Path) -> None:
+def test_identity_registry_authorizes_explicit_repos_and_the_wildcard(
+    tmp_path: Path,
+) -> None:
     path = tmp_path / "identities.json"
     path.write_text(
         json.dumps(
@@ -118,16 +120,28 @@ def test_identity_registry_scopes_a_work_authority_to_its_repo_id(tmp_path: Path
                         "actor": "test:worker",
                         "environment": "vuoro-dev",
                         "authorities": ["work:read"],
-                        "repo_id": "sprintctl",
-                    }
+                        "repo_ids": ["sprintctl", "agentops"],
+                    },
+                    "y" * 32: {
+                        "actor": "test:host",
+                        "environment": "vuoro-dev",
+                        "authorities": ["work:read"],
+                        "repo_ids": ["*"],
+                    },
                 },
             }
         ),
         encoding="utf-8",
     )
     resolver = load_identities(path, environment="vuoro-dev")
-    identity = resolver._identities["z" * 32]
-    assert identity.repo_id == "sprintctl"
+    scoped = resolver._identities["z" * 32]
+    assert scoped.repo_ids == frozenset({"sprintctl", "agentops"})
+    assert scoped.authorizes_repo("sprintctl") is True
+    assert scoped.authorizes_repo("box") is False
+
+    wildcard = resolver._identities["y" * 32]
+    assert wildcard.authorizes_repo("sprintctl") is True
+    assert wildcard.authorizes_repo("literally-anything") is True
 
 
 def test_composition_allows_production_but_rejects_non_deployable_classes() -> None:

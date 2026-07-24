@@ -9,12 +9,21 @@ from typing import Literal
 from fastapi import Request
 
 
+#: An identity's ``repo_ids`` containing this sentinel is authorized for
+#: every repository, not an enumerated set. Matches how the two production
+#: identities today are bound to a host, not a single repository.
+ALL_REPOS = "*"
+
+
 @dataclass(frozen=True)
 class Identity:
     actor: str
     environment: str
     authorities: frozenset[str] = frozenset()
-    repo_id: str = ""
+    repo_ids: frozenset[str] = frozenset()
+
+    def authorizes_repo(self, repo_id: str) -> bool:
+        return ALL_REPOS in self.repo_ids or repo_id in self.repo_ids
 
 
 class TransientCredentials:
@@ -65,6 +74,10 @@ class InvocationContext:
     catalog_revision: str
     idempotency_requirement: Literal["not-allowed", "optional", "required"]
     idempotency_key: str | None
+    # Client-supplied, not identity-bound: the repository this invocation
+    # targets. The identity only authorizes it (Identity.authorizes_repo);
+    # it does not dictate it. None for operations outside the work domain.
+    repo_id: str | None = None
     transient_credentials: TransientCredentials = field(
         default_factory=TransientCredentials.empty
     )

@@ -232,6 +232,7 @@ def create_app(
         catalog_revision: str | None,
         basis_revision: str | None,
         idempotency_key: str | None,
+        repo_id: str | None,
         transient_credentials: TransientCredentials,
     ) -> JSONResponse:
         revision = registry.revision
@@ -322,6 +323,27 @@ def create_app(
                 error_message="operation does not accept an idempotency key",
                 http_status=400,
             )
+        if operation.definition.repo_scoped:
+            if not repo_id:
+                return _invocation_response(
+                    request_id=request_id,
+                    operation=operation_name,
+                    revision=revision,
+                    status="rejected",
+                    error_code="repo-id-required",
+                    error_message="work operations require repo_id",
+                    http_status=400,
+                )
+            if not identity.authorizes_repo(repo_id):
+                return _invocation_response(
+                    request_id=request_id,
+                    operation=operation_name,
+                    revision=revision,
+                    status="rejected",
+                    error_code="repo-unauthorized",
+                    error_message="identity is not authorized for this repo_id",
+                    http_status=403,
+                )
         try:
             result = await registry.invoke(
                 operation,
@@ -333,6 +355,7 @@ def create_app(
                     catalog_revision=revision,
                     idempotency_requirement=operation.definition.idempotency,
                     idempotency_key=idempotency_key,
+                    repo_id=repo_id,
                     transient_credentials=transient_credentials,
                 ),
             )
@@ -398,6 +421,7 @@ def create_app(
             catalog_revision=invocation.catalog_revision,
             basis_revision=invocation.basis_revision,
             idempotency_key=invocation.idempotency_key,
+            repo_id=invocation.repo_id,
             transient_credentials=TransientCredentials.empty(),
         )
 
@@ -413,6 +437,7 @@ def create_app(
             catalog_revision=invocation.catalog_revision,
             basis_revision=invocation.basis_revision,
             idempotency_key=invocation.idempotency_key,
+            repo_id=invocation.repo_id,
             transient_credentials=TransientCredentials(invocation.transient_credentials),
         )
 

@@ -182,6 +182,7 @@ class AsyncVuoroClient:
         request_id: str | None = None,
         basis_revision: str | None = None,
         idempotency_key: str | None = None,
+        repo_id: str | None = None,
         transient_credentials: Mapping[str, str] | None = None,
     ) -> Any:
         if not transient_credentials:
@@ -198,6 +199,7 @@ class AsyncVuoroClient:
                     "catalog_revision": catalog["revision"],
                     "basis_revision": basis_revision,
                     "idempotency_key": idempotency_key,
+                    "repo_id": repo_id,
                 },
             )
             envelope = response.json()
@@ -244,6 +246,7 @@ class AsyncVuoroClient:
                 "catalog_revision": catalog["revision"],
                 "basis_revision": basis_revision,
                 "idempotency_key": idempotency_key,
+                "repo_id": repo_id,
                 "transient_credentials": dict(transient_credentials),
             },
         )
