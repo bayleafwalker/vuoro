@@ -68,6 +68,12 @@ class OperationDefinition(StrictModel):
     required_authority: str | None = None
     execution_semantics: Literal["read", "write", "enqueue", "admin"]
     idempotency: Literal["not-allowed", "optional", "required"]
+    # True for an operation whose result depends on which repository it
+    # targets (e.g. sprintctl's work.* catalog): the caller must supply
+    # repo_id in the invocation envelope, and the identity must authorize it
+    # (Identity.authorizes_repo). False for operations with no repository
+    # concept at all (execution/knowledge/audit domains today).
+    repo_scoped: bool = False
     deprecation: DeprecationMetadata = Field(default_factory=DeprecationMetadata)
     required_client_schema_features: list[str] = Field(
         default_factory=lambda: ["json-schema-draft-2020-12"]
@@ -88,6 +94,7 @@ class InvocationRequest(StrictModel):
     catalog_revision: str | None = None
     basis_revision: str | None = Field(default=None, min_length=1, max_length=256)
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=256)
+    repo_id: str | None = Field(default=None, min_length=1, max_length=256)
 
 
 class InvocationRequestV2(StrictModel):
@@ -107,6 +114,7 @@ class InvocationRequestV2(StrictModel):
     catalog_revision: str | None = None
     basis_revision: str | None = Field(default=None, min_length=1, max_length=256)
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=256)
+    repo_id: str | None = Field(default=None, min_length=1, max_length=256)
     transient_credentials: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("transient_credentials")
