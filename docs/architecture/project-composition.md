@@ -1,7 +1,8 @@
 # Served project composition boundary
 
-Status: source contract prepared; no project aggregate is enabled in a shipped
-Vuoro service image.
+Status: release composition prepared. The checked-in composition pins the
+canonical Agentops project binding at an immutable source revision and enables
+the released Sprintctl project aggregates after normal release verification.
 
 `project.toml` remains canonical in the project home repository. Vuoro must
 not discover a caller's checkout, derived project folder, or local
@@ -49,17 +50,10 @@ structured rejection. Keeping the component independent of an editable domain
 checkout is deliberate: Vuoro tests must exercise the release composition,
 not accidentally import a sibling source tree.
 
-## Required owner and operator changes
+## Release implementation
 
-The pinned Sprintctl adapter currently has only `work.project.next-work`, and
-its contracts contain no `project_id` selector. A future adapter must own the
-input/result schemas for `work.project.context` and `work.project.sprints`,
-including an explicit `project_id` selector when more than one binding can be
-present. It must prove the registered handlers call the composed, guarded
-project application and preserve declared member order.
-
-After that owner release is available, a Vuoro maintainer may add the reviewed
-projection to the immutable composition and test the released wheel. That is a
-new source/release artifact decision. An operator separately reviews any
-identity expansion, image pin, Appservice configuration, deployment, and live
-four-domain validation. This change intentionally makes none of those changes.
+The composition contains exactly one reviewed binding and creates a distinct
+repo-scoped Sprintctl application for each declared member. The released work
+adapter owns `work.project.context` and `work.project.sprints`; Vuoro supplies
+the guarded application and immutable provenance only. Adding another binding
+requires an owner contract with an explicit project selector and a new release.

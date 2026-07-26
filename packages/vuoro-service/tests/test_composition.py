@@ -13,6 +13,7 @@ from vuoro_service.composition import (
     load_identities,
     verify_adapter_artifacts,
 )
+from vuoro_service.project_binding import load_project_bindings
 
 
 ROOT = Path(__file__).parents[1]
@@ -23,6 +24,21 @@ def test_checked_in_manifest_pins_all_four_domains() -> None:
     assert {pin.domain for pin in manifest.adapters} == {"work", "execution", "knowledge", "audit"}
     assert all(len(pin.source_revision) == 40 for pin in manifest.adapters)
     assert all(len(pin.artifact_sha256) == 64 for pin in manifest.adapters)
+
+
+def test_checked_in_project_binding_is_immutable_and_canonical() -> None:
+    raw = json.loads(
+        (ROOT / "composition" / "project-bindings.json").read_text(encoding="utf-8")
+    )
+    bindings = load_project_bindings(raw)
+    assert len(bindings) == 1
+    binding = bindings[0]
+    assert binding.project_id == "981b2073-d7af-4c28-bff3-3cf807495fba"
+    assert binding.repo_ids == (
+        "agentops", "vuoro", "sprintctl", "kctl", "actionq"
+    )
+    assert binding.source_revision == "8ea94af795862da34e718b1fcc08644d43756205"
+    assert binding.source_sha256 == "7ff7c4022017d427ee1e6de648b72aaef2d71056e8abef8042cd22e517da1870"
 
 
 def test_artifact_verification_fails_closed_on_mismatch(tmp_path: Path) -> None:

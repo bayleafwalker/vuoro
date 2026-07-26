@@ -1,0 +1,20 @@
+{
+  "schema_version": "vuoro-project-bindings/v1",
+  "bindings": [
+    {
+      "project_id": "981b2073-d7af-4c28-bff3-3cf807495fba",
+      "home_repo": "agentops",
+      "members": [
+        {"repo_id": "agentops"},
+        {"repo_id": "vuoro"},
+        {"repo_id": "sprintctl"},
+        {"repo_id": "kctl"},
+        {"repo_id": "actionq"}
+      ],
+      "source_repository": "https://github.com/bayleafwalker/agentops",
+      "source_revision": "8ea94af795862da34e718b1fcc08644d43756205",
+      "source_path": "project.toml",
+      "source_sha256": "7ff7c4022017d427ee1e6de648b72aaef2d71056e8abef8042cd22e517da1870"
+    }
+  ]
+}

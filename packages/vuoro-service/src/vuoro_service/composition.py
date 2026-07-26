@@ -22,6 +22,12 @@ from vuoro_service.catalog import CatalogRegistry
 from vuoro_service.contracts import DomainCompatibility
 from vuoro_service.environment_record import load_environment_record
 from vuoro_service.identity import Identity, StaticBearerIdentityResolver
+from vuoro_service.project_binding import (
+    ProjectAuthorizationError,
+    ProjectBindingError,
+    compose_authorized_project_application,
+    load_project_bindings,
+)
 
 
 _REQUIRED_DOMAINS = frozenset({"work", "execution", "knowledge", "audit"})
@@ -227,6 +233,7 @@ def create_composed_app(
     manifest_path: Path | None = None,
     wheel_dir: Path | None = None,
     identity_path: Path | None = None,
+    project_bindings_path: Path | None = None,
     environ: Mapping[str, str] | None = None,
 ):
     """Create the only deployable service application: the pinned composition."""
@@ -265,7 +272,12 @@ def create_composed_app(
     work_pin = manifest.pin("work")
     from sprintctl import pg as work_pg
     from sprintctl import pg_migrations as work_migrations
-    from sprintctl.application import WorkApplication
+    from sprintctl.application import (
+        ApplicationRejection,
+        ProjectMemberApplication,
+        ProjectWorkApplication,
+        WorkApplication,
+    )
 
     # VUORO_WORK_REPOSITORY_ID only seeds this template instance; every served
     # invocation re-scopes to the client-supplied, identity-authorized
@@ -277,7 +289,62 @@ def create_composed_app(
     work_store = work_pg.get_connection(_runtime_env("VUORO_WORK_RUNTIME_DSN", environ))
     work_store.repo_id = _runtime_env("VUORO_WORK_REPOSITORY_ID", environ)
     work_application = WorkApplication.postgres(work_store)
-    _load_function(work_pin)(registry, work_application)
+    bindings_path = project_bindings_path or Path(
+        "/opt/vuoro/composition/project-bindings.json"
+    )
+    try:
+        bindings_raw = json.loads(bindings_path.read_text(encoding="utf-8"))
+        project_bindings = load_project_bindings(bindings_raw)
+    except (OSError, json.JSONDecodeError, ProjectBindingError) as error:
+        raise CompositionError("cannot load immutable project bindings") from error
+    if len(project_bindings) != 1:
+        raise CompositionError("this release must contain exactly one project binding")
+    project_binding = project_bindings[0]
+    work_dsn = _runtime_env("VUORO_WORK_RUNTIME_DSN", environ)
+
+    def make_member_application(repo_id: str) -> WorkApplication:
+        member_store = work_pg.get_connection(work_dsn)
+        member_store.repo_id = repo_id
+        return WorkApplication.postgres(member_store)
+
+    def make_project_application(
+        project_id: str, members: tuple[tuple[str, WorkApplication], ...]
+    ) -> ProjectWorkApplication:
+        return ProjectWorkApplication(
+            project_id,
+            tuple(
+                ProjectMemberApplication(origin_repo, application)
+                for origin_repo, application in members
+            ),
+            canonical_binding={
+                "project_id": project_binding.project_id,
+                "home_repo": project_binding.home_repo,
+                "backlog_repos": list(project_binding.repo_ids),
+                "source_repository": project_binding.source_repository,
+                "source_revision": project_binding.source_revision,
+                "source_path": project_binding.source_path,
+                "source_sha256": project_binding.source_sha256,
+            },
+        )
+
+    guarded_project_application = compose_authorized_project_application(
+        project_binding,
+        make_member_application=make_member_application,
+        make_project_application=make_project_application,
+    )
+
+    class ProjectApplicationBridge:
+        def invoke(self, operation: str, arguments: Mapping[str, Any], context: Any):
+            try:
+                return guarded_project_application.invoke(operation, arguments, context)
+            except ProjectAuthorizationError as error:
+                raise ApplicationRejection(
+                    "project-repo-unauthorized", str(error), 403
+                ) from error
+
+    _load_function(work_pin)(
+        registry, work_application, project_application=ProjectApplicationBridge()
+    )
     work_state = _compatibility("work", work_migrations.compatibility_handshake(work_store), work_pin)
 
     execution_pin = manifest.pin("execution")

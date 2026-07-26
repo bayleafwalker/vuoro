@@ -9,6 +9,7 @@ WORKDIR /srv/vuoro
 
 COPY scripts/fetch_pinned_adapters.py /usr/local/bin/fetch-pinned-adapters
 COPY packages/vuoro-service/composition/adapter-pins.json /opt/vuoro/composition/adapter-pins.json
+COPY packages/vuoro-service/composition/project-bindings.json /opt/vuoro/composition/project-bindings.json
 RUN python /usr/local/bin/fetch-pinned-adapters /opt/vuoro/composition/adapter-pins.json /opt/vuoro/adapters
 
 COPY README.md pyproject.toml uv.lock ./
