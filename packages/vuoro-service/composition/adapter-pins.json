@@ -18,16 +18,16 @@
     {
       "domain": "execution",
       "source_repository": "https://github.com/bayleafwalker/actionq",
-      "source_revision": "a50de53edac3d606b282b2577003b996269f2a35",
-      "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/vuoro-adapter-v1-a50de53/actionq-0.1.1-py3-none-any.whl",
-      "artifact_sha256": "7ab25bcc04c0e2111ae2f913b227aa8450e0d53fb2e22b41073e6f3aa4c61edd",
+      "source_revision": "7a2af7bdc9fde1aa4da38a3b87f1943477587923",
+      "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/vuoro-adapter-v1-7a2af7b/actionq-0.1.1-py3-none-any.whl",
+      "artifact_sha256": "87ca7a34c138c00ae767f6926e238fec2805531368a293b54d84b60d372c6a58",
       "distribution": "actionq",
       "distribution_version": "0.1.1",
       "adapter_module": "actionq.vuoro",
       "register": "register_operations",
       "migration_entrypoint": "actionctl migrate --json-output",
       "api_version": "execution/v1",
-      "schema_version": "actionq-schema/v1"
+      "schema_version": "actionq-schema/v2"
     },
     {
       "domain": "knowledge",
