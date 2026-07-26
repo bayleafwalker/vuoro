@@ -4,9 +4,9 @@
     {
       "domain": "work",
       "source_repository": "https://github.com/bayleafwalker/sprintctl",
-      "source_revision": "2bca90a1d9642d1ba4d12cbcb835d2146b7b4327",
-      "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/vuoro-adapter-v1-2bca90a/sprintctl-0.2.2-py3-none-any.whl",
-      "artifact_sha256": "00379c69d704b2e7942b838204c237ba819e804bab88988bac40599a966d94b5",
+      "source_revision": "fd93508c0d122d6952182170db48c90450b4794e",
+      "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/vuoro-adapter-v1-fd93508/sprintctl-0.2.2-py3-none-any.whl",
+      "artifact_sha256": "7845566bf1daa704b07f6748a7509aad90ad35b5eb805153c764412cc6096d98",
       "distribution": "sprintctl",
       "distribution_version": "0.2.2",
       "adapter_module": "sprintctl.vuoro_adapter",
