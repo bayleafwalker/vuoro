@@ -1,8 +1,23 @@
 # Vuoro
 
+[![pages](https://github.com/bayleafwalker/vuoro/actions/workflows/pages.yml/badge.svg)](https://github.com/bayleafwalker/vuoro/actions/workflows/pages.yml)
+
+[Explore the Vuoro overview.](https://bayleafwalker.github.io/vuoro/)
+
 Vuoro is a reusable governed-work substrate. It keeps machine-local effects on
 the machine while serving shared work, execution, knowledge, and audit
 capabilities through one versioned runtime.
+
+## Project status
+
+| | Status |
+| --- | --- |
+| **Current operational system** | The existing domain tools and agent-cockpit documented in [agentops](https://github.com/bayleafwalker/agentops). |
+| **This repository** | The target transport-neutral client and deployable service composition layer. It packages capabilities without taking authority from their domain repositories. |
+| **Works today** | Versioned handshake, catalog, and generic invocation protocol; enforced client/service packaging boundary; FastAPI service and transport-only client bootstrap; neutral Compose and Kustomize packaging checks. |
+| **Still to complete** | Production-ready released adapters, environment deployment composition, and deliberate migration of request routing—not domain authority—behind the service boundary. |
+| **Project overview** | [Vuoro on kotona.app](https://kotona.app/projects/vuoro/) |
+| **Current implementation** | [agentops system map, cockpit, contracts, and operating walkthrough](https://github.com/bayleafwalker/agentops) |
 
 This repository deliberately publishes two distributions:
 
@@ -14,8 +29,33 @@ This repository deliberately publishes two distributions:
   composition, compatibility checks, migration entrypoints, and explicitly
   authorized administration commands.
 
-The first bootstrap establishes that packaging boundary. Protocol contracts,
-domain adapters, and deployment packaging land in separately reviewable work.
+The bootstrap establishes the packaging boundary and protocol contract.
+Released domain adapters and production deployment composition remain
+separately reviewable work.
+
+## Architecture at a glance
+
+```text
+agent or cockpit
+       │
+       ├── local mode ─────► owning CLI ─────► repo-local state and effects
+       │
+       └── served mode ────► vuoro-client ───► vuoro-service
+                                                    │
+                                                    ▼
+                                      pinned owner adapters
+                                                    │
+                                      remote mode   ▼
+                                  sprintctl · actionq · kctl · auditctl
+                                      shared PostgreSQL authorities
+```
+
+Local, remote, and served describe communication paths, not competing owners.
+The domain tools retain their state machines. Machine-local worktrees and
+filesystem effects stay on the executing machine even when shared coordination
+is served remotely. See the
+[system shape and end-to-end walkthrough](https://github.com/bayleafwalker/agentops/blob/main/docs/architecture/vuoro-system-shape.md)
+for the ownership map, failure rejection, and recovery path.
 
 ## Development
 
