@@ -79,3 +79,6 @@ See [`docs/architecture/packaging.md`](docs/architecture/packaging.md) for the
 enforced dependency and ownership boundaries and
 [`docs/architecture/protocol-v1.md`](docs/architecture/protocol-v1.md) for the
 handshake, catalog, and generic invocation contract.
+Adapter pinning, the required source evidence for a new Sprintctl work adapter,
+and the release/operator boundary are documented in
+[`docs/architecture/adapter-promotion.md`](docs/architecture/adapter-promotion.md).
