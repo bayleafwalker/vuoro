@@ -1,0 +1,3 @@
+export SPRINTCTL_BACKEND=served
+export SPRINTCTL_VUORO_PROFILE=/projects/dev/agentops/templates/dispatch/environment-record/profiles/workstation-vuoro-shared.json
+unset SPRINTCTL_URL

@@ -9,3 +9,4 @@ build/
 .auditctl/
 .claude/settings.local.json
 .sprintctl/
+.envrc.local

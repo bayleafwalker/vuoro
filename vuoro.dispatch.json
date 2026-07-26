@@ -37,6 +37,8 @@
       ".claude/",
       ".github/",
       ".gitignore",
+      ".envrc",
+      ".envrc.example",
       ".python-version",
       "AGENTS.md",
       "README.md",
