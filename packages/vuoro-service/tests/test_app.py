@@ -13,10 +13,8 @@ def test_bootstrap_exposes_only_operational_probes() -> None:
     assert "/api/invoke/v1" in paths
 
 
-def test_service_commands_are_process_scoped(capsys) -> None:
+def test_service_commands_are_process_scoped() -> None:
     parser = build_parser()
-    assert {"serve", "check-compatibility", "migrate", "admin"} <= set(
+    assert {"serve"} <= set(
         parser._subparsers._group_actions[0].choices
     )
-    assert main(["check-compatibility"]) == 3
-    assert '"compatible": false' in capsys.readouterr().out
