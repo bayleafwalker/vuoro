@@ -277,6 +277,7 @@ def create_composed_app(
         ProjectMemberApplication,
         ProjectWorkApplication,
         WorkApplication,
+        make_transient_credential_resolver,
     )
 
     # VUORO_WORK_REPOSITORY_ID only seeds this template instance; every served
@@ -288,7 +289,10 @@ def create_composed_app(
     # one.
     work_store = work_pg.get_connection(_runtime_env("VUORO_WORK_RUNTIME_DSN", environ))
     work_store.repo_id = _runtime_env("VUORO_WORK_REPOSITORY_ID", environ)
-    work_application = WorkApplication.postgres(work_store)
+    work_credential_resolver = make_transient_credential_resolver()
+    work_application = WorkApplication.postgres(
+        work_store, credential_resolver=work_credential_resolver
+    )
     bindings_path = project_bindings_path or Path(
         "/opt/vuoro/composition/project-bindings.json"
     )
@@ -305,7 +309,9 @@ def create_composed_app(
     def make_member_application(repo_id: str) -> WorkApplication:
         member_store = work_pg.get_connection(work_dsn)
         member_store.repo_id = repo_id
-        return WorkApplication.postgres(member_store)
+        return WorkApplication.postgres(
+            member_store, credential_resolver=work_credential_resolver
+        )
 
     def make_project_application(
         project_id: str, members: tuple[tuple[str, WorkApplication], ...]
