@@ -18,9 +18,9 @@
     {
       "domain": "execution",
       "source_repository": "https://github.com/bayleafwalker/actionq",
-      "source_revision": "7a2af7bdc9fde1aa4da38a3b87f1943477587923",
-      "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/vuoro-adapter-v1-7a2af7b/actionq-0.1.1-py3-none-any.whl",
-      "artifact_sha256": "87ca7a34c138c00ae767f6926e238fec2805531368a293b54d84b60d372c6a58",
+      "source_revision": "d344cc297c97f76b03662685dc850a46ca639b18",
+      "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/vuoro-adapter-v1-d344cc2/actionq-0.1.1-py3-none-any.whl",
+      "artifact_sha256": "ffa91299bbe5fcc78c6e0ff8e4a164f0d8a3e887b6d99cfd704d106a7ff7ca9b",
       "distribution": "actionq",
       "distribution_version": "0.1.1",
       "adapter_module": "actionq.vuoro",
