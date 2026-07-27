@@ -25,7 +25,10 @@
       "verify-state-protocols",
       "reconcile-project-contracts"
     ],
-    "overlays": [".agents/overlays/vuoro.boundaries.md"]
+    "overlays": [
+      ".agents/overlays/vuoro.boundaries.md",
+      ".agents/overlays/vuoro.hybrid-worker.md"
+    ]
   },
   "scope": {
     "allowed_path_roots": [
@@ -69,6 +72,33 @@
       "required_on_change": true
     }
   ],
+  "hybrid": {
+    "enabled": true,
+    "worker_routes": ["bulk", "escalation"],
+    "commands": {
+      "vuoro.client.tests": "uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests",
+      "vuoro.service.tests": "uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests",
+      "vuoro.boundaries": "uv run pytest tests/test_distribution_boundaries.py",
+      "vuoro.suite": "uv run pytest"
+    },
+    "protected_paths": [
+      "deploy/**",
+      "packages/vuoro-client/src/**",
+      "vuoro.dispatch.json",
+      "AGENTS.md",
+      ".agents/**",
+      ".github/**",
+      "pyproject.toml",
+      "uv.lock"
+    ],
+    "worktree_root": "/tmp/vuoro-hybrid/worktrees",
+    "max_timeout_seconds": 1800,
+    "max_cost_usd": 3.0,
+    "notes": [
+      "The client transport boundary, deployment packaging, and compatibility/migration semantics are coordinator-only: they are exactly the surfaces vuoro.dispatch.json risk_surfaces mark as required-on-change.",
+      "Worker packets carry no VUORO_ or database credentials; every registered command runs against the repository's own fixtures."
+    ]
+  },
   "verification": {
     "command_families": ["unit", "architecture", "docs", "full-suite"],
     "targeted_first": true,

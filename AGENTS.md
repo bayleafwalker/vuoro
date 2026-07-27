@@ -43,6 +43,38 @@ python /projects/dev/agentops/templates/dispatch/scripts/validate_verification_a
 Inspect `vuoro.dispatch.json` risk surfaces before changing compatibility,
 migration, identity, authority, invocation, or adapter-composition paths.
 
+## Hybrid dispatch
+
+This repository is hybrid-eligible: a frontier coordinator may freeze a bounded
+`agentops-task/v1` packet and hand one disposable loop to a cheap OpenCode
+worker (`bulk`, or `escalation` for one corrected retry). Workers hold no Git,
+sprintctl, or deployment authority. Runbook:
+`/projects/dev/agentops/docs/runbooks/hybrid-dispatch.md`.
+
+The operator decides mode per item, before work starts:
+
+| Item looks like | Mode |
+|---|---|
+| Tests, fixtures, or parametrization under `packages/*/tests/` or `tests/` | hybrid `bulk` |
+| A refactor inside `packages/vuoro-service/src/` whose interface and acceptance the coordinator already fixed | hybrid `bulk` |
+| Docs restating an already-decided contract | hybrid `bulk` |
+| Anything touching `packages/vuoro-client/src/` — the transport-only authority boundary | coordinator-only |
+| `deploy/`, packaging, or appservice-facing configuration | coordinator-only |
+| Compatibility gates, migration assets, runtime-vs-migration role separation | coordinator-only |
+| Catalog derivation, `pyproject.toml`, `uv.lock`, adapter composition | coordinator-only |
+| Deciding *what* the behavior should be, rather than implementing a decided one | coordinator-only |
+
+The coordinator-only rows are exactly the `risk_surfaces` marked
+`required_on_change` in `vuoro.dispatch.json`; they are also listed as
+`hybrid.protected_paths`, so a packet naming them fails `validate` as a task
+defect rather than reaching a worker. `.agents/overlays/vuoro.hybrid-worker.md`
+carries the same boundaries and the stop conditions into the worker's context.
+
+Gate every packet with a registered command from `hybrid.commands`
+(`vuoro.client.tests`, `vuoro.service.tests`, `vuoro.boundaries`,
+`vuoro.suite`). If no registered command can fail on a wrong answer, do not
+dispatch — review cost will exceed the saving.
+
 <!-- agentops-project-pointer:start -->
 See `.agents/project.generated.md` for cross-repo project context (agentops-managed; do not hand-edit).
 <!-- agentops-project-pointer:end -->
