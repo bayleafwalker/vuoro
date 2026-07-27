@@ -78,7 +78,7 @@
     "commands": {
       "vuoro.client.tests": "uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests",
       "vuoro.service.tests": "uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests",
-      "vuoro.boundaries": "uv run pytest tests/test_distribution_boundaries.py",
+      "vuoro.boundaries": "uv build --package vuoro-client --wheel --out-dir dist/vuoro-client && uv build --package vuoro-service --wheel --out-dir dist/vuoro-service && uv run pytest tests/test_distribution_boundaries.py",
       "vuoro.suite": "uv run pytest"
     },
     "protected_paths": [
@@ -96,7 +96,8 @@
     "max_cost_usd": 3.0,
     "notes": [
       "The client transport boundary, deployment packaging, and compatibility/migration semantics are coordinator-only: they are exactly the surfaces vuoro.dispatch.json risk_surfaces mark as required-on-change.",
-      "Worker packets carry no VUORO_ or database credentials; every registered command runs against the repository's own fixtures."
+      "Worker packets carry no VUORO_ or database credentials; every registered command runs against the repository's own fixtures.",
+      "Every registered command must be self-contained in a fresh exact-commit worktree: the coordinator runs it cold before inference, and a command depending on artifacts from an earlier step fails that gate. vuoro.boundaries therefore builds both wheels itself rather than assuming dist/ is populated."
     ]
   },
   "verification": {
