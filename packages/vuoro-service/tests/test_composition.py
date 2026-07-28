@@ -34,6 +34,12 @@ def test_checked_in_adapter_artifact_urls_are_immutable_github_release_wheels() 
         assert pin.artifact_url.endswith(".whl")
 
 
+def test_checked_in_adapter_artifact_urls_embed_source_revision() -> None:
+    manifest = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json")
+    for pin in manifest.adapters:
+        assert pin.source_revision[:7] in pin.artifact_url
+
+
 def test_checked_in_project_binding_is_immutable_and_canonical() -> None:
     raw = json.loads(
         (ROOT / "composition" / "project-bindings.json").read_text(encoding="utf-8")
