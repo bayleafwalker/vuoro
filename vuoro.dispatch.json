@@ -83,7 +83,6 @@
     },
     "protected_paths": [
       "deploy/**",
-      "packages/vuoro-client/src/**",
       "vuoro.dispatch.json",
       "AGENTS.md",
       ".agents/**",
@@ -95,7 +94,10 @@
     "max_timeout_seconds": 1800,
     "max_cost_usd": 3.0,
     "notes": [
-      "The client transport boundary, deployment packaging, and compatibility/migration semantics are coordinator-only: they are exactly the surfaces vuoro.dispatch.json risk_surfaces mark as required-on-change.",
+      "Client authority, public contract, and compatibility decisions remain coordinator-owned. Frozen transport-only client mechanics may use a bounded worker packet with explicit schemas, fixtures, acceptance, and coordinator review.",
+      "Deployment packaging and compatibility/migration semantics are coordinator-only.",
+      "The current devbox hybrid dispatcher is one bounded patch-worker implementation, not the portable execution contract. Vuoro does not own Sprintctl plan semantics, Actionq claims or leases, runner harness internals, candidate publication, or Auditctl findings.",
+      "Portable runner envelopes carry no claim tokens or provider credentials. Candidate Git bundles, receipts, integration topology, and disposable-runner isolation are governed by docs/architecture/portable-execution.md and owner-repository acceptance evidence.",
       "Worker packets carry no VUORO_ or database credentials; every registered command runs against the repository's own fixtures.",
       "Every registered command must be self-contained in a fresh exact-commit worktree: the coordinator runs it cold before inference, and a command depending on artifacts from an earlier step fails that gate. vuoro.boundaries therefore builds both wheels itself rather than assuming dist/ is populated."
     ]

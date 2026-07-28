@@ -58,22 +58,34 @@ The operator decides mode per item, before work starts:
 | Tests, fixtures, or parametrization under `packages/*/tests/` or `tests/` | hybrid `bulk` |
 | A refactor inside `packages/vuoro-service/src/` whose interface and acceptance the coordinator already fixed | hybrid `bulk` |
 | Docs restating an already-decided contract | hybrid `bulk` |
-| Anything touching `packages/vuoro-client/src/` — the transport-only authority boundary | coordinator-only |
+| Deciding or changing client authority, schema compatibility, public semantics, or the transport-only boundary | coordinator-only |
+| Client polling, long-poll, reconnect, or fixture mechanics against a frozen interface and acceptance packet | hybrid `bulk` |
 | `deploy/`, packaging, or appservice-facing configuration | coordinator-only |
 | Compatibility gates, migration assets, runtime-vs-migration role separation | coordinator-only |
 | Catalog derivation, `pyproject.toml`, `uv.lock`, adapter composition | coordinator-only |
 | Deciding *what* the behavior should be, rather than implementing a decided one | coordinator-only |
 
-The coordinator-only rows are exactly the `risk_surfaces` marked
-`required_on_change` in `vuoro.dispatch.json`; they are also listed as
-`hybrid.protected_paths`, so a packet naming them fails `validate` as a task
-defect rather than reaching a worker. `.agents/overlays/vuoro.hybrid-worker.md`
-carries the same boundaries and the stop conditions into the worker's context.
+The coordinator owns decisions on every `risk_surface` marked
+`required_on_change` in `vuoro.dispatch.json`. Protected paths prevent a
+worker from changing contracts, composition, deployment, or repository
+policy. A frozen packet may name transport-only client implementation paths
+only when schemas, interfaces, fixtures, and acceptance are already fixed;
+the coordinator must review the boundary and compatibility evidence.
+`.agents/overlays/vuoro.hybrid-worker.md` carries the same boundaries and stop
+conditions into the worker's context.
 
 Gate every packet with a registered command from `hybrid.commands`
 (`vuoro.client.tests`, `vuoro.service.tests`, `vuoro.boundaries`,
 `vuoro.suite`). If no registered command can fail on a wrong answer, do not
 dispatch — review cost will exceed the saving.
+
+The current devbox hybrid dispatcher is one runner implementation, not the
+architecture. Portable execution contracts are owner-staged in Actionq and
+documented in `docs/architecture/portable-execution.md`. Vuoro may compose
+released execution capabilities, but it does not own Sprintctl plans, Actionq
+claims or leases, runner harness internals, candidate publication, or Auditctl
+findings. Frozen worker packets carry no claim tokens or provider credentials;
+candidate results become immutable Git artifacts before review or integration.
 
 <!-- agentops-project-pointer:start -->
 See `.agents/project.generated.md` for cross-repo project context (agentops-managed; do not hand-edit).

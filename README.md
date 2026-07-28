@@ -57,6 +57,17 @@ is served remotely. See the
 [system shape and end-to-end walkthrough](https://github.com/bayleafwalker/agentops/blob/main/docs/architecture/vuoro-system-shape.md)
 for the ownership map, failure rejection, and recovery path.
 
+Commands may eventually return references to domain-owned observable
+resources. Vuoro standardizes reference, snapshot, change, and delivery
+envelopes while the owning domain retains lifecycle authority; see
+[Domain-owned observable resources](docs/architecture/observable-resources.md).
+
+The current devbox dispatcher is one implementation of governed execution,
+not the placement contract. The staged portable boundary between Sprintctl
+plans, Actionq lifecycle authority, interchangeable runners, immutable Git
+candidate artifacts, Auditctl evidence, and Vuoro composition is defined in
+[Portable governed execution](docs/architecture/portable-execution.md).
+
 ## Development
 
 Python 3.12 and `uv` are required.

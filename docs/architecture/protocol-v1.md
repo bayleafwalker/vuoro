@@ -61,6 +61,15 @@ invocation context. The service shell enforces whether a key is required,
 optional, or forbidden; the domain adapter remains responsible for durable
 deduplication semantics.
 
+An invocation may return a `resource-reference/v1` result when its catalog
+entry declares a resource-reference result contract. The owning domain remains
+authoritative for the referenced resource. Snapshot/change observation,
+bounded long-poll delivery, cursor recovery, terminality, authorization, and
+the staged proof required before this becomes a substrate-wide contract are
+defined in [Domain-owned observable resources](observable-resources.md).
+Observation extends invocation; it is not a competing RPC or generic jobs
+subsystem.
+
 ## Dynamic availability
 
 The transport-only client caches the catalog by ETag. When an invocation names

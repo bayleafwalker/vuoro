@@ -31,9 +31,22 @@ def test_boundaries_command_builds_wheels_before_testing() -> None:
     assert service_pos < pytest_pos, "vuoro-service build must precede pytest"
 
 
-def test_protected_paths_guard_authority_and_packaging() -> None:
+def test_protected_paths_guard_policy_and_packaging_but_allow_frozen_client_mechanics() -> None:
     config = _load_dispatch_config()
     paths = config["hybrid"]["protected_paths"]
     assert "deploy/**" in paths
-    assert "packages/vuoro-client/src/**" in paths
+    assert "packages/vuoro-client/src/**" not in paths
     assert "vuoro.dispatch.json" in paths
+    assert "AGENTS.md" in paths
+    assert ".agents/**" in paths
+    assert "pyproject.toml" in paths
+    assert "uv.lock" in paths
+
+
+def test_hybrid_policy_does_not_claim_portable_runner_authority() -> None:
+    config = _load_dispatch_config()
+    notes = " ".join(config["hybrid"]["notes"])
+    assert "not the portable execution contract" in notes
+    assert "does not own Sprintctl plan semantics" in notes
+    assert "no claim tokens or provider credentials" in notes
+    assert "Candidate Git bundles" in notes
