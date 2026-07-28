@@ -32,11 +32,10 @@ adapter.
 
 ## Sprintctl blind-agent promotion gate
 
-The currently pinned Sprintctl adapter (`45ec765`, `0.2.0`) only supports the
-deployed happy path. It must not be re-pinned merely because a source commit
-contains served CLI guards. A candidate work adapter is ready for a Vuoro pin
-only after its own checked-in tests prove catalog registration and invocation
-for the complete blind-agent surface:
+The checked-in Sprintctl adapter must not be re-pinned merely because a source
+commit contains served CLI guards. A candidate work adapter is ready for a
+Vuoro pin only after its own checked-in tests prove catalog registration and
+invocation for the complete blind-agent surface:
 
 - scoped usage/context and work-item list reads;
 - item-reference and dependency add/list/remove;
@@ -57,6 +56,12 @@ test against the released wheel (not an editable checkout) before its pin is
 merged. A catalog operation's presence alone is insufficient: the test must
 include accepted and rejected invocations appropriate to its authority and
 idempotency contract.
+
+Parity fixtures must be falsifiable. For every supported filter, include at
+least one independently excluded record; supply matching records out of their
+expected order; invoke the real owner read boundary; and assert exact results.
+Ignoring a filter, preserving input order accidentally, substituting an empty
+response, or replacing the behavior under test must make the fixture fail.
 
 CI fetches the immutable artifacts from the checked-in manifest, verifies
 their digests, installs the pinned Sprintctl wheel with the built
@@ -85,6 +90,11 @@ application, served-route, and served-CLI tests recorded by that release.
 The owner release evidence must identify the exact commands and revision; do
 not treat Vuoro's manifest-shape test as evidence that an adapter implements
 new operations.
+
+Installation on a workstation or devbox is not release evidence. If an owner
+change is committed and locally installed but has no immutable release, record
+the tested source revision and stop before editing the composition manifest.
+Publication by the owner and pinning by Vuoro are separate reviewable units.
 
 ## Release and operator boundary
 
