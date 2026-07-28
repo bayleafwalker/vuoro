@@ -45,9 +45,9 @@ migration, identity, authority, invocation, or adapter-composition paths.
 
 ## Hybrid dispatch
 
-This repository is hybrid-eligible: a frontier coordinator may freeze a bounded
+This repository is hybrid-eligible: a frontier coordinator may freeze a mechanically specified
 `agentops-task/v1` packet and hand one disposable loop to a cheap OpenCode
-worker (`bulk`, or `escalation` for one corrected retry). Workers hold no Git,
+worker (`mechanical_bulk`, one attempt). Workers hold no Git,
 sprintctl, or deployment authority. Runbook:
 `/projects/dev/agentops/docs/runbooks/hybrid-dispatch.md`.
 
@@ -55,15 +55,16 @@ The operator decides mode per item, before work starts:
 
 | Item looks like | Mode |
 |---|---|
-| Tests, fixtures, or parametrization under `packages/*/tests/` or `tests/` | hybrid `bulk` |
-| A refactor inside `packages/vuoro-service/src/` whose interface and acceptance the coordinator already fixed | hybrid `bulk` |
-| Docs restating an already-decided contract | hybrid `bulk` |
+| Mechanical implementation whose externally defined oracle and falsifying gates are frozen | hybrid `mechanical_bulk` |
+| Tests, fixtures, parity proof, or parametrization as the primary deliverable | coordinator-only |
+| A refactor inside `packages/vuoro-service/src/` whose interface, oracle, and discriminating acceptance gates the coordinator already fixed | hybrid `mechanical_bulk` |
+| Docs restating an already-decided contract with a deterministic falsifying gate | hybrid `mechanical_bulk` |
 | Deciding or changing client authority, schema compatibility, public semantics, or the transport-only boundary | coordinator-only |
-| Client polling, long-poll, reconnect, or fixture mechanics against a frozen interface and acceptance packet | hybrid `bulk` |
+| Client polling, long-poll, or reconnect mechanics against a frozen interface and external oracle | hybrid `mechanical_bulk` |
 | `deploy/`, packaging, or appservice-facing configuration | coordinator-only |
 | Compatibility gates, migration assets, runtime-vs-migration role separation | coordinator-only |
 | Catalog derivation, `pyproject.toml`, `uv.lock`, adapter composition | coordinator-only |
-| Deciding *what* the behavior should be, rather than implementing a decided one | coordinator-only |
+| Deciding *what* the behavior should be, defining the test oracle, or proving cross-layer parity | coordinator-only |
 
 The coordinator owns decisions on every `risk_surface` marked
 `required_on_change` in `vuoro.dispatch.json`. Protected paths prevent a
@@ -76,8 +77,9 @@ conditions into the worker's context.
 
 Gate every packet with a registered command from `hybrid.commands`
 (`vuoro.client.tests`, `vuoro.service.tests`, `vuoro.boundaries`,
-`vuoro.suite`). If no registered command can fail on a wrong answer, do not
-dispatch — review cost will exceed the saving.
+`vuoro.suite`). Each relevant requirement must name the command and incorrect
+behaviour that makes it fail. If the worker must invent or modify that oracle,
+do not dispatch — review cost will exceed the saving.
 
 The current devbox hybrid dispatcher is one runner implementation, not the
 architecture. Portable execution contracts are owner-staged in Actionq and

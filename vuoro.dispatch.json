@@ -74,7 +74,7 @@
   ],
   "hybrid": {
     "enabled": true,
-    "worker_routes": ["bulk", "escalation"],
+    "worker_routes": ["mechanical_bulk"],
     "commands": {
       "vuoro.client.tests": "uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests",
       "vuoro.service.tests": "uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests",
@@ -93,8 +93,11 @@
     "worktree_root": "/tmp/vuoro-hybrid/worktrees",
     "max_timeout_seconds": 1800,
     "max_cost_usd": 3.0,
+    "soft_token_ceiling": 500000,
+    "hard_token_ceiling": 1000000,
     "notes": [
-      "Client authority, public contract, and compatibility decisions remain coordinator-owned. Frozen transport-only client mechanics may use a bounded worker packet with explicit schemas, fixtures, acceptance, and coordinator review.",
+      "Only low-risk mechanical implementation with frozen interfaces, an externally defined worker-immutable oracle, and coordinator-authored discriminating gates is worker-eligible. Task size alone never grants eligibility.",
+      "Test-oracle and parity-fixture construction, tests as the primary deliverable, cross-layer behavioural proof, and client authority, public contract, or compatibility decisions remain coordinator-owned.",
       "Deployment packaging and compatibility/migration semantics are coordinator-only.",
       "The current devbox hybrid dispatcher is one bounded patch-worker implementation, not the portable execution contract. Vuoro does not own Sprintctl plan semantics, Actionq claims or leases, runner harness internals, candidate publication, or Auditctl findings.",
       "Portable runner envelopes carry no claim tokens or provider credentials. Candidate Git bundles, receipts, integration topology, and disposable-runner isolation are governed by docs/architecture/portable-execution.md and owner-repository acceptance evidence.",
