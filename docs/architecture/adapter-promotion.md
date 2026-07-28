@@ -58,6 +58,14 @@ merged. A catalog operation's presence alone is insufficient: the test must
 include accepted and rejected invocations appropriate to its authority and
 idempotency contract.
 
+CI fetches the immutable artifacts from the checked-in manifest, verifies
+their digests, installs the pinned Sprintctl wheel with the built
+`vuoro-service` wheel in an isolated environment, and runs
+`scripts/validate_released_work_adapter.py`. The gate proves a populated read
+is accepted and that both missing authority and invalid arguments are rejected
+through the real Vuoro invocation envelope. It does not import Sprintctl from
+a neighboring checkout.
+
 ## Source acceptance commands
 
 Run these from the Vuoro repository after a pin update, in this order:

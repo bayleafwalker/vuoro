@@ -23,4 +23,21 @@ jobs:
       - run: uv build --package vuoro-client --wheel --out-dir dist/vuoro-client
       - run: uv build --package vuoro-service --wheel --out-dir dist/vuoro-service
       - run: uv run pytest
+      - name: Fetch immutable adapter wheels
+        run: >-
+          python scripts/fetch_pinned_adapters.py
+          packages/vuoro-service/composition/adapter-pins.json
+          dist/adapters
+      - name: Exercise pinned released work adapter
+        shell: bash
+        run: |
+          uv venv --python 3.12 /tmp/vuoro-released-wheel
+          uv pip install --python /tmp/vuoro-released-wheel/bin/python \
+            dist/vuoro-service/*.whl \
+            dist/adapters/sprintctl-*.whl \
+            'httpx>=0.27,<1'
+          /tmp/vuoro-released-wheel/bin/python \
+            scripts/validate_released_work_adapter.py \
+            packages/vuoro-service/composition/adapter-pins.json \
+            dist/adapters
       - run: python -m json.tool vuoro.dispatch.json >/dev/null
