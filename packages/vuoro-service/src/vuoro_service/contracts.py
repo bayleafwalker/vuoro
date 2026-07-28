@@ -86,8 +86,7 @@ class CatalogResponse(StrictModel):
     operations: list[OperationDefinition]
 
 
-class InvocationRequest(StrictModel):
-    schema_version: Literal["invocation/v1"] = "invocation/v1"
+class _InvocationFields(StrictModel):
     request_id: str = Field(min_length=1, max_length=256)
     operation: str = Field(min_length=1)
     arguments: Any
@@ -97,7 +96,11 @@ class InvocationRequest(StrictModel):
     repo_id: str | None = Field(default=None, min_length=1, max_length=256)
 
 
-class InvocationRequestV2(StrictModel):
+class InvocationRequest(_InvocationFields):
+    schema_version: Literal["invocation/v1"] = "invocation/v1"
+
+
+class InvocationRequestV2(_InvocationFields):
     """Additive invocation envelope carrying transient, out-of-band credentials.
 
     ``transient_credentials`` is a transport facility, not a work-domain
@@ -108,13 +111,6 @@ class InvocationRequestV2(StrictModel):
     """
 
     schema_version: Literal["invocation/v2"] = "invocation/v2"
-    request_id: str = Field(min_length=1, max_length=256)
-    operation: str = Field(min_length=1)
-    arguments: Any
-    catalog_revision: str | None = None
-    basis_revision: str | None = Field(default=None, min_length=1, max_length=256)
-    idempotency_key: str | None = Field(default=None, min_length=1, max_length=256)
-    repo_id: str | None = Field(default=None, min_length=1, max_length=256)
     transient_credentials: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("transient_credentials")
