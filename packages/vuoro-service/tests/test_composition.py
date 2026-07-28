@@ -26,6 +26,14 @@ def test_checked_in_manifest_pins_all_four_domains() -> None:
     assert all(len(pin.artifact_sha256) == 64 for pin in manifest.adapters)
 
 
+def test_checked_in_adapter_artifact_urls_are_immutable_github_release_wheels() -> None:
+    manifest = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json")
+    for pin in manifest.adapters:
+        assert pin.artifact_url.startswith("https://github.com/")
+        assert "/releases/download/" in pin.artifact_url
+        assert pin.artifact_url.endswith(".whl")
+
+
 def test_checked_in_project_binding_is_immutable_and_canonical() -> None:
     raw = json.loads(
         (ROOT / "composition" / "project-bindings.json").read_text(encoding="utf-8")
