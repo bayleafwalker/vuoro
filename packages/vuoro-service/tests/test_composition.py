@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 import pytest
+from types import SimpleNamespace
 
 from vuoro_service.composition import (
     CompositionError,
@@ -12,6 +13,7 @@ from vuoro_service.composition import (
     create_composed_app,
     load_identities,
     verify_adapter_artifacts,
+    _execution_authorizer,
 )
 from vuoro_service.project_binding import load_project_bindings
 
@@ -34,10 +36,39 @@ def test_checked_in_adapter_artifact_urls_are_immutable_github_release_wheels() 
         assert pin.artifact_url.endswith(".whl")
 
 
-def test_checked_in_adapter_artifact_urls_embed_source_revision() -> None:
+def test_checked_in_adapter_artifact_urls_are_source_named_or_exact_semver_releases() -> None:
     manifest = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json")
     for pin in manifest.adapters:
-        assert pin.source_revision[:7] in pin.artifact_url
+        tag = pin.artifact_url.split("/releases/download/", 1)[1].split("/", 1)[0]
+        exact_owner_semver = (
+            pin.artifact_url.startswith(pin.source_repository.rstrip("/") + "/releases/download/")
+            and tag == f"v{pin.distribution_version}"
+        )
+        assert pin.source_revision[:7] in tag or exact_owner_semver
+
+
+def test_checked_in_execution_pin_includes_released_contract_companion() -> None:
+    pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("execution")
+    assert (pin.source_revision, pin.distribution_version, pin.schema_version) == (
+        "dd41a9860cf9f07a4776f8279e048d70fd6dbb05", "0.1.14", "actionq-schema/v6")
+    assert [(item.distribution, item.distribution_version) for item in pin.dependencies] == [
+        ("actionq-contracts", "0.1.1")]
+
+
+def test_execution_authorizer_is_exact_and_repository_scoped() -> None:
+    scoped = SimpleNamespace(authorized_repositories=("agentops", "vuoro"))
+    wildcard = SimpleNamespace(authorized_repositories=("*",))
+    for pair in (("execution.candidate-action.create", "create"),
+                 ("execution.group.manage", "create"),
+                 ("execution.group.manage", "update")):
+        assert _execution_authorizer(scoped, *pair)
+    assert _execution_authorizer(scoped, "execution.dispatch.repo:agentops", "enqueue")
+    assert _execution_authorizer(scoped, "execution.dispatch.repo:vuoro", "read")
+    assert _execution_authorizer(wildcard, "execution.dispatch.repo:any", "enqueue")
+    assert not _execution_authorizer(scoped, "execution.dispatch.repo:kctl", "enqueue")
+    assert not _execution_authorizer(scoped, "execution.group.manage", "delete")
+    assert not _execution_authorizer(scoped, "execution.candidate-action.create", "update")
+    assert not _execution_authorizer(scoped, "execution.anything", "create")
 
 
 def test_checked_in_project_binding_is_immutable_and_canonical() -> None:
