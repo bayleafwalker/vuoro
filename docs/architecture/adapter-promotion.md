@@ -24,6 +24,19 @@ pin:
 4. The source commit, release asset, checksum, distribution version, adapter
    module, and registration entrypoint describe the *same* owner release.
 
+An adapter may declare a strict `dependencies` array when its public runtime
+contract is shipped as a separate distribution. Each companion records the
+same immutable source, release URL, checksum, distribution, and version fields
+as the primary wheel. Companion wheels are fetched and verified with the
+adapter; duplicate distributions and colliding filenames are refused.
+
+Owner releases may use either a source-SHA tag or an exact semantic-version
+tag. For a semantic-version tag, evidence must show that the tag resolves to
+`source_revision`; the release URL, full revision, digest, and installed
+version remain independently checked. ActionQ `v0.1.14` resolves to
+`dd41a9860cf9f07a4776f8279e048d70fd6dbb05` and ships `actionq` 0.1.14 with
+the pinned `actionq-contracts` 0.1.1 companion.
+
 Update all related fields in the one adapter object together. Do not install
 from a local checkout, mutate a downloaded wheel, or substitute a deployment
 overlay for the manifest. The container build fetches exactly these release
@@ -56,6 +69,14 @@ test against the released wheel (not an editable checkout) before its pin is
 merged. A catalog operation's presence alone is insufficient: the test must
 include accepted and rejected invocations appropriate to its authority and
 idempotency contract.
+
+The released execution gate installs both the pinned ActionQ adapter and its
+contracts companion, then runs `scripts/validate_released_execution_adapter.py`.
+It registers the real owner catalog into the Vuoro shell with a side-effect-free
+stub application and proves the portable candidate/group surface, exact owner
+metadata, identity-derived provenance, schema rejection, and absence of
+migration or runner operations. It opens no database and runs no startup or
+migration code.
 
 Parity fixtures must be falsifiable. For every supported filter, include at
 least one independently excluded record; supply matching records out of their
@@ -90,6 +111,14 @@ application, served-route, and served-CLI tests recorded by that release.
 The owner release evidence must identify the exact commands and revision; do
 not treat Vuoro's manifest-shape test as evidence that an adapter implements
 new operations.
+
+For a changed execution adapter, install the pinned adapter and every pinned
+companion wheel into an isolated environment with the built service wheel,
+then run `scripts/validate_released_execution_adapter.py`. The gate exercises
+the owner-published catalog through Vuoro's invocation shell, including
+authenticated provenance, required authority, idempotency, and schema-negative
+paths. It must not substitute an editable ActionQ checkout or a runner wheel
+for the released service adapter.
 
 Installation on a workstation or devbox is not release evidence. If an owner
 change is committed and locally installed but has no immutable release, record

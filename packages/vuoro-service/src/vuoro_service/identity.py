@@ -22,6 +22,12 @@ class Identity:
     authorities: frozenset[str] = frozenset()
     repo_ids: frozenset[str] = frozenset()
 
+    @property
+    def authorized_repositories(self) -> tuple[str, ...]:
+        """Expose the stable owner-adapter provenance spelling for repo scope."""
+
+        return tuple(sorted(self.repo_ids))
+
     def authorizes_repo(self, repo_id: str) -> bool:
         return ALL_REPOS in self.repo_ids or repo_id in self.repo_ids
 

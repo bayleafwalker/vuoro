@@ -8,7 +8,7 @@ registry, but cannot add, replace, or remove catalog operations.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 import hashlib
 import importlib
 from importlib.metadata import PackageNotFoundError, version
@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 import re
 from typing import Any, Callable
+from urllib.parse import urlsplit
 
 from vuoro_service.app import ServiceSettings, create_app
 from vuoro_service.catalog import CatalogRegistry
@@ -34,6 +35,7 @@ _REQUIRED_DOMAINS = frozenset({"work", "execution", "knowledge", "audit"})
 _DEPLOYABLE_ENVIRONMENT_CLASSES = frozenset({"development", "production"})
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
+_RELEASE_SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]*$")
 
 
 class CompositionError(RuntimeError):
@@ -41,23 +43,86 @@ class CompositionError(RuntimeError):
 
 
 @dataclass(frozen=True)
-class AdapterPin:
-    domain: str
+class ArtifactPin:
     source_repository: str
     source_revision: str
     artifact_url: str
     artifact_sha256: str
     distribution: str
     distribution_version: str
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, Any]) -> "ArtifactPin":
+        field_names = {field.name for field in fields(cls)}
+        if set(raw) != field_names:
+            raise CompositionError("dependency pin fields do not match the v1 contract")
+        pin = cls(**{field: raw[field] for field in field_names})
+        if not all(
+            isinstance(getattr(pin, field), str) and getattr(pin, field)
+            for field in field_names
+        ):
+            raise CompositionError("dependency pin values must be non-empty strings")
+        _validate_artifact_pin(pin, pin.distribution)
+        return pin
+
+
+def _release_wheel_identity(source_repository: str, artifact_url: str) -> tuple[str, str]:
+    try:
+        source = urlsplit(source_repository)
+        artifact = urlsplit(artifact_url)
+    except ValueError as error:
+        raise CompositionError("release artifact URL is malformed") from error
+    for value, parsed in ((source_repository, source), (artifact_url, artifact)):
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname != "github.com"
+            or parsed.netloc != "github.com"
+            or parsed.query
+            or parsed.fragment
+            or "%" in value
+        ):
+            raise CompositionError("release artifacts require canonical GitHub HTTPS URLs")
+    source_parts = source.path.strip("/").split("/")
+    artifact_parts = artifact.path.strip("/").split("/")
+    if (
+        len(source_parts) != 2
+        or len(artifact_parts) != 6
+        or artifact_parts[:2] != source_parts
+        or artifact_parts[2:4] != ["releases", "download"]
+        or any(not _RELEASE_SEGMENT.fullmatch(part) for part in source_parts)
+        or not _RELEASE_SEGMENT.fullmatch(artifact_parts[4])
+        or artifact_parts[4] in {".", ".."}
+        or not _RELEASE_SEGMENT.fullmatch(artifact_parts[5])
+        or not artifact_parts[5].endswith(".whl")
+    ):
+        raise CompositionError("artifact_url must identify one canonical GitHub release wheel")
+    return artifact_parts[4], artifact_parts[5]
+
+
+def _validate_artifact_pin(pin: Any, label: str) -> None:
+    if not _GIT_SHA.fullmatch(pin.source_revision):
+        raise CompositionError(f"{label}: source_revision must be a full Git SHA")
+    if not _SHA256.fullmatch(pin.artifact_sha256):
+        raise CompositionError(f"{label}: artifact_sha256 must be a SHA-256 digest")
+    try:
+        _release_wheel_identity(pin.source_repository, pin.artifact_url)
+    except CompositionError as error:
+        raise CompositionError(f"{label}: {error}") from error
+
+
+@dataclass(frozen=True)
+class AdapterPin(ArtifactPin):
+    domain: str
     adapter_module: str
     register: str
     migration_entrypoint: str
     api_version: str
     schema_version: str
+    dependencies: tuple[ArtifactPin, ...] = ()
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any]) -> "AdapterPin":
-        fields = {
+        required_fields = {
             "domain",
             "source_repository",
             "source_revision",
@@ -71,17 +136,39 @@ class AdapterPin:
             "api_version",
             "schema_version",
         }
-        if set(raw) != fields:
+        if not required_fields <= set(raw) <= required_fields | {"dependencies"}:
             raise CompositionError("adapter pin fields do not match the v1 contract")
-        pin = cls(**{field: raw[field] for field in fields})
-        if not all(isinstance(getattr(pin, field), str) and getattr(pin, field) for field in fields):
+        dependencies_raw = raw.get("dependencies", [])
+        if not isinstance(dependencies_raw, list):
+            raise CompositionError("adapter dependencies must be an array")
+        values = {field: raw[field] for field in required_fields}
+        pin = cls(
+            **values,
+            dependencies=tuple(
+                ArtifactPin.from_dict(item)
+                for item in dependencies_raw
+                if isinstance(item, dict)
+            ),
+        )
+        if len(pin.dependencies) != len(dependencies_raw):
+            raise CompositionError("adapter dependencies must be objects")
+        if not all(
+            isinstance(getattr(pin, field), str) and getattr(pin, field)
+            for field in required_fields
+        ):
             raise CompositionError("adapter pin values must be non-empty strings")
-        if not _GIT_SHA.fullmatch(pin.source_revision):
-            raise CompositionError(f"{pin.domain}: source_revision must be a full Git SHA")
-        if not _SHA256.fullmatch(pin.artifact_sha256):
-            raise CompositionError(f"{pin.domain}: artifact_sha256 must be a SHA-256 digest")
-        if not pin.artifact_url.startswith("https://github.com/"):
-            raise CompositionError(f"{pin.domain}: artifact_url must be a GitHub release URL")
+        _validate_artifact_pin(pin, pin.domain)
+        distributions = [dependency.distribution for dependency in pin.dependencies]
+        if len(distributions) != len(set(distributions)):
+            raise CompositionError(f"{pin.domain}: duplicate dependency distribution")
+        if any(
+            dependency.source_repository != pin.source_repository
+            or dependency.source_revision != pin.source_revision
+            for dependency in pin.dependencies
+        ):
+            raise CompositionError(
+                f"{pin.domain}: dependencies must come from the same owner revision"
+            )
         return pin
 
 
@@ -103,6 +190,13 @@ class CompositionManifest:
         adapters = tuple(AdapterPin.from_dict(item) for item in raw["adapters"] if isinstance(item, dict))
         if len(adapters) != len(raw["adapters"]) or {pin.domain for pin in adapters} != _REQUIRED_DOMAINS:
             raise CompositionError("composition must pin exactly work, execution, knowledge, and audit")
+        distributions = [
+            pin.distribution
+            for adapter in adapters
+            for pin in (adapter, *adapter.dependencies)
+        ]
+        if len(distributions) != len(set(distributions)):
+            raise CompositionError("composition contains duplicate distributions")
         return cls(schema_version=raw["schema_version"], adapters=adapters)
 
     def pin(self, domain: str) -> AdapterPin:
@@ -115,15 +209,39 @@ class CompositionManifest:
 def verify_adapter_artifacts(manifest: CompositionManifest, wheel_dir: Path) -> None:
     """Verify bundled release wheels before importing their adapter modules."""
 
-    for pin in manifest.adapters:
-        filename = pin.artifact_url.rsplit("/", 1)[-1]
-        artifact = wheel_dir / filename
-        try:
-            digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-        except OSError as error:
-            raise CompositionError(f"{pin.domain}: pinned artifact is unavailable") from error
-        if digest != pin.artifact_sha256:
-            raise CompositionError(f"{pin.domain}: pinned artifact checksum mismatch")
+    seen: dict[str, str] = {}
+    for adapter in manifest.adapters:
+        for pin in (adapter, *adapter.dependencies):
+            filename = pin.artifact_url.rsplit("/", 1)[-1]
+            if filename in seen:
+                raise CompositionError(f"artifact filename collision: {filename}")
+            seen[filename] = pin.artifact_sha256
+            artifact = wheel_dir / filename
+            try:
+                digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+            except OSError as error:
+                raise CompositionError(
+                    f"{pin.distribution}: pinned artifact is unavailable"
+                ) from error
+            if digest != pin.artifact_sha256:
+                raise CompositionError(
+                    f"{pin.distribution}: pinned artifact checksum mismatch"
+                )
+
+
+def _execution_authorizer(provenance: Any, resource: str, verb: str) -> bool:
+    if (resource, verb) in {
+        ("execution.candidate-action.create", "create"),
+        ("execution.group.manage", "create"),
+        ("execution.group.manage", "update"),
+    }:
+        return True
+    prefix = "execution.dispatch.repo:"
+    if verb not in {"enqueue", "read"} or not resource.startswith(prefix):
+        return False
+    repo_id = resource[len(prefix):]
+    repositories = tuple(provenance.authorized_repositories)
+    return bool(repo_id) and ("*" in repositories or repo_id in repositories)
 
 
 def load_identities(path: Path, *, environment: str) -> StaticBearerIdentityResolver:
@@ -213,6 +331,17 @@ def _compatibility(domain: str, record: Mapping[str, Any], pin: AdapterPin) -> D
 
 
 def _load_function(pin: AdapterPin) -> Callable[..., Any]:
+    for dependency in pin.dependencies:
+        try:
+            installed_dependency_version = version(dependency.distribution)
+        except PackageNotFoundError as error:
+            raise CompositionError(
+                f"{pin.domain}: pinned dependency is not installed: {dependency.distribution}"
+            ) from error
+        if installed_dependency_version != dependency.distribution_version:
+            raise CompositionError(
+                f"{pin.domain}: installed dependency version does not match the composition pin"
+            )
     try:
         installed_version = version(pin.distribution)
     except PackageNotFoundError as error:
@@ -360,6 +489,7 @@ def create_composed_app(
     execution_application = ActionQApplication(
         schema=_runtime_env("VUORO_EXECUTION_SCHEMA", environ),
         connection_factory=_pg_connection_factory(_runtime_env("VUORO_EXECUTION_RUNTIME_DSN", environ)),
+        authorizer=_execution_authorizer,
     )
     _load_function(execution_pin)(registry, application=execution_application)
     execution_state = _compatibility("execution", execution_adapter.compatibility_record(execution_application), execution_pin)
