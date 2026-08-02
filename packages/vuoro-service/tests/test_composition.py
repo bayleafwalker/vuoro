@@ -55,6 +55,31 @@ def test_checked_in_execution_pin_includes_released_contract_companion() -> None
         ("actionq-contracts", "0.1.1")]
 
 
+def test_checked_in_work_pin_is_the_reviewed_maintenance_adapter_release() -> None:
+    pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("work")
+    assert (
+        pin.source_revision,
+        pin.distribution_version,
+        pin.api_version,
+        pin.schema_version,
+    ) == (
+        "b0123169a69e19c3ea3d7ef29b4cc6ed06409d29",
+        "0.2.14",
+        "work-api/v1",
+        "work-schema/v1",
+    )
+    assert pin.artifact_url.endswith(
+        "/vuoro-adapter-v1-b012316/sprintctl-0.2.14-py3-none-any.whl"
+    )
+    assert pin.artifact_sha256 == (
+        "b142a24c20079637b9c5aabe7df2c0df8ded1c290c14ee20326b7ebce005b030"
+    )
+    assert (pin.adapter_module, pin.register) == (
+        "sprintctl.vuoro_adapter",
+        "register_work_catalog",
+    )
+
+
 def test_execution_authorizer_is_exact_and_repository_scoped() -> None:
     scoped = SimpleNamespace(authorized_repositories=("agentops", "vuoro"))
     wildcard = SimpleNamespace(authorized_repositories=("*",))
