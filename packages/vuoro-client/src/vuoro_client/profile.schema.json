@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vuoro.dev/schemas/client-profile/v1",
+  "title": "Vuoro transport client profile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "revision",
+    "source_environment_id",
+    "target",
+    "credential_ref",
+    "required_authorities",
+    "production_endpoint_denied"
+  ],
+  "properties": {
+    "schema_version": { "const": "vuoro-client-profile/v1" },
+    "id": { "$ref": "#/$defs/token" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "source_environment_id": { "$ref": "#/$defs/token" },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environment_id", "environment_class", "endpoint"],
+      "properties": {
+        "environment_id": { "$ref": "#/$defs/token" },
+        "environment_class": { "enum": ["local", "development", "production", "recovery"] },
+        "endpoint": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://[^/@?#]+(?:/[^?#]*)?$"
+        }
+      }
+    },
+    "credential_ref": { "type": "string", "pattern": "^file:(?:/|~/).+" },
+    "required_authorities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/authority" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "production_endpoint_denied": { "type": "boolean" }
+  },
+  "$defs": {
+    "token": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+    "authority": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*:[a-z0-9][a-z0-9._-]*$"
+    }
+  }
+}
