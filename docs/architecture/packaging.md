@@ -30,6 +30,16 @@ bundled wheels before importing an adapter. Deployment must pin the resulting
 OCI image digest. Configuration may provide runtime DSNs and an identity
 registry, but cannot change the catalog composition.
 
+Service-image publication uses an isolated Buildx builder and attaches a
+max-level BuildKit provenance statement and an SBOM to the registry image.
+It also records GitHub build provenance for the resulting digest and pushes
+that attestation to the registry. A release candidate is not deployable until
+the release-tag and source-commit aliases resolve to the same digest, GitHub
+verifies provenance for that digest and repository, and the registry artifact
+can be pulled and exercised by digest. A successful image build without those
+attestations is a rejected candidate; its immutable tag and digest remain as
+evidence and must not be reused.
+
 ## Versioning
 
 The two distributions start at the same development version for repository
