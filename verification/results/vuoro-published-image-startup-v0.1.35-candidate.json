@@ -25,6 +25,28 @@
       "evidence": "pg_migrations.py\", line 195, in compatibility_handshake\n    maintenance = _read_maintenance_bridge(cur)\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/sprintctl/pg_migrations.py\", line 149, in _read_maintenance_bridge\n    cur.execute(\n  File \"/usr/local/lib/python3.12/site-packages/psycopg/cursor.py\", line 117, in execute\n    raise ex.with_traceback(None)\npsycopg.errors.InsufficientPrivilege: permission denied for table sprintctl_schema_capability"
     },
     {
+      "state": "5-capability-stale_pre_expiry_at_after_database_expiry",
+      "ok": true,
+      "outcome": "expired"
+    },
+    {
+      "state": "5-capability-future_at_before_window_opens",
+      "ok": true,
+      "rejected_with": "maintenance execution is before window.not_before"
+    },
+    {
+      "state": "5-capability-transaction_opened_before_expiry_statement_after",
+      "ok": true,
+      "outcome": "expired",
+      "now_stayed_pinned": true,
+      "statement_timestamp_advanced": true
+    },
+    {
+      "state": "5-capability-active_ordinary_claim_blocks_activation",
+      "ok": true,
+      "rejected_with": "activation requires zero live ordinary claims"
+    },
+    {
       "state": "3-schema6-with-marker-grant",
       "ok": true,
       "work_schema": "6",
