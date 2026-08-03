@@ -410,6 +410,23 @@ class Proof:
         self.start_service()
         ready3, body3 = self.await_ready()
         final = self.work_state()
+        # Capability admission safety (sprintctl #2093) re-proven at the
+        # composition boundary, against the sprintctl this image ships.
+        # The probe reports failure through its JSON payload and a non-zero
+        # exit; let it speak rather than aborting the whole harness.
+        probe_out = run(
+            "podman", "run", "--rm", "-i", "--network", "host",
+            "--entrypoint", "python",
+            "-e", f"URL={dsn('work_migration')}", "-e", "SCHEMA=work",
+            self.image, "-",
+            check=False,
+            stdin=Path(__file__).with_name("capability_safety_probe.py").read_text(),
+        ).stdout.strip()
+        probe = json.loads(probe_out or '{"verified": false, "cases": {}}')
+        for name, entry in probe["cases"].items():
+            self.record(f"5-capability-{name}", bool(entry.get("ok")), entry)
+        capability_ok = probe["verified"]
+
         self.record("3-schema6-with-marker-grant", ready3, {
             "work_schema": final["schema_version"],
             "execution_schema": final["execution_version"],
@@ -419,7 +436,7 @@ class Proof:
         })
         self.stop_service()
 
-        return all([state1, state2, ready3, failed_closed])
+        return all([state1, state2, ready3, failed_closed, capability_ok])
 
     def cleanup(self) -> None:
         if self.keep:
