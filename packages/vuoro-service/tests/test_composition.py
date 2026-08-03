@@ -59,8 +59,8 @@ def test_checked_in_execution_pin_includes_released_contract_companion() -> None
 
 
 def test_checked_in_work_pin_is_the_qualified_schema5_bridge_release() -> None:
-    """sprintctl 0.2.16 is the release that starts safely on the live schema-5
-    work ledger while keeping 0.2.15's claim-expiry projection behavior."""
+    """sprintctl 0.2.17 keeps 0.2.16's schema-5 bridge and adds the
+    database-authoritative capability transition fix required before cutover."""
     pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("work")
     assert (
         pin.source_revision,
@@ -68,16 +68,16 @@ def test_checked_in_work_pin_is_the_qualified_schema5_bridge_release() -> None:
         pin.api_version,
         pin.schema_version,
     ) == (
-        "380cd8aab68a3a92a6d9d8f6e9e2f50467c2384c",
-        "0.2.16",
+        "c9725d39f6e2dc45b3c9934b43bfb2510d4b1e63",
+        "0.2.17",
         "work-api/v1",
         "work-schema/v1",
     )
     assert pin.artifact_url.endswith(
-        "/vuoro-adapter-v1-380cd8a/sprintctl-0.2.16-py3-none-any.whl"
+        "/vuoro-adapter-v1-c9725d3/sprintctl-0.2.17-py3-none-any.whl"
     )
     assert pin.artifact_sha256 == (
-        "20caf8f529ab30e6dba8ae58fd0e08b98ab3b94fce9551663203b319e6bba6a7"
+        "01d4cd65139e6cddf6ca14ca6cddf173b0287ad43dd776bd40b2a57a053e2866"
     )
     assert (pin.adapter_module, pin.register) == (
         "sprintctl.vuoro_adapter",

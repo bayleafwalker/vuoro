@@ -1,6 +1,6 @@
 {
   "schema_version": "vuoro-pre-migration-startup-proof/v1",
-  "image": "vuoro-service:2092-candidate",
+  "image": "vuoro-service:2093-candidate",
   "states": [
     {
       "state": "1-work5-extension-execution3",
