@@ -50,12 +50,17 @@ def test_checked_in_adapter_artifact_urls_are_source_named_or_exact_semver_relea
 def test_checked_in_execution_pin_includes_released_contract_companion() -> None:
     pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("execution")
     assert (pin.source_revision, pin.distribution_version, pin.schema_version) == (
-        "dd41a9860cf9f07a4776f8279e048d70fd6dbb05", "0.1.14", "actionq-schema/v6")
+        "e82d7bfe87eef847d1814124e0aa45543e82d539", "0.1.16", "actionq-schema/v6")
     assert [(item.distribution, item.distribution_version) for item in pin.dependencies] == [
         ("actionq-contracts", "0.1.1")]
+    assert pin.artifact_sha256 == (
+        "27d48683f4843f683288e4fb5574dc654aa132d8ec7a1d5fa1b901ea40255817"
+    )
 
 
-def test_checked_in_work_pin_is_the_reviewed_claim_expiry_adapter_release() -> None:
+def test_checked_in_work_pin_is_the_qualified_schema5_bridge_release() -> None:
+    """sprintctl 0.2.16 is the release that starts safely on the live schema-5
+    work ledger while keeping 0.2.15's claim-expiry projection behavior."""
     pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("work")
     assert (
         pin.source_revision,
@@ -63,16 +68,16 @@ def test_checked_in_work_pin_is_the_reviewed_claim_expiry_adapter_release() -> N
         pin.api_version,
         pin.schema_version,
     ) == (
-        "5947d018b825aa9834fdca0451ab4d580cec5552",
-        "0.2.15",
+        "380cd8aab68a3a92a6d9d8f6e9e2f50467c2384c",
+        "0.2.16",
         "work-api/v1",
         "work-schema/v1",
     )
     assert pin.artifact_url.endswith(
-        "/vuoro-adapter-v1-5947d01/sprintctl-0.2.15-py3-none-any.whl"
+        "/vuoro-adapter-v1-380cd8a/sprintctl-0.2.16-py3-none-any.whl"
     )
     assert pin.artifact_sha256 == (
-        "e0ac378c57ac4b678fe324c936cbefb3c06cb50e2b2af07f2d98a77b1b6a3843"
+        "20caf8f529ab30e6dba8ae58fd0e08b98ab3b94fce9551663203b319e6bba6a7"
     )
     assert (pin.adapter_module, pin.register) == (
         "sprintctl.vuoro_adapter",
