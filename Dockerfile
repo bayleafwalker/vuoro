@@ -8,13 +8,21 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /srv/vuoro
 
 COPY scripts/fetch_pinned_adapters.py /usr/local/bin/fetch-pinned-adapters
+COPY scripts/attest_installed_composition.py /usr/local/bin/attest-installed-composition
 COPY packages/vuoro-service/composition/adapter-pins.json /opt/vuoro/composition/adapter-pins.json
 COPY packages/vuoro-service/composition/project-bindings.json /opt/vuoro/composition/project-bindings.json
 RUN python /usr/local/bin/fetch-pinned-adapters /opt/vuoro/composition/adapter-pins.json /opt/vuoro/adapters
 
 COPY README.md pyproject.toml uv.lock ./
 COPY packages/vuoro-service ./packages/vuoro-service
-RUN python -m pip install --no-cache-dir "psycopg[binary]>=3.2,<4" ./packages/vuoro-service /opt/vuoro/adapters/*.whl
+# A build log showing the right wheels being fetched is not evidence of what
+# ended up installed, so verify it and keep the result in the image.
+RUN python -m pip install --no-cache-dir "psycopg[binary]>=3.2,<4" ./packages/vuoro-service /opt/vuoro/adapters/*.whl \
+    && python -m pip check \
+    && python /usr/local/bin/attest-installed-composition \
+        /opt/vuoro/composition/adapter-pins.json \
+        /opt/vuoro/adapters \
+        /opt/vuoro/composition/installed-composition.json
 
 USER 65532:65532
 EXPOSE 8080

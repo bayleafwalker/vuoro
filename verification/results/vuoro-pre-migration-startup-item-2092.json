@@ -1,0 +1,37 @@
+{
+  "schema_version": "vuoro-pre-migration-startup-proof/v1",
+  "image": "vuoro-service:2092-candidate",
+  "states": [
+    {
+      "state": "1-work5-extension-execution3",
+      "ok": true,
+      "work_schema": "5",
+      "execution_schema": "3",
+      "maintenance_staged": "True",
+      "no_ddl": true,
+      "detail": "{\"status\":\"ready\",\"compatibility\":\"compatible\"}"
+    },
+    {
+      "state": "2-restart-continuity",
+      "ok": true,
+      "no_ddl": true,
+      "work_schema": "5",
+      "detail": "{\"status\":\"ready\",\"compatibility\":\"compatible\"}"
+    },
+    {
+      "state": "4-schema6-without-marker-grant-fails-closed",
+      "ok": true,
+      "ready": false,
+      "evidence": "pg_migrations.py\", line 195, in compatibility_handshake\n    maintenance = _read_maintenance_bridge(cur)\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/sprintctl/pg_migrations.py\", line 149, in _read_maintenance_bridge\n    cur.execute(\n  File \"/usr/local/lib/python3.12/site-packages/psycopg/cursor.py\", line 117, in execute\n    raise ex.with_traceback(None)\npsycopg.errors.InsufficientPrivilege: permission denied for table sprintctl_schema_capability"
+    },
+    {
+      "state": "3-schema6-with-marker-grant",
+      "ok": true,
+      "work_schema": "6",
+      "execution_schema": "6",
+      "applied_work": "[6]",
+      "applied_execution": "[4, 5, 6]",
+      "detail": "{\"status\":\"ready\",\"compatibility\":\"compatible\"}"
+    }
+  ]
+}
