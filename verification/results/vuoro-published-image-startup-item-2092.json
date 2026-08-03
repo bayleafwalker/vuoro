@@ -1,6 +1,6 @@
 {
   "schema_version": "vuoro-pre-migration-startup-proof/v1",
-  "image": "ghcr.io/bayleafwalker/vuoro-service@sha256:463cd40980a7abd3f202833db2571f7d6684c5d578c4cfd2394e046ce172ec30",
+  "image": "ghcr.io/bayleafwalker/vuoro-service@sha256:d23387480772a4d6b41f8fdf1c1d0f43a985a1087f76f4c4e80cc4325c53060e",
   "states": [
     {
       "state": "1-work5-extension-execution3",
