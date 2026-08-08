@@ -23,6 +23,9 @@ Actionq
 Runner
   materializes repositories, invokes harnesses, verifies, and publishes results
 
+outctl
+  captures command streams and produces bounded, recoverable projections
+
 Auditctl
   records independent findings and evidence about immutable candidates
 ```
@@ -59,6 +62,15 @@ and collect operations. Actionq knows capability labels such as
 `harness:opencode`, `runtime:python-3.12`, and
 `isolation:disposable-checkout`; it does not know provider session formats,
 prompt configuration directories, or model-routing details.
+
+The optional `outctl` boundary sits inside a runner or harness command adapter.
+It drains stdout and stderr, retains policy-bounded host-local raw evidence,
+and returns deterministic projections and opaque retrieval references. The
+runner still owns subprocess invocation and cancellation; Actionq still owns
+action lifecycle; Auditctl still owns findings. Vuoro may expose the released
+capability or its opaque references, but neither `vuoro-client` nor
+`vuoro-service` becomes a raw-output store. The normative capture contracts
+remain in the [`outctl` repository](https://github.com/bayleafwalker/outctl).
 
 Initially, `actionq-runner` should live inside the Actionq repository with
 separate server and runner packages, dependency sets, and images. Import
