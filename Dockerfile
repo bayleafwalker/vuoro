@@ -3,6 +3,7 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     VUORO_COMPOSITION_MANIFEST=/opt/vuoro/composition/adapter-pins.json \
+    VUORO_INSTALLED_COMPOSITION_PATH=/opt/vuoro/composition/installed-composition.json \
     VUORO_ADAPTER_WHEEL_DIR=/opt/vuoro/adapters
 
 WORKDIR /srv/vuoro

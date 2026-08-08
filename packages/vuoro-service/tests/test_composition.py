@@ -13,6 +13,7 @@ from vuoro_service.composition import (
     create_composed_app,
     load_identities,
     verify_adapter_artifacts,
+    verify_installed_composition,
     _execution_authorizer,
 )
 from vuoro_service.project_binding import load_project_bindings
@@ -154,6 +155,39 @@ def test_artifact_verification_fails_closed_on_mismatch(tmp_path: Path) -> None:
     manifest = CompositionManifest.load(path)
     with pytest.raises(CompositionError, match="unavailable"):
         verify_adapter_artifacts(manifest, tmp_path)
+
+
+def test_installed_attestation_binds_each_runtime_import_to_the_release_lock(tmp_path: Path, monkeypatch) -> None:
+    manifest_path = ROOT / "composition" / "adapter-pins.json"
+    manifest = CompositionManifest.load(manifest_path)
+    attestation_path = tmp_path / "installed.json"
+    attestation_path.write_text(json.dumps({
+        "schema_version": "vuoro-installed-composition/v1",
+        "verified": True,
+        "manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+        "distributions": [
+            {
+                "lock_id": lock.lock_id,
+                "distribution": lock.distribution,
+                "expected_version": lock.distribution_version,
+                "artifact_sha256": lock.artifact_sha256,
+                "installed_files_sha256": f"files:{lock.distribution}",
+                "installed_files_count": 3,
+            }
+            for lock in manifest.release_locks
+        ],
+    }), encoding="utf-8")
+    monkeypatch.setattr(
+        "vuoro_service.composition._installed_files_digest",
+        lambda name: (f"files:{name}", 3),
+    )
+    verify_installed_composition(manifest, manifest_path, attestation_path)
+
+    raw = json.loads(attestation_path.read_text(encoding="utf-8"))
+    raw["distributions"][0]["installed_files_sha256"] = "tampered"
+    attestation_path.write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(CompositionError, match="installed files"):
+        verify_installed_composition(manifest, manifest_path, attestation_path)
 
 
 def test_identity_registry_is_environment_bound_and_never_accepts_short_tokens(tmp_path: Path) -> None:

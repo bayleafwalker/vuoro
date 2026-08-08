@@ -11,7 +11,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, fields
 import hashlib
 import importlib
-from importlib.metadata import PackageNotFoundError, version
+from importlib.metadata import PackageNotFoundError, distribution, version
 import json
 from pathlib import Path
 import re
@@ -375,6 +375,59 @@ def verify_adapter_artifacts(manifest: CompositionManifest, wheel_dir: Path) -> 
                 )
 
 
+def _installed_files_digest(distribution_name: str) -> tuple[str, int]:
+    installed = distribution(distribution_name)
+    files = installed.files
+    if not files:
+        raise CompositionError(f"{distribution_name}: installed RECORD is unavailable")
+    entries: list[tuple[str, str]] = []
+    for file in sorted(files, key=str):
+        path = installed.locate_file(file)
+        try:
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError as error:
+            raise CompositionError(
+                f"{distribution_name}: installed file is unavailable: {file}"
+            ) from error
+        entries.append((str(file), digest))
+    encoded = json.dumps(entries, separators=(",", ":"), ensure_ascii=True).encode()
+    return hashlib.sha256(encoded).hexdigest(), len(entries)
+
+
+def verify_installed_composition(manifest: CompositionManifest, manifest_path: Path, attestation_path: Path) -> None:
+    """Fail before adapter import unless installed files match the locked build record."""
+    try:
+        attestation = json.loads(attestation_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise CompositionError("cannot load installed composition attestation") from error
+    if (
+        not isinstance(attestation, dict)
+        or attestation.get("schema_version") != "vuoro-installed-composition/v1"
+        or attestation.get("verified") is not True
+        or attestation.get("manifest_sha256") != hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+        or not isinstance(attestation.get("distributions"), list)
+    ):
+        raise CompositionError("installed composition attestation does not bind this release lock")
+    expected = {lock.distribution: lock for lock in manifest.release_locks}
+    records = {entry.get("distribution"): entry for entry in attestation["distributions"] if isinstance(entry, dict)}
+    if set(records) != set(expected):
+        raise CompositionError("installed composition attestation distributions do not match release locks")
+    for distribution_name, lock in expected.items():
+        record = records[distribution_name]
+        if (
+            record.get("lock_id") != lock.lock_id
+            or record.get("expected_version") != lock.distribution_version
+            or record.get("artifact_sha256") != lock.artifact_sha256
+        ):
+            raise CompositionError(f"{distribution_name}: installed attestation does not match its release lock")
+        try:
+            digest, count = _installed_files_digest(distribution_name)
+        except PackageNotFoundError as error:
+            raise CompositionError(f"{distribution_name}: pinned distribution is not installed") from error
+        if record.get("installed_files_sha256") != digest or record.get("installed_files_count") != count:
+            raise CompositionError(f"{distribution_name}: installed files do not match build attestation")
+
+
 def _execution_authorizer(provenance: Any, resource: str, verb: str) -> bool:
     if (resource, verb) in {
         ("execution.candidate-action.create", "create"),
@@ -534,10 +587,14 @@ def create_composed_app(
             )
         environment_constraints = record.constraints
         environment_runbook_refs = record.runbook_refs
-    manifest = CompositionManifest.load(
-        manifest_path or Path(_runtime_env("VUORO_COMPOSITION_MANIFEST", environ))
-    )
+    resolved_manifest_path = manifest_path or Path(_runtime_env("VUORO_COMPOSITION_MANIFEST", environ))
+    manifest = CompositionManifest.load(resolved_manifest_path)
     verify_adapter_artifacts(manifest, wheel_dir or Path(_runtime_env("VUORO_ADAPTER_WHEEL_DIR", environ)))
+    verify_installed_composition(
+        manifest,
+        resolved_manifest_path,
+        Path(_runtime_env("VUORO_INSTALLED_COMPOSITION_PATH", environ)),
+    )
     resolver = load_identities(
         identity_path or Path(_runtime_env("VUORO_IDENTITIES_FILE", environ)),
         environment=environment_name,
@@ -698,4 +755,5 @@ __all__ = [
     "load_development_identities",
     "load_identities",
     "verify_adapter_artifacts",
+    "verify_installed_composition",
 ]
