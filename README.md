@@ -68,6 +68,13 @@ plans, Actionq lifecycle authority, interchangeable runners, immutable Git
 candidate artifacts, Auditctl evidence, and Vuoro composition is defined in
 [Portable governed execution](docs/architecture/portable-execution.md).
 
+Command-output mediation is provided by the adjacent
+[`outctl`](https://github.com/bayleafwalker/outctl) substrate repository. It
+runs at the runner/harness boundary to retain recoverable raw stdout/stderr and
+return deterministic bounded projections. Vuoro may advertise opaque capture
+references, but it does not own raw logs, subprocess lifecycle, retention, or
+projection policy.
+
 ## Development
 
 Python 3.12 and `uv` are required.
