@@ -717,6 +717,10 @@ def create_composed_app(
         connection_factory=_pg_connection_factory(_runtime_env("VUORO_AUDIT_RUNTIME_DSN", environ)),
         schema=_runtime_env("VUORO_AUDIT_SCHEMA", environ),
     )
+    # Auditctl's released adapter exposes an instance registration method,
+    # unlike the shared function-registration protocol used by the other
+    # domains. Keep that owner-specific exception explicit until Auditctl
+    # publishes a compatible registration contract.
     if audit_pin.adapter_module != "auditctl.vuoro_adapter" or audit_pin.register != "VuoroAuditAdapter.register":
         raise CompositionError("audit: manifest does not select the owner adapter registration")
     audit_adapter.register(registry)
