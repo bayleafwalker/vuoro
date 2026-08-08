@@ -25,17 +25,17 @@ ActionQ lifecycle state.
 
 ## Vuoro composition proof
 
-The checked-in execution descriptor selects `actionq-schema/v7` through
-ActionQ 0.1.17 at
-`70a1628aae5879c06d4226ba0de3255f9f99ca5d`. Its official release wheel is
-[`actionq-0.1.17-py3-none-any.whl`](https://github.com/bayleafwalker/actionq/releases/download/v0.1.17/actionq-0.1.17-py3-none-any.whl)
+The checked-in execution descriptor selects `actionq-schema/v8` through
+ActionQ 0.1.18 at
+`cbc426ff938053d2e695f3caf5a4871e701b4661`. Its official release wheel is
+[`actionq-0.1.18-py3-none-any.whl`](https://github.com/bayleafwalker/actionq/releases/download/v0.1.18/actionq-0.1.18-py3-none-any.whl)
 with SHA-256
-`989f5f445dc6a4095a09c8113ff0bf9eeef24b023076d56cce9882e88c60054a`.
+`613cd8a625cd14021c1333df5fa3f73018180bc4f208b6d7b42516878ca8515d`.
 That wheel declares the exact `actionq-contracts==0.1.1` dependency, which
 remains a separately locked official owner release at its own source revision.
 Each wheel is fetched and verified by its exact SHA-256 before installation or
 import; the dependency lock is not rewritten to imply it was published by the
-ActionQ 0.1.17 tag.
+ActionQ 0.1.18 tag.
 
 `scripts/validate_released_execution_adapter.py` runs in an isolated
 environment containing those wheels and the built Vuoro service wheel. It:
