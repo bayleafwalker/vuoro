@@ -57,6 +57,12 @@ allowed paths, required capabilities, harness selection, commands, resource
 limits, network policy, and acceptance gates. It contains no claim token or
 provider credential.
 
+An envelope is a coherent reasoning unit, not a mandate to split work by file
+or test case. Several implementation steps should share one envelope when they
+use the same frozen interface, oracle, context set, writable boundary, and
+acceptance history. Split when steps need different contracts, independent
+disposition, incompatible risk surfaces, or distinct topology.
+
 Harness adapters belong to the runner and expose only prepare, run, cancel,
 and collect operations. Actionq knows capability labels such as
 `harness:opencode`, `runtime:python-3.12`, and
@@ -71,6 +77,40 @@ action lifecycle; Auditctl still owns findings. Vuoro may expose the released
 capability or its opaque references, but neither `vuoro-client` nor
 `vuoro-service` becomes a raw-output store. The normative capture contracts
 remain in the [`outctl` repository](https://github.com/bayleafwalker/outctl).
+
+## Verification strata and worker command access
+
+Verification is intentionally asymmetric:
+
+1. **Attempt falsifier.** The worker runs the fastest registered contract test
+   capable of disproving its candidate through a narrow executor for exact
+   immutable command IDs. Free-form shell authority is not implied.
+2. **Candidate-focused verification.** A fresh owner-controlled checkout runs
+   the focused profile after candidate publication. Worker self-report is not
+   acceptance evidence.
+3. **Integration/repository-full verification.** A fresh integration action
+   runs the broad or full profile once after independent approval or wave
+   integration, not before and after every small attempt.
+
+For filter and parity behavior, the frozen acceptance history is adversarial:
+every filter excludes at least one record; matching records arrive in the
+wrong order; ignoring any filter makes a mutation-style check fail; the claimed
+layer is exercised through real calls; and empty or list-only assertions cannot
+pass. A worker unable to execute its focused falsifier stops with a structured
+blocker rather than compensating with prose confidence.
+
+## Context-churn boundary
+
+An envelope may cap repeated unchanged reads, reasoning steps without a
+mutation or gate result, and tokens spent against identical context. These are
+stall controls, not a general campaign to minimize cheap cache writes. A
+candidate-ready worker emits a structured handoff immediately instead of
+continuing open-ended rereading and self-review.
+
+Where the harness cannot interrupt mid-turn from these counters, the runner
+records the limits and telemetry, rejects qualification after an exceeded hard
+limit, and uses that evidence to qualify a harness-native interrupt path. A
+post-hoc counter must not be described as a real-time cap.
 
 Initially, `actionq-runner` should live inside the Actionq repository with
 separate server and runner packages, dependency sets, and images. Import
@@ -144,6 +184,32 @@ a projection over ordinary Actionq actions with bounded `max_parallel`,
 `failure_policy`, and cancellation of new claims. Sprintctl remains the owner
 of development-plan dependencies and readiness.
 
+Independent lanes run with bounded `max_parallel` in separate disposable
+checkouts. Overlapping mutable worktrees are not a concurrency mechanism. If
+overlap is deliberate, each worker still publishes an immutable candidate and
+the plan names a fresh merge-resolution action whose conflict result is durable
+evidence.
+
+Candidate publication triggers dependent work only through an explicit,
+idempotent Actionq transition bound to the immutable publication. The first
+transition creates independent review; an exact approval may create the frozen
+integration or repository-full action. Coordinators and Vuoro observers never
+infer these transitions from a polled status string.
+
+## Completion observation
+
+Dispatch returns an owner-issued observable reference for its action or group.
+The coordinator performs one bounded `wait(until="terminal")` instead of
+repeatedly checking processes and fetching partial results. Terminal owner
+state attaches execution/settlement receipts, candidate publication, focused
+verification, independent review, integration results when applicable, and
+bounded log/output references.
+
+Terminality without attachments required by the frozen plan is incomplete,
+not successful. Observation follows
+[Domain-owned observable resources](observable-resources.md); Actionq remains
+the lifecycle owner and Vuoro transports its reference, cursor, and state.
+
 ## Disposable runner isolation
 
 A second runner must consume the same envelope and produce the same lifecycle
@@ -191,6 +257,14 @@ of this proof.
 - Independently passing candidates fail after integration.
 - Generated code attempts to read cluster credentials or unrelated
   repositories.
+- A candidate is ready but unchanged reads continue until a churn limit; the
+  receipt rejects qualification and preserves an early-handoff path.
+- Candidate publication succeeds and review-action creation loses its response;
+  idempotent replay returns the same review action.
+- Review approval is replayed and creates exactly one integration/full-gate
+  action.
+- A terminal resource snapshot omits a required candidate or verification
+  attachment and is rejected as incomplete.
 
 These histories must preserve claim fencing, idempotent artifact publication,
 deterministic recovery, explicit integration failure, and least-privilege

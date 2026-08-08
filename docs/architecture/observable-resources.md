@@ -130,6 +130,36 @@ artifact available. Vuoro transports the condition to the adapter and does not
 evaluate domain state itself. Transport selection must be visible in
 logs/metrics.
 
+The coordinator issues one bounded wait for a completion-oriented operation;
+it does not layer a process-poll/fetch loop over this interface. A client may
+renew bounded long-polls across transport timeouts, but it preserves one
+logical wait, one cursor chain, and one final owner snapshot. Reconnects do not
+create new dispatches or rerun commands.
+
+For execution actions and groups, terminal state includes owner-declared
+attachments rather than forcing a second fetch choreography:
+
+```json
+{
+  "reference": "actionq:group:portable-wave-1",
+  "revision": "actionq:event:9012",
+  "terminal": true,
+  "state": {"status": "completed"},
+  "attachments": [
+    {"rel": "execution-receipt", "reference": "artifact:sha256:..."},
+    {"rel": "candidate-publication", "reference": "artifact:sha256:..."},
+    {"rel": "verification-result", "reference": "artifact:sha256:..."},
+    {"rel": "bounded-output", "reference": "outctl:capture:..."}
+  ]
+}
+```
+
+The resource-kind descriptor defines permitted `rel` values and which are
+required for each terminal outcome. Attachments are references, not embedded
+bulk logs and not bearer credentials. A terminal snapshot missing a required
+attachment is observably incomplete; Vuoro does not fabricate it, infer it from
+logs, or rerun work.
+
 SSE is deferred until lifecycle richness, cockpit use, a native wake-up path,
 or sustained long-poll load justifies it. It must project the same cursor and
 event envelopes rather than introduce new semantics. Connection closure is
@@ -143,8 +173,8 @@ state machine.
 ## Staged proof
 
 1. **Actionq owner proof.** Stabilize snapshot, cursor ordering and retention,
-   terminal declaration, idempotent reference resolution, and polling or
-   bounded long-polling in Actionq.
+   terminal declaration, required terminal attachments, idempotent reference
+   resolution, and polling or bounded long-polling in Actionq.
 2. **Minimal Vuoro contract.** Add `resource-reference/v1`, resource-kind
    descriptors, generic `get`, `changes`, and narrow `wait` ergonomics. Keep
    lifecycle interpretation in Actionq.
@@ -180,3 +210,10 @@ Vuoro or to a runner.
 - Retrying enqueue after response loss returns the same resource reference.
 - Existing clients retain ordinary immediate invocation responses.
 - Claim fencing is unchanged and represented explicitly.
+- One logical terminal wait survives multiple bounded transport timeouts
+  without creating another action or resetting its cursor chain.
+- Terminal execution state exposes every attachment required by the frozen
+  plan; missing attachments are distinguishable from failed work and expired
+  output.
+- Losing or expiring a bounded-output attachment does not contradict durable
+  lifecycle state or trigger command rerun.
