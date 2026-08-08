@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 import inspect
 import logging
@@ -42,6 +42,12 @@ from vuoro_service.identity import (
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+# Domain adapters may expose a small, non-secret readiness predicate for an
+# essential runtime dependency.  The service owns the HTTP projection; it does
+# not interpret domain state or attempt recovery through this callback.
+ReadinessCheck = Callable[[], bool]
 
 
 @dataclass(frozen=True)
@@ -120,6 +126,7 @@ def create_app(
     settings: ServiceSettings | None = None,
     registry: CatalogRegistry | None = None,
     identity_resolver: IdentityResolver = deny_all_identities,
+    readiness_check: ReadinessCheck | None = None,
 ) -> FastAPI:
     settings = settings or ServiceSettings()
     registry = registry or CatalogRegistry()
@@ -167,13 +174,29 @@ def create_app(
         return {"status": "live"}
 
     @app.get("/health/ready", include_in_schema=False)
-    async def ready() -> dict[str, object]:
-        return {
-            "status": "ready"
-            if settings.compatibility_state != "incompatible"
-            else "not-ready",
-            "compatibility": settings.compatibility_state,
-        }
+    async def ready() -> Response:
+        compatible = settings.compatibility_state != "incompatible"
+        try:
+            runtime_ready = readiness_check() if readiness_check is not None else True
+        except Exception:
+            # Readiness must fail closed and must not disclose an adapter or
+            # database exception to unauthenticated probe callers.
+            runtime_ready = False
+        if compatible and runtime_ready:
+            return JSONResponse(
+                {"status": "ready", "compatibility": settings.compatibility_state}
+            )
+        return JSONResponse(
+            {
+                "status": "not-ready",
+                "compatibility": settings.compatibility_state,
+                "error": {
+                    "code": "runtime-unavailable",
+                    "message": "an essential service runtime dependency is unavailable",
+                },
+            },
+            status_code=503,
+        )
 
     @app.get("/api/meta/v1/handshake", response_model=HandshakeResponse)
     async def handshake() -> HandshakeResponse:

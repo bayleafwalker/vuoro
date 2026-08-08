@@ -744,6 +744,7 @@ def create_composed_app(
         ),
         registry=registry,
         identity_resolver=resolver,
+        readiness_check=work_application.served_runtime_ready,
     )
 
 
