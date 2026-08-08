@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
 from typing import Any
 from uuid import uuid4
 
@@ -15,6 +14,7 @@ from vuoro_client.errors import (
     InvocationRejectedError,
     OperationNotFoundError,
 )
+from vuoro_client.profile import Profile
 
 
 PROTOCOL_VERSION = 1
@@ -24,14 +24,6 @@ SUPPORTED_SCHEMA_FEATURES = frozenset(
         "local-defs-ref",
     }
 )
-
-
-@dataclass(frozen=True)
-class Profile:
-    name: str
-    endpoint: str
-    credential_ref: str
-    expected_environment: str | None = None
 
 
 CredentialResolver = Callable[[str], str]
@@ -185,70 +177,56 @@ class AsyncVuoroClient:
         repo_id: str | None = None,
         transient_credentials: Mapping[str, str] | None = None,
     ) -> Any:
-        if not transient_credentials:
-            catalog, operation = await self._operation(operation_name)
-            Draft202012Validator(operation["input_schema"]).validate(arguments)
-            response = await self._http.post(
-                "/api/invoke/v1",
-                headers=self._headers(authenticated=True),
-                json={
-                    "schema_version": "invocation/v1",
-                    "request_id": request_id or str(uuid4()),
-                    "operation": operation_name,
-                    "arguments": arguments,
-                    "catalog_revision": catalog["revision"],
-                    "basis_revision": basis_revision,
-                    "idempotency_key": idempotency_key,
-                    "repo_id": repo_id,
-                },
-            )
-            envelope = response.json()
-            if (
-                response.status_code == 409
-                and envelope.get("error", {}).get("code") == "stale-catalog"
-            ):
-                self._catalog = None
-                self._catalog_etag = None
-            if response.status_code == 426:
-                raise ClientIncompatibleError(envelope["error"]["message"])
-            if response.is_error or envelope.get("status") != "accepted":
-                error = envelope.get("error") or {
-                    "code": "transport-error",
-                    "message": response.text,
-                }
-                raise InvocationRejectedError(
-                    error["code"],
-                    error["message"],
-                    status_code=response.status_code,
+        use_v2 = bool(transient_credentials)
+        if use_v2:
+            if self.active_environment is None:
+                await self.handshake()
+            if "invocation/v2" not in self.invocation_schema_versions:
+                raise ClientIncompatibleError(
+                    "server does not advertise invocation/v2; transient credentials "
+                    "cannot be transported"
                 )
-            Draft202012Validator(operation["result_schema"]).validate(
-                envelope["result"]
-            )
-            return envelope["result"]
+        return await self._invoke_version(
+            2 if use_v2 else 1,
+            operation_name,
+            arguments,
+            request_id=request_id,
+            basis_revision=basis_revision,
+            idempotency_key=idempotency_key,
+            repo_id=repo_id,
+            transient_credentials=transient_credentials,
+        )
 
-        if self.active_environment is None:
-            await self.handshake()
-        if "invocation/v2" not in self.invocation_schema_versions:
-            raise ClientIncompatibleError(
-                "server does not advertise invocation/v2; transient credentials "
-                "cannot be transported"
-            )
+    async def _invoke_version(
+        self,
+        version: int,
+        operation_name: str,
+        arguments: Any,
+        *,
+        request_id: str | None,
+        basis_revision: str | None,
+        idempotency_key: str | None,
+        repo_id: str | None,
+        transient_credentials: Mapping[str, str] | None,
+    ) -> Any:
         catalog, operation = await self._operation(operation_name)
         Draft202012Validator(operation["input_schema"]).validate(arguments)
+        payload = {
+            "schema_version": f"invocation/v{version}",
+            "request_id": request_id or str(uuid4()),
+            "operation": operation_name,
+            "arguments": arguments,
+            "catalog_revision": catalog["revision"],
+            "basis_revision": basis_revision,
+            "idempotency_key": idempotency_key,
+            "repo_id": repo_id,
+        }
+        if version == 2:
+            payload["transient_credentials"] = dict(transient_credentials or {})
         response = await self._http.post(
-            "/api/invoke/v2",
+            f"/api/invoke/v{version}",
             headers=self._headers(authenticated=True),
-            json={
-                "schema_version": "invocation/v2",
-                "request_id": request_id or str(uuid4()),
-                "operation": operation_name,
-                "arguments": arguments,
-                "catalog_revision": catalog["revision"],
-                "basis_revision": basis_revision,
-                "idempotency_key": idempotency_key,
-                "repo_id": repo_id,
-                "transient_credentials": dict(transient_credentials),
-            },
+            json=payload,
         )
         envelope = response.json()
         if (
