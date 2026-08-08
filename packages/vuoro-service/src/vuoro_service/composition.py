@@ -208,10 +208,9 @@ class AdapterPin:
             raise CompositionError(f"{domain}: duplicate dependency distribution")
         if any(
             dependency.source_repository != lock.source_repository
-            or dependency.source_revision != lock.source_revision
             for dependency in dependencies
         ):
-            raise CompositionError(f"{domain}: dependencies must come from the same owner revision")
+            raise CompositionError(f"{domain}: dependencies must come from the same owner repository")
         descriptor = RuntimeAdapterDescriptor(
             domain=domain,
             lock_id=domain,
@@ -326,11 +325,10 @@ class CompositionManifest:
                 ) from error
             if any(
                 dependency.source_repository != release_lock.source_repository
-                or dependency.source_revision != release_lock.source_revision
                 for dependency in dependencies
             ):
                 raise CompositionError(
-                    f"{descriptor.domain}: dependencies must come from the same owner revision"
+                    f"{descriptor.domain}: dependencies must come from the same owner repository"
                 )
             referenced.extend((descriptor.lock_id, *descriptor.dependency_lock_ids))
             adapters.append(AdapterPin(descriptor, release_lock, dependencies))

@@ -33,16 +33,19 @@ following before editing it:
 
 A descriptor may declare strict `dependency_lock_ids` when its public runtime
 contract is a separate distribution. Each companion is its own release lock
-and must share the adapter lock's owner repository and source revision.
-Duplicate distributions, colliding filenames, orphan locks, and shared
-adapter locks are refused.
+and must share the adapter lock's owner repository, but it records the source
+revision of *its own* published wheel. A separately released compatible
+companion can therefore remain pinned when a new adapter wheel declares the
+same exact companion version. Duplicate distributions, colliding filenames,
+orphan locks, and shared adapter locks are refused.
 
 Owner releases may use either a source-SHA tag or an exact semantic-version
 tag. For a semantic-version tag, evidence must show that the tag resolves to
 `source_revision`; the release URL, full revision, digest, and installed
-version remain independently checked. ActionQ `v0.1.14` resolves to
-`dd41a9860cf9f07a4776f8279e048d70fd6dbb05` and ships `actionq` 0.1.14 with
-the pinned `actionq-contracts` 0.1.1 companion.
+version remain independently checked. ActionQ `v0.1.17` resolves to
+`70a1628aae5879c06d4226ba0de3255f9f99ca5d` and ships `actionq` 0.1.17,
+whose published metadata requires `actionq-contracts==0.1.1`. The separately
+released companion remains locked to its own immutable release revision.
 
 Update a lock and its descriptor together. Do not install from a local
 checkout, mutate a downloaded wheel, or substitute a deployment overlay for
