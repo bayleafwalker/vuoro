@@ -54,10 +54,17 @@ def test_adapter_dependencies_are_optional_strict_and_unique() -> None:
         AdapterPin.from_dict(_adapter() | {"dependencies": [_dependency() | {"extra": True}]})
     with pytest.raises(CompositionError, match="duplicate"):
         AdapterPin.from_dict(_adapter() | {"dependencies": [_dependency(), _dependency()]})
-    with pytest.raises(CompositionError, match="same owner revision"):
+    assert AdapterPin.from_dict(
+        _adapter()
+        | {"dependencies": [_dependency() | {"source_revision": "c" * 40}]}
+    ).dependencies[0].source_revision == "c" * 40
+    with pytest.raises(CompositionError, match="same owner repository"):
         AdapterPin.from_dict(
             _adapter()
-            | {"dependencies": [_dependency() | {"source_revision": "c" * 40}]}
+            | {"dependencies": [_dependency() | {
+                "source_repository": "https://github.com/example/other",
+                "artifact_url": "https://github.com/example/other/releases/download/v1.0.0/companion.whl",
+            }]}
         )
 
 

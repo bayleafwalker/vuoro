@@ -73,12 +73,13 @@ def test_checked_in_adapter_artifact_urls_are_source_named_or_exact_semver_relea
 def test_checked_in_execution_pin_includes_released_contract_companion() -> None:
     pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("execution")
     assert (pin.source_revision, pin.distribution_version, pin.schema_version) == (
-        "e82d7bfe87eef847d1814124e0aa45543e82d539", "0.1.16", "actionq-schema/v6")
+        "70a1628aae5879c06d4226ba0de3255f9f99ca5d", "0.1.17", "actionq-schema/v7")
     assert [(item.distribution, item.distribution_version) for item in pin.dependencies] == [
         ("actionq-contracts", "0.1.1")]
     assert pin.artifact_sha256 == (
-        "27d48683f4843f683288e4fb5574dc654aa132d8ec7a1d5fa1b901ea40255817"
+        "989f5f445dc6a4095a09c8113ff0bf9eeef24b023076d56cce9882e88c60054a"
     )
+    assert pin.dependencies[0].source_revision == "e82d7bfe87eef847d1814124e0aa45543e82d539"
 
 
 def test_checked_in_work_pin_is_the_qualified_schema5_bridge_release() -> None:

@@ -13,11 +13,11 @@
     {
       "lock_id": "execution-adapter",
       "source_repository": "https://github.com/bayleafwalker/actionq",
-      "source_revision": "e82d7bfe87eef847d1814124e0aa45543e82d539",
-      "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/vuoro-adapter-v1-e82d7bf/actionq-0.1.16-py3-none-any.whl",
-      "artifact_sha256": "27d48683f4843f683288e4fb5574dc654aa132d8ec7a1d5fa1b901ea40255817",
+      "source_revision": "70a1628aae5879c06d4226ba0de3255f9f99ca5d",
+      "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/v0.1.17/actionq-0.1.17-py3-none-any.whl",
+      "artifact_sha256": "989f5f445dc6a4095a09c8113ff0bf9eeef24b023076d56cce9882e88c60054a",
       "distribution": "actionq",
-      "distribution_version": "0.1.16"
+      "distribution_version": "0.1.17"
     },
     {
       "lock_id": "execution-contracts",
@@ -64,7 +64,7 @@
       "adapter_module": "actionq.vuoro",
       "register": "register_operations",
       "api_version": "execution/v1",
-      "schema_version": "actionq-schema/v6"
+      "schema_version": "actionq-schema/v7"
     },
     {
       "domain": "knowledge",
