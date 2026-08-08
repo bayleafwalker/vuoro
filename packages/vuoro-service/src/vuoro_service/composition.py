@@ -43,7 +43,15 @@ class CompositionError(RuntimeError):
 
 
 @dataclass(frozen=True)
-class ArtifactPin:
+class ReleaseLock:
+    """Immutable identity of one wheel installed in this service release.
+
+    This deliberately contains no domain or adapter registration information:
+    the same release lock can be a companion dependency rather than a catalog
+    adapter.  Runtime selection belongs to :class:`RuntimeAdapterDescriptor`.
+    """
+
+    lock_id: str
     source_repository: str
     source_revision: str
     artifact_url: str
@@ -52,17 +60,17 @@ class ArtifactPin:
     distribution_version: str
 
     @classmethod
-    def from_dict(cls, raw: Mapping[str, Any]) -> "ArtifactPin":
+    def from_dict(cls, raw: Mapping[str, Any]) -> "ReleaseLock":
         field_names = {field.name for field in fields(cls)}
         if set(raw) != field_names:
-            raise CompositionError("dependency pin fields do not match the v1 contract")
+            raise CompositionError("release lock fields do not match the v2 contract")
         pin = cls(**{field: raw[field] for field in field_names})
         if not all(
             isinstance(getattr(pin, field), str) and getattr(pin, field)
             for field in field_names
         ):
-            raise CompositionError("dependency pin values must be non-empty strings")
-        _validate_artifact_pin(pin, pin.distribution)
+            raise CompositionError("release lock values must be non-empty strings")
+        _validate_release_lock(pin, pin.lock_id)
         return pin
 
 
@@ -99,7 +107,7 @@ def _release_wheel_identity(source_repository: str, artifact_url: str) -> tuple[
     return artifact_parts[4], artifact_parts[5]
 
 
-def _validate_artifact_pin(pin: Any, label: str) -> None:
+def _validate_release_lock(pin: Any, label: str) -> None:
     if not _GIT_SHA.fullmatch(pin.source_revision):
         raise CompositionError(f"{label}: source_revision must be a full Git SHA")
     if not _SHA256.fullmatch(pin.artifact_sha256):
@@ -111,70 +119,165 @@ def _validate_artifact_pin(pin: Any, label: str) -> None:
 
 
 @dataclass(frozen=True)
-class AdapterPin(ArtifactPin):
+class RuntimeAdapterDescriptor:
+    """Serve-time adapter selection which refers only to immutable locks."""
+
     domain: str
+    lock_id: str
+    dependency_lock_ids: tuple[str, ...]
     adapter_module: str
     register: str
-    migration_entrypoint: str
     api_version: str
     schema_version: str
-    dependencies: tuple[ArtifactPin, ...] = ()
 
     @classmethod
-    def from_dict(cls, raw: Mapping[str, Any]) -> "AdapterPin":
-        required_fields = {
+    def from_dict(cls, raw: Mapping[str, Any]) -> "RuntimeAdapterDescriptor":
+        field_names = {
             "domain",
-            "source_repository",
-            "source_revision",
-            "artifact_url",
-            "artifact_sha256",
-            "distribution",
-            "distribution_version",
+            "lock_id",
+            "dependency_lock_ids",
             "adapter_module",
             "register",
-            "migration_entrypoint",
             "api_version",
             "schema_version",
         }
-        if not required_fields <= set(raw) <= required_fields | {"dependencies"}:
+        if set(raw) != field_names:
+            raise CompositionError("runtime descriptor fields do not match the v2 contract")
+        dependency_lock_ids = raw["dependency_lock_ids"]
+        if not isinstance(dependency_lock_ids, list):
+            raise CompositionError("runtime descriptor dependency_lock_ids must be an array")
+        pin = cls(
+            **{field: raw[field] for field in field_names - {"dependency_lock_ids"}},
+            dependency_lock_ids=tuple(dependency_lock_ids),
+        )
+        if not all(
+            isinstance(getattr(pin, field), str) and getattr(pin, field)
+            for field in field_names - {"dependency_lock_ids"}
+        ):
+            raise CompositionError("runtime descriptor values must be non-empty strings")
+        if (
+            not all(isinstance(lock_id, str) and lock_id for lock_id in pin.dependency_lock_ids)
+            or len(pin.dependency_lock_ids) != len(set(pin.dependency_lock_ids))
+            or pin.lock_id in pin.dependency_lock_ids
+        ):
+            raise CompositionError(f"{pin.domain}: invalid dependency lock references")
+        return pin
+
+
+@dataclass(frozen=True)
+class AdapterPin:
+    """A validated runtime descriptor joined to its immutable release locks."""
+
+    descriptor: RuntimeAdapterDescriptor
+    release_lock: ReleaseLock
+    dependencies: tuple[ReleaseLock, ...] = ()
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, Any]) -> "AdapterPin":
+        """Read the former single-record shape for test/helper compatibility.
+
+        Release manifests are parsed exclusively through the v2 split above.
+        """
+        fields_v1 = {
+            "domain", "source_repository", "source_revision", "artifact_url",
+            "artifact_sha256", "distribution", "distribution_version", "adapter_module",
+            "register", "migration_entrypoint", "api_version", "schema_version",
+        }
+        if not fields_v1 <= set(raw) <= fields_v1 | {"dependencies"}:
             raise CompositionError("adapter pin fields do not match the v1 contract")
         dependencies_raw = raw.get("dependencies", [])
         if not isinstance(dependencies_raw, list):
             raise CompositionError("adapter dependencies must be an array")
-        values = {field: raw[field] for field in required_fields}
-        pin = cls(
-            **values,
-            dependencies=tuple(
-                ArtifactPin.from_dict(item)
-                for item in dependencies_raw
-                if isinstance(item, dict)
-            ),
+        domain = raw["domain"]
+        lock = ReleaseLock.from_dict({
+            "lock_id": domain,
+            **{key: raw[key] for key in (
+                "source_repository", "source_revision", "artifact_url", "artifact_sha256",
+                "distribution", "distribution_version",
+            )},
+        })
+        dependencies = tuple(
+            ReleaseLock.from_dict({"lock_id": f"{domain}-dependency-{index}", **item})
+            for index, item in enumerate(dependencies_raw)
+            if isinstance(item, dict)
         )
-        if len(pin.dependencies) != len(dependencies_raw):
+        if len(dependencies) != len(dependencies_raw):
             raise CompositionError("adapter dependencies must be objects")
-        if not all(
-            isinstance(getattr(pin, field), str) and getattr(pin, field)
-            for field in required_fields
-        ):
-            raise CompositionError("adapter pin values must be non-empty strings")
-        _validate_artifact_pin(pin, pin.domain)
-        distributions = [dependency.distribution for dependency in pin.dependencies]
+        distributions = [dependency.distribution for dependency in dependencies]
         if len(distributions) != len(set(distributions)):
-            raise CompositionError(f"{pin.domain}: duplicate dependency distribution")
+            raise CompositionError(f"{domain}: duplicate dependency distribution")
         if any(
-            dependency.source_repository != pin.source_repository
-            or dependency.source_revision != pin.source_revision
-            for dependency in pin.dependencies
+            dependency.source_repository != lock.source_repository
+            or dependency.source_revision != lock.source_revision
+            for dependency in dependencies
         ):
-            raise CompositionError(
-                f"{pin.domain}: dependencies must come from the same owner revision"
-            )
-        return pin
+            raise CompositionError(f"{domain}: dependencies must come from the same owner revision")
+        descriptor = RuntimeAdapterDescriptor(
+            domain=domain,
+            lock_id=domain,
+            dependency_lock_ids=tuple(dependency.lock_id for dependency in dependencies),
+            adapter_module=raw["adapter_module"],
+            register=raw["register"],
+            api_version=raw["api_version"],
+            schema_version=raw["schema_version"],
+        )
+        if not all(isinstance(value, str) and value for value in (
+            descriptor.domain, descriptor.adapter_module, descriptor.register,
+            descriptor.api_version, descriptor.schema_version,
+        )):
+            raise CompositionError("adapter pin values must be non-empty strings")
+        return cls(descriptor, lock, dependencies)
+
+    @property
+    def domain(self) -> str:
+        return self.descriptor.domain
+
+    @property
+    def adapter_module(self) -> str:
+        return self.descriptor.adapter_module
+
+    @property
+    def register(self) -> str:
+        return self.descriptor.register
+
+    @property
+    def api_version(self) -> str:
+        return self.descriptor.api_version
+
+    @property
+    def schema_version(self) -> str:
+        return self.descriptor.schema_version
+
+    @property
+    def distribution(self) -> str:
+        return self.release_lock.distribution
+
+    @property
+    def distribution_version(self) -> str:
+        return self.release_lock.distribution_version
+
+    @property
+    def source_repository(self) -> str:
+        return self.release_lock.source_repository
+
+    @property
+    def source_revision(self) -> str:
+        return self.release_lock.source_revision
+
+    @property
+    def artifact_url(self) -> str:
+        return self.release_lock.artifact_url
+
+    @property
+    def artifact_sha256(self) -> str:
+        return self.release_lock.artifact_sha256
 
 
 @dataclass(frozen=True)
 class CompositionManifest:
     schema_version: str
+    release_locks: tuple[ReleaseLock, ...]
+    runtime_descriptors: tuple[RuntimeAdapterDescriptor, ...]
     adapters: tuple[AdapterPin, ...]
 
     @classmethod
@@ -183,21 +286,64 @@ class CompositionManifest:
             raw = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
             raise CompositionError(f"cannot load composition manifest: {path}") from error
-        if not isinstance(raw, dict) or set(raw) != {"schema_version", "adapters"}:
-            raise CompositionError("composition manifest must use the v1 top-level shape")
-        if raw["schema_version"] != "vuoro-composition/v1" or not isinstance(raw["adapters"], list):
+        expected_fields = {"schema_version", "release_locks", "runtime_descriptors"}
+        if not isinstance(raw, dict) or set(raw) != expected_fields:
+            raise CompositionError("composition manifest must use the v2 top-level shape")
+        if (
+            raw["schema_version"] != "vuoro-composition/v2"
+            or not isinstance(raw["release_locks"], list)
+            or not isinstance(raw["runtime_descriptors"], list)
+        ):
             raise CompositionError("unsupported composition manifest")
-        adapters = tuple(AdapterPin.from_dict(item) for item in raw["adapters"] if isinstance(item, dict))
-        if len(adapters) != len(raw["adapters"]) or {pin.domain for pin in adapters} != _REQUIRED_DOMAINS:
-            raise CompositionError("composition must pin exactly work, execution, knowledge, and audit")
-        distributions = [
-            pin.distribution
-            for adapter in adapters
-            for pin in (adapter, *adapter.dependencies)
-        ]
+        locks = tuple(ReleaseLock.from_dict(item) for item in raw["release_locks"] if isinstance(item, dict))
+        descriptors = tuple(
+            RuntimeAdapterDescriptor.from_dict(item)
+            for item in raw["runtime_descriptors"]
+            if isinstance(item, dict)
+        )
+        if len(locks) != len(raw["release_locks"]) or len(descriptors) != len(raw["runtime_descriptors"]):
+            raise CompositionError("release locks and runtime descriptors must be objects")
+        lock_ids = [lock.lock_id for lock in locks]
+        distributions = [lock.distribution for lock in locks]
+        if len(lock_ids) != len(set(lock_ids)):
+            raise CompositionError("composition contains duplicate lock identifiers")
         if len(distributions) != len(set(distributions)):
             raise CompositionError("composition contains duplicate distributions")
-        return cls(schema_version=raw["schema_version"], adapters=adapters)
+        if {descriptor.domain for descriptor in descriptors} != _REQUIRED_DOMAINS:
+            raise CompositionError("composition must pin exactly work, execution, knowledge, and audit")
+        if len(descriptors) != len(_REQUIRED_DOMAINS):
+            raise CompositionError("composition contains duplicate runtime domains")
+        by_id = {lock.lock_id: lock for lock in locks}
+        referenced: list[str] = []
+        adapters: list[AdapterPin] = []
+        for descriptor in descriptors:
+            try:
+                release_lock = by_id[descriptor.lock_id]
+                dependencies = tuple(by_id[lock_id] for lock_id in descriptor.dependency_lock_ids)
+            except KeyError as error:
+                raise CompositionError(
+                    f"{descriptor.domain}: runtime descriptor references an unknown release lock"
+                ) from error
+            if any(
+                dependency.source_repository != release_lock.source_repository
+                or dependency.source_revision != release_lock.source_revision
+                for dependency in dependencies
+            ):
+                raise CompositionError(
+                    f"{descriptor.domain}: dependencies must come from the same owner revision"
+                )
+            referenced.extend((descriptor.lock_id, *descriptor.dependency_lock_ids))
+            adapters.append(AdapterPin(descriptor, release_lock, dependencies))
+        if len(referenced) != len(set(referenced)):
+            raise CompositionError("release locks cannot be shared by runtime descriptors")
+        if set(referenced) != set(lock_ids):
+            raise CompositionError("composition contains an orphan release lock")
+        return cls(
+            schema_version=raw["schema_version"],
+            release_locks=locks,
+            runtime_descriptors=descriptors,
+            adapters=tuple(adapters),
+        )
 
     def pin(self, domain: str) -> AdapterPin:
         for pin in self.adapters:
@@ -546,6 +692,8 @@ __all__ = [
     "AdapterPin",
     "CompositionError",
     "CompositionManifest",
+    "ReleaseLock",
+    "RuntimeAdapterDescriptor",
     "create_composed_app",
     "load_development_identities",
     "load_identities",

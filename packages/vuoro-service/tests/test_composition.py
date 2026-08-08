@@ -26,6 +26,28 @@ def test_checked_in_manifest_pins_all_four_domains() -> None:
     assert {pin.domain for pin in manifest.adapters} == {"work", "execution", "knowledge", "audit"}
     assert all(len(pin.source_revision) == 40 for pin in manifest.adapters)
     assert all(len(pin.artifact_sha256) == 64 for pin in manifest.adapters)
+    assert all("migration_entrypoint" not in descriptor.__dict__ for descriptor in manifest.runtime_descriptors)
+
+
+def test_v2_composition_fails_closed_on_duplicate_and_orphan_release_locks(
+    tmp_path: Path,
+) -> None:
+    source = ROOT / "composition" / "adapter-pins.json"
+    raw = json.loads(source.read_text(encoding="utf-8"))
+    path = tmp_path / "manifest.json"
+
+    duplicate = raw["release_locks"][0].copy()
+    duplicate["lock_id"] = "duplicate-work"
+    raw["release_locks"].append(duplicate)
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(CompositionError, match="duplicate distributions"):
+        CompositionManifest.load(path)
+
+    raw = json.loads(source.read_text(encoding="utf-8"))
+    raw["runtime_descriptors"][1]["dependency_lock_ids"] = []
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(CompositionError, match="orphan"):
+        CompositionManifest.load(path)
 
 
 def test_checked_in_adapter_artifact_urls_are_immutable_github_release_wheels() -> None:
@@ -121,14 +143,13 @@ def test_artifact_verification_fails_closed_on_mismatch(tmp_path: Path) -> None:
     raw = json.loads(source.read_text(encoding="utf-8"))
     artifact = tmp_path / "sprintctl-0.2.0-py3-none-any.whl"
     artifact.write_bytes(b"immutable-work-adapter")
-    raw["adapters"] = [raw["adapters"][0]]
-    raw["adapters"][0]["domain"] = "work"
+    raw["runtime_descriptors"] = [raw["runtime_descriptors"][0]]
     path = tmp_path / "manifest.json"
     path.write_text(json.dumps(raw), encoding="utf-8")
     with pytest.raises(CompositionError, match="exactly"):
         CompositionManifest.load(path)
-    raw["adapters"] = json.loads(source.read_text(encoding="utf-8"))["adapters"]
-    raw["adapters"][0]["artifact_sha256"] = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    raw = json.loads(source.read_text(encoding="utf-8"))
+    raw["release_locks"][0]["artifact_sha256"] = hashlib.sha256(artifact.read_bytes()).hexdigest()
     path.write_text(json.dumps(raw), encoding="utf-8")
     manifest = CompositionManifest.load(path)
     with pytest.raises(CompositionError, match="unavailable"):

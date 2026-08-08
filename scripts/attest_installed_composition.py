@@ -18,32 +18,22 @@ import sys
 
 def _pinned(manifest: dict) -> list[dict]:
     entries: list[dict] = []
-    for adapter in manifest["adapters"]:
+    if manifest.get("schema_version") != "vuoro-composition/v2":
+        raise SystemExit("unsupported composition schema_version")
+    for lock in manifest.get("release_locks", []):
+        if not isinstance(lock, dict):
+            raise SystemExit("release locks must be objects")
         entries.append(
             {
-                "domain": adapter["domain"],
-                "role": "adapter",
-                "distribution": adapter["distribution"],
-                "expected_version": adapter["distribution_version"],
-                "artifact_url": adapter["artifact_url"],
-                "artifact_sha256": adapter["artifact_sha256"],
-                "source_repository": adapter["source_repository"],
-                "source_revision": adapter["source_revision"],
+                "lock_id": lock["lock_id"],
+                "distribution": lock["distribution"],
+                "expected_version": lock["distribution_version"],
+                "artifact_url": lock["artifact_url"],
+                "artifact_sha256": lock["artifact_sha256"],
+                "source_repository": lock["source_repository"],
+                "source_revision": lock["source_revision"],
             }
         )
-        for dependency in adapter.get("dependencies", ()):
-            entries.append(
-                {
-                    "domain": adapter["domain"],
-                    "role": "dependency",
-                    "distribution": dependency["distribution"],
-                    "expected_version": dependency["distribution_version"],
-                    "artifact_url": dependency["artifact_url"],
-                    "artifact_sha256": dependency["artifact_sha256"],
-                    "source_repository": adapter["source_repository"],
-                    "source_revision": adapter["source_revision"],
-                }
-            )
     return entries
 
 
