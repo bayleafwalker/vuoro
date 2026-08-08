@@ -10,7 +10,7 @@ image so the running container can be asked what it actually contains.
 from __future__ import annotations
 
 import hashlib
-from importlib.metadata import PackageNotFoundError, version
+from importlib.metadata import PackageNotFoundError, distribution, version
 import json
 from pathlib import Path
 import sys
@@ -18,33 +18,45 @@ import sys
 
 def _pinned(manifest: dict) -> list[dict]:
     entries: list[dict] = []
-    for adapter in manifest["adapters"]:
+    if manifest.get("schema_version") != "vuoro-composition/v2":
+        raise SystemExit("unsupported composition schema_version")
+    for lock in manifest.get("release_locks", []):
+        if not isinstance(lock, dict):
+            raise SystemExit("release locks must be objects")
         entries.append(
             {
-                "domain": adapter["domain"],
-                "role": "adapter",
-                "distribution": adapter["distribution"],
-                "expected_version": adapter["distribution_version"],
-                "artifact_url": adapter["artifact_url"],
-                "artifact_sha256": adapter["artifact_sha256"],
-                "source_repository": adapter["source_repository"],
-                "source_revision": adapter["source_revision"],
+                "lock_id": lock["lock_id"],
+                "distribution": lock["distribution"],
+                "expected_version": lock["distribution_version"],
+                "artifact_url": lock["artifact_url"],
+                "artifact_sha256": lock["artifact_sha256"],
+                "source_repository": lock["source_repository"],
+                "source_revision": lock["source_revision"],
             }
         )
-        for dependency in adapter.get("dependencies", ()):
-            entries.append(
-                {
-                    "domain": adapter["domain"],
-                    "role": "dependency",
-                    "distribution": dependency["distribution"],
-                    "expected_version": dependency["distribution_version"],
-                    "artifact_url": dependency["artifact_url"],
-                    "artifact_sha256": dependency["artifact_sha256"],
-                    "source_repository": adapter["source_repository"],
-                    "source_revision": adapter["source_revision"],
-                }
-            )
     return entries
+
+
+def _installed_files_digest(distribution_name: str) -> tuple[str, int]:
+    """Hash every installed file named by the wheel's installed RECORD.
+
+    The lock verifies the wheel before installation; this second digest binds
+    that lock to the actual files which Python will import at service startup.
+    """
+    installed = distribution(distribution_name)
+    files = installed.files
+    if not files:
+        raise RuntimeError(f"{distribution_name}: installed RECORD is unavailable")
+    entries: list[tuple[str, str]] = []
+    for file in sorted(files, key=str):
+        path = installed.locate_file(file)
+        try:
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError as error:
+            raise RuntimeError(f"{distribution_name}: installed file is unavailable: {file}") from error
+        entries.append((str(file), digest))
+    encoded = json.dumps(entries, separators=(",", ":"), ensure_ascii=True).encode()
+    return hashlib.sha256(encoded).hexdigest(), len(entries)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -82,6 +94,13 @@ def main(argv: list[str] | None = None) -> int:
                 f"{entry['distribution']}: installed {installed!r}, "
                 f"composition pins {entry['expected_version']!r}"
             )
+        try:
+            files_digest, files_count = _installed_files_digest(entry["distribution"])
+        except (PackageNotFoundError, RuntimeError) as error:
+            failures.append(str(error))
+            files_digest, files_count = None, 0
+        record["installed_files_sha256"] = files_digest
+        record["installed_files_count"] = files_count
         attested.append(record)
 
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -90,6 +109,7 @@ def main(argv: list[str] | None = None) -> int:
             {
                 "schema_version": "vuoro-installed-composition/v1",
                 "verified": not failures,
+                "manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
                 "distributions": attested,
             },
             indent=2,

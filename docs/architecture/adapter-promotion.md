@@ -5,11 +5,18 @@ This document governs a source-only update to
 an image release, deployment change, schema migration, data backfill, or
 runtime validation.
 
-## Immutable pin update
+## Release-lock and runtime-descriptor update
 
-An adapter update is one reviewable manifest change. For every changed
-adapter, the reviewer must establish all of the following before editing the
-pin:
+Composition v2 deliberately separates immutable release identity from
+serve-time registration. `release_locks` contain only `lock_id`, owner
+repository/revision, wheel URL/digest, and distribution/version. Runtime
+descriptors bind one domain to a `lock_id`, any dependency lock IDs, and its
+adapter module, registration entrypoint, API, and schema versions. Descriptors
+contain no migration entrypoint: Vuoro never migrates an owner domain at
+startup.
+
+For every changed release lock, the reviewer must establish all of the
+following before editing it:
 
 1. The owner repository has committed the adapter implementation and its
    contract/integration tests. Record the full source commit SHA in
@@ -18,17 +25,17 @@ pin:
    a GitHub release asset, its SHA-256 must match the downloaded bytes, and
    its installed distribution version must equal `distribution_version`.
    Reusing a version for a different wheel is not a valid promotion.
-3. The adapter's declared API and schema versions are compatible with the
-   values in the pin. A version change requires the corresponding Vuoro
+3. The matching runtime descriptor's declared API and schema versions are
+   compatible with the owner release. A version change requires the corresponding Vuoro
    compatibility review; matching Python package versions are not sufficient.
-4. The source commit, release asset, checksum, distribution version, adapter
-   module, and registration entrypoint describe the *same* owner release.
+4. The descriptor lock reference, source commit, release asset, checksum, and
+   distribution version describe the *same* owner release.
 
-An adapter may declare a strict `dependencies` array when its public runtime
-contract is shipped as a separate distribution. Each companion records the
-same immutable source, release URL, checksum, distribution, and version fields
-as the primary wheel. Companion wheels are fetched and verified with the
-adapter; duplicate distributions and colliding filenames are refused.
+A descriptor may declare strict `dependency_lock_ids` when its public runtime
+contract is a separate distribution. Each companion is its own release lock
+and must share the adapter lock's owner repository and source revision.
+Duplicate distributions, colliding filenames, orphan locks, and shared
+adapter locks are refused.
 
 Owner releases may use either a source-SHA tag or an exact semantic-version
 tag. For a semantic-version tag, evidence must show that the tag resolves to
@@ -37,11 +44,13 @@ version remain independently checked. ActionQ `v0.1.14` resolves to
 `dd41a9860cf9f07a4776f8279e048d70fd6dbb05` and ships `actionq` 0.1.14 with
 the pinned `actionq-contracts` 0.1.1 companion.
 
-Update all related fields in the one adapter object together. Do not install
-from a local checkout, mutate a downloaded wheel, or substitute a deployment
-overlay for the manifest. The container build fetches exactly these release
-assets, and service startup verifies their checksums before importing an
-adapter.
+Update a lock and its descriptor together. Do not install from a local
+checkout, mutate a downloaded wheel, or substitute a deployment overlay for
+the manifest. The container build fetches exactly these release assets and
+records the installed wheel files; service startup verifies that record before
+importing an owner adapter. Auditctl intentionally remains an explicit
+instance-registration exception because its released adapter contract exposes
+`VuoroAuditAdapter.register`, not the shared function registration protocol.
 
 ## Sprintctl blind-agent promotion gate
 

@@ -30,6 +30,22 @@ def _adapter() -> dict:
         "api_version": "execution/v1", "schema_version": "owner-schema/v1"}
 
 
+def _release_lock(lock_id: str, raw: dict) -> dict:
+    fields = {
+        "source_repository", "source_revision", "artifact_url", "artifact_sha256",
+        "distribution", "distribution_version",
+    }
+    return {"lock_id": lock_id, **{field: raw[field] for field in fields}}
+
+
+def _v2_manifest(*locks: dict) -> dict:
+    return {
+        "schema_version": "vuoro-composition/v2",
+        "release_locks": list(locks),
+        "runtime_descriptors": [],
+    }
+
+
 def test_adapter_dependencies_are_optional_strict_and_unique() -> None:
     assert AdapterPin.from_dict(_adapter()).dependencies == ()
     raw = _adapter() | {"dependencies": [_dependency()]}
@@ -52,14 +68,9 @@ def test_fetcher_rejects_dependency_filename_collisions() -> None:
     spec.loader.exec_module(module)
     dependency = _dependency() | {"artifact_url": _adapter()["artifact_url"], "distribution": "companion"}
     with pytest.raises(SystemExit, match="filename collision"):
-        module.artifact_pins({"schema_version": "vuoro-composition/v1",
-            "adapters": [_adapter() | {"dependencies": [dependency]}]})
-    drifted = _dependency() | {"source_revision": "c" * 40}
-    with pytest.raises(SystemExit, match="owner revision"):
-        module.artifact_pins(
-            {"schema_version": "vuoro-composition/v1",
-             "adapters": [_adapter() | {"dependencies": [drifted]}]}
-        )
+        module.artifact_pins(_v2_manifest(
+            _release_lock("owner", _adapter()), _release_lock("companion", dependency)
+        ))
 
 
 @pytest.mark.parametrize(
@@ -85,9 +96,7 @@ def test_runtime_and_fetcher_reject_ambiguous_release_urls(artifact_url: str) ->
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     with pytest.raises(SystemExit, match="canonical|release wheel"):
-        module.artifact_pins(
-            {"schema_version": "vuoro-composition/v1", "adapters": [raw]}
-        )
+        module.artifact_pins(_v2_manifest(_release_lock("owner", raw)))
 
 
 def test_adapter_load_fails_before_import_on_companion_version_mismatch(monkeypatch) -> None:

@@ -44,47 +44,36 @@ def _release_wheel_filename(source_repository: str, artifact_url: str) -> str:
 
 
 def artifact_pins(manifest: object) -> list[tuple[str, dict[str, str]]]:
-    if not isinstance(manifest, dict) or set(manifest) != {"schema_version", "adapters"}:
+    if not isinstance(manifest, dict) or set(manifest) != {
+        "schema_version", "release_locks", "runtime_descriptors"
+    }:
         raise SystemExit("invalid composition manifest")
-    if manifest["schema_version"] != "vuoro-composition/v1":
+    if manifest["schema_version"] != "vuoro-composition/v2":
         raise SystemExit("unsupported composition schema_version")
-    adapters = manifest["adapters"]
-    if not isinstance(adapters, list):
-        raise SystemExit("composition adapters must be an array")
+    locks = manifest["release_locks"]
+    if not isinstance(locks, list) or not isinstance(manifest["runtime_descriptors"], list):
+        raise SystemExit("composition release locks and runtime descriptors must be arrays")
     pins: list[tuple[str, dict[str, str]]] = []
     seen_distributions: set[str] = set()
     seen_filenames: set[str] = set()
-    for adapter in adapters:
-        if not isinstance(adapter, dict):
-            raise SystemExit("adapter pins must be objects")
-        dependencies = adapter.get("dependencies", [])
-        if not isinstance(dependencies, list):
-            raise SystemExit("adapter dependencies must be an array")
-        for label, pin in [(str(adapter.get("domain", "adapter")), adapter), *[("dependency", item) for item in dependencies]]:
-            if not isinstance(pin, dict):
-                raise SystemExit("dependency pins must be objects")
-            if label == "dependency" and set(pin) != _ARTIFACT_FIELDS:
-                raise SystemExit("dependency pin fields do not match the v1 contract")
-            if not _ARTIFACT_FIELDS <= set(pin) or not all(isinstance(pin[key], str) and pin[key] for key in _ARTIFACT_FIELDS):
-                raise SystemExit(f"invalid artifact pin for {label}")
-            if not re.fullmatch(r"[0-9a-f]{40}", pin["source_revision"]):
-                raise SystemExit(f"invalid source revision for {label}")
-            if not re.fullmatch(r"[0-9a-f]{64}", pin["artifact_sha256"]):
-                raise SystemExit(f"invalid artifact digest for {label}")
-            if label == "dependency" and (
-                pin["source_repository"] != adapter.get("source_repository")
-                or pin["source_revision"] != adapter.get("source_revision")
-            ):
-                raise SystemExit("dependency must come from the adapter owner revision")
-            distribution = pin["distribution"]
-            filename = _release_wheel_filename(pin["source_repository"], pin["artifact_url"])
-            if distribution in seen_distributions:
-                raise SystemExit(f"duplicate distribution: {distribution}")
-            if filename in seen_filenames:
-                raise SystemExit(f"artifact filename collision: {filename}")
-            seen_distributions.add(distribution)
-            seen_filenames.add(filename)
-            pins.append((label, pin))
+    for pin in locks:
+        if not isinstance(pin, dict) or set(pin) != _ARTIFACT_FIELDS | {"lock_id"}:
+            raise SystemExit("release lock fields do not match the v2 contract")
+        if not all(isinstance(pin[key], str) and pin[key] for key in _ARTIFACT_FIELDS | {"lock_id"}):
+            raise SystemExit("invalid release lock")
+        if not re.fullmatch(r"[0-9a-f]{40}", pin["source_revision"]):
+            raise SystemExit("invalid source revision")
+        if not re.fullmatch(r"[0-9a-f]{64}", pin["artifact_sha256"]):
+            raise SystemExit("invalid artifact digest")
+        distribution = pin["distribution"]
+        filename = _release_wheel_filename(pin["source_repository"], pin["artifact_url"])
+        if distribution in seen_distributions:
+            raise SystemExit(f"duplicate distribution: {distribution}")
+        if filename in seen_filenames:
+            raise SystemExit(f"artifact filename collision: {filename}")
+        seen_distributions.add(distribution)
+        seen_filenames.add(filename)
+        pins.append((pin["lock_id"], pin))
     return pins
 
 

@@ -46,8 +46,13 @@ class StubApplication:
 
 def _pins(path: Path) -> tuple[dict, dict]:
     manifest = json.loads(path.read_text(encoding="utf-8"))
-    adapter = next(pin for pin in manifest["adapters"] if pin["domain"] == "execution")
-    return adapter, adapter["dependencies"][0]
+    if manifest.get("schema_version") != "vuoro-composition/v2":
+        raise SystemExit("unsupported composition schema_version")
+    descriptor = next(item for item in manifest["runtime_descriptors"] if item["domain"] == "execution")
+    locks = {lock["lock_id"]: lock for lock in manifest["release_locks"]}
+    if len(descriptor["dependency_lock_ids"]) != 1:
+        raise SystemExit("execution descriptor must identify exactly one contract dependency lock")
+    return locks[descriptor["lock_id"]], locks[descriptor["dependency_lock_ids"][0]]
 
 
 async def _exercise() -> None:

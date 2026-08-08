@@ -13,6 +13,7 @@ from vuoro_service.composition import (
     create_composed_app,
     load_identities,
     verify_adapter_artifacts,
+    verify_installed_composition,
     _execution_authorizer,
 )
 from vuoro_service.project_binding import load_project_bindings
@@ -26,6 +27,28 @@ def test_checked_in_manifest_pins_all_four_domains() -> None:
     assert {pin.domain for pin in manifest.adapters} == {"work", "execution", "knowledge", "audit"}
     assert all(len(pin.source_revision) == 40 for pin in manifest.adapters)
     assert all(len(pin.artifact_sha256) == 64 for pin in manifest.adapters)
+    assert all("migration_entrypoint" not in descriptor.__dict__ for descriptor in manifest.runtime_descriptors)
+
+
+def test_v2_composition_fails_closed_on_duplicate_and_orphan_release_locks(
+    tmp_path: Path,
+) -> None:
+    source = ROOT / "composition" / "adapter-pins.json"
+    raw = json.loads(source.read_text(encoding="utf-8"))
+    path = tmp_path / "manifest.json"
+
+    duplicate = raw["release_locks"][0].copy()
+    duplicate["lock_id"] = "duplicate-work"
+    raw["release_locks"].append(duplicate)
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(CompositionError, match="duplicate distributions"):
+        CompositionManifest.load(path)
+
+    raw = json.loads(source.read_text(encoding="utf-8"))
+    raw["runtime_descriptors"][1]["dependency_lock_ids"] = []
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(CompositionError, match="orphan"):
+        CompositionManifest.load(path)
 
 
 def test_checked_in_adapter_artifact_urls_are_immutable_github_release_wheels() -> None:
@@ -121,18 +144,50 @@ def test_artifact_verification_fails_closed_on_mismatch(tmp_path: Path) -> None:
     raw = json.loads(source.read_text(encoding="utf-8"))
     artifact = tmp_path / "sprintctl-0.2.0-py3-none-any.whl"
     artifact.write_bytes(b"immutable-work-adapter")
-    raw["adapters"] = [raw["adapters"][0]]
-    raw["adapters"][0]["domain"] = "work"
+    raw["runtime_descriptors"] = [raw["runtime_descriptors"][0]]
     path = tmp_path / "manifest.json"
     path.write_text(json.dumps(raw), encoding="utf-8")
     with pytest.raises(CompositionError, match="exactly"):
         CompositionManifest.load(path)
-    raw["adapters"] = json.loads(source.read_text(encoding="utf-8"))["adapters"]
-    raw["adapters"][0]["artifact_sha256"] = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    raw = json.loads(source.read_text(encoding="utf-8"))
+    raw["release_locks"][0]["artifact_sha256"] = hashlib.sha256(artifact.read_bytes()).hexdigest()
     path.write_text(json.dumps(raw), encoding="utf-8")
     manifest = CompositionManifest.load(path)
     with pytest.raises(CompositionError, match="unavailable"):
         verify_adapter_artifacts(manifest, tmp_path)
+
+
+def test_installed_attestation_binds_each_runtime_import_to_the_release_lock(tmp_path: Path, monkeypatch) -> None:
+    manifest_path = ROOT / "composition" / "adapter-pins.json"
+    manifest = CompositionManifest.load(manifest_path)
+    attestation_path = tmp_path / "installed.json"
+    attestation_path.write_text(json.dumps({
+        "schema_version": "vuoro-installed-composition/v1",
+        "verified": True,
+        "manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+        "distributions": [
+            {
+                "lock_id": lock.lock_id,
+                "distribution": lock.distribution,
+                "expected_version": lock.distribution_version,
+                "artifact_sha256": lock.artifact_sha256,
+                "installed_files_sha256": f"files:{lock.distribution}",
+                "installed_files_count": 3,
+            }
+            for lock in manifest.release_locks
+        ],
+    }), encoding="utf-8")
+    monkeypatch.setattr(
+        "vuoro_service.composition._installed_files_digest",
+        lambda name: (f"files:{name}", 3),
+    )
+    verify_installed_composition(manifest, manifest_path, attestation_path)
+
+    raw = json.loads(attestation_path.read_text(encoding="utf-8"))
+    raw["distributions"][0]["installed_files_sha256"] = "tampered"
+    attestation_path.write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(CompositionError, match="installed files"):
+        verify_installed_composition(manifest, manifest_path, attestation_path)
 
 
 def test_identity_registry_is_environment_bound_and_never_accepts_short_tokens(tmp_path: Path) -> None:
