@@ -2,7 +2,7 @@
   "schema_version": "verification-result/v1",
   "context_id": "vuoro.sprintctl-maintenance.second-owner",
   "contract_ref": {"doc_id": "second-owner-proof-freeze/v1", "revision": "sprintctl:159647d;vuoro:81f0740"},
-  "implementation_sha": "9ac12f479b53ead02937f0da7fb0952a4961e445",
+  "implementation_sha": "87eb7b9d5347e0c7ddec6ba77a94c43e9b45d24e",
   "depth": 2,
   "environment": {
     "backend": "local-worktree-asgi-and-immutable-owner-goldens",
@@ -12,7 +12,7 @@
   "execution": {
     "seed": null,
     "histories": 7,
-    "bounds": {"resource_kinds": 2, "non_disclosure_classes": 4, "maximum_wait_seconds": 30, "full_suite_tests": 201},
+    "bounds": {"resource_kinds": 2, "non_disclosure_classes": 4, "maximum_wait_seconds": 30, "full_suite_tests": 202},
     "faults_exercised": ["malformed-reference", "absent-reference", "foreign-reference", "unauthorized-reference", "parallel-owner-decoder-crossing"]
   },
   "claims": [
@@ -51,12 +51,12 @@
       "verification/validate_2029_second_owner_freeze.py",
       "verification/validate_2029_second_owner_implementation.py"
     ],
-    "candidate_digest": "b5973831610e5e339e69a9d107ffd90730bf16afbd98d6a61d09dca66f40de09",
+    "candidate_digest": "bfb4e86f6be2ffd37b3392c20809d5a918fa2aba5a7f2b3d5d26e4383ba6e98d",
     "owner_revision": "159647d",
     "owner_release": {"version": "0.2.22", "revision": "159647d80c91fb4d0f7ae2090c7dec413ec91a8f", "artifact_status": "published", "wheel_sha256": "bd508ff25f0a586cbcd5fee9a369188361b6f5c54f7a37160ba46e84756a72d8"},
     "owner_goldens": "verification/plans/2029-sprintctl-maintenance-owner-goldens.json",
     "test_command": "uv run pytest -q; install verified pinned wheels; .venv/bin/pytest verification/specialized/test_2029_actual_sprintctl_composition.py -q",
-    "test_result": "201 passed; specialized 1 passed; both wheels built"
+    "test_result": "202 passed; specialized 1 passed; both wheels built"
   },
   "notes": ["The production composition pin selects the published immutable Sprintctl 0.2.22 wheel; no deployment or rollout was performed.", "No SSE, persistence, lifecycle state, retention, cancellation, recovery, or fencing authority was added to Vuoro.", "Self-referential evidence packet files are included in candidate_paths completeness but excluded from candidate_digest bytes."]
 }
