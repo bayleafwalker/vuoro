@@ -1,9 +1,18 @@
 from __future__ import annotations
 
+import hashlib
+
 import pytest
+from pydantic import ValidationError
 
 from vuoro_service.catalog import CatalogRegistrationError, CatalogRegistry
-from vuoro_service.contracts import OperationDefinition
+from vuoro_service.contracts import (
+    BoundedLongPollCapability,
+    OperationDefinition,
+    ResourceKindDefinition,
+    ResourceObservationContract,
+    ResourceResultContract,
+)
 
 
 OBJECT_SCHEMA = {
@@ -39,6 +48,154 @@ def test_revision_is_deterministic_and_catalog_is_sorted() -> None:
         "audit.observation.alpha",
         "work.pilot.zeta",
     ]
+
+
+def test_legacy_catalog_bytes_and_revision_are_unchanged_without_metadata() -> None:
+    registry = CatalogRegistry()
+    registry.register(
+        operation("work.pilot.inspect"), lambda arguments, context: arguments
+    )
+
+    operation_bytes = (
+        b'[{"deprecation":{"deprecated":false,"replacement":null,"sunset_at":null},'
+        b'"execution_semantics":"read","idempotency":"not-allowed",'
+        b'"input_schema":{"$schema":"https://json-schema.org/draft/2020-12/schema",'
+        b'"additionalProperties":false,"type":"object"},"name":"work.pilot.inspect",'
+        b'"owning_domain":"work","repo_scoped":false,"required_authority":null,'
+        b'"required_client_schema_features":["json-schema-draft-2020-12"],'
+        b'"result_schema":{"$schema":"https://json-schema.org/draft/2020-12/schema",'
+        b'"additionalProperties":false,"type":"object"}}]'
+    )
+    assert registry.revision == hashlib.sha256(operation_bytes).hexdigest()
+    dumped = registry.catalog().model_dump(mode="json")
+    assert set(dumped) == {"schema_version", "revision", "operations"}
+    assert "result_contract" not in dumped["operations"][0]
+
+
+def test_resource_metadata_is_sorted_immutable_and_revision_bound() -> None:
+    registry = CatalogRegistry()
+    for name in ("execution.session.get", "execution.session.changes"):
+        registry.register(operation(name), lambda arguments, context: arguments)
+    resource_kind = ResourceKindDefinition(
+        resource_kind="execution.session",
+        observation=ResourceObservationContract(
+            snapshot_operation="execution.session.get",
+            changes_operation="execution.session.changes",
+            cursor_schema="execution-event-cursor/v1",
+            supports_terminality=True,
+        ),
+    )
+    revision_without_metadata = registry.revision
+    registry.register_resource_kind(resource_kind)
+    registry.register_observation_transport(
+        BoundedLongPollCapability(maximum_wait_seconds=30)
+    )
+    registry.register(
+        OperationDefinition(
+            **operation("execution.dispatch.enqueue").model_dump(),
+            result_contract=ResourceResultContract(resource_kind="execution.session"),
+        ),
+        lambda arguments, context: arguments,
+    )
+
+    dumped = registry.catalog().model_dump(mode="json")
+    assert registry.revision != revision_without_metadata
+    assert dumped["resource_kinds"] == [resource_kind.model_dump(mode="json")]
+    assert dumped["observation_transports"] == [
+        {"transport": "bounded-long-poll", "maximum_wait_seconds": 30}
+    ]
+    assert dumped["operations"][0]["result_contract"] == {
+        "mode": "resource-reference",
+        "resource_kind": "execution.session",
+    }
+    with pytest.raises(ValidationError, match="frozen"):
+        resource_kind.resource_kind = "execution.other"  # type: ignore[misc]
+
+
+def test_resource_metadata_registration_invariants_fail_closed() -> None:
+    registry = CatalogRegistry()
+    registry.register(
+        operation("execution.session.get"), lambda arguments, context: arguments
+    )
+    definition = ResourceKindDefinition(
+        resource_kind="execution.session",
+        observation=ResourceObservationContract(
+            snapshot_operation="execution.session.get",
+            changes_operation="execution.session.changes",
+            cursor_schema="execution-event-cursor/v1",
+            supports_terminality=True,
+        ),
+    )
+    with pytest.raises(CatalogRegistrationError, match="unregistered operation"):
+        registry.register_resource_kind(definition)
+
+    with pytest.raises(CatalogRegistrationError, match="unregistered resource kind"):
+        registry.register(
+            OperationDefinition(
+                **operation("execution.dispatch.enqueue").model_dump(),
+                result_contract=ResourceResultContract(
+                    resource_kind="execution.session"
+                ),
+            ),
+            lambda arguments, context: arguments,
+        )
+
+    with pytest.raises(ValidationError, match="less than or equal to 300"):
+        BoundedLongPollCapability(maximum_wait_seconds=301)
+
+
+def test_registered_operation_is_isolated_from_caller_mutation() -> None:
+    registry = CatalogRegistry()
+    definition = operation("execution.session.get")
+    registry.register(definition, lambda arguments, context: arguments)
+    revision = registry.revision
+
+    definition.owning_domain = "work"
+    definition.execution_semantics = "admin"
+    definition.input_schema["additionalProperties"] = True
+
+    registered = registry.get("execution.session.get")
+    assert registered is not None
+    assert registered.definition.owning_domain == "execution"
+    assert registered.definition.execution_semantics == "read"
+    assert registered.definition.input_schema["additionalProperties"] is False
+    assert registry.revision == revision
+
+    registered.definition.owning_domain = "work"
+    registry.catalog().operations[0].execution_semantics = "admin"
+    reread = registry.get("execution.session.get")
+    assert reread is not None
+    assert reread.definition.owning_domain == "execution"
+    assert registry.catalog().operations[0].execution_semantics == "read"
+    assert registry.revision == revision
+
+
+def test_result_contract_cannot_cross_owner_domains() -> None:
+    registry = CatalogRegistry()
+    for name in ("execution.session.get", "execution.session.changes"):
+        registry.register(operation(name), lambda arguments, context: arguments)
+    registry.register_resource_kind(
+        ResourceKindDefinition(
+            resource_kind="execution.session",
+            observation=ResourceObservationContract(
+                snapshot_operation="execution.session.get",
+                changes_operation="execution.session.changes",
+                cursor_schema="execution-event-cursor/v1",
+                supports_terminality=True,
+            ),
+        )
+    )
+
+    with pytest.raises(CatalogRegistrationError, match="must be owned by work"):
+        registry.register(
+            OperationDefinition(
+                **operation("work.dispatch.enqueue").model_dump(),
+                result_contract=ResourceResultContract(
+                    resource_kind="execution.session"
+                ),
+            ),
+            lambda arguments, context: arguments,
+        )
 
 
 def test_duplicate_names_are_rejected() -> None:

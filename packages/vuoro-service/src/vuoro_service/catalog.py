@@ -13,7 +13,12 @@ from typing import Any
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError, ValidationError
 
-from vuoro_service.contracts import CatalogResponse, OperationDefinition
+from vuoro_service.contracts import (
+    BoundedLongPollCapability,
+    CatalogResponse,
+    OperationDefinition,
+    ResourceKindDefinition,
+)
 from vuoro_service.identity import InvocationContext
 
 
@@ -134,6 +139,8 @@ class CatalogRegistry:
     ) -> None:
         self.schema_features = schema_features
         self._operations: dict[str, RegisteredOperation] = {}
+        self._resource_kinds: dict[str, ResourceKindDefinition] = {}
+        self._observation_transports: dict[str, BoundedLongPollCapability] = {}
 
     def register(
         self, definition: OperationDefinition, handler: OperationHandler
@@ -162,16 +169,95 @@ class CatalogRegistry:
             raise CatalogRegistrationError(
                 f"{definition.name}: service does not support declared schema features: {unsupported}"
             )
-        self._operations[definition.name] = RegisteredOperation(definition, handler)
+        if definition.result_contract is not None:
+            resource_kind = definition.result_contract.resource_kind
+            if resource_kind.split(".", 1)[0] != definition.owning_domain:
+                raise CatalogRegistrationError(
+                    f"{definition.name}: result_contract resource kind must be owned by "
+                    f"{definition.owning_domain}"
+                )
+            if resource_kind not in self._resource_kinds:
+                raise CatalogRegistrationError(
+                    f"{definition.name}: result_contract references unregistered "
+                    f"resource kind: {resource_kind}"
+                )
+        # Adapter definitions are caller-owned Pydantic objects. Keep an isolated
+        # snapshot so later mutation cannot invalidate registration checks or
+        # silently change catalog bytes and revisions.
+        registered_definition = definition.model_copy(deep=True)
+        self._operations[definition.name] = RegisteredOperation(
+            registered_definition, handler
+        )
 
-    @property
-    def revision(self) -> str:
-        canonical = [
+    def register_resource_kind(self, definition: ResourceKindDefinition) -> None:
+        """Register immutable owner metadata after its observation operations."""
+
+        kind = definition.resource_kind
+        if kind in self._resource_kinds:
+            raise CatalogRegistrationError(f"duplicate resource kind: {kind}")
+        domain = kind.split(".", 1)[0]
+        observation = definition.observation
+        if observation.snapshot_operation == observation.changes_operation:
+            raise CatalogRegistrationError(
+                f"{kind}: snapshot_operation and changes_operation must differ"
+            )
+        for label, operation_name in (
+            ("snapshot_operation", observation.snapshot_operation),
+            ("changes_operation", observation.changes_operation),
+        ):
+            operation = self._operations.get(operation_name)
+            if operation is None:
+                raise CatalogRegistrationError(
+                    f"{kind}: {label} references unregistered operation: {operation_name}"
+                )
+            if operation.definition.owning_domain != domain:
+                raise CatalogRegistrationError(
+                    f"{kind}: {label} must be owned by {domain}"
+                )
+            if operation.definition.execution_semantics != "read":
+                raise CatalogRegistrationError(
+                    f"{kind}: {label} must reference a read operation"
+                )
+        self._resource_kinds[kind] = definition
+
+    def register_observation_transport(
+        self, capability: BoundedLongPollCapability
+    ) -> None:
+        if capability.transport in self._observation_transports:
+            raise CatalogRegistrationError(
+                f"duplicate observation transport: {capability.transport}"
+            )
+        self._observation_transports[capability.transport] = capability
+
+    def _canonical_operations(self) -> list[dict[str, Any]]:
+        return [
             operation.definition.model_dump(mode="json")
             for operation in sorted(
                 self._operations.values(), key=lambda value: value.definition.name
             )
         ]
+
+    @property
+    def revision(self) -> str:
+        canonical: Any = self._canonical_operations()
+        if self._resource_kinds or self._observation_transports:
+            canonical = {
+                "operations": canonical,
+                "resource_kinds": [
+                    definition.model_dump(mode="json")
+                    for definition in sorted(
+                        self._resource_kinds.values(),
+                        key=lambda value: value.resource_kind,
+                    )
+                ],
+                "observation_transports": [
+                    capability.model_dump(mode="json")
+                    for capability in sorted(
+                        self._observation_transports.values(),
+                        key=lambda value: value.transport,
+                    )
+                ],
+            }
         encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
         return hashlib.sha256(encoded).hexdigest()
 
@@ -179,15 +265,40 @@ class CatalogRegistry:
         return CatalogResponse(
             revision=self.revision,
             operations=[
-                operation.definition
+                operation.definition.model_copy(deep=True)
                 for operation in sorted(
                     self._operations.values(), key=lambda value: value.definition.name
                 )
             ],
+            resource_kinds=(
+                tuple(
+                    sorted(
+                        self._resource_kinds.values(),
+                        key=lambda value: value.resource_kind,
+                    )
+                )
+                if self._resource_kinds
+                else None
+            ),
+            observation_transports=(
+                tuple(
+                    sorted(
+                        self._observation_transports.values(),
+                        key=lambda value: value.transport,
+                    )
+                )
+                if self._observation_transports
+                else None
+            ),
         )
 
     def get(self, name: str) -> RegisteredOperation | None:
-        return self._operations.get(name)
+        operation = self._operations.get(name)
+        if operation is None:
+            return None
+        return RegisteredOperation(
+            operation.definition.model_copy(deep=True), operation.handler
+        )
 
     async def invoke(
         self,
