@@ -681,6 +681,17 @@ def create_composed_app(
     _load_function(work_pin)(
         registry, work_application, project_application=ProjectApplicationBridge()
     )
+    # Sprintctl's schema-gated resource descriptors are additive.  Old released
+    # adapters omit them entirely; once present, bind the owner's repository-
+    # scoped visibility proof without transferring lifecycle authority to Vuoro.
+    if registry.has_resource_kind("work.maintenance-capability"):
+        registry.register_resource_visibility(
+            "work.maintenance-capability",
+            lambda resource_ref, context: work_application._scoped_for(
+                context.repo_id
+            ).maintenance_resource_visible(resource_ref, authorized=True),
+            visibility_reference_pattern=r"^smr1_[A-Za-z0-9_-]{43}$",
+        )
     work_state = _compatibility("work", work_migrations.compatibility_handshake(work_store), work_pin)
 
     execution_pin = manifest.pin("execution")

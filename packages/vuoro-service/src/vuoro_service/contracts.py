@@ -117,6 +117,9 @@ class OperationDefinition(StrictModel):
     result_contract: ResourceResultContract | None = Field(
         default=None, exclude_if=lambda value: value is None
     )
+    failure_disclosure: Literal["resource-not-found/v1"] | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
 
 class CatalogResponse(StrictModel):

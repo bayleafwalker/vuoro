@@ -38,6 +38,11 @@ _FEATURE_KEYWORDS = {
 
 OperationHandler = Callable[[Any, InvocationContext], Any | Awaitable[Any]]
 ResultDecoder = Callable[[Any], Any]
+VisibilityGuard = Callable[[str, InvocationContext], bool | Awaitable[bool]]
+
+
+class ResourceNotFoundDisclosure(RuntimeError):
+    """Constant, non-correlating resource-observation rejection."""
 
 
 class CatalogRegistrationError(ValueError):
@@ -66,6 +71,8 @@ class RegisteredOperation:
     definition: OperationDefinition
     handler: OperationHandler
     result_decoder: ResultDecoder | None = None
+    visibility_guard: VisibilityGuard | None = None
+    visibility_reference_pattern: re.Pattern[str] | None = None
 
 
 def _validate_references(value: Any, path: str = "$") -> None:
@@ -147,6 +154,8 @@ class CatalogRegistry:
     def register(
         self, definition: OperationDefinition, handler: OperationHandler,
         *, result_decoder: ResultDecoder | None = None,
+        visibility_guard: VisibilityGuard | None = None,
+        visibility_reference_pattern: str | None = None,
     ) -> None:
         if result_decoder is not None and not callable(result_decoder):
             raise CatalogRegistrationError(
@@ -156,6 +165,30 @@ class CatalogRegistry:
             raise CatalogRegistrationError(
                 f"duplicate operation name: {definition.name}"
             )
+        disclosed = definition.failure_disclosure == "resource-not-found/v1"
+        if (
+            disclosed != (visibility_guard is not None)
+            or disclosed != (visibility_reference_pattern is not None)
+        ):
+            raise CatalogRegistrationError(
+                f"{definition.name}: resource-not-found disclosure requires exactly one visibility guard"
+            )
+        if disclosed and (
+            definition.execution_semantics != "read"
+            or visibility_reference_pattern is None
+        ):
+            raise CatalogRegistrationError(
+                f"{definition.name}: resource disclosure requires a read operation and opaque-reference grammar"
+            )
+        try:
+            compiled_visibility_pattern = (
+                re.compile(visibility_reference_pattern)
+                if visibility_reference_pattern is not None else None
+            )
+        except re.error as error:
+            raise CatalogRegistrationError(
+                f"{definition.name}: invalid opaque-reference grammar"
+            ) from error
         if definition.name.split(".", 1)[0] != definition.owning_domain:
             raise CatalogRegistrationError(
                 f"{definition.name}: owning_domain must match the operation-name prefix"
@@ -193,7 +226,8 @@ class CatalogRegistry:
         # silently change catalog bytes and revisions.
         registered_definition = definition.model_copy(deep=True)
         self._operations[definition.name] = RegisteredOperation(
-            registered_definition, handler, result_decoder
+            registered_definition, handler, result_decoder,
+            visibility_guard, compiled_visibility_pattern,
         )
 
     def register_resource_kind(self, definition: ResourceKindDefinition) -> None:
@@ -227,6 +261,69 @@ class CatalogRegistry:
                 )
         self._resource_kinds[kind] = definition
 
+    def has_resource_kind(self, resource_kind: str) -> bool:
+        """Report whether an immutable owner resource descriptor is registered."""
+
+        return resource_kind in self._resource_kinds
+
+    def register_resource_visibility(
+        self,
+        resource_kind: str,
+        visibility_guard: VisibilityGuard,
+        *,
+        visibility_reference_pattern: str,
+    ) -> None:
+        """Bind uniform non-disclosure to both observations of one owner resource.
+
+        Older owner adapters can register the frozen transport descriptors without
+        knowing about this service-side disclosure seam.  Binding remains explicit,
+        immutable, and scoped to the named resource kind.
+        """
+
+        definition = self._resource_kinds.get(resource_kind)
+        if definition is None:
+            raise CatalogRegistrationError(
+                f"unregistered resource kind: {resource_kind}"
+            )
+        if not callable(visibility_guard):
+            raise CatalogRegistrationError(
+                f"{resource_kind}: visibility_guard must be callable"
+            )
+        try:
+            compiled_pattern = re.compile(visibility_reference_pattern)
+        except re.error as error:
+            raise CatalogRegistrationError(
+                f"{resource_kind}: invalid opaque-reference grammar"
+            ) from error
+
+        operation_names = (
+            definition.observation.snapshot_operation,
+            definition.observation.changes_operation,
+        )
+        for operation_name in operation_names:
+            operation = self._operations[operation_name]
+            if (
+                operation.visibility_guard is not None
+                or operation.definition.failure_disclosure is not None
+            ):
+                raise CatalogRegistrationError(
+                    f"{resource_kind}: visibility is already bound"
+                )
+
+        for operation_name in operation_names:
+            operation = self._operations[operation_name]
+            disclosed_definition = operation.definition.model_copy(
+                deep=True,
+                update={"failure_disclosure": "resource-not-found/v1"},
+            )
+            self._operations[operation_name] = RegisteredOperation(
+                disclosed_definition,
+                operation.handler,
+                operation.result_decoder,
+                visibility_guard,
+                compiled_pattern,
+            )
+
     def register_observation_transport(
         self, capability: BoundedLongPollCapability
     ) -> None:
@@ -244,8 +341,27 @@ class CatalogRegistry:
             )
         ]
 
+    def _validate_failure_disclosures(self) -> None:
+        observation_operations = {
+            operation_name
+            for definition in self._resource_kinds.values()
+            for operation_name in (
+                definition.observation.snapshot_operation,
+                definition.observation.changes_operation,
+            )
+        }
+        disclosed = {
+            name for name, operation in self._operations.items()
+            if operation.definition.failure_disclosure is not None
+        }
+        if disclosed - observation_operations:
+            raise CatalogRegistrationError(
+                "resource-not-found disclosure is legal only on registered resource observation operations"
+            )
+
     @property
     def revision(self) -> str:
+        self._validate_failure_disclosures()
         canonical: Any = self._canonical_operations()
         if self._resource_kinds or self._observation_transports:
             canonical = {
@@ -305,7 +421,8 @@ class CatalogRegistry:
             return None
         return RegisteredOperation(
             operation.definition.model_copy(deep=True), operation.handler,
-            operation.result_decoder,
+            operation.result_decoder, operation.visibility_guard,
+            operation.visibility_reference_pattern,
         )
 
     async def invoke(
@@ -314,6 +431,22 @@ class CatalogRegistry:
         arguments: Any,
         context: InvocationContext,
     ) -> Any:
+        if operation.visibility_guard is not None:
+            resource_ref = (
+                arguments.get("resource_ref") if isinstance(arguments, dict) else None
+            )
+            pattern = operation.visibility_reference_pattern
+            if (
+                not isinstance(resource_ref, str)
+                or pattern is None
+                or pattern.fullmatch(resource_ref) is None
+            ):
+                raise ResourceNotFoundDisclosure
+            visible = operation.visibility_guard(resource_ref, context)
+            if inspect.isawaitable(visible):
+                visible = await visible
+            if visible is not True:
+                raise ResourceNotFoundDisclosure
         try:
             Draft202012Validator(operation.definition.input_schema).validate(arguments)
         except ValidationError as error:
@@ -337,6 +470,8 @@ __all__ = [
     "InvocationInputValidationError",
     "InvocationResultValidationError",
     "OperationRejectedError",
+    "ResourceNotFoundDisclosure",
     "ResultDecoder",
+    "VisibilityGuard",
     "SCHEMA_DIALECT",
 ]

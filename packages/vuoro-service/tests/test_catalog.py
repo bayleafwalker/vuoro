@@ -35,6 +35,102 @@ def operation(name: str) -> OperationDefinition:
     )
 
 
+def disclosed_operation(name: str) -> OperationDefinition:
+    return OperationDefinition(
+        **operation(name).model_dump(),
+        failure_disclosure="resource-not-found/v1",
+    )
+
+
+def test_failure_disclosure_registration_is_immutable_and_observation_only() -> None:
+    registry = CatalogRegistry()
+    guard = lambda resource_ref, context: False
+    for name in ("execution.session.get", "execution.session.changes"):
+        registry.register(
+            disclosed_operation(name), lambda arguments, context: arguments,
+            visibility_guard=guard,
+            visibility_reference_pattern=r"^exr1_[A-Za-z0-9_-]{43}$",
+        )
+    with pytest.raises(CatalogRegistrationError, match="only on registered"):
+        _ = registry.revision
+    registry.register_resource_kind(
+        ResourceKindDefinition(
+            resource_kind="execution.session",
+            observation=ResourceObservationContract(
+                snapshot_operation="execution.session.get",
+                changes_operation="execution.session.changes",
+                cursor_schema="execution-event-cursor/v1",
+                supports_terminality=True,
+            ),
+        )
+    )
+    dumped = registry.catalog().model_dump(mode="json")
+    assert [operation["failure_disclosure"] for operation in dumped["operations"]] == [
+        "resource-not-found/v1", "resource-not-found/v1"
+    ]
+
+
+def test_failure_disclosure_requires_guard_read_semantics_and_grammar() -> None:
+    registry = CatalogRegistry()
+    with pytest.raises(CatalogRegistrationError, match="requires exactly one"):
+        registry.register(disclosed_operation("execution.session.get"), lambda arguments, context: arguments)
+    with pytest.raises(CatalogRegistrationError, match="requires exactly one"):
+        registry.register(operation("execution.session.get"), lambda arguments, context: arguments, visibility_guard=lambda ref, context: False, visibility_reference_pattern="^x$")
+    with pytest.raises(CatalogRegistrationError, match="requires exactly one"):
+        registry.register(operation("execution.session.get"), lambda arguments, context: arguments, visibility_reference_pattern="^x$")
+    write = disclosed_operation("execution.session.write").model_copy(update={"execution_semantics": "write"})
+    with pytest.raises(CatalogRegistrationError, match="requires a read operation"):
+        registry.register(write, lambda arguments, context: arguments, visibility_guard=lambda ref, context: False, visibility_reference_pattern="^x$")
+    with pytest.raises(CatalogRegistrationError, match="invalid opaque-reference"):
+        registry.register(disclosed_operation("execution.session.changes"), lambda arguments, context: arguments, visibility_guard=lambda ref, context: False, visibility_reference_pattern="[")
+
+
+def test_resource_visibility_can_bind_an_older_owner_adapter_atomically() -> None:
+    registry = CatalogRegistry()
+    for name in ("work.maintenance.get", "work.maintenance.changes"):
+        registry.register(operation(name), lambda arguments, context: arguments)
+    registry.register_resource_kind(
+        ResourceKindDefinition(
+            resource_kind="work.maintenance-capability",
+            observation=ResourceObservationContract(
+                snapshot_operation="work.maintenance.get",
+                changes_operation="work.maintenance.changes",
+                cursor_schema="maintenance-cursor/v1",
+                supports_terminality=True,
+            ),
+        )
+    )
+
+    assert registry.has_resource_kind("work.maintenance-capability")
+    assert not registry.has_resource_kind("work.absent")
+    registry.register_resource_visibility(
+        "work.maintenance-capability",
+        lambda resource_ref, context: resource_ref.endswith("A"),
+        visibility_reference_pattern=r"^smr1_[A-Za-z0-9_-]{43}$",
+    )
+
+    catalog = registry.catalog().model_dump(mode="json")
+    observed = {
+        item["name"]: item["failure_disclosure"]
+        for item in catalog["operations"]
+    }
+    assert observed == {
+        "work.maintenance.changes": "resource-not-found/v1",
+        "work.maintenance.get": "resource-not-found/v1",
+    }
+    with pytest.raises(CatalogRegistrationError, match="already bound"):
+        registry.register_resource_visibility(
+            "work.maintenance-capability",
+            lambda resource_ref, context: True,
+            visibility_reference_pattern=r"^smr1_",
+        )
+    with pytest.raises(CatalogRegistrationError, match="unregistered resource kind"):
+        registry.register_resource_visibility(
+            "work.absent", lambda resource_ref, context: True,
+            visibility_reference_pattern=r"^smr1_",
+        )
+
+
 def test_revision_is_deterministic_and_catalog_is_sorted() -> None:
     first = CatalogRegistry()
     second = CatalogRegistry()

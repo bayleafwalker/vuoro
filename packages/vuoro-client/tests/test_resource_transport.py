@@ -116,6 +116,44 @@ def test_actual_actionq_goldens_are_accepted_by_owner_supplied_decoder():
     assert event.event_id == "owner-change:5"
 
 
+def test_sprintctl_goldens_are_generic_and_parallel_owner_decoders_do_not_cross():
+    import json
+    from pathlib import Path
+
+    freeze = json.loads(
+        (Path.cwd() / "verification/plans/2029-sprintctl-maintenance-owner-goldens.json").read_text()
+    )
+    sprintctl_calls, actionq_calls = [], []
+
+    def sprintctl_decode(value):
+        sprintctl_calls.append(value["schema_version"])
+        return value
+
+    def actionq_decode(value):
+        actionq_calls.append(value["schema_version"])
+        return value
+
+    reference = ResourceReference.model_validate(
+        sprintctl_decode(freeze["goldens"]["reference"])
+    )
+    snapshot = ResourceSnapshot.model_validate(
+        sprintctl_decode(freeze["goldens"]["snapshot"])
+    )
+    changes = ResourceChanges.model_validate(
+        sprintctl_decode(freeze["goldens"]["changes"])
+    )
+    actionq_decode({"schema_version": "resource-snapshot/v1", "owner": "execution"})
+
+    assert reference.owner == "work"
+    assert reference.resource_kind == "work.maintenance-capability"
+    assert snapshot.cursor == "sprintctl-maintenance-cursor-3"
+    assert changes.events[-1].terminal is True
+    assert sprintctl_calls == [
+        "resource-reference/v1", "resource-snapshot/v1", "resource-changes/v1"
+    ]
+    assert actionq_calls == ["resource-snapshot/v1"]
+
+
 def test_wait_recovers_expired_cursor_with_snapshot_and_never_mutates_owner():
     async def run():
         client = AsyncVuoroClient(_profile(), lambda _: "secret", transport=httpx.MockTransport(lambda _: httpx.Response(500)))
@@ -270,7 +308,7 @@ def test_response_loss_retry_preserves_idempotency_and_returns_same_neutral_refe
 
 def test_non_disclosure_bytes_pass_through_without_reference_derived_auth_or_output_calls():
     paths, auth = [], []
-    body = b'{"error":{"code":"resource_not_found","message":"resource not found"},"schema_version":"resource-reference/v1"}\n'
+    body = b'{"schema_version":"invocation-result/v1","request_id":"00000000-0000-0000-0000-000000000000","operation":"resource-observation","catalog_revision":"redacted","status":"rejected","result":null,"error":{"code":"resource_not_found","message":"resource not found"}}'
     def handler(request):
         paths.append(request.url.path); auth.append(request.headers.get("authorization"))
         if request.url.path == "/api/catalog/v1": return httpx.Response(200, json=CATALOG)

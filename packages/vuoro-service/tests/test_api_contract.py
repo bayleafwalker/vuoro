@@ -5,7 +5,10 @@ import pytest
 
 from vuoro_service.app import ServiceSettings, create_app
 from vuoro_service.catalog import CatalogRegistry, OperationRejectedError
-from vuoro_service.contracts import DomainCompatibility, OperationDefinition
+from vuoro_service.contracts import (
+    DomainCompatibility, OperationDefinition, ResourceKindDefinition,
+    ResourceObservationContract,
+)
 from vuoro_service.identity import Identity, StaticBearerIdentityResolver
 
 
@@ -106,6 +109,77 @@ async def test_handshake_and_etag_catalog_contract() -> None:
         )
         assert incompatible.status_code == 426
         assert incompatible.json()["error"]["code"] == "client-protocol-incompatible"
+
+
+@pytest.mark.anyio
+async def test_resource_non_disclosure_is_ordered_constant_and_pre_handler() -> None:
+    registry = CatalogRegistry(); handler_calls, guard_calls = [], []
+    visible = {
+        "smr1_" + "F" * 43: ("foreign", "human:viewer"),
+        "smr1_" + "U" * 43: ("sprintctl", "human:other"),
+        "smr1_" + "V" * 43: ("sprintctl", "human:viewer"),
+    }
+    def guard(resource_ref, context):
+        guard_calls.append((resource_ref, context.repo_id, context.identity.actor))
+        return visible.get(resource_ref) == (context.repo_id, context.identity.actor)
+    def handler(arguments, context):
+        handler_calls.append(arguments)
+        return {"visible": True}
+    schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object",
+        "required": ["resource_ref"], "properties": {"resource_ref": {"type": "string"}},
+        "additionalProperties": False,
+    }
+    result_schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object",
+        "additionalProperties": True,
+    }
+    for name in ("work.maintenance.resource.get", "work.maintenance.resource.changes"):
+        registry.register(
+            OperationDefinition(
+                name=name, owning_domain="work", input_schema=schema,
+                result_schema=result_schema, required_authority="work:maintenance",
+                execution_semantics="read", idempotency="not-allowed", repo_scoped=True,
+            ), handler,
+        )
+    registry.register_resource_kind(ResourceKindDefinition(
+        resource_kind="work.maintenance-capability",
+        observation=ResourceObservationContract(
+            snapshot_operation="work.maintenance.resource.get",
+            changes_operation="work.maintenance.resource.changes",
+            cursor_schema="sprintctl-maintenance-cursor/v1", supports_terminality=True,
+        ),
+    ))
+    registry.register_resource_visibility(
+        "work.maintenance-capability", guard,
+        visibility_reference_pattern=r"^smr1_[A-Za-z0-9_-]{43}$",
+    )
+    resolver = StaticBearerIdentityResolver({
+        "viewer": Identity(actor="human:viewer", environment="vuoro-dev", authorities=frozenset({"work:maintenance"}), repo_ids=frozenset({"sprintctl"})),
+        "no-authority": Identity(actor="human:noauth", environment="vuoro-dev", authorities=frozenset(), repo_ids=frozenset({"sprintctl"})),
+    })
+    app = create_app(settings=ServiceSettings(environment_name="vuoro-dev", environment_class="development", compatibility_state="compatible"), registry=registry, identity_resolver=resolver)
+    base = {
+        "schema_version": "invocation/v1", "operation": "work.maintenance.resource.get",
+        "catalog_revision": registry.revision, "idempotency_key": None,
+    }
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        denied_authority = await client.post("/api/invoke/v1", headers={"Authorization": "Bearer no-authority", "X-Vuoro-Client-Protocol": "1"}, json=base | {"request_id": "auth", "repo_id": "sprintctl", "arguments": {"resource_ref": "smr1_" + "V" * 43}})
+        denied_repo = await client.post("/api/invoke/v1", headers={"Authorization": "Bearer viewer", "X-Vuoro-Client-Protocol": "1"}, json=base | {"request_id": "repo", "repo_id": "foreign", "arguments": {"resource_ref": "smr1_" + "V" * 43}})
+        assert denied_authority.status_code == denied_repo.status_code == 403
+        assert guard_calls == []
+        responses = []
+        for label, reference in (
+            ("malformed", "bad"), ("absent", "smr1_" + "A" * 43),
+            ("foreign", "smr1_" + "F" * 43), ("unauthorized", "smr1_" + "U" * 43),
+        ):
+            response = await client.post("/api/invoke/v1", headers={"Authorization": "Bearer viewer", "X-Vuoro-Client-Protocol": "1"}, json=base | {"request_id": label, "repo_id": "sprintctl", "arguments": {"resource_ref": reference}})
+            responses.append(response)
+    expected = b'{"schema_version":"invocation-result/v1","request_id":"00000000-0000-0000-0000-000000000000","operation":"resource-observation","catalog_revision":"redacted","status":"rejected","result":null,"error":{"code":"resource_not_found","message":"resource not found"}}'
+    assert all(response.status_code == 404 and response.content == expected for response in responses)
+    assert all([(key.lower(), value) for key, value in response.headers.raw if key.lower() in (b"cache-control", b"content-type")] == [(b"cache-control", b"no-store"), (b"content-type", b"application/json")] for response in responses)
+    assert handler_calls == []
+    assert [entry[0] for entry in guard_calls] == ["smr1_" + "A" * 43, "smr1_" + "F" * 43, "smr1_" + "U" * 43]
 
 
 @pytest.mark.anyio
