@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-ACTIONQ = ROOT.parent / "actionq/verification/fixtures/action-resource-owner-v1"
+ACTIONQ = ROOT / "verification/external/actionq-action-resource-owner-v1"
 RESULT = ROOT / "verification/results/observable-resource-transport.json"
 CANDIDATES = (
     "docs/architecture/observable-resources.md",
@@ -39,6 +39,9 @@ def candidate_digest() -> str:
 
 def main() -> None:
     result = json.loads(RESULT.read_text())
+    source = json.loads((ACTIONQ / "source.json").read_text())
+    assert source["source_repository"] == "actionq"
+    assert source["source_revision"] == "9e53ce1"
     assert result["evidence"]["candidate_paths"] == list(CANDIDATES)
     assert result["evidence"]["candidate_digest"] == candidate_digest()
     assert result["evidence"]["owner_fixtures"] == FIXTURES
@@ -46,6 +49,7 @@ def main() -> None:
     assert result["evidence"]["test_result"] == "passed"
     for name, expected in FIXTURES.items():
         assert digest(ACTIONQ / name) == expected
+        assert source["source_paths"][name]["sha256"] == expected
     owner_manifest = json.loads((ACTIONQ / "manifest.json").read_text())
     assert owner_manifest["registered_files"]["protocol-responses.json"]["sha256"] == FIXTURES["protocol-responses.json"]
     print("observable-resource transport evidence: valid")

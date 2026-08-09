@@ -96,7 +96,7 @@ def test_invalid_local_wait_never_reaches_transport():
 def test_actual_actionq_goldens_are_accepted_by_owner_supplied_decoder():
     import json
     from pathlib import Path
-    fixture = Path.cwd().parent / "actionq/verification/fixtures/action-resource-owner-v1/protocol-responses.json"
+    fixture = Path.cwd() / "verification/external/actionq-action-resource-owner-v1/protocol-responses.json"
     owner = json.loads(fixture.read_text())["responses"]
     ref = "aqr1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     def decode(value):
