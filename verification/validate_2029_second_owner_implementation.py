@@ -24,14 +24,19 @@ def main() -> None:
     result = json.loads(RESULT.read_text())
     freeze = json.loads(FREEZE.read_text())
     evidence = result["evidence"]
-    assert result["implementation_sha"] == "81f0740292a2f14ff9fbccae582d7da702f2cd52"
+    assert result["implementation_sha"] == "6503d84c7909109ef127efc5213c907c46157abd"
     assert freeze["resource_kind"] == "work.maintenance-capability"
     assert freeze["identity"]["reference_pattern"] == "^smr1_[A-Za-z0-9_-]{43}$"
     assert freeze["vuoro_non_disclosure"]["status"] == 404
     assert freeze["vuoro_non_disclosure"]["handler_invoked"] is False
     assert evidence["candidate_digest"] == candidate_digest(evidence["candidate_paths"])
     assert evidence["owner_revision"] == "159647d"
-    assert evidence["test_result"] == "199 passed"
+    assert evidence["owner_release"] == {
+        "version": "0.2.22",
+        "revision": "159647d80c91fb4d0f7ae2090c7dec413ec91a8f",
+        "artifact_status": "merged-source-no-published-wheel",
+    }
+    assert evidence["test_result"] == "201 passed"
     print("sprintctl maintenance second-owner evidence: valid")
 
 

@@ -2,7 +2,7 @@
   "schema_version": "verification-result/v1",
   "context_id": "vuoro.sprintctl-maintenance.second-owner",
   "contract_ref": {"doc_id": "second-owner-proof-freeze/v1", "revision": "sprintctl:159647d;vuoro:81f0740"},
-  "implementation_sha": "81f0740292a2f14ff9fbccae582d7da702f2cd52",
+  "implementation_sha": "6503d84c7909109ef127efc5213c907c46157abd",
   "depth": 2,
   "environment": {
     "backend": "local-worktree-asgi-and-immutable-owner-goldens",
@@ -12,7 +12,7 @@
   "execution": {
     "seed": null,
     "histories": 7,
-    "bounds": {"resource_kinds": 2, "non_disclosure_classes": 4, "maximum_wait_seconds": 30, "full_suite_tests": 199},
+    "bounds": {"resource_kinds": 2, "non_disclosure_classes": 4, "maximum_wait_seconds": 30, "full_suite_tests": 201},
     "faults_exercised": ["malformed-reference", "absent-reference", "foreign-reference", "unauthorized-reference", "parallel-owner-decoder-crossing"]
   },
   "claims": [
@@ -44,11 +44,12 @@
       "packages/vuoro-service/tests/test_catalog.py",
       "verification/contexts/sprintctl-maintenance-second-owner.json"
     ],
-    "candidate_digest": "e4589aace47255e8f65c722987a8adaf9dfd3e2a328cb4d43d79df55e78a9f5e",
+    "candidate_digest": "f80f6bf4af81df427e6fc6c53691e69638e9adbb1daf38721d89c23900cd3a4b",
     "owner_revision": "159647d",
+    "owner_release": {"version": "0.2.22", "revision": "159647d80c91fb4d0f7ae2090c7dec413ec91a8f", "artifact_status": "merged-source-no-published-wheel"},
     "owner_goldens": "verification/plans/2029-sprintctl-maintenance-owner-goldens.json",
     "test_command": "uv run pytest -q",
-    "test_result": "199 passed"
+    "test_result": "201 passed"
   },
   "notes": ["No production Sprintctl pin was changed because no immutable reviewed owner wheel has been published.", "No SSE, persistence, lifecycle state, retention, cancellation, recovery, or fencing authority was added to Vuoro.", "The Sprintctl owner merged revision and frozen goldens are used as the portable second-owner proof; deployment remains separately gated."]
 }
