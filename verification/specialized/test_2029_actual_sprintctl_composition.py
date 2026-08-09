@@ -15,7 +15,7 @@ from vuoro_service.app import RESOURCE_NOT_FOUND_RESPONSE, ServiceSettings, crea
 from vuoro_service.catalog import CatalogRegistry
 from vuoro_service.composition import (
     _bind_work_resource_visibility,
-    _production_work_resource_observation_authorizer,
+    _load_work_resource_observation_authorizer,
 )
 from vuoro_service.identity import Identity, StaticBearerIdentityResolver
 
@@ -59,8 +59,13 @@ async def test_published_sprintctl_adapter_denial_and_generic_observation(
             return []
 
     register_actionq_operations(registry, application=ActionQReadFixture())
+    policy_path = tmp_path / "observers.json"
+    policy_path.write_text(
+        '{"schema_version":"vuoro-work-resource-observers/v1",'
+        '"grants":[{"actor":"allowed","repo_ids":["sprintctl"]}]}'
+    )
     _bind_work_resource_visibility(
-        registry, work, _production_work_resource_observation_authorizer,
+        registry, work, _load_work_resource_observation_authorizer(policy_path),
     )
     handler_calls = []
     owner_invoke = WorkApplication.invoke
@@ -71,12 +76,9 @@ async def test_published_sprintctl_adapter_denial_and_generic_observation(
         return owner_invoke(self, operation, arguments, context)
 
     monkeypatch.setattr(WorkApplication, "invoke", counted_invoke)
-    identity = lambda actor, observation=False: Identity(
+    identity = lambda actor: Identity(
         actor=actor, environment="vuoro-dev",
-        authorities=frozenset(
-            {"work:maintenance", "execution.read"}
-            | ({"work:maintenance-observe"} if observation else set())
-        ),
+        authorities=frozenset({"work:maintenance", "execution.read"}),
         repo_ids=frozenset({"sprintctl"}),
     )
     app = create_app(
@@ -86,7 +88,7 @@ async def test_published_sprintctl_adapter_denial_and_generic_observation(
         ),
         registry=registry,
         identity_resolver=StaticBearerIdentityResolver({
-            "denied": identity("denied"), "allowed": identity("allowed", True),
+            "denied": identity("denied"), "allowed": identity("allowed"),
         }),
     )
     request = {
