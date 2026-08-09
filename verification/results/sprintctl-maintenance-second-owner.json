@@ -1,0 +1,54 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.sprintctl-maintenance.second-owner",
+  "contract_ref": {"doc_id": "second-owner-proof-freeze/v1", "revision": "sprintctl:159647d;vuoro:81f0740"},
+  "implementation_sha": "81f0740292a2f14ff9fbccae582d7da702f2cd52",
+  "depth": 2,
+  "environment": {
+    "backend": "local-worktree-asgi-and-immutable-owner-goldens",
+    "isolation": "Vuoro transports and gates owner references without owner lifecycle authority",
+    "tool_versions": {"python": "3.12", "pytest": "8.4.2"}
+  },
+  "execution": {
+    "seed": null,
+    "histories": 7,
+    "bounds": {"resource_kinds": 2, "non_disclosure_classes": 4, "maximum_wait_seconds": 30, "full_suite_tests": 199},
+    "faults_exercised": ["malformed-reference", "absent-reference", "foreign-reference", "unauthorized-reference", "parallel-owner-decoder-crossing"]
+  },
+  "claims": [
+    {
+      "property": "resource-not-found/v1 is an additive immutable descriptor restricted to registered read-only observation operations",
+      "result": "example-tested",
+      "evidence": ["registration rejects missing guards, missing or invalid grammar, writes, duplicate binding, and non-observation disclosure", "legacy catalog byte and revision oracle remains unchanged when metadata is absent"]
+    },
+    {
+      "property": "malformed, absent, foreign, and unauthorized references are non-enumerating and never reach the owner handler",
+      "result": "example-tested",
+      "evidence": ["ASGI responses are byte-identical with fixed status, body, and ordered application headers", "generic authority and repository denials occur before the visibility guard"]
+    },
+    {
+      "property": "Sprintctl maintenance resources use the generic #2028 transport alongside ActionQ without transferring owner authority",
+      "result": "example-tested",
+      "evidence": ["Sprintctl frozen reference, snapshot, and changes goldens validate through neutral client models", "parallel Sprintctl and ActionQ decoder call histories remain isolated", "composition binds Sprintctl visibility only when its schema-gated resource kind is registered"]
+    }
+  ],
+  "counterexamples": [],
+  "evidence": {
+    "candidate_paths": [
+      "packages/vuoro-client/tests/test_resource_transport.py",
+      "packages/vuoro-service/src/vuoro_service/app.py",
+      "packages/vuoro-service/src/vuoro_service/catalog.py",
+      "packages/vuoro-service/src/vuoro_service/composition.py",
+      "packages/vuoro-service/src/vuoro_service/contracts.py",
+      "packages/vuoro-service/tests/test_api_contract.py",
+      "packages/vuoro-service/tests/test_catalog.py",
+      "verification/contexts/sprintctl-maintenance-second-owner.json"
+    ],
+    "candidate_digest": "e4589aace47255e8f65c722987a8adaf9dfd3e2a328cb4d43d79df55e78a9f5e",
+    "owner_revision": "159647d",
+    "owner_goldens": "verification/plans/2029-sprintctl-maintenance-owner-goldens.json",
+    "test_command": "uv run pytest -q",
+    "test_result": "199 passed"
+  },
+  "notes": ["No production Sprintctl pin was changed because no immutable reviewed owner wheel has been published.", "No SSE, persistence, lifecycle state, retention, cancellation, recovery, or fencing authority was added to Vuoro.", "The Sprintctl owner merged revision and frozen goldens are used as the portable second-owner proof; deployment remains separately gated."]
+}
