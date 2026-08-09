@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from typing import Any
+import asyncio
+import math
+import time
+from typing import Any, Literal
 from uuid import uuid4
 
 import httpx
@@ -15,6 +18,7 @@ from vuoro_client.errors import (
     OperationNotFoundError,
 )
 from vuoro_client.profile import Profile
+from vuoro_client.resources import ResourceChanges, ResourceReference, ResourceSnapshot
 
 
 PROTOCOL_VERSION = 1
@@ -27,6 +31,7 @@ SUPPORTED_SCHEMA_FEATURES = frozenset(
 
 
 CredentialResolver = Callable[[str], str]
+ObservationHook = Callable[[Mapping[str, Any]], None]
 
 
 class AsyncVuoroClient:
@@ -37,6 +42,8 @@ class AsyncVuoroClient:
         *,
         transport: httpx.AsyncBaseTransport | None = None,
         supported_schema_features: frozenset[str] = SUPPORTED_SCHEMA_FEATURES,
+        observation_hook: ObservationHook | None = None,
+        observation_state: Mapping[tuple[str, str], Mapping[str, Any]] | None = None,
     ) -> None:
         self.profile = profile
         self._credential_resolver = credential_resolver
@@ -49,6 +56,11 @@ class AsyncVuoroClient:
         self.active_environment_constraints: tuple[str, ...] = ()
         self.active_environment_runbook_refs: tuple[str, ...] = ()
         self.invocation_schema_versions: list[str] = ["invocation/v1"]
+        self._observation_hook = observation_hook
+        self._observation_state = {
+            key: {"event_ids": set(value.get("event_ids", ())), "cursors": list(value.get("cursors", ()))}
+            for key, value in (observation_state or {}).items()
+        }
 
     async def __aenter__(self) -> AsyncVuoroClient:
         return self
@@ -58,6 +70,11 @@ class AsyncVuoroClient:
 
     async def aclose(self) -> None:
         await self._http.aclose()
+
+    def export_observation_state(self) -> dict[tuple[str, str], dict[str, Any]]:
+        """Transfer reconnect-only dedup/cursor state; contains no authority."""
+        return {key: {"event_ids": tuple(sorted(value["event_ids"])), "cursors": tuple(value["cursors"])}
+                for key, value in self._observation_state.items()}
 
     def _headers(self, *, authenticated: bool) -> dict[str, str]:
         headers = {"X-Vuoro-Client-Protocol": str(PROTOCOL_VERSION)}
@@ -197,6 +214,148 @@ class AsyncVuoroClient:
             transient_credentials=transient_credentials,
         )
 
+    async def _resource_descriptor(self, resource_kind: str) -> tuple[dict[str, Any], dict[str, Any]]:
+        catalog = await self.catalog()
+        descriptor = next(
+            (item for item in catalog.get("resource_kinds", ()) if item["resource_kind"] == resource_kind),
+            None,
+        )
+        if descriptor is None:
+            catalog = await self.catalog(force_refresh=True)
+            descriptor = next(
+                (item for item in catalog.get("resource_kinds", ()) if item["resource_kind"] == resource_kind),
+                None,
+            )
+        if descriptor is None:
+            raise ClientIncompatibleError(f"resource kind is not advertised: {resource_kind}")
+        return catalog, descriptor
+
+    async def get(self, resource_kind: str, resource_ref: str) -> dict[str, Any]:
+        """Fetch an owner snapshot without interpreting its domain state."""
+        _catalog, descriptor = await self._resource_descriptor(resource_kind)
+        result = await self.invoke(
+            descriptor["observation"]["snapshot_operation"],
+            {"resource_ref": resource_ref},
+        )
+        result = ResourceSnapshot.model_validate(result).model_dump(mode="json")
+        if not isinstance(result, dict) or result.get("reference") != resource_ref:
+            raise ClientIncompatibleError("snapshot response does not bind the requested resource")
+        if not isinstance(result.get("cursor"), str) or not isinstance(result.get("terminal"), bool) or not isinstance(result.get("state"), dict):
+            raise ClientIncompatibleError("snapshot response is not a neutral resource envelope")
+        return result
+
+    async def changes(
+        self,
+        resource_kind: str,
+        resource_ref: str,
+        cursor: str,
+        *,
+        wait_seconds: int = 0,
+    ) -> dict[str, Any]:
+        """Poll changes, preserving opaque cursors and deduplicating revisions."""
+        if isinstance(wait_seconds, bool) or not isinstance(wait_seconds, int) or wait_seconds < 0:
+            raise ValueError("wait_seconds must be a non-negative integer")
+        catalog, descriptor = await self._resource_descriptor(resource_kind)
+        maximum = 0
+        for capability in catalog.get("observation_transports", ()):
+            if capability.get("transport") == "bounded-long-poll":
+                maximum = int(capability["maximum_wait_seconds"])
+                break
+        if wait_seconds and (not maximum or wait_seconds > maximum):
+            raise ClientIncompatibleError(
+                f"bounded-long-poll does not support wait_seconds={wait_seconds}"
+            )
+        selected = "bounded-long-poll" if wait_seconds else "poll"
+        if self._observation_hook:
+            self._observation_hook({"event": "observation.transport-selected", "transport": selected,
+                                    "resource_kind": resource_kind, "wait_seconds": wait_seconds})
+        result = await self.invoke(
+            descriptor["observation"]["changes_operation"],
+            {"resource_ref": resource_ref, "cursor": cursor, "wait_seconds": wait_seconds},
+        )
+        result = ResourceChanges.model_validate(result).model_dump(mode="json")
+        if not isinstance(result, dict) or result.get("reference") != resource_ref:
+            raise ClientIncompatibleError("changes response does not bind the requested resource")
+        changes = result.get("events")
+        next_cursor = result.get("next_cursor")
+        if not isinstance(changes, list) or not isinstance(next_cursor, str) or not next_cursor:
+            raise ClientIncompatibleError("changes response must contain events and an opaque next_cursor")
+        state = self._observation_state.setdefault((resource_kind, resource_ref), {"event_ids": set(), "cursors": []})
+        cursors = state["cursors"]
+        if next_cursor in cursors and (not cursors or next_cursor != cursors[-1]):
+            raise ClientIncompatibleError("owner cursor chain regressed")
+        if not cursors or cursors[-1] != cursor:
+            cursors.append(cursor)
+        if next_cursor != cursors[-1]:
+            cursors.append(next_cursor)
+        seen = state["event_ids"]
+        deduplicated = []
+        for change in changes:
+            event_id = change.get("event_id") if isinstance(change, dict) else None
+            if not isinstance(event_id, str) or not event_id:
+                raise ClientIncompatibleError("each event must contain an opaque event_id")
+            if event_id not in seen:
+                seen.add(event_id)
+                deduplicated.append(change)
+        result = dict(result)
+        result["events"] = deduplicated
+        return result
+
+    async def wait(
+        self,
+        resource_kind: str,
+        resource_ref: str,
+        *,
+        until: Literal["terminal"] = "terminal",
+        wait_seconds: int = 30,
+        timeout: float = 900,
+    ) -> dict[str, Any]:
+        """Observe until terminal; timeout/disconnect never issues owner commands."""
+        if until != "terminal":
+            raise ValueError("until must be 'terminal'")
+        _catalog, descriptor = await self._resource_descriptor(resource_kind)
+        if not descriptor["observation"].get("supports_terminality", False):
+            raise ClientIncompatibleError(f"resource kind does not advertise terminality: {resource_kind}")
+        if timeout <= 0:
+            raise ValueError("timeout must be positive")
+        deadline = time.monotonic() + timeout
+        saved = self._observation_state.get((resource_kind, resource_ref))
+        saved_cursors = list(saved.get("cursors", ())) if saved else []
+        if saved_cursors:
+            cursor = saved_cursors[-1]
+        else:
+            snapshot = await self.get(resource_kind, resource_ref)
+            if snapshot["terminal"]:
+                return snapshot
+            cursor = snapshot["cursor"]
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("resource wait exceeded its overall timeout")
+            try:
+                delta = await asyncio.wait_for(
+                    self.changes(
+                        resource_kind, resource_ref, cursor,
+                        wait_seconds=min(wait_seconds, max(1, math.ceil(remaining))),
+                    ),
+                    timeout=remaining,
+                )
+            except InvocationRejectedError as error:
+                if error.code != "cursor_expired":
+                    raise
+                snapshot = await self.get(resource_kind, resource_ref)
+                if snapshot["terminal"]:
+                    return snapshot
+                cursor = snapshot["cursor"]
+                continue
+            except (httpx.TimeoutException, httpx.TransportError):
+                if self._observation_hook:
+                    self._observation_hook({"event": "observation.reconnecting", "resource_kind": resource_kind})
+                continue
+            cursor = delta["next_cursor"]
+            if any(bool(event.get("terminal")) for event in delta["events"]):
+                return await self.get(resource_kind, resource_ref)
+
     async def _invoke_version(
         self,
         version: int,
@@ -248,4 +407,8 @@ class AsyncVuoroClient:
                 status_code=response.status_code,
             )
         Draft202012Validator(operation["result_schema"]).validate(envelope["result"])
-        return envelope["result"]
+        result = envelope["result"]
+        result_contract = operation.get("result_contract")
+        if result_contract and result_contract.get("mode") == "resource-reference":
+            result = ResourceReference.model_validate(result).model_dump(mode="json")
+        return result

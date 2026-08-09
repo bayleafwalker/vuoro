@@ -12,6 +12,12 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ImmutableStrictModel(StrictModel):
+    """Catalog metadata that cannot be changed after registration."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
 _TRANSIENT_CREDENTIAL_KEY = re.compile(r"^sha256:[0-9a-f]{64}$")
 MAX_TRANSIENT_CREDENTIALS = 8
 
@@ -60,6 +66,36 @@ class DeprecationMetadata(StrictModel):
     sunset_at: str | None = None
 
 
+class ResourceResultContract(ImmutableStrictModel):
+    mode: Literal["resource-reference"] = "resource-reference"
+    resource_kind: str = Field(
+        pattern=r"^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*$"
+    )
+
+
+class ResourceObservationContract(ImmutableStrictModel):
+    snapshot_operation: str = Field(
+        pattern=r"^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*){2,}$"
+    )
+    changes_operation: str = Field(
+        pattern=r"^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*){2,}$"
+    )
+    cursor_schema: str = Field(min_length=1, max_length=128)
+    supports_terminality: bool
+
+
+class ResourceKindDefinition(ImmutableStrictModel):
+    resource_kind: str = Field(
+        pattern=r"^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*$"
+    )
+    observation: ResourceObservationContract
+
+
+class BoundedLongPollCapability(ImmutableStrictModel):
+    transport: Literal["bounded-long-poll"] = "bounded-long-poll"
+    maximum_wait_seconds: int = Field(ge=1, le=300)
+
+
 class OperationDefinition(StrictModel):
     name: str = Field(pattern=r"^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*){2,}$")
     owning_domain: str = Field(pattern=r"^[a-z][a-z0-9-]*$")
@@ -78,12 +114,21 @@ class OperationDefinition(StrictModel):
     required_client_schema_features: list[str] = Field(
         default_factory=lambda: ["json-schema-draft-2020-12"]
     )
+    result_contract: ResourceResultContract | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
 
 class CatalogResponse(StrictModel):
     schema_version: Literal["operation-catalog/v1"] = "operation-catalog/v1"
     revision: str
     operations: list[OperationDefinition]
+    resource_kinds: tuple[ResourceKindDefinition, ...] | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
+    observation_transports: tuple[BoundedLongPollCapability, ...] | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
 
 class _InvocationFields(StrictModel):

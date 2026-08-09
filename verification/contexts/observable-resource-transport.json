@@ -1,0 +1,39 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.observable-resource.transport-v1",
+  "owner_repo": "vuoro",
+  "subject": "transport-only-resource-observation",
+  "contract_ref": {"doc_id": "resource-reference/v1", "revision": "actionq:9e53ce1;vuoro:df023a3"},
+  "source_of_truth": "owner-catalog-resource-kind-descriptor",
+  "depth": 2,
+  "backends": ["protocol-v1-invoke", "poll", "bounded-long-poll"],
+  "actors": ["authenticated-client", "vuoro-service", "domain-owner"],
+  "initial_state": ["owner-reference-already-exists", "catalog-descriptor-is-immutable", "authorization-is-independent-of-reference"],
+  "operations": [
+    {"name": "get", "actors": ["authenticated-client", "domain-owner"], "synchronization": "catalog-selected-snapshot-operation"},
+    {"name": "changes", "actors": ["authenticated-client", "domain-owner"], "synchronization": "opaque-owner-cursor"},
+    {"name": "wait-terminal", "actors": ["authenticated-client", "domain-owner"], "synchronization": "bounded-long-poll-and-fresh-terminal-snapshot"}
+  ],
+  "consistency": {"target": "transport-invariant", "object": "owner-envelope-and-cursor-chain"},
+  "assumptions": {"isolation": "domain-owner", "clock": "owner-bounded-wait", "fairness": "reconnect-may-retry-observation-only"},
+  "bounds": {"maximum_wait_seconds": 30, "resource_kinds": 1, "duplicate_event_ids": 1, "overall_wait_seconds": 900},
+  "invariants": [
+    "opaque-reference-never-creates-authorization",
+    "cursor-is-never-decoded-or-derived-by-vuoro",
+    "duplicate-event-ids-are-deduplicated-per-resource-across-batches",
+    "cursor-expiry-recovers-through-fresh-snapshot",
+    "disconnect-or-timeout-never-invokes-lifecycle-command",
+    "transport-selection-is-client-visible",
+    "ordinary-invoke-responses-remain-compatible",
+    "output-streams-are-not-lifecycle-observation"
+  ],
+  "faults": ["duplicate-delivery", "cursor-expired", "bounded-timeout", "disconnect", "service-restart", "response-loss"],
+  "oracles": ["client-resource-transport-tests", "client-suite", "service-suite", "repository-suite", "wheel-build", "artifact-validator"],
+  "implementation_anchors": [
+    "packages/vuoro-client/src/vuoro_client/client.py",
+    "packages/vuoro-client/tests/test_resource_transport.py",
+    "packages/vuoro-service/src/vuoro_service/contracts.py",
+    "packages/vuoro-service/src/vuoro_service/catalog.py"
+  ],
+  "expansions": ["second-owner-proof", "sse-separate-item"]
+}

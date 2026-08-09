@@ -16,9 +16,9 @@ The instance result uses `resource-reference/v1`:
 {
   "schema_version": "resource-reference/v1",
   "owner": "execution",
-  "resource_kind": "session",
-  "reference": "actionq:session:1234",
-  "revision": "actionq:event:5678"
+  "resource_kind": "execution.action",
+  "reference": "owner-issued-opaque-reference",
+  "revision": "owner-issued-opaque-revision"
 }
 ```
 
@@ -64,12 +64,13 @@ owner-declared terminality, and domain-owned state:
 
 ```json
 {
-  "reference": "actionq:session:1234",
-  "revision": "actionq:event:5678",
+  "schema_version": "resource-snapshot/v1",
+  "reference": "owner-issued-opaque-reference",
+  "revision": "owner-issued-opaque-revision",
+  "cursor": "owner-issued-opaque-cursor",
   "terminal": false,
   "state": {
-    "status": "claimed",
-    "claimant": "worker-17"
+    "owner_defined": "value"
   }
 }
 ```
@@ -84,13 +85,12 @@ duplicates harmless:
 {
   "events": [
     {
-      "id": "actionq:event:5679",
-      "type": "session-started",
+      "event_id": "owner-issued-opaque-event-id",
       "terminal": false,
       "data": {}
     }
   ],
-  "next_cursor": "actionq:event:5679"
+  "next_cursor": "owner-issued-next-cursor"
 }
 ```
 
@@ -103,25 +103,28 @@ Lifecycle observation and high-volume logs, tokens, or process output are
 different contracts. Losing every non-authoritative output frame must not
 prevent lifecycle recovery.
 
+Vuoro does not parse, derive, hash, compare, or mint references, revisions,
+cursors, or event IDs. A domain adapter may decode its private result into
+these neutral envelopes at service composition, before the declared result
+schema is validated. The client validates and transports that envelope only.
+
 ## Initial transport and client ergonomics
 
 Bounded long-poll is the first completion-oriented transport:
 
-```http
-GET /api/observe/v1/{reference}?after={cursor}&wait=30
-```
-
-It returns immediately after a change or at the bounded server timeout.
+The catalog-selected snapshot and changes operations are invoked through the
+existing invocation transport. A bounded changes invocation returns immediately
+after a change or at the bounded server timeout.
 Neither a local client timeout nor a disconnected or slow observer cancels the
 owned resource.
 
 Client convenience is layered over snapshot/change observation:
 
 ```python
-handle = await client.invoke("execution.dispatch.enqueue", arguments)
-snapshot = await client.get(handle)
-batch = await client.changes(handle, after=cursor, wait_timeout=30)
-result = await client.wait(handle, until="terminal", timeout=900)
+handle = await client.invoke("owner.operation.enqueue", arguments)
+snapshot = await client.get(handle["resource_kind"], handle["reference"])
+batch = await client.changes(handle["resource_kind"], handle["reference"], snapshot["cursor"], wait_seconds=30)
+result = await client.wait(handle["resource_kind"], handle["reference"], timeout=900)
 ```
 
 The first `wait` condition is terminality. The contract leaves room for
@@ -136,29 +139,9 @@ renew bounded long-polls across transport timeouts, but it preserves one
 logical wait, one cursor chain, and one final owner snapshot. Reconnects do not
 create new dispatches or rerun commands.
 
-For execution actions and groups, terminal state includes owner-declared
-attachments rather than forcing a second fetch choreography:
-
-```json
-{
-  "reference": "actionq:group:portable-wave-1",
-  "revision": "actionq:event:9012",
-  "terminal": true,
-  "state": {"status": "completed"},
-  "attachments": [
-    {"rel": "execution-receipt", "reference": "artifact:sha256:..."},
-    {"rel": "candidate-publication", "reference": "artifact:sha256:..."},
-    {"rel": "verification-result", "reference": "artifact:sha256:..."},
-    {"rel": "bounded-output", "reference": "outctl:capture:..."}
-  ]
-}
-```
-
-The resource-kind descriptor defines permitted `rel` values and which are
-required for each terminal outcome. Attachments are references, not embedded
-bulk logs and not bearer credentials. A terminal snapshot missing a required
-attachment is observably incomplete; Vuoro does not fabricate it, infer it from
-logs, or rerun work.
+Any attachments, lifecycle fields, retention rules, and recovery meaning remain
+inside owner-defined `state`. Vuoro does not require, interpret, or fabricate
+them.
 
 SSE is deferred until lifecycle richness, cockpit use, a native wake-up path,
 or sustained long-poll load justifies it. It must project the same cursor and
