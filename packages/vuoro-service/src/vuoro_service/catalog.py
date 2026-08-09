@@ -37,6 +37,7 @@ _FEATURE_KEYWORDS = {
 }
 
 OperationHandler = Callable[[Any, InvocationContext], Any | Awaitable[Any]]
+ResultDecoder = Callable[[Any], Any]
 
 
 class CatalogRegistrationError(ValueError):
@@ -64,6 +65,7 @@ class OperationRejectedError(RuntimeError):
 class RegisteredOperation:
     definition: OperationDefinition
     handler: OperationHandler
+    result_decoder: ResultDecoder | None = None
 
 
 def _validate_references(value: Any, path: str = "$") -> None:
@@ -143,8 +145,13 @@ class CatalogRegistry:
         self._observation_transports: dict[str, BoundedLongPollCapability] = {}
 
     def register(
-        self, definition: OperationDefinition, handler: OperationHandler
+        self, definition: OperationDefinition, handler: OperationHandler,
+        *, result_decoder: ResultDecoder | None = None,
     ) -> None:
+        if result_decoder is not None and not callable(result_decoder):
+            raise CatalogRegistrationError(
+                f"{definition.name}: result_decoder must be callable"
+            )
         if definition.name in self._operations:
             raise CatalogRegistrationError(
                 f"duplicate operation name: {definition.name}"
@@ -186,7 +193,7 @@ class CatalogRegistry:
         # silently change catalog bytes and revisions.
         registered_definition = definition.model_copy(deep=True)
         self._operations[definition.name] = RegisteredOperation(
-            registered_definition, handler
+            registered_definition, handler, result_decoder
         )
 
     def register_resource_kind(self, definition: ResourceKindDefinition) -> None:
@@ -297,7 +304,8 @@ class CatalogRegistry:
         if operation is None:
             return None
         return RegisteredOperation(
-            operation.definition.model_copy(deep=True), operation.handler
+            operation.definition.model_copy(deep=True), operation.handler,
+            operation.result_decoder,
         )
 
     async def invoke(
@@ -313,6 +321,8 @@ class CatalogRegistry:
         result = operation.handler(arguments, context)
         if inspect.isawaitable(result):
             result = await result
+        if operation.result_decoder is not None:
+            result = operation.result_decoder(result)
         try:
             Draft202012Validator(operation.definition.result_schema).validate(result)
         except ValidationError as error:
@@ -327,5 +337,6 @@ __all__ = [
     "InvocationInputValidationError",
     "InvocationResultValidationError",
     "OperationRejectedError",
+    "ResultDecoder",
     "SCHEMA_DIALECT",
 ]

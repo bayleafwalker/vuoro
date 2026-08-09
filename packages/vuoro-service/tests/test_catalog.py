@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 
 import pytest
@@ -13,6 +14,7 @@ from vuoro_service.contracts import (
     ResourceObservationContract,
     ResourceResultContract,
 )
+from vuoro_service.identity import Identity, InvocationContext
 
 
 OBJECT_SCHEMA = {
@@ -48,6 +50,48 @@ def test_revision_is_deterministic_and_catalog_is_sorted() -> None:
         "audit.observation.alpha",
         "work.pilot.zeta",
     ]
+
+
+def test_owner_decoder_runs_at_composition_boundary_before_result_validation() -> None:
+    registry = CatalogRegistry()
+    values = operation("execution.action.get").model_dump()
+    values["result_schema"] = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "required": ["schema_version", "reference", "cursor"],
+        "properties": {
+            "schema_version": {"const": "resource-snapshot/v1"},
+            "reference": {"type": "string"},
+            "cursor": {"type": "string"},
+        },
+    }
+    definition = OperationDefinition(
+        **values,
+    )
+    registry.register(
+        definition,
+        lambda _arguments, _context: {"owner_ref": "opaque", "sequence": 7},
+        result_decoder=lambda value: {
+            "schema_version": "resource-snapshot/v1",
+            "reference": value["owner_ref"],
+            "cursor": f"owner-cursor:{value['sequence']}",
+        },
+    )
+    registered = registry.get(definition.name)
+    assert registered is not None
+    context = InvocationContext(
+        identity=Identity(actor="test", environment="test"),
+        request_id="request-1",
+        basis_revision=None,
+        catalog_revision=registry.revision,
+        idempotency_requirement="not-allowed",
+        idempotency_key=None,
+    )
+    assert asyncio.run(registry.invoke(registered, {}, context)) == {
+        "schema_version": "resource-snapshot/v1",
+        "reference": "opaque",
+        "cursor": "owner-cursor:7",
+    }
 
 
 def test_legacy_catalog_bytes_and_revision_are_unchanged_without_metadata() -> None:

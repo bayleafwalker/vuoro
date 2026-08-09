@@ -1,0 +1,55 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.observable-resource.transport-v1",
+  "contract_ref": {"doc_id": "resource-reference/v1", "revision": "actionq:9e53ce1;vuoro:df023a3"},
+  "implementation_sha": "df023a38c5eb41915110b4530dcc4178c6a8c1db",
+  "depth": 2,
+  "environment": {
+    "backend": "local-worktree-httpx-mocktransport",
+    "isolation": "neutral Vuoro transport tested against immutable owner fixture bytes without owner runtime authority",
+    "tool_versions": {"python": "3.12", "pytest": "8.4.2"}
+  },
+  "execution": {
+    "seed": null,
+    "histories": 12,
+    "bounds": {"maximum_wait_seconds": 30, "resource_kinds": 1, "overall_timeout_seconds": 1},
+    "faults_exercised": ["duplicate-delivery", "cursor-expired", "disconnect", "restart", "response-loss", "output-loss"]
+  },
+  "claims": [
+    {
+      "property": "Vuoro transports one strict neutral resource envelope whose identifiers and cursors are opaque owner-supplied strings",
+      "result": "example-tested",
+      "evidence": ["actual ActionQ accepted protocol fixture is decoded by a test-owned adapter", "client contains no ActionQ normalization or derived token algorithm"]
+    },
+    {
+      "property": "owner-private output is decoded at service composition before declared result-schema validation",
+      "result": "example-tested",
+      "evidence": ["catalog registry result_decoder test supplies an invalid private shape and validates its decoded neutral shape"]
+    },
+    {
+      "property": "a restarted wait resumes the saved cursor without an initial snapshot and survives cursor expiry and output loss",
+      "result": "example-tested",
+      "evidence": ["MockTransport request history fixes the exact changes/get/changes/get sequence"]
+    }
+  ],
+  "counterexamples": [],
+  "evidence": {
+    "candidate_paths": [
+      "docs/architecture/observable-resources.md",
+      "packages/vuoro-client/src/vuoro_client/client.py",
+      "packages/vuoro-client/src/vuoro_client/resources.py",
+      "packages/vuoro-client/tests/test_resource_transport.py",
+      "packages/vuoro-service/src/vuoro_service/catalog.py",
+      "packages/vuoro-service/tests/test_catalog.py",
+      "verification/contexts/observable-resource-transport.json"
+    ],
+    "candidate_digest": "226c511ef9908c6be8b279c7057bf6fce661626b9ba4afe1a123c4039ae33965",
+    "owner_fixtures": {
+      "manifest.json": "fefb86dabfdd7db6f390c1c4f79864606e8878d0752c95f9eb899c541fa83e3d",
+      "protocol-responses.json": "4e23f09c8296572671931004e451ce4649c8339865db3e7950b59d96b9e6eb6b"
+    },
+    "test_command": "uv run pytest packages/vuoro-client/tests/test_resource_transport.py packages/vuoro-service/tests/test_catalog.py -q",
+    "test_result": "passed"
+  },
+  "notes": ["No routes, lifecycle authority, authorization policy, deployment, migrations, or SSE were added.", "Independent review remains required before claim completion."]
+}
