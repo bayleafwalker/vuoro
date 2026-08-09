@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from vuoro_service.composition import (
     verify_installed_composition,
     _execution_authorizer,
     _bind_work_resource_visibility,
+    _production_work_resource_observation_authorizer,
 )
 from vuoro_service.identity import Identity, InvocationContext
 from vuoro_service.project_binding import load_project_bindings
@@ -169,6 +171,28 @@ def test_work_resource_visibility_requires_a_separate_injected_policy() -> None:
     assert captured["guard"](reference, context) is False
     assert captured["owner_decision"] == (reference, False)
     assert policy_calls == [("denied", "sprintctl", reference)]
+
+
+def test_zero_argument_composition_uses_distinct_production_observation_grant() -> None:
+    default = inspect.signature(create_composed_app).parameters[
+        "work_resource_observation_authorizer"
+    ].default
+    assert default is _production_work_resource_observation_authorizer
+    base = dict(
+        actor="operator", environment="vuoro-dev",
+        repo_ids=frozenset({"sprintctl"}),
+    )
+    context = lambda authorities: InvocationContext(
+        identity=Identity(authorities=frozenset(authorities), **base),
+        request_id="request", basis_revision=None, catalog_revision="revision",
+        idempotency_requirement="not-allowed", idempotency_key=None,
+        repo_id="sprintctl",
+    )
+    reference = "smr1_" + "A" * 43
+    assert not default(context({"work:maintenance"}), reference)
+    assert default(
+        context({"work:maintenance", "work:maintenance-observe"}), reference
+    )
 
 
 def test_checked_in_project_binding_is_immutable_and_canonical() -> None:

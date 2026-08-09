@@ -13,7 +13,10 @@ from sprintctl.vuoro_adapter import register_work_catalog
 from vuoro_client import AsyncVuoroClient, Profile
 from vuoro_service.app import RESOURCE_NOT_FOUND_RESPONSE, ServiceSettings, create_app
 from vuoro_service.catalog import CatalogRegistry
-from vuoro_service.composition import _bind_work_resource_visibility
+from vuoro_service.composition import (
+    _bind_work_resource_visibility,
+    _production_work_resource_observation_authorizer,
+)
 from vuoro_service.identity import Identity, StaticBearerIdentityResolver
 
 
@@ -56,12 +59,8 @@ async def test_published_sprintctl_adapter_denial_and_generic_observation(
             return []
 
     register_actionq_operations(registry, application=ActionQReadFixture())
-    policy_calls = []
     _bind_work_resource_visibility(
-        registry, work,
-        lambda context, reference: policy_calls.append(
-            (context.identity.actor, context.repo_id, reference)
-        ) or context.identity.actor == "allowed",
+        registry, work, _production_work_resource_observation_authorizer,
     )
     handler_calls = []
     owner_invoke = WorkApplication.invoke
@@ -72,9 +71,12 @@ async def test_published_sprintctl_adapter_denial_and_generic_observation(
         return owner_invoke(self, operation, arguments, context)
 
     monkeypatch.setattr(WorkApplication, "invoke", counted_invoke)
-    identity = lambda actor: Identity(
+    identity = lambda actor, observation=False: Identity(
         actor=actor, environment="vuoro-dev",
-        authorities=frozenset({"work:maintenance", "execution.read"}),
+        authorities=frozenset(
+            {"work:maintenance", "execution.read"}
+            | ({"work:maintenance-observe"} if observation else set())
+        ),
         repo_ids=frozenset({"sprintctl"}),
     )
     app = create_app(
@@ -84,7 +86,7 @@ async def test_published_sprintctl_adapter_denial_and_generic_observation(
         ),
         registry=registry,
         identity_resolver=StaticBearerIdentityResolver({
-            "denied": identity("denied"), "allowed": identity("allowed"),
+            "denied": identity("denied"), "allowed": identity("allowed", True),
         }),
     )
     request = {
@@ -131,8 +133,6 @@ async def test_published_sprintctl_adapter_denial_and_generic_observation(
     assert actionq_result == []
     assert changes["events"] == []
     assert terminal["terminal"] is True
-    assert policy_calls[0] == ("denied", "sprintctl", resource_ref)
-    assert {call[0] for call in policy_calls[1:]} == {"allowed"}
     assert handler_calls == [
         "work.maintenance.resource.get",
         "work.maintenance.resource.changes",

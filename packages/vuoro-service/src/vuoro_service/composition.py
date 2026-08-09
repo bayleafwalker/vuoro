@@ -444,6 +444,14 @@ def _execution_authorizer(provenance: Any, resource: str, verb: str) -> bool:
 WorkResourceObservationAuthorizer = Callable[[InvocationContext, str], bool]
 
 
+def _production_work_resource_observation_authorizer(
+    context: InvocationContext, _resource_ref: str
+) -> bool:
+    """Enforce the distinct observation grant carried by mounted identities."""
+
+    return "work:maintenance-observe" in context.identity.authorities
+
+
 def _bind_work_resource_visibility(
     registry: CatalogRegistry,
     work_application: Any,
@@ -588,7 +596,9 @@ def create_composed_app(
     identity_path: Path | None = None,
     project_bindings_path: Path | None = None,
     environ: Mapping[str, str] | None = None,
-    work_resource_observation_authorizer: WorkResourceObservationAuthorizer | None = None,
+    work_resource_observation_authorizer: WorkResourceObservationAuthorizer | None = (
+        _production_work_resource_observation_authorizer
+    ),
 ):
     """Create the only deployable service application: the pinned composition."""
 
