@@ -441,13 +441,32 @@ def _execution_authorizer(provenance: Any, resource: str, verb: str) -> bool:
     return bool(repo_id) and ("*" in repositories or repo_id in repositories)
 
 
-def _work_maintenance_resource_authorized(context: InvocationContext) -> bool:
-    """Derive owner visibility authority from the authenticated repository scope."""
+WorkResourceObservationAuthorizer = Callable[[InvocationContext, str], bool]
 
-    return (
-        "work:maintenance" in context.identity.authorities
-        and context.repo_id is not None
-        and context.identity.authorizes_repo(context.repo_id)
+
+def _bind_work_resource_visibility(
+    registry: CatalogRegistry,
+    work_application: Any,
+    authorizer: WorkResourceObservationAuthorizer | None,
+) -> None:
+    """Bind a separately injected owner-observation decision, failing closed."""
+
+    resource_kind = "work.maintenance-capability"
+    if not registry.has_resource_kind(resource_kind):
+        return
+    if authorizer is None:
+        raise CompositionError(
+            "work: resource observation policy is required when maintenance resources are registered"
+        )
+    registry.register_resource_visibility(
+        resource_kind,
+        lambda resource_ref, context: work_application._scoped_for(
+            context.repo_id
+        ).maintenance_resource_visible(
+            resource_ref,
+            authorized=authorizer(context, resource_ref) is True,
+        ),
+        visibility_reference_pattern=r"^smr1_[A-Za-z0-9_-]{43}$",
     )
 def load_identities(path: Path, *, environment: str) -> StaticBearerIdentityResolver:
     """Load opaque environment-bound bearer identities from a mounted secret file."""
@@ -569,6 +588,7 @@ def create_composed_app(
     identity_path: Path | None = None,
     project_bindings_path: Path | None = None,
     environ: Mapping[str, str] | None = None,
+    work_resource_observation_authorizer: WorkResourceObservationAuthorizer | None = None,
 ):
     """Create the only deployable service application: the pinned composition."""
 
@@ -692,17 +712,9 @@ def create_composed_app(
     # Sprintctl's schema-gated resource descriptors are additive.  Old released
     # adapters omit them entirely; once present, bind the owner's repository-
     # scoped visibility proof without transferring lifecycle authority to Vuoro.
-    if registry.has_resource_kind("work.maintenance-capability"):
-        registry.register_resource_visibility(
-            "work.maintenance-capability",
-            lambda resource_ref, context: work_application._scoped_for(
-                context.repo_id
-            ).maintenance_resource_visible(
-                resource_ref,
-                authorized=_work_maintenance_resource_authorized(context),
-            ),
-            visibility_reference_pattern=r"^smr1_[A-Za-z0-9_-]{43}$",
-        )
+    _bind_work_resource_visibility(
+        registry, work_application, work_resource_observation_authorizer
+    )
     work_state = _compatibility("work", work_migrations.compatibility_handshake(work_store), work_pin)
 
     execution_pin = manifest.pin("execution")

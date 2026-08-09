@@ -219,10 +219,10 @@ def test_wait_recovers_expired_cursor_with_snapshot_and_never_mutates_owner():
             {"reference": "ref", "cursor": "terminal", "terminal": True, "state": {}},
         ])
         calls = []
-        async def get(kind, ref):
+        async def get(kind, ref, *, repo_id=None):
             calls.append(("get", kind, ref))
             return next(snapshots)
-        async def changes(kind, ref, cursor, *, wait_seconds=0):
+        async def changes(kind, ref, cursor, *, wait_seconds=0, repo_id=None):
             calls.append(("changes", kind, ref, cursor, wait_seconds))
             if cursor == "old":
                 raise InvocationRejectedError("cursor_expired", "fresh snapshot", status_code=409)
@@ -272,9 +272,9 @@ def test_wait_reconnects_on_disconnect_resumes_cursor_and_honors_overall_timeout
     observations = []
     client = AsyncVuoroClient(_profile(), lambda _: "secret", observation_hook=observations.append)
     calls = 0
-    async def get(_kind, ref):
+    async def get(_kind, ref, *, repo_id=None):
         return {"reference": ref, "revision": "r", "cursor": "c1", "terminal": calls > 1, "state": {}}
-    async def changes(_kind, ref, cursor, *, wait_seconds=0):
+    async def changes(_kind, ref, cursor, *, wait_seconds=0, repo_id=None):
         nonlocal calls
         calls += 1
         if calls == 1:
@@ -296,7 +296,7 @@ def test_wait_reconnects_on_disconnect_resumes_cursor_and_honors_overall_timeout
 
 def test_wait_timeout_does_not_issue_any_mutating_operation():
     client = AsyncVuoroClient(_profile(), lambda _: "secret")
-    async def get(_kind, ref):
+    async def get(_kind, ref, *, repo_id=None):
         return {"reference": ref, "revision": "r", "cursor": "c1", "terminal": False, "state": {}}
     async def changes(*_args, **_kwargs):
         await asyncio.sleep(1)

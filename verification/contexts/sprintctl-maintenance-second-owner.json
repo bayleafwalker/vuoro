@@ -27,9 +27,11 @@
   "faults": ["malformed-reference", "absent-reference", "foreign-reference", "unauthorized-reference", "parallel-owner-decoder-crossing"],
   "oracles": ["asgi-byte-oracle", "catalog-registration-oracle", "legacy-revision-oracle", "frozen-owner-golden-oracle", "full-pytest-suite"],
   "implementation_anchors": [
+    "packages/vuoro-client/src/vuoro_client/client.py",
+    "packages/vuoro-service/composition/adapter-pins.json",
     "packages/vuoro-service/src/vuoro_service/catalog.py",
     "packages/vuoro-service/src/vuoro_service/composition.py",
     "packages/vuoro-service/tests/test_api_contract.py:test_resource_non_disclosure_is_ordered_constant_and_pre_handler",
-    "packages/vuoro-client/tests/test_resource_transport.py:test_sprintctl_goldens_use_catalog_driven_get_changes_and_wait"
+    "verification/specialized/test_2029_actual_sprintctl_composition.py:test_published_sprintctl_adapter_denial_and_generic_observation"
   ]
 }
