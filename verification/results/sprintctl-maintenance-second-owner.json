@@ -2,7 +2,7 @@
   "schema_version": "verification-result/v1",
   "context_id": "vuoro.sprintctl-maintenance.second-owner",
   "contract_ref": {"doc_id": "second-owner-proof-freeze/v1", "revision": "sprintctl:159647d;vuoro:81f0740"},
-  "implementation_sha": "6503d84c7909109ef127efc5213c907c46157abd",
+  "implementation_sha": "9ac12f479b53ead02937f0da7fb0952a4961e445",
   "depth": 2,
   "environment": {
     "backend": "local-worktree-asgi-and-immutable-owner-goldens",
@@ -29,27 +29,34 @@
     {
       "property": "Sprintctl maintenance resources use the generic #2028 transport alongside ActionQ without transferring owner authority",
       "result": "example-tested",
-      "evidence": ["Sprintctl frozen reference, snapshot, and changes goldens validate through neutral client models", "parallel Sprintctl and ActionQ decoder call histories remain isolated", "composition binds Sprintctl visibility only when its schema-gated resource kind is registered"]
+      "evidence": ["published Sprintctl 0.2.22 and pinned ActionQ adapters register together and are invoked concurrently", "generic client performs repository-scoped get, changes, and wait against the real Sprintctl SQLite owner", "composition binds a separately injected owner observation policy only when its schema-gated resource kind is registered"]
     }
   ],
   "counterexamples": [],
   "evidence": {
     "candidate_paths": [
+      "packages/vuoro-client/src/vuoro_client/client.py",
       "packages/vuoro-client/tests/test_resource_transport.py",
+      "packages/vuoro-service/composition/adapter-pins.json",
       "packages/vuoro-service/src/vuoro_service/app.py",
       "packages/vuoro-service/src/vuoro_service/catalog.py",
       "packages/vuoro-service/src/vuoro_service/composition.py",
       "packages/vuoro-service/src/vuoro_service/contracts.py",
       "packages/vuoro-service/tests/test_api_contract.py",
       "packages/vuoro-service/tests/test_catalog.py",
-      "verification/contexts/sprintctl-maintenance-second-owner.json"
+      "packages/vuoro-service/tests/test_composition.py",
+      "verification/contexts/sprintctl-maintenance-second-owner.json",
+      "verification/results/sprintctl-maintenance-second-owner.json",
+      "verification/specialized/test_2029_actual_sprintctl_composition.py",
+      "verification/validate_2029_second_owner_freeze.py",
+      "verification/validate_2029_second_owner_implementation.py"
     ],
-    "candidate_digest": "f80f6bf4af81df427e6fc6c53691e69638e9adbb1daf38721d89c23900cd3a4b",
+    "candidate_digest": "b5973831610e5e339e69a9d107ffd90730bf16afbd98d6a61d09dca66f40de09",
     "owner_revision": "159647d",
-    "owner_release": {"version": "0.2.22", "revision": "159647d80c91fb4d0f7ae2090c7dec413ec91a8f", "artifact_status": "merged-source-no-published-wheel"},
+    "owner_release": {"version": "0.2.22", "revision": "159647d80c91fb4d0f7ae2090c7dec413ec91a8f", "artifact_status": "published", "wheel_sha256": "bd508ff25f0a586cbcd5fee9a369188361b6f5c54f7a37160ba46e84756a72d8"},
     "owner_goldens": "verification/plans/2029-sprintctl-maintenance-owner-goldens.json",
-    "test_command": "uv run pytest -q",
-    "test_result": "201 passed"
+    "test_command": "uv run pytest -q; install verified pinned wheels; .venv/bin/pytest verification/specialized/test_2029_actual_sprintctl_composition.py -q",
+    "test_result": "201 passed; specialized 1 passed; both wheels built"
   },
-  "notes": ["No production Sprintctl pin was changed because no immutable reviewed owner wheel has been published.", "No SSE, persistence, lifecycle state, retention, cancellation, recovery, or fencing authority was added to Vuoro.", "The Sprintctl owner merged revision and frozen goldens are used as the portable second-owner proof; deployment remains separately gated."]
+  "notes": ["The production composition pin selects the published immutable Sprintctl 0.2.22 wheel; no deployment or rollout was performed.", "No SSE, persistence, lifecycle state, retention, cancellation, recovery, or fencing authority was added to Vuoro.", "Self-referential evidence packet files are included in candidate_paths completeness but excluded from candidate_digest bytes."]
 }
