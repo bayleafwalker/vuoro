@@ -230,12 +230,15 @@ class AsyncVuoroClient:
             raise ClientIncompatibleError(f"resource kind is not advertised: {resource_kind}")
         return catalog, descriptor
 
-    async def get(self, resource_kind: str, resource_ref: str) -> dict[str, Any]:
+    async def get(
+        self, resource_kind: str, resource_ref: str, *, repo_id: str | None = None
+    ) -> dict[str, Any]:
         """Fetch an owner snapshot without interpreting its domain state."""
         _catalog, descriptor = await self._resource_descriptor(resource_kind)
         result = await self.invoke(
             descriptor["observation"]["snapshot_operation"],
             {"resource_ref": resource_ref},
+            repo_id=repo_id,
         )
         result = ResourceSnapshot.model_validate(result).model_dump(mode="json")
         if not isinstance(result, dict) or result.get("reference") != resource_ref:
@@ -251,6 +254,7 @@ class AsyncVuoroClient:
         cursor: str,
         *,
         wait_seconds: int = 0,
+        repo_id: str | None = None,
     ) -> dict[str, Any]:
         """Poll changes, preserving opaque cursors and deduplicating revisions."""
         if isinstance(wait_seconds, bool) or not isinstance(wait_seconds, int) or wait_seconds < 0:
@@ -272,6 +276,7 @@ class AsyncVuoroClient:
         result = await self.invoke(
             descriptor["observation"]["changes_operation"],
             {"resource_ref": resource_ref, "cursor": cursor, "wait_seconds": wait_seconds},
+            repo_id=repo_id,
         )
         result = ResourceChanges.model_validate(result).model_dump(mode="json")
         if not isinstance(result, dict) or result.get("reference") != resource_ref:
@@ -309,6 +314,7 @@ class AsyncVuoroClient:
         until: Literal["terminal"] = "terminal",
         wait_seconds: int = 30,
         timeout: float = 900,
+        repo_id: str | None = None,
     ) -> dict[str, Any]:
         """Observe until terminal; timeout/disconnect never issues owner commands."""
         if until != "terminal":
@@ -324,7 +330,7 @@ class AsyncVuoroClient:
         if saved_cursors:
             cursor = saved_cursors[-1]
         else:
-            snapshot = await self.get(resource_kind, resource_ref)
+            snapshot = await self.get(resource_kind, resource_ref, repo_id=repo_id)
             if snapshot["terminal"]:
                 return snapshot
             cursor = snapshot["cursor"]
@@ -337,13 +343,14 @@ class AsyncVuoroClient:
                     self.changes(
                         resource_kind, resource_ref, cursor,
                         wait_seconds=min(wait_seconds, max(1, math.ceil(remaining))),
+                        repo_id=repo_id,
                     ),
                     timeout=remaining,
                 )
             except InvocationRejectedError as error:
                 if error.code != "cursor_expired":
                     raise
-                snapshot = await self.get(resource_kind, resource_ref)
+                snapshot = await self.get(resource_kind, resource_ref, repo_id=repo_id)
                 if snapshot["terminal"]:
                     return snapshot
                 cursor = snapshot["cursor"]
@@ -354,7 +361,7 @@ class AsyncVuoroClient:
                 continue
             cursor = delta["next_cursor"]
             if any(bool(event.get("terminal")) for event in delta["events"]):
-                return await self.get(resource_kind, resource_ref)
+                return await self.get(resource_kind, resource_ref, repo_id=repo_id)
 
     async def _invoke_version(
         self,

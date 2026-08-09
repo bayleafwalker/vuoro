@@ -1,0 +1,62 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.sprintctl-maintenance.second-owner",
+  "contract_ref": {"doc_id": "second-owner-proof-freeze/v1", "revision": "sprintctl:159647d;vuoro:81f0740"},
+  "implementation_sha": "9ac12f479b53ead02937f0da7fb0952a4961e445",
+  "depth": 2,
+  "environment": {
+    "backend": "local-worktree-asgi-and-immutable-owner-goldens",
+    "isolation": "Vuoro transports and gates owner references without owner lifecycle authority",
+    "tool_versions": {"python": "3.12", "pytest": "8.4.2"}
+  },
+  "execution": {
+    "seed": null,
+    "histories": 7,
+    "bounds": {"resource_kinds": 2, "non_disclosure_classes": 4, "maximum_wait_seconds": 30, "full_suite_tests": 201},
+    "faults_exercised": ["malformed-reference", "absent-reference", "foreign-reference", "unauthorized-reference", "parallel-owner-decoder-crossing"]
+  },
+  "claims": [
+    {
+      "property": "resource-not-found/v1 is an additive immutable descriptor restricted to registered read-only observation operations",
+      "result": "example-tested",
+      "evidence": ["registration rejects missing guards, missing or invalid grammar, writes, duplicate binding, and non-observation disclosure", "legacy catalog byte and revision oracle remains unchanged when metadata is absent"]
+    },
+    {
+      "property": "malformed, absent, foreign, and unauthorized references are non-enumerating and never reach the owner handler",
+      "result": "example-tested",
+      "evidence": ["ASGI responses are byte-identical with fixed status, body, and ordered application headers", "generic authority and repository denials occur before the visibility guard"]
+    },
+    {
+      "property": "Sprintctl maintenance resources use the generic #2028 transport alongside ActionQ without transferring owner authority",
+      "result": "example-tested",
+      "evidence": ["published Sprintctl 0.2.22 and pinned ActionQ adapters register together and are invoked concurrently", "generic client performs repository-scoped get, changes, and wait against the real Sprintctl SQLite owner", "composition binds a separately injected owner observation policy only when its schema-gated resource kind is registered"]
+    }
+  ],
+  "counterexamples": [],
+  "evidence": {
+    "candidate_paths": [
+      "packages/vuoro-client/src/vuoro_client/client.py",
+      "packages/vuoro-client/tests/test_resource_transport.py",
+      "packages/vuoro-service/composition/adapter-pins.json",
+      "packages/vuoro-service/src/vuoro_service/app.py",
+      "packages/vuoro-service/src/vuoro_service/catalog.py",
+      "packages/vuoro-service/src/vuoro_service/composition.py",
+      "packages/vuoro-service/src/vuoro_service/contracts.py",
+      "packages/vuoro-service/tests/test_api_contract.py",
+      "packages/vuoro-service/tests/test_catalog.py",
+      "packages/vuoro-service/tests/test_composition.py",
+      "verification/contexts/sprintctl-maintenance-second-owner.json",
+      "verification/results/sprintctl-maintenance-second-owner.json",
+      "verification/specialized/test_2029_actual_sprintctl_composition.py",
+      "verification/validate_2029_second_owner_freeze.py",
+      "verification/validate_2029_second_owner_implementation.py"
+    ],
+    "candidate_digest": "b5973831610e5e339e69a9d107ffd90730bf16afbd98d6a61d09dca66f40de09",
+    "owner_revision": "159647d",
+    "owner_release": {"version": "0.2.22", "revision": "159647d80c91fb4d0f7ae2090c7dec413ec91a8f", "artifact_status": "published", "wheel_sha256": "bd508ff25f0a586cbcd5fee9a369188361b6f5c54f7a37160ba46e84756a72d8"},
+    "owner_goldens": "verification/plans/2029-sprintctl-maintenance-owner-goldens.json",
+    "test_command": "uv run pytest -q; install verified pinned wheels; .venv/bin/pytest verification/specialized/test_2029_actual_sprintctl_composition.py -q",
+    "test_result": "201 passed; specialized 1 passed; both wheels built"
+  },
+  "notes": ["The production composition pin selects the published immutable Sprintctl 0.2.22 wheel; no deployment or rollout was performed.", "No SSE, persistence, lifecycle state, retention, cancellation, recovery, or fencing authority was added to Vuoro.", "Self-referential evidence packet files are included in candidate_paths completeness but excluded from candidate_digest bytes."]
+}

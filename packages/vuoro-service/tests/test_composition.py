@@ -15,7 +15,9 @@ from vuoro_service.composition import (
     verify_adapter_artifacts,
     verify_installed_composition,
     _execution_authorizer,
+    _bind_work_resource_visibility,
 )
+from vuoro_service.identity import Identity, InvocationContext
 from vuoro_service.project_binding import load_project_bindings
 
 
@@ -82,8 +84,7 @@ def test_checked_in_execution_pin_includes_released_contract_companion() -> None
     assert pin.dependencies[0].source_revision == "e82d7bfe87eef847d1814124e0aa45543e82d539"
 
 
-def test_checked_in_work_pin_is_the_claim_clock_release() -> None:
-    """Sprintctl 0.2.21 uses live PostgreSQL statement time for leases."""
+def test_checked_in_work_pin_is_the_maintenance_resource_owner_release() -> None:
     pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("work")
     assert (
         pin.source_revision,
@@ -91,16 +92,16 @@ def test_checked_in_work_pin_is_the_claim_clock_release() -> None:
         pin.api_version,
         pin.schema_version,
     ) == (
-        "d5ed2cfb2d14b1dbf982736f2d29c37b6a6dc712",
-        "0.2.21",
+        "159647d80c91fb4d0f7ae2090c7dec413ec91a8f",
+        "0.2.22",
         "work-api/v1",
         "work-schema/v1",
     )
     assert pin.artifact_url.endswith(
-        "/v0.2.21/sprintctl-0.2.21-py3-none-any.whl"
+        "/v0.2.22/sprintctl-0.2.22-py3-none-any.whl"
     )
     assert pin.artifact_sha256 == (
-        "b5b43e186e3cb2f57c65a76953a7754236e730ce9ff5041541344620adb32d11"
+        "bd508ff25f0a586cbcd5fee9a369188361b6f5c54f7a37160ba46e84756a72d8"
     )
     assert (pin.adapter_module, pin.register) == (
         "sprintctl.vuoro_adapter",
@@ -122,6 +123,52 @@ def test_execution_authorizer_is_exact_and_repository_scoped() -> None:
     assert not _execution_authorizer(scoped, "execution.group.manage", "delete")
     assert not _execution_authorizer(scoped, "execution.candidate-action.create", "update")
     assert not _execution_authorizer(scoped, "execution.anything", "create")
+
+
+def test_work_resource_visibility_requires_a_separate_injected_policy() -> None:
+    captured = {}
+
+    class Registry:
+        def has_resource_kind(self, resource_kind):
+            return resource_kind == "work.maintenance-capability"
+
+        def register_resource_visibility(self, resource_kind, guard, **options):
+            captured.update(kind=resource_kind, guard=guard, options=options)
+
+    class ScopedApplication:
+        def maintenance_resource_visible(self, resource_ref, *, authorized):
+            captured["owner_decision"] = (resource_ref, authorized)
+            return authorized
+
+    class WorkApplication:
+        def _scoped_for(self, repo_id):
+            captured["repo_id"] = repo_id
+            return ScopedApplication()
+
+    with pytest.raises(CompositionError, match="observation policy is required"):
+        _bind_work_resource_visibility(Registry(), WorkApplication(), None)
+
+    policy_calls = []
+    _bind_work_resource_visibility(
+        Registry(), WorkApplication(),
+        lambda context, resource_ref: policy_calls.append(
+            (context.identity.actor, context.repo_id, resource_ref)
+        ) or context.identity.actor == "allowed",
+    )
+    identity = Identity(
+        actor="denied", environment="vuoro-dev",
+        authorities=frozenset({"work:maintenance"}),
+        repo_ids=frozenset({"sprintctl"}),
+    )
+    context = InvocationContext(
+        identity=identity, request_id="request", basis_revision=None,
+        catalog_revision="revision", idempotency_requirement="not-allowed",
+        idempotency_key=None, repo_id="sprintctl",
+    )
+    reference = "smr1_" + "A" * 43
+    assert captured["guard"](reference, context) is False
+    assert captured["owner_decision"] == (reference, False)
+    assert policy_calls == [("denied", "sprintctl", reference)]
 
 
 def test_checked_in_project_binding_is_immutable_and_canonical() -> None:

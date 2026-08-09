@@ -116,6 +116,100 @@ def test_actual_actionq_goldens_are_accepted_by_owner_supplied_decoder():
     assert event.event_id == "owner-change:5"
 
 
+def test_sprintctl_goldens_use_catalog_driven_get_changes_and_wait():
+    import json
+    from pathlib import Path
+
+    freeze = json.loads(
+        (Path.cwd() / "verification/plans/2029-sprintctl-maintenance-owner-goldens.json").read_text()
+    )
+    reference = ResourceReference.model_validate(freeze["goldens"]["reference"])
+    snapshot = freeze["goldens"]["snapshot"]
+    changes = freeze["goldens"]["changes"]
+    operations = [
+        {
+            "name": name, "owning_domain": "work", "input_schema": {},
+            "result_schema": {}, "required_authority": "work:maintenance",
+            "execution_semantics": "read", "idempotency": "not-allowed",
+            "repo_scoped": True,
+            "deprecation": {"deprecated": False, "replacement": None, "sunset_at": None},
+            "required_client_schema_features": ["json-schema-draft-2020-12"],
+            "failure_disclosure": "resource-not-found/v1",
+        }
+        for name in (
+            "work.maintenance.resource.get", "work.maintenance.resource.changes"
+        )
+    ]
+    catalog = {
+        "schema_version": "operation-catalog/v1", "revision": "catalog-work-1",
+        "operations": operations,
+        "resource_kinds": [{
+            "resource_kind": "work.maintenance-capability",
+            "observation": {
+                "snapshot_operation": "work.maintenance.resource.get",
+                "changes_operation": "work.maintenance.resource.changes",
+                "cursor_schema": "sprintctl-maintenance-cursor/v1",
+                "supports_terminality": True,
+            },
+        }],
+        "observation_transports": [
+            {"transport": "bounded-long-poll", "maximum_wait_seconds": 30}
+        ],
+    }
+    calls = []
+    get_count = 0
+
+    def handler(request):
+        nonlocal get_count
+        if request.url.path == "/api/catalog/v1":
+            return httpx.Response(200, json=catalog)
+        payload = json.loads(request.content)
+        calls.append((payload["operation"], payload["arguments"]))
+        if payload["operation"].endswith(".get"):
+            get_count += 1
+            result = (
+                {**snapshot, "terminal": True, "state": changes["events"][-1]["data"]}
+                if get_count == 3 else snapshot
+            )
+        else:
+            result = changes
+        return httpx.Response(200, json={
+            "schema_version": "invocation-result/v1",
+            "request_id": payload["request_id"], "status": "accepted",
+            "result": result, "error": None,
+        })
+
+    async def run():
+        transport = httpx.MockTransport(handler)
+        async with AsyncVuoroClient(
+            _profile(), lambda _: "secret", transport=transport
+        ) as client:
+            observed_snapshot = await client.get(
+                reference.resource_kind, reference.reference
+            )
+            observed_changes = await client.changes(
+                reference.resource_kind, reference.reference,
+                observed_snapshot["cursor"], wait_seconds=0,
+            )
+        async with AsyncVuoroClient(
+            _profile(), lambda _: "secret", transport=transport
+        ) as client:
+            terminal = await client.wait(reference.resource_kind, reference.reference)
+        assert observed_snapshot["cursor"] == "sprintctl-maintenance-cursor-3"
+        assert observed_changes["events"][-1]["terminal"] is True
+        assert terminal["terminal"] is True
+
+    asyncio.run(run())
+    assert [name for name, _ in calls] == [
+        "work.maintenance.resource.get",
+        "work.maintenance.resource.changes",
+        "work.maintenance.resource.get",
+        "work.maintenance.resource.changes",
+        "work.maintenance.resource.get",
+    ]
+    assert calls[-2][1]["wait_seconds"] == 30
+
+
 def test_wait_recovers_expired_cursor_with_snapshot_and_never_mutates_owner():
     async def run():
         client = AsyncVuoroClient(_profile(), lambda _: "secret", transport=httpx.MockTransport(lambda _: httpx.Response(500)))
@@ -125,10 +219,10 @@ def test_wait_recovers_expired_cursor_with_snapshot_and_never_mutates_owner():
             {"reference": "ref", "cursor": "terminal", "terminal": True, "state": {}},
         ])
         calls = []
-        async def get(kind, ref):
+        async def get(kind, ref, *, repo_id=None):
             calls.append(("get", kind, ref))
             return next(snapshots)
-        async def changes(kind, ref, cursor, *, wait_seconds=0):
+        async def changes(kind, ref, cursor, *, wait_seconds=0, repo_id=None):
             calls.append(("changes", kind, ref, cursor, wait_seconds))
             if cursor == "old":
                 raise InvocationRejectedError("cursor_expired", "fresh snapshot", status_code=409)
@@ -178,9 +272,9 @@ def test_wait_reconnects_on_disconnect_resumes_cursor_and_honors_overall_timeout
     observations = []
     client = AsyncVuoroClient(_profile(), lambda _: "secret", observation_hook=observations.append)
     calls = 0
-    async def get(_kind, ref):
+    async def get(_kind, ref, *, repo_id=None):
         return {"reference": ref, "revision": "r", "cursor": "c1", "terminal": calls > 1, "state": {}}
-    async def changes(_kind, ref, cursor, *, wait_seconds=0):
+    async def changes(_kind, ref, cursor, *, wait_seconds=0, repo_id=None):
         nonlocal calls
         calls += 1
         if calls == 1:
@@ -202,7 +296,7 @@ def test_wait_reconnects_on_disconnect_resumes_cursor_and_honors_overall_timeout
 
 def test_wait_timeout_does_not_issue_any_mutating_operation():
     client = AsyncVuoroClient(_profile(), lambda _: "secret")
-    async def get(_kind, ref):
+    async def get(_kind, ref, *, repo_id=None):
         return {"reference": ref, "revision": "r", "cursor": "c1", "terminal": False, "state": {}}
     async def changes(*_args, **_kwargs):
         await asyncio.sleep(1)
@@ -270,7 +364,7 @@ def test_response_loss_retry_preserves_idempotency_and_returns_same_neutral_refe
 
 def test_non_disclosure_bytes_pass_through_without_reference_derived_auth_or_output_calls():
     paths, auth = [], []
-    body = b'{"error":{"code":"resource_not_found","message":"resource not found"},"schema_version":"resource-reference/v1"}\n'
+    body = b'{"schema_version":"invocation-result/v1","request_id":"00000000-0000-0000-0000-000000000000","operation":"resource-observation","catalog_revision":"redacted","status":"rejected","result":null,"error":{"code":"resource_not_found","message":"resource not found"}}'
     def handler(request):
         paths.append(request.url.path); auth.append(request.headers.get("authorization"))
         if request.url.path == "/api/catalog/v1": return httpx.Response(200, json=CATALOG)

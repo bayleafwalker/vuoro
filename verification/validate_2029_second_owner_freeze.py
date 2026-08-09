@@ -81,13 +81,12 @@ def main() -> None:
     assert list(body) == ["schema_version", "request_id", "operation", "catalog_revision", "status", "result", "error"]
     assert body["error"] == {"code": "resource_not_found", "message": "resource not found"}
     assert disclosure["body_utf8"] == json.dumps(body, separators=(",", ":"))
-    revision = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=SPRINTCTL, check=True,
-        text=True, capture_output=True,
-    ).stdout.strip()
-    assert revision == value["selected_owner_revision"]
     for relative, expected in value["source_files"].items():
-        actual = hashlib.sha256((SPRINTCTL / relative).read_bytes()).hexdigest()
+        frozen_bytes = subprocess.run(
+            ["git", "show", f"{value['selected_owner_revision']}:{relative}"],
+            cwd=SPRINTCTL, check=True, capture_output=True,
+        ).stdout
+        actual = hashlib.sha256(frozen_bytes).hexdigest()
         assert re.fullmatch(r"[0-9a-f]{64}", expected) and actual == expected
     text = PLAN.read_text()
     for forbidden in ("jobs table", "ActionQ's action-root"):

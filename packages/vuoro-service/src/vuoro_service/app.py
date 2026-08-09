@@ -19,6 +19,7 @@ from vuoro_service.catalog import (
     InvocationInputValidationError,
     InvocationResultValidationError,
     OperationRejectedError,
+    ResourceNotFoundDisclosure,
 )
 from vuoro_service.contracts import (
     ClientProtocolRange,
@@ -42,6 +43,16 @@ from vuoro_service.identity import (
 
 
 LOGGER = logging.getLogger(__name__)
+RESOURCE_NOT_FOUND_RESPONSE = b'{"schema_version":"invocation-result/v1","request_id":"00000000-0000-0000-0000-000000000000","operation":"resource-observation","catalog_revision":"redacted","status":"rejected","result":null,"error":{"code":"resource_not_found","message":"resource not found"}}'
+
+
+def _resource_not_found_response() -> Response:
+    response = Response(RESOURCE_NOT_FOUND_RESPONSE, status_code=404)
+    response.raw_headers = [
+        (b"cache-control", b"no-store"),
+        (b"content-type", b"application/json"),
+    ]
+    return response
 
 
 # Domain adapters may expose a small, non-secret readiness predicate for an
@@ -392,6 +403,8 @@ def create_app(
                 error_message=str(error),
                 http_status=422,
             )
+        except ResourceNotFoundDisclosure:
+            return _resource_not_found_response()
         except OperationRejectedError as error:
             return _invocation_response(
                 request_id=request_id,

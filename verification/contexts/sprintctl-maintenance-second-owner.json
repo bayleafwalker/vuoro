@@ -1,0 +1,37 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.sprintctl-maintenance.second-owner",
+  "owner_repo": "vuoro",
+  "subject": "generic-transport-non-disclosure-and-second-owner-composition",
+  "source_of_truth": "frozen Sprintctl owner goldens plus merged owner release identity",
+  "contract_ref": {"doc_id": "second-owner-proof-freeze/v1", "revision": "sprintctl:159647d;vuoro:81f0740"},
+  "depth": 2,
+  "backends": ["vuoro-asgi", "immutable-sprintctl-goldens"],
+  "actors": ["authorized-caller", "unauthorized-caller", "vuoro-service", "sprintctl-owner"],
+  "operations": [
+    {"name": "work.maintenance.resource.get", "synchronization": "catalog revision and owner visibility guard"},
+    {"name": "work.maintenance.resource.changes", "synchronization": "bounded long-poll with opaque owner cursor"},
+    {"name": "wait", "synchronization": "generic get/changes loop until owner terminal projection"}
+  ],
+  "consistency": {"target": "application-invariant", "object": "transport preserves owner authorization and lifecycle authority"},
+  "bounds": {"resource_kinds": 2, "non_disclosure_classes": 4, "maximum_wait_seconds": 30},
+  "invariants": [
+    "failure-disclosure-is-additive-immutable-and-observation-only",
+    "generic-authority-and-repository-authorization-precede-owner-visibility",
+    "malformed-absent-foreign-and-unauthorized-references-return-identical-ordered-404-bytes",
+    "rejected-observations-never-invoke-the-owner-handler",
+    "sprintctl-and-actionq-owner-decoders-remain-independent",
+    "legacy-operation-descriptor-and-catalog-bytes-remain-unchanged-without-metadata",
+    "vuoro-gains-no-lifecycle-persistence-retention-cancellation-recovery-or-fencing-authority"
+  ],
+  "faults": ["malformed-reference", "absent-reference", "foreign-reference", "unauthorized-reference", "parallel-owner-decoder-crossing"],
+  "oracles": ["asgi-byte-oracle", "catalog-registration-oracle", "legacy-revision-oracle", "frozen-owner-golden-oracle", "full-pytest-suite"],
+  "implementation_anchors": [
+    "packages/vuoro-client/src/vuoro_client/client.py",
+    "packages/vuoro-service/composition/adapter-pins.json",
+    "packages/vuoro-service/src/vuoro_service/catalog.py",
+    "packages/vuoro-service/src/vuoro_service/composition.py",
+    "packages/vuoro-service/tests/test_api_contract.py:test_resource_non_disclosure_is_ordered_constant_and_pre_handler",
+    "verification/specialized/test_2029_actual_sprintctl_composition.py:test_published_sprintctl_adapter_denial_and_generic_observation"
+  ]
+}
