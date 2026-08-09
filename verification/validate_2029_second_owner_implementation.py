@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RESULT = ROOT / "verification/results/sprintctl-maintenance-second-owner.json"
 FREEZE = ROOT / "verification/plans/2029-sprintctl-maintenance-owner-goldens.json"
 BASE = "d152799c95cf2990cd291c370cafd06e59aea6d8"
-IMPLEMENTATION = "9ac12f479b53ead02937f0da7fb0952a4961e445"
+IMPLEMENTATION = "044a0f8fcb10ccefe11617dfda5c0b2e5b9e63e1"
 SELF_REFERENTIAL_EVIDENCE = {
     "verification/results/sprintctl-maintenance-second-owner.json",
     "verification/validate_2029_second_owner_implementation.py",
@@ -51,7 +51,7 @@ def main() -> None:
         cwd=ROOT, check=True, text=True, capture_output=True,
     ).stdout.splitlines()
     assert evidence["candidate_paths"] == changed
-    assert evidence["test_result"] == "201 passed; specialized 1 passed; both wheels built"
+    assert evidence["test_result"] == "202 passed; specialized 1 passed; both wheels built"
     print("sprintctl maintenance second-owner evidence: valid")
 
 

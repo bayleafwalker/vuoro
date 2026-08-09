@@ -444,6 +444,48 @@ def _execution_authorizer(provenance: Any, resource: str, verb: str) -> bool:
 WorkResourceObservationAuthorizer = Callable[[InvocationContext, str], bool]
 
 
+def _load_work_resource_observation_authorizer(
+    path: Path,
+) -> WorkResourceObservationAuthorizer:
+    """Load strict immutable actor/repository grants; references grant nothing."""
+
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise CompositionError(
+            "cannot load immutable work resource observation policy"
+        ) from error
+    if not isinstance(raw, dict) or set(raw) != {"schema_version", "grants"}:
+        raise CompositionError("work resource observation policy must use the v1 shape")
+    if raw["schema_version"] != "vuoro-work-resource-observers/v1":
+        raise CompositionError("unsupported work resource observation policy")
+    grants = raw["grants"]
+    if not isinstance(grants, list):
+        raise CompositionError("work resource observation grants must be an array")
+    allowed: set[tuple[str, str]] = set()
+    for grant in grants:
+        if (
+            not isinstance(grant, dict)
+            or set(grant) != {"actor", "repo_ids"}
+            or not isinstance(grant["actor"], str)
+            or not grant["actor"]
+            or not isinstance(grant["repo_ids"], list)
+            or not grant["repo_ids"]
+            or any(not isinstance(repo_id, str) or not repo_id for repo_id in grant["repo_ids"])
+        ):
+            raise CompositionError("invalid work resource observation grant")
+        for repo_id in grant["repo_ids"]:
+            pair = (grant["actor"], repo_id)
+            if pair in allowed:
+                raise CompositionError("duplicate work resource observation grant")
+            allowed.add(pair)
+    immutable_allowed = frozenset(allowed)
+    return lambda context, _resource_ref: (
+        context.repo_id is not None
+        and (context.identity.actor, context.repo_id) in immutable_allowed
+    )
+
+
 def _bind_work_resource_visibility(
     registry: CatalogRegistry,
     work_application: Any,
@@ -625,6 +667,12 @@ def create_composed_app(
         identity_path or Path(_runtime_env("VUORO_IDENTITIES_FILE", environ)),
         environment=environment_name,
     )
+    if work_resource_observation_authorizer is None:
+        work_resource_observation_authorizer = (
+            _load_work_resource_observation_authorizer(
+                Path(_runtime_env("VUORO_WORK_RESOURCE_OBSERVERS_FILE", environ))
+            )
+        )
     registry = CatalogRegistry()
 
     work_pin = manifest.pin("work")

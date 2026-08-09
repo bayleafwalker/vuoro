@@ -16,6 +16,7 @@ from vuoro_service.composition import (
     verify_installed_composition,
     _execution_authorizer,
     _bind_work_resource_visibility,
+    _load_work_resource_observation_authorizer,
 )
 from vuoro_service.identity import Identity, InvocationContext
 from vuoro_service.project_binding import load_project_bindings
@@ -169,6 +170,31 @@ def test_work_resource_visibility_requires_a_separate_injected_policy() -> None:
     assert captured["guard"](reference, context) is False
     assert captured["owner_decision"] == (reference, False)
     assert policy_calls == [("denied", "sprintctl", reference)]
+
+
+def test_production_observation_policy_is_strict_actor_repo_only(tmp_path) -> None:
+    path = tmp_path / "observers.json"
+    path.write_text(json.dumps({
+        "schema_version": "vuoro-work-resource-observers/v1",
+        "grants": [{"actor": "allowed", "repo_ids": ["sprintctl"]}],
+    }), encoding="utf-8")
+    policy = _load_work_resource_observation_authorizer(path)
+    context = lambda actor, repo_id="sprintctl": InvocationContext(
+        identity=Identity(
+            actor=actor, environment="vuoro-dev",
+            authorities=frozenset({"work:maintenance"}),
+            repo_ids=frozenset({"sprintctl"}),
+        ),
+        request_id="request", basis_revision=None, catalog_revision="revision",
+        idempotency_requirement="not-allowed", idempotency_key=None,
+        repo_id=repo_id,
+    )
+    assert policy(context("allowed"), "smr1_" + "A" * 43)
+    assert not policy(context("denied"), "smr1_" + "A" * 43)
+    assert not policy(context("allowed", "foreign"), "smr1_" + "A" * 43)
+    with pytest.raises(CompositionError, match="v1 shape"):
+        path.write_text('{"schema_version":"vuoro-work-resource-observers/v1","grants":[],"extra":true}')
+        _load_work_resource_observation_authorizer(path)
 
 
 def test_checked_in_project_binding_is_immutable_and_canonical() -> None:

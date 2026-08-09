@@ -13,7 +13,10 @@ from sprintctl.vuoro_adapter import register_work_catalog
 from vuoro_client import AsyncVuoroClient, Profile
 from vuoro_service.app import RESOURCE_NOT_FOUND_RESPONSE, ServiceSettings, create_app
 from vuoro_service.catalog import CatalogRegistry
-from vuoro_service.composition import _bind_work_resource_visibility
+from vuoro_service.composition import (
+    _bind_work_resource_visibility,
+    _load_work_resource_observation_authorizer,
+)
 from vuoro_service.identity import Identity, StaticBearerIdentityResolver
 
 
@@ -56,12 +59,13 @@ async def test_published_sprintctl_adapter_denial_and_generic_observation(
             return []
 
     register_actionq_operations(registry, application=ActionQReadFixture())
-    policy_calls = []
+    policy_path = tmp_path / "observers.json"
+    policy_path.write_text(
+        '{"schema_version":"vuoro-work-resource-observers/v1",'
+        '"grants":[{"actor":"allowed","repo_ids":["sprintctl"]}]}'
+    )
     _bind_work_resource_visibility(
-        registry, work,
-        lambda context, reference: policy_calls.append(
-            (context.identity.actor, context.repo_id, reference)
-        ) or context.identity.actor == "allowed",
+        registry, work, _load_work_resource_observation_authorizer(policy_path),
     )
     handler_calls = []
     owner_invoke = WorkApplication.invoke
@@ -131,8 +135,6 @@ async def test_published_sprintctl_adapter_denial_and_generic_observation(
     assert actionq_result == []
     assert changes["events"] == []
     assert terminal["terminal"] is True
-    assert policy_calls[0] == ("denied", "sprintctl", resource_ref)
-    assert {call[0] for call in policy_calls[1:]} == {"allowed"}
     assert handler_calls == [
         "work.maintenance.resource.get",
         "work.maintenance.resource.changes",
