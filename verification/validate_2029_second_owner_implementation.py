@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RESULT = ROOT / "verification/results/sprintctl-maintenance-second-owner.json"
 FREEZE = ROOT / "verification/plans/2029-sprintctl-maintenance-owner-goldens.json"
 BASE = "d152799c95cf2990cd291c370cafd06e59aea6d8"
-IMPLEMENTATION = "87eb7b9d5347e0c7ddec6ba77a94c43e9b45d24e"
+IMPLEMENTATION = "044a0f8fcb10ccefe11617dfda5c0b2e5b9e63e1"
 SELF_REFERENTIAL_EVIDENCE = {
     "verification/results/sprintctl-maintenance-second-owner.json",
     "verification/validate_2029_second_owner_implementation.py",

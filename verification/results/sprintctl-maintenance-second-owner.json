@@ -2,7 +2,7 @@
   "schema_version": "verification-result/v1",
   "context_id": "vuoro.sprintctl-maintenance.second-owner",
   "contract_ref": {"doc_id": "second-owner-proof-freeze/v1", "revision": "sprintctl:159647d;vuoro:81f0740"},
-  "implementation_sha": "87eb7b9d5347e0c7ddec6ba77a94c43e9b45d24e",
+  "implementation_sha": "044a0f8fcb10ccefe11617dfda5c0b2e5b9e63e1",
   "depth": 2,
   "environment": {
     "backend": "local-worktree-asgi-and-immutable-owner-goldens",
@@ -51,7 +51,7 @@
       "verification/validate_2029_second_owner_freeze.py",
       "verification/validate_2029_second_owner_implementation.py"
     ],
-    "candidate_digest": "bfb4e86f6be2ffd37b3392c20809d5a918fa2aba5a7f2b3d5d26e4383ba6e98d",
+    "candidate_digest": "4800795988ee5ce27a67b20d3be6f462b8d78b203ac19009b328f413187ea489",
     "owner_revision": "159647d",
     "owner_release": {"version": "0.2.22", "revision": "159647d80c91fb4d0f7ae2090c7dec413ec91a8f", "artifact_status": "published", "wheel_sha256": "bd508ff25f0a586cbcd5fee9a369188361b6f5c54f7a37160ba46e84756a72d8"},
     "owner_goldens": "verification/plans/2029-sprintctl-maintenance-owner-goldens.json",
