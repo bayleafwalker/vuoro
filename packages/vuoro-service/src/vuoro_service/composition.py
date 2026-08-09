@@ -22,7 +22,7 @@ from vuoro_service.app import ServiceSettings, create_app
 from vuoro_service.catalog import CatalogRegistry
 from vuoro_service.contracts import DomainCompatibility
 from vuoro_service.environment_record import load_environment_record
-from vuoro_service.identity import Identity, StaticBearerIdentityResolver
+from vuoro_service.identity import Identity, InvocationContext, StaticBearerIdentityResolver
 from vuoro_service.project_binding import (
     ProjectAuthorizationError,
     ProjectBindingError,
@@ -441,6 +441,14 @@ def _execution_authorizer(provenance: Any, resource: str, verb: str) -> bool:
     return bool(repo_id) and ("*" in repositories or repo_id in repositories)
 
 
+def _work_maintenance_resource_authorized(context: InvocationContext) -> bool:
+    """Derive owner visibility authority from the authenticated repository scope."""
+
+    return (
+        "work:maintenance" in context.identity.authorities
+        and context.repo_id is not None
+        and context.identity.authorizes_repo(context.repo_id)
+    )
 def load_identities(path: Path, *, environment: str) -> StaticBearerIdentityResolver:
     """Load opaque environment-bound bearer identities from a mounted secret file."""
 
@@ -689,7 +697,10 @@ def create_composed_app(
             "work.maintenance-capability",
             lambda resource_ref, context: work_application._scoped_for(
                 context.repo_id
-            ).maintenance_resource_visible(resource_ref, authorized=True),
+            ).maintenance_resource_visible(
+                resource_ref,
+                authorized=_work_maintenance_resource_authorized(context),
+            ),
             visibility_reference_pattern=r"^smr1_[A-Za-z0-9_-]{43}$",
         )
     work_state = _compatibility("work", work_migrations.compatibility_handshake(work_store), work_pin)

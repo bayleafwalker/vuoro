@@ -15,7 +15,9 @@ from vuoro_service.composition import (
     verify_adapter_artifacts,
     verify_installed_composition,
     _execution_authorizer,
+    _work_maintenance_resource_authorized,
 )
+from vuoro_service.identity import Identity, InvocationContext
 from vuoro_service.project_binding import load_project_bindings
 
 
@@ -122,6 +124,33 @@ def test_execution_authorizer_is_exact_and_repository_scoped() -> None:
     assert not _execution_authorizer(scoped, "execution.group.manage", "delete")
     assert not _execution_authorizer(scoped, "execution.candidate-action.create", "update")
     assert not _execution_authorizer(scoped, "execution.anything", "create")
+
+
+def test_work_resource_authorization_is_derived_from_authenticated_repo_scope() -> None:
+    def context(identity: Identity, repo_id: str | None = "sprintctl") -> InvocationContext:
+        return InvocationContext(
+            identity=identity,
+            request_id="request",
+            basis_revision=None,
+            catalog_revision="revision",
+            idempotency_requirement="not-allowed",
+            idempotency_key=None,
+            repo_id=repo_id,
+        )
+
+    authorized = Identity(
+        actor="operator", environment="vuoro-dev",
+        authorities=frozenset({"work:maintenance"}),
+        repo_ids=frozenset({"sprintctl"}),
+    )
+    assert _work_maintenance_resource_authorized(context(authorized))
+    assert not _work_maintenance_resource_authorized(context(
+        Identity(
+            actor="operator", environment="vuoro-dev", authorities=frozenset(),
+            repo_ids=frozenset({"sprintctl"}),
+        )
+    ))
+    assert not _work_maintenance_resource_authorized(context(authorized, "foreign"))
 
 
 def test_checked_in_project_binding_is_immutable_and_canonical() -> None:

@@ -190,6 +190,46 @@ def test_owner_decoder_runs_at_composition_boundary_before_result_validation() -
     }
 
 
+def test_two_registered_owner_decoders_remain_isolated_under_parallel_invocation() -> None:
+    registry = CatalogRegistry()
+    calls: dict[str, list[str]] = {"work": [], "execution": []}
+
+    for domain in calls:
+        definition = operation(f"{domain}.resource.get")
+
+        def decode(value, *, owner=domain):
+            calls[owner].append(value["owner"])
+            return {}
+
+        registry.register(
+            definition,
+            lambda arguments, context, owner=domain: {"owner": owner},
+            result_decoder=decode,
+        )
+
+    context = InvocationContext(
+        identity=Identity(actor="test", environment="test"),
+        request_id="parallel",
+        basis_revision=None,
+        catalog_revision=registry.revision,
+        idempotency_requirement="not-allowed",
+        idempotency_key=None,
+    )
+
+    async def invoke_both():
+        registered = [
+            registry.get("work.resource.get"),
+            registry.get("execution.resource.get"),
+        ]
+        assert all(item is not None for item in registered)
+        return await asyncio.gather(*(
+            registry.invoke(item, {}, context) for item in registered if item is not None
+        ))
+
+    assert asyncio.run(invoke_both()) == [{}, {}]
+    assert calls == {"work": ["work"], "execution": ["execution"]}
+
+
 def test_legacy_catalog_bytes_and_revision_are_unchanged_without_metadata() -> None:
     registry = CatalogRegistry()
     registry.register(

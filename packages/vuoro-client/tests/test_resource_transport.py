@@ -116,42 +116,98 @@ def test_actual_actionq_goldens_are_accepted_by_owner_supplied_decoder():
     assert event.event_id == "owner-change:5"
 
 
-def test_sprintctl_goldens_are_generic_and_parallel_owner_decoders_do_not_cross():
+def test_sprintctl_goldens_use_catalog_driven_get_changes_and_wait():
     import json
     from pathlib import Path
 
     freeze = json.loads(
         (Path.cwd() / "verification/plans/2029-sprintctl-maintenance-owner-goldens.json").read_text()
     )
-    sprintctl_calls, actionq_calls = [], []
-
-    def sprintctl_decode(value):
-        sprintctl_calls.append(value["schema_version"])
-        return value
-
-    def actionq_decode(value):
-        actionq_calls.append(value["schema_version"])
-        return value
-
-    reference = ResourceReference.model_validate(
-        sprintctl_decode(freeze["goldens"]["reference"])
-    )
-    snapshot = ResourceSnapshot.model_validate(
-        sprintctl_decode(freeze["goldens"]["snapshot"])
-    )
-    changes = ResourceChanges.model_validate(
-        sprintctl_decode(freeze["goldens"]["changes"])
-    )
-    actionq_decode({"schema_version": "resource-snapshot/v1", "owner": "execution"})
-
-    assert reference.owner == "work"
-    assert reference.resource_kind == "work.maintenance-capability"
-    assert snapshot.cursor == "sprintctl-maintenance-cursor-3"
-    assert changes.events[-1].terminal is True
-    assert sprintctl_calls == [
-        "resource-reference/v1", "resource-snapshot/v1", "resource-changes/v1"
+    reference = ResourceReference.model_validate(freeze["goldens"]["reference"])
+    snapshot = freeze["goldens"]["snapshot"]
+    changes = freeze["goldens"]["changes"]
+    operations = [
+        {
+            "name": name, "owning_domain": "work", "input_schema": {},
+            "result_schema": {}, "required_authority": "work:maintenance",
+            "execution_semantics": "read", "idempotency": "not-allowed",
+            "repo_scoped": True,
+            "deprecation": {"deprecated": False, "replacement": None, "sunset_at": None},
+            "required_client_schema_features": ["json-schema-draft-2020-12"],
+            "failure_disclosure": "resource-not-found/v1",
+        }
+        for name in (
+            "work.maintenance.resource.get", "work.maintenance.resource.changes"
+        )
     ]
-    assert actionq_calls == ["resource-snapshot/v1"]
+    catalog = {
+        "schema_version": "operation-catalog/v1", "revision": "catalog-work-1",
+        "operations": operations,
+        "resource_kinds": [{
+            "resource_kind": "work.maintenance-capability",
+            "observation": {
+                "snapshot_operation": "work.maintenance.resource.get",
+                "changes_operation": "work.maintenance.resource.changes",
+                "cursor_schema": "sprintctl-maintenance-cursor/v1",
+                "supports_terminality": True,
+            },
+        }],
+        "observation_transports": [
+            {"transport": "bounded-long-poll", "maximum_wait_seconds": 30}
+        ],
+    }
+    calls = []
+    get_count = 0
+
+    def handler(request):
+        nonlocal get_count
+        if request.url.path == "/api/catalog/v1":
+            return httpx.Response(200, json=catalog)
+        payload = json.loads(request.content)
+        calls.append((payload["operation"], payload["arguments"]))
+        if payload["operation"].endswith(".get"):
+            get_count += 1
+            result = (
+                {**snapshot, "terminal": True, "state": changes["events"][-1]["data"]}
+                if get_count == 3 else snapshot
+            )
+        else:
+            result = changes
+        return httpx.Response(200, json={
+            "schema_version": "invocation-result/v1",
+            "request_id": payload["request_id"], "status": "accepted",
+            "result": result, "error": None,
+        })
+
+    async def run():
+        transport = httpx.MockTransport(handler)
+        async with AsyncVuoroClient(
+            _profile(), lambda _: "secret", transport=transport
+        ) as client:
+            observed_snapshot = await client.get(
+                reference.resource_kind, reference.reference
+            )
+            observed_changes = await client.changes(
+                reference.resource_kind, reference.reference,
+                observed_snapshot["cursor"], wait_seconds=0,
+            )
+        async with AsyncVuoroClient(
+            _profile(), lambda _: "secret", transport=transport
+        ) as client:
+            terminal = await client.wait(reference.resource_kind, reference.reference)
+        assert observed_snapshot["cursor"] == "sprintctl-maintenance-cursor-3"
+        assert observed_changes["events"][-1]["terminal"] is True
+        assert terminal["terminal"] is True
+
+    asyncio.run(run())
+    assert [name for name, _ in calls] == [
+        "work.maintenance.resource.get",
+        "work.maintenance.resource.changes",
+        "work.maintenance.resource.get",
+        "work.maintenance.resource.changes",
+        "work.maintenance.resource.get",
+    ]
+    assert calls[-2][1]["wait_seconds"] == 30
 
 
 def test_wait_recovers_expired_cursor_with_snapshot_and_never_mutates_owner():
