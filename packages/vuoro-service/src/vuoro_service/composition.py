@@ -571,6 +571,22 @@ def _runtime_env(name: str, environ: Mapping[str, str]) -> str:
     return value
 
 
+def _runtime_path(
+    name: str,
+    environ: Mapping[str, str],
+    *,
+    default: str,
+) -> Path:
+    """Resolve a read-only mounted composition input without changing defaults."""
+
+    value = environ.get(name)
+    if value is None:
+        return Path(default)
+    if not value:
+        raise CompositionError(f"{name} must be a non-empty path")
+    return Path(value)
+
+
 def _pg_connection_factory(dsn: str) -> Callable[[], Any]:
     try:
         import psycopg
@@ -699,8 +715,10 @@ def create_composed_app(
     work_application = WorkApplication.postgres(
         work_store, credential_resolver=work_credential_resolver
     )
-    bindings_path = project_bindings_path or Path(
-        "/opt/vuoro/composition/project-bindings.json"
+    bindings_path = project_bindings_path or _runtime_path(
+        "VUORO_PROJECT_BINDINGS_FILE",
+        environ,
+        default="/opt/vuoro/composition/project-bindings.json",
     )
     try:
         bindings_raw = json.loads(bindings_path.read_text(encoding="utf-8"))

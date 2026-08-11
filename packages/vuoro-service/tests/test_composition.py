@@ -17,6 +17,7 @@ from vuoro_service.composition import (
     _execution_authorizer,
     _bind_work_resource_visibility,
     _load_work_resource_observation_authorizer,
+    _runtime_path,
 )
 from vuoro_service.identity import Identity, InvocationContext
 from vuoro_service.project_binding import load_project_bindings
@@ -210,6 +211,25 @@ def test_checked_in_project_binding_is_immutable_and_canonical() -> None:
     )
     assert binding.source_revision == "8ea94af795862da34e718b1fcc08644d43756205"
     assert binding.source_sha256 == "7ff7c4022017d427ee1e6de648b72aaef2d71056e8abef8042cd22e517da1870"
+
+
+def test_project_bindings_path_can_be_supplied_by_a_runtime_mount() -> None:
+    assert _runtime_path(
+        "VUORO_PROJECT_BINDINGS_FILE",
+        {},
+        default="/opt/vuoro/composition/project-bindings.json",
+    ) == Path("/opt/vuoro/composition/project-bindings.json")
+    assert _runtime_path(
+        "VUORO_PROJECT_BINDINGS_FILE",
+        {"VUORO_PROJECT_BINDINGS_FILE": "/run/vuoro/project-bindings.json"},
+        default="/opt/vuoro/composition/project-bindings.json",
+    ) == Path("/run/vuoro/project-bindings.json")
+    with pytest.raises(CompositionError, match="non-empty path"):
+        _runtime_path(
+            "VUORO_PROJECT_BINDINGS_FILE",
+            {"VUORO_PROJECT_BINDINGS_FILE": ""},
+            default="/opt/vuoro/composition/project-bindings.json",
+        )
 
 
 def test_artifact_verification_fails_closed_on_mismatch(tmp_path: Path) -> None:

@@ -25,10 +25,12 @@ source provenance. The projection does not create a project database or make
 Vuoro authoritative for project membership; it is release-reviewed data used
 only to construct domain applications.
 
-The source projection must be incorporated into the immutable service
-composition at image-build time. Do not add an environment variable, mounted
-secret, ConfigMap, or local file lookup for it: deployment overlays must not be
-able to change catalog behavior or widen the repositories an aggregate reads.
+The default source projection is incorporated into the immutable service
+composition at image-build time. A hosting deployment may instead mount a
+reviewed generated projection and set `VUORO_PROJECT_BINDINGS_FILE`; the
+selected file still passes the strict v1 parser and the exactly-one-binding
+guard. This changes the binding input, not the catalog or authority model, and
+must remain a read-only mount owned by the deployment layer.
 
 ## Construction and authorization
 
