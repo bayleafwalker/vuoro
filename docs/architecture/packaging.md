@@ -29,6 +29,11 @@ complete client profile, and writes bearer credentials only with mode `0600`.
 It does not own account, workspace, tenant, database, or device-authorization
 state. Print-only mode must remain side-effect free.
 
+Tag publication synchronizes and tests the complete locked workspace, builds
+each distribution once, and runs release and served-conformance gates against
+that wheel set. The tagged wheel is selected from that exact gated set for
+publication and attestation; it is never rebuilt after the gates.
+
 ## `vuoro-service`
 
 The service owns FastAPI/uvicorn hosting and separate process entrypoints for

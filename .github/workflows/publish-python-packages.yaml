@@ -33,6 +33,10 @@ jobs:
           esac
           echo "name=$package" >> "$GITHUB_OUTPUT"
           echo "version=${tag#*-v}" >> "$GITHUB_OUTPUT"
+      - name: Synchronize the complete locked workspace
+        run: uv sync --all-packages --all-extras --locked
+      - name: Run the complete repository test suite
+        run: uv run pytest
       - name: Build and exercise the complete release candidate
         shell: bash
         run: |
@@ -48,11 +52,28 @@ jobs:
             dist/gate/*.whl 'httpx>=0.27,<1'
           /tmp/vuoro-release-conformance/bin/python \
             scripts/validate_served_conformance.py
-      - run: uv build --package "${{ steps.package.outputs.name }}" --wheel --out-dir dist/publish
-      - run: >-
+      - name: Select the gated wheel for publication
+        id: publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="${{ steps.package.outputs.name }}"
+          wheel_stem="${package//-/_}"
+          shopt -s nullglob
+          wheels=(dist/gate/"${wheel_stem}"-*.whl)
+          if [[ "${#wheels[@]}" -ne 1 ]]; then
+            echo "expected exactly one gated wheel for $package, found ${#wheels[@]}" >&2
+            exit 1
+          fi
+          mkdir -p dist/publish
+          wheel="dist/publish/$(basename "${wheels[0]}")"
+          cp -- "${wheels[0]}" "$wheel"
+          echo "wheel=$wheel" >> "$GITHUB_OUTPUT"
+      - name: Validate the selected gated wheel against its tag
+        run: >-
           uv run --package vuoro-service --extra test python
           scripts/validate_release_contract.py
-          dist/publish/${{ steps.package.outputs.name }}-*.whl
+          ${{ steps.publication.outputs.wheel }}
           --tag "${GITHUB_REF_NAME}"
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
@@ -60,4 +81,4 @@ jobs:
           skip-existing: false
       - uses: actions/attest@v4
         with:
-          subject-path: "dist/publish/${{ steps.package.outputs.name }}-*.whl"
+          subject-path: "${{ steps.publication.outputs.wheel }}"

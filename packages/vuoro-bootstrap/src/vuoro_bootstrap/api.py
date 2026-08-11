@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import quote, urljoin, urlsplit
 
 import httpx
 
@@ -20,6 +20,31 @@ class BootstrapError(RuntimeError):
     """The public bootstrap contract could not be completed safely."""
 
 
+def _normalized_https_url(value: Any, label: str) -> str:
+    if not isinstance(value, str):
+        raise BootstrapError(f"{label} must be an HTTPS URL")
+    parsed = urlsplit(value)
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise BootstrapError(
+            f"{label} must be an HTTPS URL without credentials or query data"
+        )
+    return value.rstrip("/")
+
+
+def _encoded_opaque_path_segment(value: str) -> str:
+    encoded = quote(value, safe="")
+    if encoded in {".", ".."}:
+        return encoded.replace(".", "%2E")
+    return encoded
+
+
 class BootstrapApi:
     """Small, injectable API facade; it never writes local files."""
 
@@ -29,10 +54,7 @@ class BootstrapApi:
         *,
         client: httpx.Client | None = None,
     ) -> None:
-        parsed = urlsplit(endpoint.rstrip("/"))
-        if parsed.scheme != "https" or not parsed.netloc or parsed.query or parsed.fragment:
-            raise BootstrapError("bootstrap endpoint must be an HTTPS origin")
-        self.endpoint = endpoint.rstrip("/")
+        self.endpoint = _normalized_https_url(endpoint, "bootstrap endpoint")
         self._client = client or httpx.Client(base_url=self.endpoint, timeout=20.0)
         self._owns_client = client is None
 
@@ -48,10 +70,10 @@ class BootstrapApi:
             response = self._client.get(urljoin(self.endpoint + "/", ".well-known/vuoro"))
             response.raise_for_status()
             document = parse_discovery(response.json())
-            configured = urlsplit(self.endpoint)
-            advertised = urlsplit(document.api_endpoint)
-            if (configured.scheme, configured.netloc) != (advertised.scheme, advertised.netloc):
-                raise BootstrapError("discovery api_endpoint is not bound to the requested endpoint")
+            if document.api_endpoint != self.endpoint:
+                raise BootstrapError(
+                    "discovery api_endpoint does not exactly match the requested endpoint"
+                )
             return document
         except Exception as error:
             if isinstance(error, BootstrapError):
@@ -93,14 +115,37 @@ class BootstrapApi:
         required = {"session_id", "device_code", "user_code", "verification_uri", "expires_in", "interval"}
         if not isinstance(value, dict) or not required <= set(value):
             raise BootstrapError("bootstrap session response is incomplete")
-        if not all(isinstance(value[key], str) and value[key] for key in required - {"expires_in", "interval"}):
+        identifiers = required - {"expires_in", "interval"}
+        if not all(isinstance(value[key], str) and value[key] for key in identifiers):
             raise BootstrapError("bootstrap session response contains invalid identifiers")
+        if _normalized_https_url(
+            value["verification_uri"], "bootstrap verification_uri"
+        ) != discovery.activation_endpoint:
+            raise BootstrapError(
+                "bootstrap verification_uri does not match discovery activation_endpoint"
+            )
+        if any(
+            isinstance(value[key], bool)
+            or not isinstance(value[key], int)
+            or value[key] <= 0
+            for key in ("expires_in", "interval")
+        ):
+            raise BootstrapError(
+                "bootstrap session expires_in and interval must be positive integers"
+            )
         return value
 
-    def exchange(self, discovery: DiscoveryDocument, *, session_id: str, device_code: str) -> dict[str, Any]:
-        endpoint = urljoin(self.endpoint + "/", f"api/control/v1/bootstrap/sessions/{session_id}/exchange")
-        if urlsplit(endpoint).netloc != urlsplit(discovery.bootstrap_endpoint).netloc:
-            raise BootstrapError("bootstrap exchange origin is not discovery-bound")
+    def exchange(
+        self,
+        discovery: DiscoveryDocument,
+        *,
+        session_id: str,
+        device_code: str,
+    ) -> dict[str, Any]:
+        if not isinstance(session_id, str) or not session_id:
+            raise BootstrapError("bootstrap exchange requires a session_id")
+        opaque_session_id = _encoded_opaque_path_segment(session_id)
+        endpoint = f"{discovery.bootstrap_endpoint}/{opaque_session_id}/exchange"
         try:
             response = self._client.post(endpoint, json={"device_code": device_code})
             response.raise_for_status()

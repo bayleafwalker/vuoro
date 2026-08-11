@@ -6,7 +6,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from vuoro_bootstrap.api import BootstrapApi
+from vuoro_bootstrap.api import BootstrapApi, BootstrapError
 from vuoro_bootstrap import cli
 from vuoro_bootstrap.files import (
     BootstrapFilesError,
@@ -57,7 +57,10 @@ def test_api_validates_cloud_shaped_discovery_manifest_and_session() -> None:
             return httpx.Response(200, json=EXCHANGE)
         return httpx.Response(404)
 
-    with BootstrapApi("https://api.vuoro.cloud", client=httpx.Client(transport=httpx.MockTransport(handler))) as api:
+    with BootstrapApi(
+        "https://api.vuoro.cloud/",
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    ) as api:
         discovery = api.discovery()
         manifest = api.manifest(discovery)
         session = api.create_session(discovery, repository_hint={"repo_id": "repo-1"})
@@ -65,6 +68,83 @@ def test_api_validates_cloud_shaped_discovery_manifest_and_session() -> None:
 
     assert manifest.packages.sprintctl == "0.2.22"
     assert exchange["token_id"] == "token-1"
+
+
+def test_discovery_requires_the_exact_normalized_requested_api_endpoint() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=DISCOVERY)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    with BootstrapApi("https://api.vuoro.cloud/tenant/", client=client) as api:
+        with pytest.raises(BootstrapError, match="exactly match"):
+            api.discovery()
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("verification_uri", "https://vuoro.cloud/other-activation"),
+        ("expires_in", 0),
+        ("expires_in", True),
+        ("interval", -1),
+        ("interval", 1.5),
+    ],
+)
+def test_session_creation_rejects_uncorrelated_or_nonpositive_activation_contract(
+    field: str, value: object
+) -> None:
+    response = {
+        "session_id": "session-1",
+        "device_code": "device-1",
+        "user_code": "KITE-MOON",
+        "verification_uri": "https://vuoro.cloud/activate",
+        "expires_in": 600,
+        "interval": 3,
+        field: value,
+    }
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(201, json=response)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    with BootstrapApi("https://api.vuoro.cloud", client=client) as api:
+        with pytest.raises(BootstrapError):
+            api.create_session(
+                parse_discovery(DISCOVERY), repository_hint={"repo_id": "repo-1"}
+            )
+
+
+@pytest.mark.parametrize(
+    ("session_id", "encoded_id"),
+    [
+        ("session/part?query#fragment", "session%2Fpart%3Fquery%23fragment"),
+        ("..", "%2E%2E"),
+    ],
+)
+def test_exchange_uses_declared_session_endpoint_and_encodes_opaque_id(
+    session_id: str, encoded_id: str
+) -> None:
+    discovery = parse_discovery(
+        {
+            **DISCOVERY,
+            "bootstrap_endpoint": "https://api.vuoro.cloud/custom/bootstrap-sessions",
+        }
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.raw_path.decode() == (
+            f"/custom/bootstrap-sessions/{encoded_id}/exchange"
+        )
+        return httpx.Response(200, json=EXCHANGE)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    with BootstrapApi("https://api.vuoro.cloud", client=client) as api:
+        exchange = api.exchange(
+            discovery,
+            session_id=session_id,
+            device_code="device-1",
+        )
+    assert exchange["token"] == "secret-token"
 
 
 def test_file_plan_is_pure_and_conflicts_fail_closed(tmp_path: Path) -> None:
@@ -142,12 +222,33 @@ def test_file_plan_requires_concrete_sprintctl_release(tmp_path: Path) -> None:
         )
 
 
-def test_private_session_read_rejects_widened_permissions(tmp_path: Path) -> None:
+@pytest.mark.parametrize("mode", [0o400, 0o644, 0o700, 0o1600])
+def test_private_session_read_requires_exact_permissions(
+    tmp_path: Path, mode: int
+) -> None:
     session_file = tmp_path / "bootstrap-session.json"
     session_file.write_text("{}")
-    session_file.chmod(0o644)
+    session_file.chmod(mode)
     with pytest.raises(BootstrapFilesError, match="mode 0600"):
         read_private_file(session_file)
+
+
+@pytest.mark.parametrize("mode", [0o400, 0o700, 0o1600])
+def test_idempotent_private_write_requires_existing_mode_0600(
+    tmp_path: Path, mode: int
+) -> None:
+    plan = plan_files(
+        EXCHANGE,
+        root=tmp_path / "repo",
+        credential_dir=tmp_path / "credentials",
+        repo_id="repo-1",
+        sprintctl_version="0.2.22",
+    )
+    apply_plan(plan)
+    credential = tmp_path / "credentials" / "vuoro-cloud.token"
+    credential.chmod(mode)
+    with pytest.raises(BootstrapFilesError, match="mode 0600"):
+        apply_plan(plan)
 
 
 def test_private_session_read_rejects_symlinked_parent(tmp_path: Path) -> None:

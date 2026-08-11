@@ -124,8 +124,10 @@ def _write_nofollow(path: Path, content: bytes, *, private: bool) -> None:
                 metadata = os.fstat(file_descriptor)
                 if not stat.S_ISREG(metadata.st_mode):
                     raise BootstrapFilesError(f"bootstrap output is not a regular file: {path}")
-                if private and metadata.st_mode & 0o077:
-                    raise BootstrapFilesError(f"private bootstrap file is too permissive: {path}")
+                if private and stat.S_IMODE(metadata.st_mode) != 0o600:
+                    raise BootstrapFilesError(
+                        f"private bootstrap file must have mode 0600: {path}"
+                    )
                 existing = bytearray()
                 while chunk := os.read(file_descriptor, 1024 * 1024):
                     existing.extend(chunk)
@@ -135,6 +137,7 @@ def _write_nofollow(path: Path, content: bytes, *, private: bool) -> None:
                 os.close(file_descriptor)
             return
         try:
+            os.fchmod(file_descriptor, mode)
             offset = 0
             while offset < len(content):
                 offset += os.write(file_descriptor, content[offset:])
@@ -168,7 +171,7 @@ def read_private_file(path: Path) -> bytes:
         metadata = os.fstat(descriptor)
         if not stat.S_ISREG(metadata.st_mode):
             raise BootstrapFilesError(f"bootstrap session is not a regular file: {path}")
-        if metadata.st_mode & 0o777 != 0o600:
+        if stat.S_IMODE(metadata.st_mode) != 0o600:
             raise BootstrapFilesError(f"bootstrap session must have mode 0600: {path}")
         return os.read(descriptor, 1024 * 1024)
     finally:
