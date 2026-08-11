@@ -20,6 +20,7 @@ from vuoro_service.composition import (
     _load_project_binding_for_composition,
     _load_project_bindings_file,
     _runtime_path,
+    _validate_identity_mode,
 )
 from vuoro_service.identity import Identity, InvocationContext
 from vuoro_service.project_binding import load_project_bindings
@@ -357,6 +358,16 @@ def test_startup_loader_preserves_canonical_default_without_hosted_environment(
     loaded = _load_project_binding_for_composition(path)
     assert loaded.environment is None
     assert loaded.home_repo == "repo-a"
+
+
+def test_hosted_binding_cannot_fall_back_to_static_identity_mode() -> None:
+    hosted = SimpleNamespace(environment=_HOSTED_ENVIRONMENT)
+    local = SimpleNamespace(environment=None)
+
+    with pytest.raises(CompositionError, match="require gateway assertion"):
+        _validate_identity_mode(hosted, gateway_key_configured=False)
+    _validate_identity_mode(hosted, gateway_key_configured=True)
+    _validate_identity_mode(local, gateway_key_configured=False)
 
 
 def test_startup_loader_rejects_many_projects(tmp_path: Path) -> None:

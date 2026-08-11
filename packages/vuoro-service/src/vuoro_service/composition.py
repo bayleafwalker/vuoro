@@ -669,6 +669,15 @@ def _load_project_binding_for_composition(
     return binding
 
 
+def _validate_identity_mode(
+    project_binding: ProjectBinding, *, gateway_key_configured: bool
+) -> None:
+    if project_binding.environment is not None and not gateway_key_configured:
+        raise CompositionError(
+            "hosted project bindings require gateway assertion identity mode"
+        )
+
+
 def _pg_connection_factory(dsn: str) -> Callable[[], Any]:
     try:
         import psycopg
@@ -810,6 +819,9 @@ def create_composed_app(
         ),
     )
     gateway_key_value = environ.get("VUORO_GATEWAY_PUBLIC_KEY_FILE")
+    _validate_identity_mode(
+        project_binding, gateway_key_configured=gateway_key_value is not None
+    )
     if gateway_key_value is not None:
         if identity_path is not None or "VUORO_IDENTITIES_FILE" in environ:
             raise CompositionError(
