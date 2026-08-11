@@ -573,8 +573,12 @@ def load_development_identities(path: Path, *, environment: str) -> StaticBearer
     return load_identities(path, environment=environment)
 
 
-def _runtime_env(name: str, environ: Mapping[str, str]) -> str:
-    value = environ.get(name)
+def _runtime_env(
+    name: str, environ: Mapping[str, str], *, aliases: tuple[str, ...] = ()
+) -> str:
+    value = environ[name] if name in environ else next(
+        (environ[alias] for alias in aliases if alias in environ), None
+    )
     if not value:
         raise CompositionError(f"{name} is required for four-domain composition")
     return value
@@ -745,7 +749,9 @@ def create_composed_app(
 
     environ = environ or os.environ
     environment_name = _validate_expected_environment(
-        _runtime_env("VUORO_ENVIRONMENT_NAME", environ)
+        _runtime_env(
+            "VUORO_ENVIRONMENT_NAME", environ, aliases=("VUORO_ENVIRONMENT",)
+        )
     )
     environment_class = _runtime_env("VUORO_ENVIRONMENT_CLASS", environ)
     if environment_class not in _DEPLOYABLE_ENVIRONMENT_CLASSES:
@@ -798,7 +804,9 @@ def create_composed_app(
     # re-scopes via _scoped_for), so this application can serve every
     # repository tenant a bound identity is authorized for -- not only this
     # one.
-    work_store = work_pg.get_connection(_runtime_env("VUORO_WORK_RUNTIME_DSN", environ))
+    work_store = work_pg.get_connection(
+        _runtime_env("VUORO_WORK_RUNTIME_DSN", environ, aliases=("VUORO_WORK_DSN",))
+    )
     work_store.repo_id = _runtime_env("VUORO_WORK_REPOSITORY_ID", environ)
     work_credential_resolver = make_transient_credential_resolver()
     work_application = WorkApplication.postgres(
@@ -841,7 +849,7 @@ def create_composed_app(
         try:
             resolver = GatewayAssertionIdentityResolver.from_file(
                 gateway_key_path,
-                issuer=environ.get("VUORO_GATEWAY_ASSERTION_ISSUER", "vuoro-cloud"),
+                issuer=_runtime_env("VUORO_GATEWAY_ASSERTION_ISSUER", environ),
                 audience=environ.get("VUORO_GATEWAY_ASSERTION_AUDIENCE", "vuoro-service"),
                 environment=environment_name,
                 expected_workspace_id=_runtime_env("VUORO_WORKSPACE_ID", environ),
@@ -856,7 +864,9 @@ def create_composed_app(
             identity_path or Path(_runtime_env("VUORO_IDENTITIES_FILE", environ)),
             environment=environment_name,
         )
-    work_dsn = _runtime_env("VUORO_WORK_RUNTIME_DSN", environ)
+    work_dsn = _runtime_env(
+        "VUORO_WORK_RUNTIME_DSN", environ, aliases=("VUORO_WORK_DSN",)
+    )
 
     def make_member_application(repo_id: str) -> WorkApplication:
         member_store = work_pg.get_connection(work_dsn)
@@ -933,7 +943,13 @@ def create_composed_app(
 
     execution_application = ActionQApplication(
         schema=_runtime_env("VUORO_EXECUTION_SCHEMA", environ),
-        connection_factory=_pg_connection_factory(_runtime_env("VUORO_EXECUTION_RUNTIME_DSN", environ)),
+        connection_factory=_pg_connection_factory(
+            _runtime_env(
+                "VUORO_EXECUTION_RUNTIME_DSN",
+                environ,
+                aliases=("VUORO_EXECUTION_DSN",),
+            )
+        ),
         authorizer=_execution_authorizer,
     )
     _load_function(execution_pin)(registry, application=execution_application)
@@ -945,7 +961,13 @@ def create_composed_app(
 
     knowledge_application = CentralKnowledgeApplication(
         schema=_runtime_env("VUORO_KNOWLEDGE_SCHEMA", environ),
-        connection_factory=_pg_connection_factory(_runtime_env("VUORO_KNOWLEDGE_RUNTIME_DSN", environ)),
+        connection_factory=_pg_connection_factory(
+            _runtime_env(
+                "VUORO_KNOWLEDGE_RUNTIME_DSN",
+                environ,
+                aliases=("VUORO_KNOWLEDGE_DSN",),
+            )
+        ),
         expected_environment_name=environment_name,
         expected_environment_class=environment_class,
     )
@@ -956,7 +978,11 @@ def create_composed_app(
     from auditctl.vuoro_adapter import VuoroAuditAdapter
 
     audit_adapter = VuoroAuditAdapter(
-        connection_factory=_pg_connection_factory(_runtime_env("VUORO_AUDIT_RUNTIME_DSN", environ)),
+        connection_factory=_pg_connection_factory(
+            _runtime_env(
+                "VUORO_AUDIT_RUNTIME_DSN", environ, aliases=("VUORO_AUDIT_DSN",)
+            )
+        ),
         schema=_runtime_env("VUORO_AUDIT_SCHEMA", environ),
     )
     # Auditctl's released adapter exposes an instance registration method,

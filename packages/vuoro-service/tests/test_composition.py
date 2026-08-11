@@ -19,6 +19,7 @@ from vuoro_service.composition import (
     _load_work_resource_observation_authorizer,
     _load_project_binding_for_composition,
     _load_project_bindings_file,
+    _runtime_env,
     _runtime_path,
     _validate_identity_mode,
 )
@@ -260,6 +261,19 @@ def test_project_bindings_path_can_be_supplied_by_a_runtime_mount() -> None:
             mounted_path=gateway_key,
             mount_label="approved Cloud gateway key mount",
         )
+
+
+def test_cloud_rendered_environment_and_dsn_aliases_are_compatible() -> None:
+    assert _runtime_env(
+        "VUORO_ENVIRONMENT_NAME",
+        {"VUORO_ENVIRONMENT": "vuoro-cloud"},
+        aliases=("VUORO_ENVIRONMENT",),
+    ) == "vuoro-cloud"
+    assert _runtime_env(
+        "VUORO_WORK_RUNTIME_DSN",
+        {"VUORO_WORK_DSN": "postgresql://work"},
+        aliases=("VUORO_WORK_DSN",),
+    ) == "postgresql://work"
 
 
 def _hosted_binding(*, projects: list[dict] | None = None) -> dict:

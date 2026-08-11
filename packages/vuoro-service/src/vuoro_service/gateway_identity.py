@@ -21,6 +21,7 @@ from vuoro_service.identity import Identity, IdentityResolutionError
 
 _ULID = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
 _REPO_ID = re.compile(r"^[A-Za-z0-9._-]+$")
+_NBF_CLOCK_SKEW_SECONDS = 2
 _REQUIRED_CLAIMS = (
     "actor",
     "authorities",
@@ -115,7 +116,7 @@ class GatewayAssertionIdentityResolver:
         cls,
         path: Path,
         *,
-        issuer: str = "vuoro-cloud",
+        issuer: str,
         audience: str = "vuoro-service",
         environment: str,
         expected_workspace_id: str,
@@ -186,7 +187,7 @@ class GatewayAssertionIdentityResolver:
                 algorithms=["EdDSA"],
                 audience=self._audience,
                 issuer=self._issuer,
-                leeway=2,
+                leeway=_NBF_CLOCK_SKEW_SECONDS,
                 options={"require": list(_REQUIRED_CLAIMS)},
             )
         except jwt.InvalidTokenError as error:
@@ -212,7 +213,15 @@ class GatewayAssertionIdentityResolver:
             raise IdentityResolutionError("gateway identity assertion has invalid repo_ids")
         signed_request_id = _required_text(claims.get("request_id"), "request_id")
         signed_jti = _required_text(claims.get("jti"), "jti")
-        if signed_request_id != request_id or signed_jti != request_id:
+        invocation_request_id = getattr(
+            request.state, "vuoro_invocation_request_id", None
+        )
+        if (
+            signed_request_id != request_id
+            or signed_jti != request_id
+            or not isinstance(invocation_request_id, str)
+            or signed_request_id != invocation_request_id
+        ):
             raise IdentityResolutionError("gateway identity request correlation failed")
         for field in ("iat", "nbf", "exp"):
             value = claims.get(field)
@@ -220,7 +229,12 @@ class GatewayAssertionIdentityResolver:
                 raise IdentityResolutionError(f"gateway identity assertion has invalid {field}")
         if claims["exp"] <= datetime.now(UTC).timestamp():
             raise IdentityResolutionError("gateway identity assertion has expired")
-        if claims["exp"] <= claims["iat"] or claims["exp"] - claims["iat"] > 32:
+        if (
+            claims["nbf"] > claims["iat"]
+            or claims["iat"] - claims["nbf"] > _NBF_CLOCK_SKEW_SECONDS
+        ):
+            raise IdentityResolutionError("gateway identity nbf skew is invalid")
+        if claims["exp"] <= claims["iat"] or claims["exp"] - claims["iat"] > 30:
             raise IdentityResolutionError("gateway identity assertion lifetime is invalid")
         return Identity(
             actor=actor,

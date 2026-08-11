@@ -301,6 +301,11 @@ def create_app(
                 error_message="operation is not present in the active catalog",
                 http_status=404,
             )
+        # The gateway assertion's request_id must cover the parsed invocation
+        # envelope, not only the transport header.  This state is populated
+        # immediately before identity resolution and is consumed by the
+        # gateway-aware resolver; static local resolvers intentionally ignore it.
+        request.state.vuoro_invocation_request_id = request_id
         try:
             identity = identity_resolver(request)
             if inspect.isawaitable(identity):

@@ -9,7 +9,11 @@ from vuoro_service.contracts import (
     DomainCompatibility, OperationDefinition, ResourceKindDefinition,
     ResourceObservationContract,
 )
-from vuoro_service.identity import Identity, StaticBearerIdentityResolver
+from vuoro_service.identity import (
+    Identity,
+    IdentityResolutionError,
+    StaticBearerIdentityResolver,
+)
 
 
 @pytest.fixture
@@ -17,7 +21,7 @@ def anyio_backend() -> str:
     return "asyncio"
 
 
-def configured_service(handler=None) -> tuple[CatalogRegistry, object]:
+def configured_service(handler=None, identity_resolver=None) -> tuple[CatalogRegistry, object]:
     registry = CatalogRegistry()
     registry.register(
         OperationDefinition(
@@ -70,8 +74,48 @@ def configured_service(handler=None) -> tuple[CatalogRegistry, object]:
         }
     )
     return registry, create_app(
-        settings=settings, registry=registry, identity_resolver=resolver
+        settings=settings,
+        registry=registry,
+        identity_resolver=identity_resolver or resolver,
     )
+
+
+@pytest.mark.anyio
+async def test_identity_is_bound_to_the_parsed_invocation_request_id() -> None:
+    calls: list[str] = []
+
+    def resolver(request):
+        if getattr(request.state, "vuoro_invocation_request_id", None) != "body-id":
+            raise IdentityResolutionError("request correlation failed")
+        return Identity(
+            actor="human:developer",
+            environment="vuoro-dev",
+            authorities=frozenset({"work.transition"}),
+        )
+
+    registry, app = configured_service(
+        handler=lambda arguments, context: calls.append(context.request_id)
+        or {"accepted": arguments["value"]},
+        identity_resolver=resolver,
+    )
+    request = {
+        "schema_version": "invocation/v1",
+        "request_id": "body-id",
+        "operation": "work.pilot.transition",
+        "arguments": {"value": 7},
+        "catalog_revision": registry.revision,
+        "idempotency_key": "transition-7",
+    }
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/api/invoke/v1",
+            headers={"X-Vuoro-Client-Protocol": "1"},
+            json=request,
+        )
+    assert response.status_code == 200
+    assert calls == ["body-id"]
 
 
 @pytest.mark.anyio
