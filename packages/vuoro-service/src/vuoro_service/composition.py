@@ -22,6 +22,10 @@ from vuoro_service.app import ServiceSettings, create_app
 from vuoro_service.catalog import CatalogRegistry
 from vuoro_service.contracts import DomainCompatibility
 from vuoro_service.environment_record import load_environment_record
+from vuoro_service.gateway_identity import (
+    GatewayAssertionConfigurationError,
+    GatewayAssertionIdentityResolver,
+)
 from vuoro_service.identity import Identity, InvocationContext, StaticBearerIdentityResolver
 from vuoro_service.project_binding import (
     ProjectAuthorizationError,
@@ -37,6 +41,7 @@ _DEPLOYABLE_ENVIRONMENT_CLASSES = frozenset({"development", "production"})
 _DEFAULT_PROJECT_BINDINGS_PATH = Path("/opt/vuoro/composition/project-bindings.json")
 _CLOUD_PROJECT_BINDINGS_PATH = Path("/etc/vuoro/bindings/bindings.json")
 _CLOUD_BINDINGS_TRUST_ROOT = Path("/etc/vuoro")
+_CLOUD_GATEWAY_PUBLIC_KEY_PATH = Path("/etc/vuoro/identity/gateway-public.pem")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 _RELEASE_SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]*$")
@@ -568,8 +573,12 @@ def load_development_identities(path: Path, *, environment: str) -> StaticBearer
     return load_identities(path, environment=environment)
 
 
-def _runtime_env(name: str, environ: Mapping[str, str]) -> str:
-    value = environ.get(name)
+def _runtime_env(
+    name: str, environ: Mapping[str, str], *, aliases: tuple[str, ...] = ()
+) -> str:
+    value = environ[name] if name in environ else next(
+        (environ[alias] for alias in aliases if alias in environ), None
+    )
     if not value:
         raise CompositionError(f"{name} is required for four-domain composition")
     return value
@@ -589,6 +598,7 @@ def _runtime_path(
     *,
     default: str | Path,
     mounted_path: str | Path = _CLOUD_PROJECT_BINDINGS_PATH,
+    mount_label: str = "approved Cloud binding mount",
 ) -> Path:
     """Resolve the embedded file or the one approved Cloud ConfigMap path.
 
@@ -602,10 +612,10 @@ def _runtime_path(
     if value is None:
         return Path(default)
     if not value or value != value.strip() or "\x00" in value:
-        raise CompositionError(f"{name} must name the approved Cloud binding mount")
+        raise CompositionError(f"{name} must name the {mount_label}")
     path = Path(value)
     if path != Path(mounted_path):
-        raise CompositionError(f"{name} must name the approved Cloud binding mount")
+        raise CompositionError(f"{name} must name the {mount_label}")
     return path
 
 
@@ -661,6 +671,15 @@ def _load_project_binding_for_composition(
                 "VUORO_ENVIRONMENT_NAME"
             )
     return binding
+
+
+def _validate_identity_mode(
+    project_binding: ProjectBinding, *, gateway_key_configured: bool
+) -> None:
+    if project_binding.environment is not None and not gateway_key_configured:
+        raise CompositionError(
+            "hosted project bindings require gateway assertion identity mode"
+        )
 
 
 def _pg_connection_factory(dsn: str) -> Callable[[], Any]:
@@ -730,7 +749,9 @@ def create_composed_app(
 
     environ = environ or os.environ
     environment_name = _validate_expected_environment(
-        _runtime_env("VUORO_ENVIRONMENT_NAME", environ)
+        _runtime_env(
+            "VUORO_ENVIRONMENT_NAME", environ, aliases=("VUORO_ENVIRONMENT",)
+        )
     )
     environment_class = _runtime_env("VUORO_ENVIRONMENT_CLASS", environ)
     if environment_class not in _DEPLOYABLE_ENVIRONMENT_CLASSES:
@@ -756,10 +777,6 @@ def create_composed_app(
         manifest,
         resolved_manifest_path,
         Path(_runtime_env("VUORO_INSTALLED_COMPOSITION_PATH", environ)),
-    )
-    resolver = load_identities(
-        identity_path or Path(_runtime_env("VUORO_IDENTITIES_FILE", environ)),
-        environment=environment_name,
     )
     if work_resource_observation_authorizer is None:
         work_resource_observation_authorizer = (
@@ -787,7 +804,9 @@ def create_composed_app(
     # re-scopes via _scoped_for), so this application can serve every
     # repository tenant a bound identity is authorized for -- not only this
     # one.
-    work_store = work_pg.get_connection(_runtime_env("VUORO_WORK_RUNTIME_DSN", environ))
+    work_store = work_pg.get_connection(
+        _runtime_env("VUORO_WORK_RUNTIME_DSN", environ, aliases=("VUORO_WORK_DSN",))
+    )
     work_store.repo_id = _runtime_env("VUORO_WORK_REPOSITORY_ID", environ)
     work_credential_resolver = make_transient_credential_resolver()
     work_application = WorkApplication.postgres(
@@ -807,7 +826,47 @@ def create_composed_app(
             else None
         ),
     )
-    work_dsn = _runtime_env("VUORO_WORK_RUNTIME_DSN", environ)
+    gateway_key_value = environ.get("VUORO_GATEWAY_PUBLIC_KEY_FILE")
+    _validate_identity_mode(
+        project_binding, gateway_key_configured=gateway_key_value is not None
+    )
+    if gateway_key_value is not None:
+        if identity_path is not None or "VUORO_IDENTITIES_FILE" in environ:
+            raise CompositionError(
+                "gateway assertion identity mode cannot be combined with a static identity registry"
+            )
+        if project_binding.environment is None:
+            raise CompositionError(
+                "gateway assertion identity mode requires hosted project bindings"
+            )
+        gateway_key_path = _runtime_path(
+            "VUORO_GATEWAY_PUBLIC_KEY_FILE",
+            environ,
+            default=_CLOUD_GATEWAY_PUBLIC_KEY_PATH,
+            mounted_path=_CLOUD_GATEWAY_PUBLIC_KEY_PATH,
+            mount_label="approved Cloud gateway key mount",
+        )
+        try:
+            resolver = GatewayAssertionIdentityResolver.from_file(
+                gateway_key_path,
+                issuer=_runtime_env("VUORO_GATEWAY_ASSERTION_ISSUER", environ),
+                audience=environ.get("VUORO_GATEWAY_ASSERTION_AUDIENCE", "vuoro-service"),
+                environment=environment_name,
+                expected_workspace_id=_runtime_env("VUORO_WORKSPACE_ID", environ),
+                allowed_repo_ids=frozenset(project_binding.repo_ids),
+                key_id=environ.get("VUORO_GATEWAY_ASSERTION_KEY_ID", "gateway-2026-01"),
+                trusted_root=_CLOUD_BINDINGS_TRUST_ROOT,
+            )
+        except GatewayAssertionConfigurationError as error:
+            raise CompositionError("cannot configure gateway assertion identity") from error
+    else:
+        resolver = load_identities(
+            identity_path or Path(_runtime_env("VUORO_IDENTITIES_FILE", environ)),
+            environment=environment_name,
+        )
+    work_dsn = _runtime_env(
+        "VUORO_WORK_RUNTIME_DSN", environ, aliases=("VUORO_WORK_DSN",)
+    )
 
     def make_member_application(repo_id: str) -> WorkApplication:
         member_store = work_pg.get_connection(work_dsn)
@@ -884,7 +943,13 @@ def create_composed_app(
 
     execution_application = ActionQApplication(
         schema=_runtime_env("VUORO_EXECUTION_SCHEMA", environ),
-        connection_factory=_pg_connection_factory(_runtime_env("VUORO_EXECUTION_RUNTIME_DSN", environ)),
+        connection_factory=_pg_connection_factory(
+            _runtime_env(
+                "VUORO_EXECUTION_RUNTIME_DSN",
+                environ,
+                aliases=("VUORO_EXECUTION_DSN",),
+            )
+        ),
         authorizer=_execution_authorizer,
     )
     _load_function(execution_pin)(registry, application=execution_application)
@@ -896,7 +961,13 @@ def create_composed_app(
 
     knowledge_application = CentralKnowledgeApplication(
         schema=_runtime_env("VUORO_KNOWLEDGE_SCHEMA", environ),
-        connection_factory=_pg_connection_factory(_runtime_env("VUORO_KNOWLEDGE_RUNTIME_DSN", environ)),
+        connection_factory=_pg_connection_factory(
+            _runtime_env(
+                "VUORO_KNOWLEDGE_RUNTIME_DSN",
+                environ,
+                aliases=("VUORO_KNOWLEDGE_DSN",),
+            )
+        ),
         expected_environment_name=environment_name,
         expected_environment_class=environment_class,
     )
@@ -907,7 +978,11 @@ def create_composed_app(
     from auditctl.vuoro_adapter import VuoroAuditAdapter
 
     audit_adapter = VuoroAuditAdapter(
-        connection_factory=_pg_connection_factory(_runtime_env("VUORO_AUDIT_RUNTIME_DSN", environ)),
+        connection_factory=_pg_connection_factory(
+            _runtime_env(
+                "VUORO_AUDIT_RUNTIME_DSN", environ, aliases=("VUORO_AUDIT_DSN",)
+            )
+        ),
         schema=_runtime_env("VUORO_AUDIT_SCHEMA", environ),
     )
     # Auditctl's released adapter exposes an instance registration method,

@@ -19,7 +19,9 @@ from vuoro_service.composition import (
     _load_work_resource_observation_authorizer,
     _load_project_binding_for_composition,
     _load_project_bindings_file,
+    _runtime_env,
     _runtime_path,
+    _validate_identity_mode,
 )
 from vuoro_service.identity import Identity, InvocationContext
 from vuoro_service.project_binding import load_project_bindings
@@ -243,6 +245,35 @@ def test_project_bindings_path_can_be_supplied_by_a_runtime_mount() -> None:
             default="/opt/vuoro/composition/project-bindings.json",
             mounted_path=mounted,
         )
+    gateway_key = "/etc/vuoro/identity/gateway-public.pem"
+    assert _runtime_path(
+        "VUORO_GATEWAY_PUBLIC_KEY_FILE",
+        {"VUORO_GATEWAY_PUBLIC_KEY_FILE": gateway_key},
+        default=gateway_key,
+        mounted_path=gateway_key,
+        mount_label="approved Cloud gateway key mount",
+    ) == Path(gateway_key)
+    with pytest.raises(CompositionError, match="approved Cloud gateway key mount"):
+        _runtime_path(
+            "VUORO_GATEWAY_PUBLIC_KEY_FILE",
+            {"VUORO_GATEWAY_PUBLIC_KEY_FILE": "/tmp/gateway.pem"},
+            default=gateway_key,
+            mounted_path=gateway_key,
+            mount_label="approved Cloud gateway key mount",
+        )
+
+
+def test_cloud_rendered_environment_and_dsn_aliases_are_compatible() -> None:
+    assert _runtime_env(
+        "VUORO_ENVIRONMENT_NAME",
+        {"VUORO_ENVIRONMENT": "vuoro-cloud"},
+        aliases=("VUORO_ENVIRONMENT",),
+    ) == "vuoro-cloud"
+    assert _runtime_env(
+        "VUORO_WORK_RUNTIME_DSN",
+        {"VUORO_WORK_DSN": "postgresql://work"},
+        aliases=("VUORO_WORK_DSN",),
+    ) == "postgresql://work"
 
 
 def _hosted_binding(*, projects: list[dict] | None = None) -> dict:
@@ -341,6 +372,16 @@ def test_startup_loader_preserves_canonical_default_without_hosted_environment(
     loaded = _load_project_binding_for_composition(path)
     assert loaded.environment is None
     assert loaded.home_repo == "repo-a"
+
+
+def test_hosted_binding_cannot_fall_back_to_static_identity_mode() -> None:
+    hosted = SimpleNamespace(environment=_HOSTED_ENVIRONMENT)
+    local = SimpleNamespace(environment=None)
+
+    with pytest.raises(CompositionError, match="require gateway assertion"):
+        _validate_identity_mode(hosted, gateway_key_configured=False)
+    _validate_identity_mode(hosted, gateway_key_configured=True)
+    _validate_identity_mode(local, gateway_key_configured=False)
 
 
 def test_startup_loader_rejects_many_projects(tmp_path: Path) -> None:
