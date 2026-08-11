@@ -9,26 +9,43 @@ not discover a caller's checkout, derived project folder, or local
 `project.context.json`: those are mutable client inputs and cannot safely
 choose the repositories a served request reads.
 
-## Immutable input
+## Binding inputs
 
 Before a work-adapter release adds `work.project.context` or
-`work.project.sprints`, the Vuoro release composition must contain one
-reviewed `vuoro-project-bindings/v1` projection. Each binding records:
+`work.project.sprints`, Vuoro accepts one of two explicit
+`vuoro-project-bindings/v1` inputs. The checked-in release input uses
+`bindings` and records:
 
 - the canonical `project_id`, home repo, and ordered member repo IDs;
 - the canonical source repository, full commit SHA, source path, and SHA-256
   of the source `project.toml`.
 
 The parser in `vuoro_service.project_binding` rejects malformed IDs, duplicate
-members, a home repo outside the members, path traversal, and non-immutable
-source provenance. The projection does not create a project database or make
-Vuoro authoritative for project membership; it is release-reviewed data used
-only to construct domain applications.
+members, a home repo outside the members, path traversal, and invalid
+provenance. The projection does not create a project database or make Vuoro
+authoritative for project membership; it is used only to construct domain
+applications.
 
-The source projection must be incorporated into the immutable service
-composition at image-build time. Do not add an environment variable, mounted
-secret, ConfigMap, or local file lookup for it: deployment overlays must not be
-able to change catalog behavior or widen the repositories an aggregate reads.
+Vuoro Cloud owns the runtime-generated form. It emits `environment` and one or
+more `projects`, with each project carrying its hosted ULID, descriptor digest,
+and ordered repository records (`repo_id`, `git_remote`, `commit_sha`). Cloud
+generates and deploys exactly one such project as a read-only ConfigMap mount;
+Vuoro parses it, requires exactly one project at startup, and retains the
+repository provenance while applying its normal repository and authority
+checks. At startup, Vuoro requires the hosted `environment` to exactly match
+the appservice-controlled `VUORO_ENVIRONMENT_NAME`; disagreement or a missing
+expected environment fails closed. Vuoro does not absorb Cloud's workspace
+state or deployment policy.
+
+The deployment-trust contract is deliberately narrow: the embedded default is
+`/opt/vuoro/composition/project-bindings.json`; the only runtime override is
+the exact ConfigMap path `/etc/vuoro/bindings/bindings.json`. The override must
+be a read-only Cloud-owned mount, and ConfigMap `..data` symlinks are allowed
+only when their resolved target remains under `/etc/vuoro`. Relative paths,
+other absolute paths, broken/out-of-root links, malformed or undecodable files,
+and empty or multi-project documents fail closed. The path selector is not a
+general deployment-controlled authority and does not make arbitrary mounted
+JSON release-reviewed.
 
 ## Construction and authorization
 

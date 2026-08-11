@@ -25,6 +25,7 @@ from vuoro_service.environment_record import load_environment_record
 from vuoro_service.identity import Identity, InvocationContext, StaticBearerIdentityResolver
 from vuoro_service.project_binding import (
     ProjectAuthorizationError,
+    ProjectBinding,
     ProjectBindingError,
     compose_authorized_project_application,
     load_project_bindings,
@@ -33,6 +34,9 @@ from vuoro_service.project_binding import (
 
 _REQUIRED_DOMAINS = frozenset({"work", "execution", "knowledge", "audit"})
 _DEPLOYABLE_ENVIRONMENT_CLASSES = frozenset({"development", "production"})
+_DEFAULT_PROJECT_BINDINGS_PATH = Path("/opt/vuoro/composition/project-bindings.json")
+_CLOUD_PROJECT_BINDINGS_PATH = Path("/etc/vuoro/bindings/bindings.json")
+_CLOUD_BINDINGS_TRUST_ROOT = Path("/etc/vuoro")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 _RELEASE_SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]*$")
@@ -571,6 +575,94 @@ def _runtime_env(name: str, environ: Mapping[str, str]) -> str:
     return value
 
 
+def _validate_expected_environment(value: str) -> str:
+    if not value or value != value.strip() or "\x00" in value:
+        raise CompositionError(
+            "VUORO_ENVIRONMENT_NAME must be a non-empty environment name"
+        )
+    return value
+
+
+def _runtime_path(
+    name: str,
+    environ: Mapping[str, str],
+    *,
+    default: str | Path,
+    mounted_path: str | Path = _CLOUD_PROJECT_BINDINGS_PATH,
+) -> Path:
+    """Resolve the embedded file or the one approved Cloud ConfigMap path.
+
+    The environment variable is a deployment selector, not an arbitrary file
+    authority.  Vuoro Cloud owns the read-only ConfigMap mounted at the exact
+    ``mounted_path``; accepting any other path would let deployment config
+    substitute a different membership document.
+    """
+
+    value = environ.get(name)
+    if value is None:
+        return Path(default)
+    if not value or value != value.strip() or "\x00" in value:
+        raise CompositionError(f"{name} must name the approved Cloud binding mount")
+    path = Path(value)
+    if path != Path(mounted_path):
+        raise CompositionError(f"{name} must name the approved Cloud binding mount")
+    return path
+
+
+def _load_project_bindings_file(
+    path: Path,
+    *,
+    trusted_root: Path | None = None,
+) -> tuple[ProjectBinding, ...]:
+    """Read a UTF-8 JSON binding file and normalize startup failures."""
+
+    try:
+        resolved = path.resolve(strict=True)
+        if trusted_root is not None:
+            root = trusted_root.resolve(strict=True)
+            try:
+                resolved.relative_to(root)
+            except ValueError as error:
+                raise CompositionError(
+                    "mounted project bindings resolve outside the trusted ConfigMap root"
+                ) from error
+        document = json.loads(resolved.read_bytes().decode("utf-8"))
+    except CompositionError:
+        raise
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise CompositionError("cannot load mounted project bindings") from error
+    if not isinstance(document, dict):
+        raise CompositionError("mounted project bindings must be a JSON object")
+    try:
+        return load_project_bindings(document)
+    except ProjectBindingError as error:
+        raise CompositionError("mounted project bindings are invalid") from error
+
+
+def _load_project_binding_for_composition(
+    path: Path,
+    *,
+    trusted_root: Path | None = None,
+    expected_environment: str | None = None,
+) -> ProjectBinding:
+    bindings = _load_project_bindings_file(path, trusted_root=trusted_root)
+    if len(bindings) != 1:
+        raise CompositionError("this release must contain exactly one project binding")
+    binding = bindings[0]
+    if binding.environment is not None:
+        if expected_environment is None:
+            raise CompositionError(
+                "VUORO_ENVIRONMENT_NAME is required for hosted project bindings"
+            )
+        _validate_expected_environment(expected_environment)
+        if binding.environment != expected_environment:
+            raise CompositionError(
+                "hosted project binding environment does not match "
+                "VUORO_ENVIRONMENT_NAME"
+            )
+    return binding
+
+
 def _pg_connection_factory(dsn: str) -> Callable[[], Any]:
     try:
         import psycopg
@@ -637,7 +729,9 @@ def create_composed_app(
     import os
 
     environ = environ or os.environ
-    environment_name = _runtime_env("VUORO_ENVIRONMENT_NAME", environ)
+    environment_name = _validate_expected_environment(
+        _runtime_env("VUORO_ENVIRONMENT_NAME", environ)
+    )
     environment_class = _runtime_env("VUORO_ENVIRONMENT_CLASS", environ)
     if environment_class not in _DEPLOYABLE_ENVIRONMENT_CLASSES:
         raise CompositionError("this composition requires a deployable environment class")
@@ -699,17 +793,20 @@ def create_composed_app(
     work_application = WorkApplication.postgres(
         work_store, credential_resolver=work_credential_resolver
     )
-    bindings_path = project_bindings_path or Path(
-        "/opt/vuoro/composition/project-bindings.json"
+    bindings_path = project_bindings_path or _runtime_path(
+        "VUORO_PROJECT_BINDINGS_FILE",
+        environ,
+        default=_DEFAULT_PROJECT_BINDINGS_PATH,
     )
-    try:
-        bindings_raw = json.loads(bindings_path.read_text(encoding="utf-8"))
-        project_bindings = load_project_bindings(bindings_raw)
-    except (OSError, json.JSONDecodeError, ProjectBindingError) as error:
-        raise CompositionError("cannot load immutable project bindings") from error
-    if len(project_bindings) != 1:
-        raise CompositionError("this release must contain exactly one project binding")
-    project_binding = project_bindings[0]
+    project_binding = _load_project_binding_for_composition(
+        bindings_path,
+        expected_environment=environment_name,
+        trusted_root=(
+            _CLOUD_BINDINGS_TRUST_ROOT
+            if bindings_path == _CLOUD_PROJECT_BINDINGS_PATH
+            else None
+        ),
+    )
     work_dsn = _runtime_env("VUORO_WORK_RUNTIME_DSN", environ)
 
     def make_member_application(repo_id: str) -> WorkApplication:
@@ -722,21 +819,37 @@ def create_composed_app(
     def make_project_application(
         project_id: str, members: tuple[tuple[str, WorkApplication], ...]
     ) -> ProjectWorkApplication:
+        canonical_binding = {
+            "project_id": project_binding.project_id,
+            "home_repo": project_binding.home_repo,
+            "backlog_repos": list(project_binding.repo_ids),
+            "source_repository": project_binding.source_repository,
+            "source_revision": project_binding.source_revision,
+            "source_path": project_binding.source_path,
+            "source_sha256": project_binding.source_sha256,
+        }
+        if project_binding.environment is not None:
+            canonical_binding.update(
+                {
+                    "environment": project_binding.environment,
+                    "descriptor_digest": project_binding.descriptor_digest,
+                    "repositories": [
+                        {
+                            "repo_id": member.repo_id,
+                            "git_remote": member.git_remote,
+                            "commit_sha": member.commit_sha,
+                        }
+                        for member in project_binding.members
+                    ],
+                }
+            )
         return ProjectWorkApplication(
             project_id,
             tuple(
                 ProjectMemberApplication(origin_repo, application)
                 for origin_repo, application in members
             ),
-            canonical_binding={
-                "project_id": project_binding.project_id,
-                "home_repo": project_binding.home_repo,
-                "backlog_repos": list(project_binding.repo_ids),
-                "source_repository": project_binding.source_repository,
-                "source_revision": project_binding.source_revision,
-                "source_path": project_binding.source_path,
-                "source_sha256": project_binding.source_sha256,
-            },
+            canonical_binding=canonical_binding,
         )
 
     guarded_project_application = compose_authorized_project_application(
