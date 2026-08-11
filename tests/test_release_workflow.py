@@ -17,7 +17,7 @@ def _assert_python_release_order(workflow: str) -> None:
     )
     build = workflow.index("uv build --package vuoro-client")
     release_gate = workflow.index(
-        "scripts/validate_release_contract.py dist/gate/*.whl --release"
+        'scripts/validate_release_contract.py "${wheels[@]}" --release'
     )
     served_gate = workflow.index("scripts/validate_served_conformance.py")
     selection = workflow.index("name: Select the gated wheel for publication")
@@ -25,11 +25,11 @@ def _assert_python_release_order(workflow: str) -> None:
     publisher = workflow.index("uses: pypa/gh-action-pypi-publish@release/v1")
     attestation = workflow.index("uses: actions/attest@v4")
 
-    assert sync < full_suite < build < release_gate < served_gate
+    assert sync < build < full_suite < release_gate < served_gate
     assert served_gate < selection < tag_gate < publisher < attestation
     assert workflow.count("uv build --package") == 3
     assert 'wheel_stem="${package//-/_}"' in workflow
-    assert 'wheels=(dist/gate/"${wheel_stem}"-*.whl)' in workflow
+    assert 'wheels=(dist/"${package}"/"${wheel_stem}"-*.whl)' in workflow
     assert 'cp -- "${wheels[0]}" "$wheel"' in workflow
     assert "packages-dir: dist/publish/" in workflow
     assert workflow.count("${{ steps.publication.outputs.wheel }}") == 2
@@ -81,11 +81,11 @@ def test_python_release_workflow_uses_independent_immutable_package_tags() -> No
             "",
             1,
         ).replace(
-            "      - name: Build and exercise the complete release candidate\n",
+            "      - name: Exercise the complete release candidate\n",
             "      - uses: pypa/gh-action-pypi-publish@release/v1\n"
             "        with:\n"
             "          packages-dir: dist/publish/\n"
-            "      - name: Build and exercise the complete release candidate\n",
+            "      - name: Exercise the complete release candidate\n",
             1,
         ),
         lambda workflow: workflow.replace(
