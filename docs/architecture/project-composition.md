@@ -32,7 +32,10 @@ and ordered repository records (`repo_id`, `git_remote`, `commit_sha`). Cloud
 generates and deploys exactly one such project as a read-only ConfigMap mount;
 Vuoro parses it, requires exactly one project at startup, and retains the
 repository provenance while applying its normal repository and authority
-checks. Vuoro does not absorb Cloud's workspace state or deployment policy.
+checks. At startup, Vuoro requires the hosted `environment` to exactly match
+the appservice-controlled `VUORO_ENVIRONMENT_NAME`; disagreement or a missing
+expected environment fails closed. Vuoro does not absorb Cloud's workspace
+state or deployment policy.
 
 The deployment-trust contract is deliberately narrow: the embedded default is
 `/opt/vuoro/composition/project-bindings.json`; the only runtime override is

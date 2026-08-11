@@ -269,14 +269,78 @@ def _hosted_binding(*, projects: list[dict] | None = None) -> dict:
     }
 
 
+_HOSTED_ENVIRONMENT = "vuoro-cloud-ws-01k111111111"
+
+
 def test_startup_loader_accepts_the_cloud_document_and_default_file(tmp_path: Path) -> None:
     path = tmp_path / "bindings.json"
     path.write_text(json.dumps(_hosted_binding()), encoding="utf-8")
-    loaded = _load_project_binding_for_composition(path)
+    loaded = _load_project_binding_for_composition(
+        path, expected_environment=_HOSTED_ENVIRONMENT
+    )
     assert loaded.project_id == "01K22222222222222222222222"
     assert loaded.repo_ids == ("repo-a",)
     assert loaded.members[0].commit_sha == "b" * 40
+    assert loaded.environment == _HOSTED_ENVIRONMENT
     assert loaded.descriptor_digest == "sha256:" + "a" * 64
+
+
+def test_startup_loader_rejects_a_hosted_environment_mismatch(tmp_path: Path) -> None:
+    path = tmp_path / "bindings.json"
+    path.write_text(json.dumps(_hosted_binding()), encoding="utf-8")
+    with pytest.raises(CompositionError, match="does not match"):
+        _load_project_binding_for_composition(
+            path, expected_environment="vuoro-cloud-ws-other"
+        )
+
+
+def test_startup_loader_rejects_hosted_binding_without_expected_environment(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "bindings.json"
+    path.write_text(json.dumps(_hosted_binding()), encoding="utf-8")
+    with pytest.raises(CompositionError, match="required for hosted"):
+        _load_project_binding_for_composition(path)
+
+
+@pytest.mark.parametrize("expected", ["", " leading", "trailing ", "bad\x00name"])
+def test_startup_loader_rejects_invalid_expected_environment(
+    tmp_path: Path, expected: str
+) -> None:
+    path = tmp_path / "bindings.json"
+    path.write_text(json.dumps(_hosted_binding()), encoding="utf-8")
+    with pytest.raises(CompositionError, match="non-empty environment"):
+        _load_project_binding_for_composition(
+            path, expected_environment=expected
+        )
+
+
+def test_startup_loader_preserves_canonical_default_without_hosted_environment(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "bindings.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "vuoro-project-bindings/v1",
+                "bindings": [
+                    {
+                        "project_id": "981b2073-d7af-4c28-bff3-3cf807495fba",
+                        "home_repo": "repo-a",
+                        "members": [{"repo_id": "repo-a"}],
+                        "source_repository": "https://github.com/example/repo-a",
+                        "source_revision": "a" * 40,
+                        "source_path": "project.toml",
+                        "source_sha256": "b" * 64,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    loaded = _load_project_binding_for_composition(path)
+    assert loaded.environment is None
+    assert loaded.home_repo == "repo-a"
 
 
 def test_startup_loader_rejects_many_projects(tmp_path: Path) -> None:
@@ -287,7 +351,9 @@ def test_startup_loader_rejects_many_projects(tmp_path: Path) -> None:
     documents["projects"].append(second)
     path.write_text(json.dumps(documents), encoding="utf-8")
     with pytest.raises(CompositionError, match="exactly one"):
-        _load_project_binding_for_composition(path)
+        _load_project_binding_for_composition(
+            path, expected_environment=_HOSTED_ENVIRONMENT
+        )
 
 
 @pytest.mark.parametrize(
@@ -304,7 +370,9 @@ def test_startup_loader_rejects_an_empty_cloud_project_list(tmp_path: Path) -> N
     path = tmp_path / "bindings.json"
     path.write_text(json.dumps(_hosted_binding(projects=[])), encoding="utf-8")
     with pytest.raises(CompositionError, match="exactly one"):
-        _load_project_binding_for_composition(path)
+        _load_project_binding_for_composition(
+            path, expected_environment=_HOSTED_ENVIRONMENT
+        )
 
 
 def test_startup_loader_rejects_directory_unreadable_and_broken_link(
@@ -346,7 +414,9 @@ def test_startup_loader_accepts_a_configmap_style_symlink_inside_trusted_root(
     target.write_text(json.dumps(_hosted_binding()), encoding="utf-8")
     mounted = binding_dir / "bindings.json"
     mounted.symlink_to(Path("..") / "..data" / "bindings.json")
-    loaded = _load_project_binding_for_composition(mounted, trusted_root=root)
+    loaded = _load_project_binding_for_composition(
+        mounted, trusted_root=root, expected_environment=_HOSTED_ENVIRONMENT
+    )
     assert loaded.project_id == "01K22222222222222222222222"
 
     outside = tmp_path / "outside.json"

@@ -575,6 +575,14 @@ def _runtime_env(name: str, environ: Mapping[str, str]) -> str:
     return value
 
 
+def _validate_expected_environment(value: str) -> str:
+    if not value or value != value.strip() or "\x00" in value:
+        raise CompositionError(
+            "VUORO_ENVIRONMENT_NAME must be a non-empty environment name"
+        )
+    return value
+
+
 def _runtime_path(
     name: str,
     environ: Mapping[str, str],
@@ -635,11 +643,24 @@ def _load_project_binding_for_composition(
     path: Path,
     *,
     trusted_root: Path | None = None,
+    expected_environment: str | None = None,
 ) -> ProjectBinding:
     bindings = _load_project_bindings_file(path, trusted_root=trusted_root)
     if len(bindings) != 1:
         raise CompositionError("this release must contain exactly one project binding")
-    return bindings[0]
+    binding = bindings[0]
+    if binding.environment is not None:
+        if expected_environment is None:
+            raise CompositionError(
+                "VUORO_ENVIRONMENT_NAME is required for hosted project bindings"
+            )
+        _validate_expected_environment(expected_environment)
+        if binding.environment != expected_environment:
+            raise CompositionError(
+                "hosted project binding environment does not match "
+                "VUORO_ENVIRONMENT_NAME"
+            )
+    return binding
 
 
 def _pg_connection_factory(dsn: str) -> Callable[[], Any]:
@@ -708,7 +729,9 @@ def create_composed_app(
     import os
 
     environ = environ or os.environ
-    environment_name = _runtime_env("VUORO_ENVIRONMENT_NAME", environ)
+    environment_name = _validate_expected_environment(
+        _runtime_env("VUORO_ENVIRONMENT_NAME", environ)
+    )
     environment_class = _runtime_env("VUORO_ENVIRONMENT_CLASS", environ)
     if environment_class not in _DEPLOYABLE_ENVIRONMENT_CLASSES:
         raise CompositionError("this composition requires a deployable environment class")
@@ -777,6 +800,7 @@ def create_composed_app(
     )
     project_binding = _load_project_binding_for_composition(
         bindings_path,
+        expected_environment=environment_name,
         trusted_root=(
             _CLOUD_BINDINGS_TRUST_ROOT
             if bindings_path == _CLOUD_PROJECT_BINDINGS_PATH
