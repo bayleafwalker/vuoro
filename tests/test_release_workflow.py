@@ -26,3 +26,11 @@ def test_service_image_publication_keeps_tag_and_source_aliases() -> None:
 
     assert "vuoro-service:${{ github.ref_name }}" in workflow
     assert "vuoro-service:sha-${{ github.sha }}" in workflow
+
+
+def test_python_release_workflow_uses_independent_immutable_package_tags() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "publish-python-packages.yaml").read_text()
+    for tag in ("vuoro-client-v*", "vuoro-bootstrap-v*", "vuoro-service-v*"):
+        assert tag in workflow
+    assert "actions/attest@v4" in workflow
+    assert "validate_release_contract.py" in workflow

@@ -1,0 +1,16 @@
+{
+  "schema_version": "vuoro-bootstrap-manifest/v1",
+  "environment_id": "vuoro-cloud",
+  "minimum_python": "3.12",
+  "packages": {
+    "vuoro-bootstrap": "0.1.0",
+    "vuoro-client": "0.1.0",
+    "sprintctl": "0.2.22"
+  },
+  "service": {
+    "client_protocol_minimum": 1,
+    "client_protocol_maximum": 1,
+    "vuoro_cloud": "0.1.0"
+  },
+  "release_ready": true
+}

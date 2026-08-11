@@ -3,22 +3,24 @@ requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
-name = "vuoro-client"
+name = "vuoro-bootstrap"
 version = "0.1.0"
-description = "Transport-only client for Vuoro governed-work services"
+description = "Release-gated Vuoro Cloud bootstrap client"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
   "httpx>=0.27,<1",
-  "jsonschema>=4.23,<5",
-  "pydantic>=2.10,<3",
+  "vuoro-client==0.1.0",
 ]
 
 [project.optional-dependencies]
 test = ["pytest>=8.3,<9"]
 
 [project.scripts]
-vuoro-client = "vuoro_client.cli:main"
+vuoro = "vuoro_bootstrap.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/vuoro_client"]
+packages = ["src/vuoro_bootstrap"]
+
+[tool.uv.sources]
+vuoro-client = { workspace = true }

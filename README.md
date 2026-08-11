@@ -19,7 +19,7 @@ capabilities through one versioned runtime.
 | **Project overview** | [Vuoro on kotona.app](https://kotona.app/projects/vuoro/) |
 | **Current implementation** | [agentops system map, cockpit, contracts, and operating walkthrough](https://github.com/bayleafwalker/agentops) |
 
-This repository deliberately publishes two distributions:
+This repository deliberately publishes three distributions:
 
 - `vuoro-client` is transport-only. It owns endpoint and identity profiles,
   handshake/catalog discovery, schema rendering, caching, and generic
@@ -28,6 +28,9 @@ This repository deliberately publishes two distributions:
 - `vuoro-service` is the deployable FastAPI/uvicorn runtime. It owns service
   composition, compatibility checks, migration entrypoints, and explicitly
   authorized administration commands.
+- `vuoro-bootstrap` is the release-gated filesystem boundary for public
+  onboarding. It consumes Cloud's device flow but does not own account,
+  workspace, tenant, or domain state.
 
 The bootstrap establishes the packaging boundary and protocol contract.
 Released domain adapters and production deployment composition remain
@@ -82,6 +85,7 @@ Python 3.12 and `uv` are required.
 ```bash
 uv sync --all-packages --all-extras
 uv build --package vuoro-client --wheel --out-dir dist/vuoro-client
+uv build --package vuoro-bootstrap --wheel --out-dir dist/vuoro-bootstrap
 uv build --package vuoro-service --wheel --out-dir dist/vuoro-service
 uv run pytest
 ```
@@ -90,6 +94,7 @@ The client and service can also be tested independently:
 
 ```bash
 uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests
+uv run --package vuoro-bootstrap --extra test pytest packages/vuoro-bootstrap/tests
 uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests
 ```
 

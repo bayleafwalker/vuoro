@@ -1,6 +1,6 @@
 # Packaging boundary
 
-Vuoro has one repository and two independently installable Python
+Vuoro has one repository and three independently installable Python
 distributions. They share protocol vocabulary through versioned schemas, not
 through a combined application package.
 
@@ -8,12 +8,26 @@ through a combined application package.
 
 The client may depend on HTTP, identity-profile, cache, and JSON Schema
 libraries. Its wheel contains only the `vuoro_client` Python package and the
-`vuoro` console entrypoint. The architecture test rejects migration, adapter,
+`vuoro-client` console entrypoint. The architecture test rejects migration, adapter,
 domain-core, and database-driver material in the built wheel or its dependency
 metadata.
 
 This makes client upgrades a protocol concern rather than an authority-schema
 deployment. Installing the client can never grant DDL capability.
+
+The client also validates the shared `vuoro-discovery/v1` and
+`vuoro-bootstrap-manifest/v1` documents. Validation remains transport-only;
+filesystem changes and package installation belong to the separate
+`vuoro-bootstrap` distribution.
+
+## `vuoro-bootstrap`
+
+`vuoro-bootstrap` is an independently released, filesystem-owning companion.
+It consumes the Cloud device-session API, refuses an unreleased compatibility
+manifest, renders `.vuoro/project.json`, `.sprintctl/backend.json`, and a
+complete client profile, and writes bearer credentials only with mode `0600`.
+It does not own account, workspace, tenant, database, or device-authorization
+state. Print-only mode must remain side-effect free.
 
 ## `vuoro-service`
 
@@ -42,7 +56,7 @@ evidence and must not be reused.
 
 ## Versioning
 
-The two distributions start at the same development version for repository
-bootstrap, but releases are independent. Protocol and schema compatibility are
-reported explicitly by the service handshake; equal package versions are not a
-compatibility guarantee.
+The three distributions currently share the `0.1.0` candidate version, but
+releases remain independent. Protocol and schema compatibility are
+reported explicitly by the service handshake and bootstrap manifest; equal
+package versions are not a compatibility guarantee.

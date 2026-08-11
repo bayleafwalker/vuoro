@@ -1,0 +1,14 @@
+{
+  "schema_version": "vuoro-client-profile/v1",
+  "id": "vuoro-cloud",
+  "revision": 1,
+  "source_environment_id": "developer-workstation",
+  "target": {
+    "environment_id": "vuoro-cloud",
+    "environment_class": "production",
+    "endpoint": "https://api.vuoro.cloud"
+  },
+  "credential_ref": "file:~/.config/vuoro/credentials/vuoro-cloud.token",
+  "required_authorities": ["work:read", "work:write"],
+  "production_endpoint_denied": false
+}
