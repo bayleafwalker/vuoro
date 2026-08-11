@@ -1,10 +1,11 @@
 """Immutable project-composition inputs and served authorization checks.
 
-Project bindings originate in their home repository; a deployed Vuoro image
-must consume an immutable, release-reviewed projection of that binding rather
-than discovering a caller's ``project.toml``.  This module deliberately has no
-filesystem or environment access.  Composition supplies the already-validated
-input and the work adapter supplies the project application.
+Project bindings originate in their home repository or the Vuoro Cloud
+deployment contract; Vuoro must consume a reviewed canonical projection or the
+strictly-shaped Cloud document rather than discovering a caller's
+``project.toml``.  This module deliberately has no filesystem or environment
+access.  Composition supplies the already-validated input and the work adapter
+supplies the project application.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from uuid import UUID
 
 
 _REPO_ID = re.compile(r"^[A-Za-z0-9._-]+$")
+_ULID = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
 
 
 class ProjectBindingError(ValueError):
@@ -29,27 +31,33 @@ class ProjectAuthorizationError(PermissionError):
 
 @dataclass(frozen=True, slots=True)
 class ProjectMember:
-    """One ordered backlog member in a release-reviewed project projection."""
+    """One ordered backlog member and its optional hosted provenance."""
 
     repo_id: str
+    git_remote: str | None = None
+    commit_sha: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class ProjectBinding:
-    """Minimal canonical project data required by a served aggregate.
+    """Minimal project data required by a served aggregate.
 
-    ``source_revision`` and ``source_sha256`` identify the exact canonical
-    ``project.toml`` from which the projection was produced.  They make the
-    copied release input auditable without making Vuoro the project authority.
+    For the checked-in form, ``source_revision`` and ``source_sha256`` identify
+    the exact canonical ``project.toml`` from which the projection was
+    produced.  For the Cloud form, ``environment``, ``descriptor_digest`` and
+    member repository metadata preserve Cloud's release provenance without
+    making Vuoro the project authority.
     """
 
     project_id: str
-    home_repo: str
+    home_repo: str | None
     members: tuple[ProjectMember, ...]
-    source_repository: str
-    source_revision: str
-    source_path: str
+    source_repository: str | None
+    source_revision: str | None
+    source_path: str | None
     source_sha256: str
+    environment: str | None = None
+    descriptor_digest: str | None = None
 
     @property
     def repo_ids(self) -> tuple[str, ...]:
@@ -68,7 +76,7 @@ class ProjectBinding:
         }
         if set(raw) != expected:
             raise ProjectBindingError("project binding fields do not match the v1 contract")
-        project_id = _uuid4(raw["project_id"], "project_id")
+        project_id = _project_id(raw["project_id"], "project_id")
         home_repo = _repo_id(raw["home_repo"], "home_repo")
         source_repository = _https_url(raw["source_repository"], "source_repository")
         source_revision = _sha(raw["source_revision"], "source_revision", 40)
@@ -97,19 +105,92 @@ class ProjectBinding:
             source_sha256=source_sha256,
         )
 
+    @classmethod
+    def from_hosted_dict(
+        cls, raw: Mapping[str, Any], *, environment: str
+    ) -> "ProjectBinding":
+        expected = {"project_id", "descriptor_digest", "repositories"}
+        if set(raw) != expected:
+            raise ProjectBindingError("hosted project fields do not match the v1 contract")
+        project_id = _project_id(raw["project_id"], "projects[].project_id")
+        descriptor_digest = _descriptor_digest(raw["descriptor_digest"])
+        raw_repositories = raw["repositories"]
+        if not isinstance(raw_repositories, list) or not raw_repositories:
+            raise ProjectBindingError("projects[].repositories must be a non-empty array")
+        members: list[ProjectMember] = []
+        for index, repository in enumerate(raw_repositories):
+            if not isinstance(repository, dict) or set(repository) != {
+                "repo_id", "git_remote", "commit_sha"
+            }:
+                raise ProjectBindingError(
+                    f"projects[].repositories[{index}] fields do not match the v1 contract"
+                )
+            git_remote = repository["git_remote"]
+            if git_remote is not None and (
+                not isinstance(git_remote, str) or not git_remote.strip()
+            ):
+                raise ProjectBindingError("repository git_remote must be null or non-empty")
+            commit_sha = repository["commit_sha"]
+            if commit_sha is not None and (
+                not isinstance(commit_sha, str)
+                or not re.fullmatch(r"[0-9a-f]{40,64}", commit_sha)
+            ):
+                raise ProjectBindingError(
+                    "repository commit_sha must be null or a lowercase Git SHA"
+                )
+            members.append(
+                ProjectMember(
+                    _repo_id(repository["repo_id"], f"repositories[{index}].repo_id"),
+                    git_remote=git_remote,
+                    commit_sha=commit_sha,
+                )
+            )
+        repo_ids = [member.repo_id for member in members]
+        if len(repo_ids) != len(set(repo_ids)):
+            raise ProjectBindingError("member repo_id values must be unique")
+        return cls(
+            project_id=project_id,
+            home_repo=None,
+            members=tuple(members),
+            source_repository=None,
+            source_revision=None,
+            source_path=None,
+            source_sha256=descriptor_digest.removeprefix("sha256:"),
+            environment=environment,
+            descriptor_digest=descriptor_digest,
+        )
+
 
 def load_project_bindings(raw: Mapping[str, Any]) -> tuple[ProjectBinding, ...]:
     """Parse a deterministic ``vuoro-project-bindings/v1`` input.
 
-    The caller is responsible for obtaining this mapping from the immutable
-    service composition.  Empty bindings are valid: project operations remain
-    unavailable until a reviewed binding is added to a future release.
+    The caller is responsible for obtaining this mapping from the checked-in
+    service composition or the approved Cloud runtime mount.  Empty bindings
+    are syntactically valid here; composition rejects them before startup
+    because a served release requires exactly one project.
     """
 
+    if not isinstance(raw, dict) or raw.get("schema_version") != "vuoro-project-bindings/v1":
+        raise ProjectBindingError("unsupported project bindings manifest")
+    if set(raw) == {"schema_version", "environment", "projects"}:
+        environment = raw["environment"]
+        if not isinstance(environment, str) or not environment or environment != environment.strip():
+            raise ProjectBindingError("environment must be a non-empty string")
+        projects = raw["projects"]
+        if not isinstance(projects, list):
+            raise ProjectBindingError("projects must be an array")
+        bindings = tuple(
+            ProjectBinding.from_hosted_dict(item, environment=environment)
+            for item in projects
+            if isinstance(item, dict)
+        )
+        if len(bindings) != len(projects):
+            raise ProjectBindingError("each hosted project must be an object")
+        if len({binding.project_id for binding in bindings}) != len(bindings):
+            raise ProjectBindingError("project_id values must be unique")
+        return bindings
     if set(raw) != {"schema_version", "bindings"}:
         raise ProjectBindingError("project bindings must use the v1 top-level shape")
-    if raw["schema_version"] != "vuoro-project-bindings/v1":
-        raise ProjectBindingError("unsupported project bindings manifest")
     items = raw["bindings"]
     if not isinstance(items, list):
         raise ProjectBindingError("project bindings must be an array")
@@ -196,15 +277,23 @@ def _repo_id(value: Any, field: str) -> str:
     return value
 
 
-def _uuid4(value: Any, field: str) -> str:
+def _project_id(value: Any, field: str) -> str:
     if not isinstance(value, str):
-        raise ProjectBindingError(f"{field} must be a canonical UUIDv4")
+        raise ProjectBindingError(f"{field} must be a canonical UUIDv4 or hosted ULID")
     try:
         parsed = UUID(value)
-    except ValueError as error:
-        raise ProjectBindingError(f"{field} must be a canonical UUIDv4") from error
+    except ValueError:
+        if _ULID.fullmatch(value):
+            return value
+        raise ProjectBindingError(f"{field} must be a canonical UUIDv4 or hosted ULID")
     if parsed.version != 4 or str(parsed) != value:
-        raise ProjectBindingError(f"{field} must be a canonical UUIDv4")
+        raise ProjectBindingError(f"{field} must be a canonical UUIDv4 or hosted ULID")
+    return value
+
+
+def _descriptor_digest(value: Any) -> str:
+    if not isinstance(value, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", value):
+        raise ProjectBindingError("descriptor_digest must be a sha256 digest")
     return value
 
 
