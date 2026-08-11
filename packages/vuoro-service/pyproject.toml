@@ -9,8 +9,10 @@ description = "Modular service runtime for Vuoro governed-work adapters"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+  "cryptography>=44,<51",
   "fastapi>=0.115,<1",
   "jsonschema>=4.23,<5",
+  "pyjwt>=2.10,<3",
   "uvicorn[standard]>=0.34,<1",
 ]
 

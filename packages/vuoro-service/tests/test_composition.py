@@ -243,6 +243,22 @@ def test_project_bindings_path_can_be_supplied_by_a_runtime_mount() -> None:
             default="/opt/vuoro/composition/project-bindings.json",
             mounted_path=mounted,
         )
+    gateway_key = "/etc/vuoro/identity/gateway-public.pem"
+    assert _runtime_path(
+        "VUORO_GATEWAY_PUBLIC_KEY_FILE",
+        {"VUORO_GATEWAY_PUBLIC_KEY_FILE": gateway_key},
+        default=gateway_key,
+        mounted_path=gateway_key,
+        mount_label="approved Cloud gateway key mount",
+    ) == Path(gateway_key)
+    with pytest.raises(CompositionError, match="approved Cloud gateway key mount"):
+        _runtime_path(
+            "VUORO_GATEWAY_PUBLIC_KEY_FILE",
+            {"VUORO_GATEWAY_PUBLIC_KEY_FILE": "/tmp/gateway.pem"},
+            default=gateway_key,
+            mounted_path=gateway_key,
+            mount_label="approved Cloud gateway key mount",
+        )
 
 
 def _hosted_binding(*, projects: list[dict] | None = None) -> dict:

@@ -21,6 +21,7 @@ class Identity:
     environment: str
     authorities: frozenset[str] = frozenset()
     repo_ids: frozenset[str] = frozenset()
+    workspace_id: str | None = None
 
     @property
     def authorized_repositories(self) -> tuple[str, ...]:

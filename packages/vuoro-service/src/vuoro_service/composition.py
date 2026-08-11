@@ -22,6 +22,10 @@ from vuoro_service.app import ServiceSettings, create_app
 from vuoro_service.catalog import CatalogRegistry
 from vuoro_service.contracts import DomainCompatibility
 from vuoro_service.environment_record import load_environment_record
+from vuoro_service.gateway_identity import (
+    GatewayAssertionConfigurationError,
+    GatewayAssertionIdentityResolver,
+)
 from vuoro_service.identity import Identity, InvocationContext, StaticBearerIdentityResolver
 from vuoro_service.project_binding import (
     ProjectAuthorizationError,
@@ -37,6 +41,7 @@ _DEPLOYABLE_ENVIRONMENT_CLASSES = frozenset({"development", "production"})
 _DEFAULT_PROJECT_BINDINGS_PATH = Path("/opt/vuoro/composition/project-bindings.json")
 _CLOUD_PROJECT_BINDINGS_PATH = Path("/etc/vuoro/bindings/bindings.json")
 _CLOUD_BINDINGS_TRUST_ROOT = Path("/etc/vuoro")
+_CLOUD_GATEWAY_PUBLIC_KEY_PATH = Path("/etc/vuoro/identity/gateway-public.pem")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 _RELEASE_SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]*$")
@@ -589,6 +594,7 @@ def _runtime_path(
     *,
     default: str | Path,
     mounted_path: str | Path = _CLOUD_PROJECT_BINDINGS_PATH,
+    mount_label: str = "approved Cloud binding mount",
 ) -> Path:
     """Resolve the embedded file or the one approved Cloud ConfigMap path.
 
@@ -602,10 +608,10 @@ def _runtime_path(
     if value is None:
         return Path(default)
     if not value or value != value.strip() or "\x00" in value:
-        raise CompositionError(f"{name} must name the approved Cloud binding mount")
+        raise CompositionError(f"{name} must name the {mount_label}")
     path = Path(value)
     if path != Path(mounted_path):
-        raise CompositionError(f"{name} must name the approved Cloud binding mount")
+        raise CompositionError(f"{name} must name the {mount_label}")
     return path
 
 
@@ -757,10 +763,6 @@ def create_composed_app(
         resolved_manifest_path,
         Path(_runtime_env("VUORO_INSTALLED_COMPOSITION_PATH", environ)),
     )
-    resolver = load_identities(
-        identity_path or Path(_runtime_env("VUORO_IDENTITIES_FILE", environ)),
-        environment=environment_name,
-    )
     if work_resource_observation_authorizer is None:
         work_resource_observation_authorizer = (
             _load_work_resource_observation_authorizer(
@@ -807,6 +809,41 @@ def create_composed_app(
             else None
         ),
     )
+    gateway_key_value = environ.get("VUORO_GATEWAY_PUBLIC_KEY_FILE")
+    if gateway_key_value is not None:
+        if identity_path is not None or "VUORO_IDENTITIES_FILE" in environ:
+            raise CompositionError(
+                "gateway assertion identity mode cannot be combined with a static identity registry"
+            )
+        if project_binding.environment is None:
+            raise CompositionError(
+                "gateway assertion identity mode requires hosted project bindings"
+            )
+        gateway_key_path = _runtime_path(
+            "VUORO_GATEWAY_PUBLIC_KEY_FILE",
+            environ,
+            default=_CLOUD_GATEWAY_PUBLIC_KEY_PATH,
+            mounted_path=_CLOUD_GATEWAY_PUBLIC_KEY_PATH,
+            mount_label="approved Cloud gateway key mount",
+        )
+        try:
+            resolver = GatewayAssertionIdentityResolver.from_file(
+                gateway_key_path,
+                issuer=environ.get("VUORO_GATEWAY_ASSERTION_ISSUER", "vuoro-cloud"),
+                audience=environ.get("VUORO_GATEWAY_ASSERTION_AUDIENCE", "vuoro-service"),
+                environment=environment_name,
+                expected_workspace_id=_runtime_env("VUORO_WORKSPACE_ID", environ),
+                allowed_repo_ids=frozenset(project_binding.repo_ids),
+                key_id=environ.get("VUORO_GATEWAY_ASSERTION_KEY_ID", "gateway-2026-01"),
+                trusted_root=_CLOUD_BINDINGS_TRUST_ROOT,
+            )
+        except GatewayAssertionConfigurationError as error:
+            raise CompositionError("cannot configure gateway assertion identity") from error
+    else:
+        resolver = load_identities(
+            identity_path or Path(_runtime_env("VUORO_IDENTITIES_FILE", environ)),
+            environment=environment_name,
+        )
     work_dsn = _runtime_env("VUORO_WORK_RUNTIME_DSN", environ)
 
     def make_member_application(repo_id: str) -> WorkApplication:
