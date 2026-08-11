@@ -21,7 +21,23 @@ jobs:
       - run: uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests
       - run: uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests
       - run: uv build --package vuoro-client --wheel --out-dir dist/vuoro-client
+      - run: uv build --package vuoro-bootstrap --wheel --out-dir dist/vuoro-bootstrap
       - run: uv build --package vuoro-service --wheel --out-dir dist/vuoro-service
+      - name: Validate built release identities
+        run: >-
+          uv run --package vuoro-service --extra test python
+          scripts/validate_release_contract.py
+          dist/vuoro-client/*.whl dist/vuoro-bootstrap/*.whl dist/vuoro-service/*.whl
+          --release
+      - name: Exercise built served contract
+        shell: bash
+        run: |
+          uv venv --python 3.12 /tmp/vuoro-served-conformance
+          uv pip install --python /tmp/vuoro-served-conformance/bin/python \
+            dist/vuoro-client/*.whl dist/vuoro-bootstrap/*.whl dist/vuoro-service/*.whl \
+            'httpx>=0.27,<1'
+          /tmp/vuoro-served-conformance/bin/python \
+            scripts/validate_served_conformance.py
       - run: uv run pytest
       - name: Fetch immutable adapter wheels
         run: >-

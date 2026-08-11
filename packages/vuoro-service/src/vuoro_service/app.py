@@ -31,6 +31,7 @@ from vuoro_service.contracts import (
     InvocationRequest,
     InvocationRequestV2,
     InvocationResponse,
+    ServiceReleaseIdentity,
 )
 from vuoro_service.identity import (
     Identity,
@@ -231,6 +232,7 @@ def create_app(
                 state=settings.compatibility_state,
                 domains=dict(settings.domains),
             ),
+            service_release=ServiceReleaseIdentity(version=__version__),
         )
 
     @app.get("/api/catalog/v1")

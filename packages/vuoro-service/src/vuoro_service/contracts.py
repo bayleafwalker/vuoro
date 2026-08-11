@@ -46,6 +46,13 @@ class CompatibilityState(StrictModel):
     domains: dict[str, DomainCompatibility] = Field(default_factory=dict)
 
 
+class ServiceReleaseIdentity(ImmutableStrictModel):
+    """Identity of the installed service distribution, not its deployment."""
+
+    distribution: Literal["vuoro-service"] = "vuoro-service"
+    version: str = Field(min_length=1)
+
+
 class HandshakeResponse(StrictModel):
     schema_version: Literal["handshake/v1"] = "handshake/v1"
     environment: EnvironmentMetadata
@@ -58,6 +65,7 @@ class HandshakeResponse(StrictModel):
     client_protocol: ClientProtocolRange
     catalog_revision: str
     compatibility: CompatibilityState
+    service_release: ServiceReleaseIdentity
 
 
 class DeprecationMetadata(StrictModel):

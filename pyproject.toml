@@ -15,6 +15,7 @@ package = false
 [tool.uv.workspace]
 members = [
   "packages/vuoro-client",
+  "packages/vuoro-bootstrap",
   "packages/vuoro-service",
 ]
 
@@ -22,6 +23,7 @@ members = [
 addopts = "-ra"
 testpaths = [
   "packages/vuoro-client/tests",
+  "packages/vuoro-bootstrap/tests",
   "packages/vuoro-service/tests",
   "tests",
 ]

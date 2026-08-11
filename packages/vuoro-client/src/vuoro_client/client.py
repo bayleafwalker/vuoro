@@ -97,6 +97,14 @@ class AsyncVuoroClient:
                 f"protocol {PROTOCOL_VERSION} is outside service range "
                 f"{protocol_range['minimum']}..{protocol_range['maximum']}"
             )
+        service_release = handshake.get("service_release")
+        if service_release is not None and (
+            not isinstance(service_release, dict)
+            or service_release.get("distribution") != "vuoro-service"
+            or not isinstance(service_release.get("version"), str)
+            or not service_release["version"]
+        ):
+            raise ClientIncompatibleError("service release identity is invalid")
         environment = handshake["environment"]["name"]
         if (
             self.profile.expected_environment
