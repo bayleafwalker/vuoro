@@ -13,18 +13,18 @@
     {
       "lock_id": "execution-adapter",
       "source_repository": "https://github.com/bayleafwalker/actionq",
-      "source_revision": "cbc426ff938053d2e695f3caf5a4871e701b4661",
-      "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/v0.1.18/actionq-0.1.18-py3-none-any.whl",
-      "artifact_sha256": "613cd8a625cd14021c1333df5fa3f73018180bc4f208b6d7b42516878ca8515d",
+      "source_revision": "0e8b21325a7fd3d59a989110e61ce80476c51dea",
+      "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/v0.1.19/actionq-0.1.19-py3-none-any.whl",
+      "artifact_sha256": "99449924645fb838ed202f572ccc6da3c96eee0e6b7442a246643fb74f55a4ec",
       "distribution": "actionq",
-      "distribution_version": "0.1.18"
+      "distribution_version": "0.1.19"
     },
     {
       "lock_id": "execution-contracts",
       "source_repository": "https://github.com/bayleafwalker/actionq",
-      "source_revision": "e82d7bfe87eef847d1814124e0aa45543e82d539",
-      "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/vuoro-adapter-v1-e82d7bf/actionq_contracts-0.1.1-py3-none-any.whl",
-      "artifact_sha256": "eb541f5957c090517e5e2052cff185753728c79d07239efad7b055cda6a15524",
+      "source_revision": "0e8b21325a7fd3d59a989110e61ce80476c51dea",
+      "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/vuoro-adapter-v1-0e8b213/actionq_contracts-0.1.1-py3-none-any.whl",
+      "artifact_sha256": "23236d0f662a1dc58eacbc7c5d9a3dcd27f11fb34be2b725945518452119d3df",
       "distribution": "actionq-contracts",
       "distribution_version": "0.1.1"
     },
@@ -40,9 +40,9 @@
     {
       "lock_id": "audit-adapter",
       "source_repository": "https://github.com/bayleafwalker/auditctl",
-      "source_revision": "571d9b4d609a217f0f9b3210e9045219762adcbf",
-      "artifact_url": "https://github.com/bayleafwalker/auditctl/releases/download/vuoro-adapter-v1-571d9b4/auditctl-0.1.0-py3-none-any.whl",
-      "artifact_sha256": "f103c00c72c7049571c31eda13cba9519b0e409d3f60ebd2f63cb357e8527d76",
+      "source_revision": "0bd1d46c4efb932426ad26b4b1f338f77d0f9ab6",
+      "artifact_url": "https://github.com/bayleafwalker/auditctl/releases/download/vuoro-adapter-v1-0bd1d46/auditctl-0.1.0-py3-none-any.whl",
+      "artifact_sha256": "54f19d9ec63a830a0f31ed806343f9455ada8cbd498e60fad844426b45e26150",
       "distribution": "auditctl",
       "distribution_version": "0.1.0"
     }
@@ -64,7 +64,7 @@
       "adapter_module": "actionq.vuoro",
       "register": "register_operations",
       "api_version": "execution/v1",
-      "schema_version": "actionq-schema/v8"
+      "schema_version": "actionq-schema/v10"
     },
     {
       "domain": "knowledge",

@@ -42,10 +42,11 @@ orphan locks, and shared adapter locks are refused.
 Owner releases may use either a source-SHA tag or an exact semantic-version
 tag. For a semantic-version tag, evidence must show that the tag resolves to
 `source_revision`; the release URL, full revision, digest, and installed
-version remain independently checked. ActionQ `v0.1.18` resolves to
-`cbc426ff938053d2e695f3caf5a4871e701b4661` and ships `actionq` 0.1.18,
+version remain independently checked. ActionQ `v0.1.19` resolves to
+`0e8b21325a7fd3d59a989110e61ce80476c51dea` and ships `actionq` 0.1.19,
 whose published metadata requires `actionq-contracts==0.1.1`. The separately
-released companion remains locked to its own immutable release revision.
+released companion is locked to the same immutable release revision because
+the 0.1.19 execution contract added the dispatch-result settlement fields.
 
 Update a lock and its descriptor together. Do not install from a local
 checkout, mutate a downloaded wheel, or substitute a deployment overlay for
