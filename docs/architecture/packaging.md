@@ -32,7 +32,12 @@ state. Print-only mode must remain side-effect free.
 Tag publication synchronizes and tests the complete locked workspace, builds
 each distribution once, and runs release and served-conformance gates against
 that wheel set. The tagged wheel is selected from that exact gated set for
-publication and attestation; it is never rebuilt after the gates.
+publication and attestation; it is never rebuilt after the gates. GitHub
+Releases are the sole artifact authority for this currently single-operator
+ecosystem: the workflow attests the selected wheel, attaches it to the
+verified tag's draft release, and publishes that release immediately. There
+is no PyPI publication or index precedence. Consumers install an immutable
+GitHub release wheel URL and verify its recorded SHA-256 digest.
 
 ## `vuoro-service`
 

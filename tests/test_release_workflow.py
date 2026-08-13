@@ -24,18 +24,18 @@ def _assert_python_release_order(workflow: str) -> None:
     tag_gate = workflow.index("name: Validate the selected gated wheel against its tag")
     attestation = workflow.index("name: Attest the selected gated wheel")
     release_create = workflow.index("name: Create the draft GitHub release with the selected wheel")
-    publisher = workflow.index("uses: pypa/gh-action-pypi-publish@release/v1")
-    release_finalize = workflow.index("name: Publish the GitHub release after PyPI succeeds")
+    release_finalize = workflow.index(
+        "name: Publish the GitHub release after attestation and draft creation"
+    )
 
     assert sync < build < full_suite < release_gate < served_gate
-    assert served_gate < selection < tag_gate < attestation < release_create < publisher < release_finalize
+    assert served_gate < selection < tag_gate < attestation < release_create < release_finalize
     assert workflow.count("uv build --package") == 5
     assert 'wheel_stem="${package//-/_}"' in workflow
     assert 'wheels=(dist/"${package}"/"${wheel_stem}"-*.whl)' in workflow
     assert 'cp -- "${wheels[0]}" "$wheel"' in workflow
     assert 'sha256="$(sha256sum "$wheel" | awk \'{print $1}\')"' in workflow
     assert 'echo "sha256=$sha256" >> "$GITHUB_OUTPUT"' in workflow
-    assert "packages-dir: dist/publish/" in workflow
     assert workflow.count("${{ steps.publication.outputs.wheel }}") == 3
     assert "subject-path: \"${{ steps.publication.outputs.wheel }}\"" in workflow
     assert workflow.count("uses: actions/attest@v4") == 1
@@ -50,7 +50,10 @@ def _assert_python_release_order(workflow: str) -> None:
     assert '"$wheel"' in workflow
     assert '--clobber' not in workflow
     assert 'gh release upload' not in workflow
-    assert 'skip-existing: false' in workflow
+    assert "pypa/gh-action-pypi-publish" not in workflow
+    assert "pypi" not in workflow.lower()
+    assert "packages-dir:" not in workflow
+    assert "id-token: write" in workflow  # required by actions/attest
     assert 'gh release edit "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --draft=false' in workflow
 
 
@@ -85,6 +88,23 @@ def test_python_release_workflow_uses_independent_immutable_package_tags() -> No
     _assert_python_release_order(workflow)
 
 
+def test_python_release_is_github_only_and_publishes_the_created_release() -> None:
+    workflow = PYTHON_WORKFLOW.read_text()
+
+    assert "pypa/gh-action-pypi-publish" not in workflow
+    assert "pypi" not in workflow.lower()
+    assert "packages-dir:" not in workflow
+    assert "skip-existing:" not in workflow
+    assert "id-token: write" in workflow  # required by actions/attest
+
+    attestation = workflow.index("name: Attest the selected gated wheel")
+    release_create = workflow.index("name: Create the draft GitHub release with the selected wheel")
+    release_publish = workflow.index(
+        "name: Publish the GitHub release after attestation and draft creation"
+    )
+    assert attestation < release_create < release_publish
+
+
 @pytest.mark.parametrize(
     "broken",
     [
@@ -95,19 +115,11 @@ def test_python_release_workflow_uses_independent_immutable_package_tags() -> No
             "run: uv run pytest", "run: uv run pytest tests/test_release_workflow.py"
         ),
         lambda workflow: workflow.replace(
+            "      - name: Publish the GitHub release after attestation and draft creation\n",
             "      - uses: pypa/gh-action-pypi-publish@release/v1\n"
             "        with:\n"
             "          packages-dir: dist/publish/\n"
-            "          skip-existing: false\n",
-            "",
-            1,
-        ).replace(
-            "      - name: Exercise the complete release candidate\n",
-            "      - uses: pypa/gh-action-pypi-publish@release/v1\n"
-            "        with:\n"
-            "          packages-dir: dist/publish/\n"
-            "      - name: Exercise the complete release candidate\n",
-            1,
+            "      - name: Publish the GitHub release after attestation and draft creation\n",
         ),
         lambda workflow: workflow.replace(
             "      - name: Select the gated wheel for publication\n",
@@ -128,6 +140,7 @@ def test_python_release_workflow_uses_independent_immutable_package_tags() -> No
             "            --clobber \"$wheel\"\n",
         ),
         lambda workflow: workflow.replace("  contents: write", "  contents: read"),
+        lambda workflow: workflow.replace("  id-token: write", "  id-token: read"),
     ],
     ids=(
         "partial-sync",
@@ -139,6 +152,7 @@ def test_python_release_workflow_uses_independent_immutable_package_tags() -> No
         "missing-verify-tag",
         "clobber-release-asset",
         "read-only-release-permission",
+        "read-only-attestation-oidc-permission",
     ),
 )
 def test_python_release_order_contract_rejects_regressions(broken) -> None:
