@@ -55,11 +55,11 @@
       "lock_id": "audit-adapter",
       "lock_kind": "adapter",
       "source_repository": "https://github.com/bayleafwalker/auditctl",
-      "source_revision": "0bd1d46c4efb932426ad26b4b1f338f77d0f9ab6",
-      "artifact_url": "https://github.com/bayleafwalker/auditctl/releases/download/vuoro-adapter-v1-0bd1d46/auditctl-0.1.0-py3-none-any.whl",
-      "artifact_sha256": "54f19d9ec63a830a0f31ed806343f9455ada8cbd498e60fad844426b45e26150",
+      "source_revision": "41e6d4ac5831fda0d85331dcc753c0b85f227332",
+      "artifact_url": "https://github.com/bayleafwalker/auditctl/releases/download/auditctl-v0.1.1/auditctl-0.1.1-py3-none-any.whl",
+      "artifact_sha256": "cc56ec05f7a3bcf84f9b4b4bb787247afb4b3917f9ea90ea0d00d8eebd4e7c5f",
       "distribution": "auditctl",
-      "distribution_version": "0.1.0"
+      "distribution_version": "0.1.1"
     }
   ],
   "runtime_descriptors": [
@@ -93,7 +93,7 @@
     {
       "domain": "audit",
       "lock_id": "audit-adapter",
-      "dependency_lock_ids": [],
+      "dependency_lock_ids": ["vuoro-adapter-kit"],
       "adapter_module": "auditctl.vuoro_adapter",
       "register": "VuoroAuditAdapter.register",
       "api_version": "audit/v1",

@@ -246,6 +246,44 @@ def test_checked_in_knowledge_pin_is_kctl_012_with_released_adapter_kit() -> Non
     )]
 
 
+def test_checked_in_audit_pin_is_auditctl_011_with_released_adapter_kit() -> None:
+    manifest = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json")
+    pin = manifest.pin("audit")
+    assert (
+        pin.source_repository,
+        pin.source_revision,
+        pin.distribution,
+        pin.distribution_version,
+        pin.artifact_url,
+        pin.artifact_sha256,
+    ) == (
+        "https://github.com/bayleafwalker/auditctl",
+        "41e6d4ac5831fda0d85331dcc753c0b85f227332",
+        "auditctl",
+        "0.1.1",
+        "https://github.com/bayleafwalker/auditctl/releases/download/auditctl-v0.1.1/auditctl-0.1.1-py3-none-any.whl",
+        "cc56ec05f7a3bcf84f9b4b4bb787247afb4b3917f9ea90ea0d00d8eebd4e7c5f",
+    )
+    assert (pin.adapter_module, pin.register, pin.api_version, pin.schema_version) == (
+        "auditctl.vuoro_adapter",
+        "VuoroAuditAdapter.register",
+        "audit/v1",
+        "audit-schema/v1",
+    )
+    assert [(dependency.lock_id, dependency.lock_kind, dependency.distribution,
+             dependency.source_revision, dependency.artifact_url,
+             dependency.artifact_sha256, dependency.distribution_version)
+            for dependency in pin.dependencies] == [(
+        "vuoro-adapter-kit",
+        "shared-dependency",
+        "vuoro-adapter-kit",
+        "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c",
+        "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.1.0/vuoro_adapter_kit-0.1.0-py3-none-any.whl",
+        "0037898a4c9f01720a42302365b0172ecd203732070326ea2abdf549a44bf0c2",
+        "0.1.0",
+    )]
+
+
 def test_execution_authorizer_is_exact_and_repository_scoped() -> None:
     scoped = SimpleNamespace(authorized_repositories=("agentops", "vuoro"))
     wildcard = SimpleNamespace(authorized_repositories=("*",))
