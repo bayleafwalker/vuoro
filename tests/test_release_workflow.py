@@ -27,7 +27,7 @@ def _assert_python_release_order(workflow: str) -> None:
 
     assert sync < build < full_suite < release_gate < served_gate
     assert served_gate < selection < tag_gate < publisher < attestation
-    assert workflow.count("uv build --package") == 3
+    assert workflow.count("uv build --package") == 5
     assert 'wheel_stem="${package//-/_}"' in workflow
     assert 'wheels=(dist/"${package}"/"${wheel_stem}"-*.whl)' in workflow
     assert 'cp -- "${wheels[0]}" "$wheel"' in workflow
@@ -59,7 +59,10 @@ def test_service_image_publication_keeps_tag_and_source_aliases() -> None:
 
 def test_python_release_workflow_uses_independent_immutable_package_tags() -> None:
     workflow = PYTHON_WORKFLOW.read_text()
-    for tag in ("vuoro-client-v*", "vuoro-bootstrap-v*", "vuoro-service-v*"):
+    for tag in (
+        "vuoro-client-v*", "vuoro-bootstrap-v*", "vuoro-service-v*",
+        "vuoro-schema-runtime-v*", "vuoro-adapter-kit-v*",
+    ):
         assert tag in workflow
     _assert_python_release_order(workflow)
 

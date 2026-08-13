@@ -23,12 +23,24 @@ jobs:
       - run: uv build --package vuoro-client --wheel --out-dir dist/vuoro-client
       - run: uv build --package vuoro-bootstrap --wheel --out-dir dist/vuoro-bootstrap
       - run: uv build --package vuoro-service --wheel --out-dir dist/vuoro-service
+      - run: uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime
+      - run: uv build --package vuoro-adapter-kit --wheel --out-dir dist/vuoro-adapter-kit
       - name: Validate built release identities
         run: >-
           uv run --package vuoro-service --extra test python
           scripts/validate_release_contract.py
           dist/vuoro-client/*.whl dist/vuoro-bootstrap/*.whl dist/vuoro-service/*.whl
+          dist/vuoro-schema-runtime/*.whl dist/vuoro-adapter-kit/*.whl
           --release
+      - name: Exercise shared wheels in an isolated Python 3.11 environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv venv --python 3.11 /tmp/vuoro-shared-wheel-python311
+          uv pip install --python /tmp/vuoro-shared-wheel-python311/bin/python \
+            dist/vuoro-schema-runtime/*.whl dist/vuoro-adapter-kit/*.whl
+          /tmp/vuoro-shared-wheel-python311/bin/python -c \
+            'from vuoro_schema_runtime import migration_asset, render_schema_sql; from vuoro_adapter_kit import object_schema, operation_spec; a=migration_asset(1, "initial", "CREATE SCHEMA __SCHEMA__"); assert render_schema_sql(a.sql, "central") == '"'"'CREATE SCHEMA "central"'"'"'; s=object_schema({"value": {"type": "string"}}, required=("value",)); assert operation_spec("work.read.items", input_schema=s, result_schema=object_schema({}), execution_semantics="read", idempotency="not-allowed")["owning_domain"] == "work"'
       - name: Exercise built served contract
         shell: bash
         run: |

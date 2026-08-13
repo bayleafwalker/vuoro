@@ -1,6 +1,6 @@
 # Packaging boundary
 
-Vuoro has one repository and three independently installable Python
+Vuoro has one repository and five independently installable Python
 distributions. They share protocol vocabulary through versioned schemas, not
 through a combined application package.
 
@@ -59,9 +59,21 @@ can be pulled and exercised by digest. A successful image build without those
 attestations is a rejected candidate; its immutable tag and digest remain as
 evidence and must not be reused.
 
+## Shared contract wheels
+
+`vuoro-schema-runtime` and `vuoro-adapter-kit` are independent, versioned,
+stdlib-only wheels. The former provides owner-configured migration assets,
+rendering, and pure read-only, fail-closed schema compatibility reports; the latter provides
+strict Draft 2020-12 object schemas, operation metadata, and a structural
+catalog registration protocol. They do not import the service shell, a
+database driver, Pydantic, or any domain owner, and never execute SQL or DDL.
+Domain repositories retain migration runners, database policy, operation
+schemas, and handlers.
+
 ## Versioning
 
-The three distributions currently share the `0.1.0` candidate version, but
-releases remain independent. Protocol and schema compatibility are
+The client, bootstrap, and shared contract wheels currently use the `0.1.0`
+candidate version; service releases remain independent. Releases remain
+independent even when versions match. Protocol and schema compatibility are
 reported explicitly by the service handshake and bootstrap manifest; equal
 package versions are not a compatibility guarantee.

@@ -6,6 +6,8 @@ on:
       - "vuoro-client-v*"
       - "vuoro-bootstrap-v*"
       - "vuoro-service-v*"
+      - "vuoro-schema-runtime-v*"
+      - "vuoro-adapter-kit-v*"
 
 permissions:
   attestations: write
@@ -28,7 +30,7 @@ jobs:
           tag="${GITHUB_REF_NAME}"
           package="${tag%-v*}"
           case "$package" in
-            vuoro-client|vuoro-bootstrap|vuoro-service) ;;
+            vuoro-client|vuoro-bootstrap|vuoro-service|vuoro-schema-runtime|vuoro-adapter-kit) ;;
             *) echo "unsupported package tag: $tag" >&2; exit 1 ;;
           esac
           echo "name=$package" >> "$GITHUB_OUTPUT"
@@ -40,13 +42,15 @@ jobs:
           uv build --package vuoro-client --wheel --out-dir dist/vuoro-client
           uv build --package vuoro-bootstrap --wheel --out-dir dist/vuoro-bootstrap
           uv build --package vuoro-service --wheel --out-dir dist/vuoro-service
+          uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime
+          uv build --package vuoro-adapter-kit --wheel --out-dir dist/vuoro-adapter-kit
       - name: Run the complete repository test suite
         run: uv run pytest
       - name: Exercise the complete release candidate
         shell: bash
         run: |
           set -euo pipefail
-          wheels=(dist/vuoro-client/*.whl dist/vuoro-bootstrap/*.whl dist/vuoro-service/*.whl)
+          wheels=(dist/vuoro-client/*.whl dist/vuoro-bootstrap/*.whl dist/vuoro-service/*.whl dist/vuoro-schema-runtime/*.whl dist/vuoro-adapter-kit/*.whl)
           uv run --package vuoro-service --extra test python \
             scripts/validate_release_contract.py "${wheels[@]}" --release
           uv venv --python 3.12 /tmp/vuoro-release-conformance

@@ -7,13 +7,30 @@ runtime validation.
 
 ## Release-lock and runtime-descriptor update
 
-Composition v2 deliberately separates immutable release identity from
-serve-time registration. `release_locks` contain only `lock_id`, owner
+Composition v3 deliberately separates immutable release identity from
+serve-time registration. `release_locks` contain `lock_id`, `lock_kind`, owner
 repository/revision, wheel URL/digest, and distribution/version. Runtime
-descriptors bind one domain to a `lock_id`, any dependency lock IDs, and its
-adapter module, registration entrypoint, API, and schema versions. Descriptors
-contain no migration entrypoint: Vuoro never migrates an owner domain at
-startup.
+descriptors bind one domain to an adapter `lock_id`, any dependency lock IDs,
+and its adapter module, registration entrypoint, API, and schema versions.
+Descriptors contain no migration entrypoint: Vuoro never migrates an owner
+domain at startup.
+
+An adapter lock is an exclusive descriptor primary. An `owner-dependency` is
+referenced by exactly one descriptor and must come from that descriptor's
+adapter owner repository. A `shared-dependency` is never a primary and may be
+referenced by multiple descriptors, but must be a release from the canonical
+Vuoro source repository and use the `vuoro-schema-runtime` or
+`vuoro-adapter-kit` distribution. Every lock is referenced, distributions and
+artifact filenames are unique, and each immutable wheel is fetched and
+attested once even when a shared dependency is reused.
+
+The two shared wheels are deliberately stdlib-only. `vuoro-schema-runtime`
+owns pure migration-asset metadata, SQL rendering, and fail-closed
+compatibility reporting; it does not connect to a database or execute DDL.
+`vuoro-adapter-kit` owns pure JSON-Schema/object-spec builders; its registry
+surface is typing-only. Neither package owns domain migration runners, a
+database driver, or service composition. Domain owners may promote them only
+as exact, digest-verified `shared-dependency` locks.
 
 For every changed release lock, the reviewer must establish all of the
 following before editing it:
@@ -32,12 +49,12 @@ following before editing it:
    distribution version describe the *same* owner release.
 
 A descriptor may declare strict `dependency_lock_ids` when its public runtime
-contract is a separate distribution. Each companion is its own release lock
-and must share the adapter lock's owner repository, but it records the source
-revision of *its own* published wheel. A separately released compatible
-companion can therefore remain pinned when a new adapter wheel declares the
-same exact companion version. Duplicate distributions, colliding filenames,
-orphan locks, and shared adapter locks are refused.
+contract is a separate distribution. Each owner companion is its own release
+lock and must share the adapter lock's owner repository, but it records the
+source revision of *its own* published wheel. Shared Vuoro dependencies are
+the exception to descriptor exclusivity and are fetched once. Duplicate
+distributions, colliding filenames, orphan locks, and shared adapter locks are
+refused.
 
 Owner releases may use either a source-SHA tag or an exact semantic-version
 tag. For a semantic-version tag, evidence must show that the tag resolves to

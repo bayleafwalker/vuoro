@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vuoro-schema-runtime"
+version = "0.1.0"
+description = "Pure central-schema contract and migration-asset utilities"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=8.3,<9"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vuoro_schema_runtime"]

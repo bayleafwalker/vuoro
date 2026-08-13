@@ -14,18 +14,80 @@ from importlib.metadata import PackageNotFoundError, distribution, version
 import json
 from pathlib import Path
 import sys
+import re
+from urllib.parse import urlsplit
+
+_LOCK_KINDS = {"adapter", "owner-dependency", "shared-dependency"}
+_DOMAINS = {"work", "execution", "knowledge", "audit"}
+_SHARED_SOURCE = "https://github.com/bayleafwalker/vuoro"
+_SHARED_DISTRIBUTIONS = {"vuoro-schema-runtime", "vuoro-adapter-kit"}
+_LOCK_FIELDS = {"lock_id", "lock_kind", "source_repository", "source_revision", "artifact_url", "artifact_sha256", "distribution", "distribution_version"}
+_DESCRIPTOR_FIELDS = {"domain", "lock_id", "dependency_lock_ids", "adapter_module", "register", "api_version", "schema_version"}
+_SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]*$")
+
+
+def _filename(lock: dict) -> str:
+    source = urlsplit(lock["source_repository"])
+    artifact = urlsplit(lock["artifact_url"])
+    if any(
+        parsed.scheme != "https" or parsed.hostname != "github.com" or parsed.netloc != "github.com"
+        or parsed.query or parsed.fragment or "%" in value
+        for value, parsed in ((lock["source_repository"], source), (lock["artifact_url"], artifact))
+    ):
+        raise SystemExit("release artifacts require canonical GitHub HTTPS URLs")
+    source_parts = source.path.strip("/").split("/")
+    artifact_parts = artifact.path.strip("/").split("/")
+    if (
+        len(source_parts) != 2 or len(artifact_parts) != 6
+        or artifact_parts[:2] != source_parts or artifact_parts[2:4] != ["releases", "download"]
+        or any(not _SEGMENT.fullmatch(part) for part in source_parts)
+        or not _SEGMENT.fullmatch(artifact_parts[4]) or artifact_parts[4] in {".", ".."}
+        or not _SEGMENT.fullmatch(artifact_parts[5]) or not artifact_parts[5].endswith(".whl")
+    ):
+        raise SystemExit("artifact URL must identify one canonical GitHub release wheel")
+    if not re.fullmatch(r"[0-9a-f]{40}", lock["source_revision"]):
+        raise SystemExit("invalid source revision")
+    if not re.fullmatch(r"[0-9a-f]{64}", lock["artifact_sha256"]):
+        raise SystemExit("invalid artifact digest")
+    return artifact_parts[5]
 
 
 def _pinned(manifest: dict) -> list[dict]:
     entries: list[dict] = []
-    if manifest.get("schema_version") != "vuoro-composition/v2":
+    if manifest.get("schema_version") != "vuoro-composition/v3":
         raise SystemExit("unsupported composition schema_version")
-    for lock in manifest.get("release_locks", []):
+    locks = manifest.get("release_locks")
+    if not isinstance(locks, list):
+        raise SystemExit("release locks must be an array")
+    seen_ids: set[str] = set()
+    seen_distributions: set[str] = set()
+    seen_filenames: set[str] = set()
+    by_id: dict[str, dict] = {}
+    for lock in locks:
         if not isinstance(lock, dict):
             raise SystemExit("release locks must be objects")
+        if set(lock) != {
+            "lock_id", "lock_kind", "source_repository", "source_revision",
+            "artifact_url", "artifact_sha256", "distribution", "distribution_version",
+        }:
+            raise SystemExit("release lock fields do not match the v3 contract")
+        if not all(isinstance(lock[field], str) and lock[field] for field in _LOCK_FIELDS):
+            raise SystemExit("release lock values must be non-empty strings")
+        if lock["lock_kind"] not in _LOCK_KINDS:
+            raise SystemExit("invalid release lock kind")
+        filename = _filename(lock)
+        if filename in seen_filenames:
+            raise SystemExit(f"artifact filename collision: {filename}")
+        if lock["lock_id"] in seen_ids or lock["distribution"] in seen_distributions:
+            raise SystemExit("duplicate release lock identifier or distribution")
+        seen_ids.add(lock["lock_id"])
+        seen_distributions.add(lock["distribution"])
+        seen_filenames.add(filename)
+        by_id[lock["lock_id"]] = lock
         entries.append(
             {
                 "lock_id": lock["lock_id"],
+                "lock_kind": lock["lock_kind"],
                 "distribution": lock["distribution"],
                 "expected_version": lock["distribution_version"],
                 "artifact_url": lock["artifact_url"],
@@ -34,6 +96,51 @@ def _pinned(manifest: dict) -> list[dict]:
                 "source_revision": lock["source_revision"],
             }
         )
+    descriptors = manifest.get("runtime_descriptors")
+    if not isinstance(descriptors, list) or len(descriptors) != len(_DOMAINS):
+        raise SystemExit("composition must contain exactly four runtime descriptors")
+    if any(not isinstance(item, dict) or set(item) != _DESCRIPTOR_FIELDS for item in descriptors):
+        raise SystemExit("runtime descriptor fields do not match the v3 contract")
+    if {item["domain"] for item in descriptors} != _DOMAINS:
+        raise SystemExit("composition must pin exactly work, execution, knowledge, and audit")
+    referenced: list[str] = []
+    primary_counts: dict[str, int] = {}
+    dependency_counts: dict[str, int] = {}
+    for descriptor in descriptors:
+        deps = descriptor["dependency_lock_ids"]
+        if not isinstance(deps, list) or len(deps) != len(set(deps)) or descriptor["lock_id"] in deps:
+            raise SystemExit(f"{descriptor['domain']}: invalid dependency lock references")
+        primary = by_id.get(descriptor["lock_id"])
+        if primary is None or primary["lock_kind"] != "adapter":
+            raise SystemExit(f"{descriptor['domain']}: primary release lock must be an adapter")
+        primary_counts[primary["lock_id"]] = primary_counts.get(primary["lock_id"], 0) + 1
+        referenced.append(primary["lock_id"])
+        for dependency_id in deps:
+            dependency = by_id.get(dependency_id)
+            if dependency is None:
+                raise SystemExit(f"{descriptor['domain']}: unknown dependency release lock")
+            dependency_counts[dependency_id] = dependency_counts.get(dependency_id, 0) + 1
+            referenced.append(dependency_id)
+            if dependency["lock_kind"] == "adapter":
+                raise SystemExit("adapter release locks cannot be dependencies")
+            if dependency["lock_kind"] == "owner-dependency":
+                if dependency["source_repository"] != primary["source_repository"]:
+                    raise SystemExit("owner dependencies must come from the same owner repository")
+            elif dependency["source_repository"] != _SHARED_SOURCE:
+                raise SystemExit("shared dependencies must come from the canonical Vuoro repository")
+            elif dependency["distribution"] not in _SHARED_DISTRIBUTIONS:
+                raise SystemExit("shared dependency distribution is not allowed")
+    for lock_id, lock in by_id.items():
+        primary_count = primary_counts.get(lock_id, 0)
+        dependency_count = dependency_counts.get(lock_id, 0)
+        if lock["lock_kind"] == "adapter" and (primary_count != 1 or dependency_count):
+            raise SystemExit("adapter release locks must be exclusive primaries")
+        if lock["lock_kind"] == "owner-dependency" and dependency_count != 1:
+            raise SystemExit(f"{lock_id}: owner dependency must be referenced by exactly one runtime descriptor")
+        if lock["lock_kind"] == "shared-dependency" and not dependency_count:
+            raise SystemExit(f"{lock_id}: shared dependency must be referenced by a runtime descriptor")
+    if set(referenced) != set(by_id):
+        raise SystemExit("composition contains an orphan release lock")
     return entries
 
 

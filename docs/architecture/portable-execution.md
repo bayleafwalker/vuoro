@@ -18,10 +18,10 @@ Dispatch-plan compiler
   snapshots selected work into immutable execution envelopes
 
 Actionq
-  owns actions, claims, leases, retries, cancellation, and terminal outcomes
-
-Runner
-  materializes repositories, invokes harnesses, verifies, and publishes results
+  owns actions, claims, leases, retries, cancellation, terminal outcomes,
+  and worktree preparation. The Runner is an internal ActionQ package that
+  materializes repositories, invokes harnesses, verifies, and publishes
+  results; it is not a separate repository member.
 
 outctl
   captures command streams and produces bounded, recoverable projections
@@ -41,8 +41,10 @@ that exact envelopes `A@rev7` and `B@rev4` execute against source commit
 
 ## Portable runner boundary
 
-The first milestone extracts these versioned structures from the existing
-devbox dispatcher:
+The Runner is an internal ActionQ package, not a separate repository member.
+It owns repository materialization, harness invocation, verification, and
+result publication under ActionQ's execution authority. The first milestone
+extracts these versioned structures from the existing devbox dispatcher:
 
 - `ExecutionEnvelope`
 - `ClaimReceipt`

@@ -22,10 +22,13 @@ from vuoro_service.identity import Identity, StaticBearerIdentityResolver
 
 def _work_pin(manifest_path: Path) -> dict[str, str]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if manifest.get("schema_version") != "vuoro-composition/v2":
+    if manifest.get("schema_version") != "vuoro-composition/v3":
         raise SystemExit("unsupported composition schema_version")
     descriptor = next(item for item in manifest["runtime_descriptors"] if item["domain"] == "work")
-    return next(lock for lock in manifest["release_locks"] if lock["lock_id"] == descriptor["lock_id"])
+    pin = next(lock for lock in manifest["release_locks"] if lock["lock_id"] == descriptor["lock_id"])
+    if pin.get("lock_kind") != "adapter":
+        raise SystemExit("work descriptor primary lock must be an adapter")
+    return pin
 
 
 async def _exercise() -> None:

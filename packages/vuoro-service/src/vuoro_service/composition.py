@@ -45,6 +45,11 @@ _CLOUD_GATEWAY_PUBLIC_KEY_PATH = Path("/etc/vuoro/identity/gateway-public.pem")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 _RELEASE_SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]*$")
+_LOCK_KINDS = frozenset({"adapter", "owner-dependency", "shared-dependency"})
+_CANONICAL_VUORO_SOURCE_REPOSITORY = "https://github.com/bayleafwalker/vuoro"
+_SHARED_DEPENDENCY_DISTRIBUTIONS = frozenset(
+    {"vuoro-schema-runtime", "vuoro-adapter-kit"}
+)
 
 
 class CompositionError(RuntimeError):
@@ -61,6 +66,7 @@ class ReleaseLock:
     """
 
     lock_id: str
+    lock_kind: str
     source_repository: str
     source_revision: str
     artifact_url: str
@@ -72,13 +78,15 @@ class ReleaseLock:
     def from_dict(cls, raw: Mapping[str, Any]) -> "ReleaseLock":
         field_names = {field.name for field in fields(cls)}
         if set(raw) != field_names:
-            raise CompositionError("release lock fields do not match the v2 contract")
+            raise CompositionError("release lock fields do not match the v3 contract")
         pin = cls(**{field: raw[field] for field in field_names})
         if not all(
             isinstance(getattr(pin, field), str) and getattr(pin, field)
             for field in field_names
         ):
             raise CompositionError("release lock values must be non-empty strings")
+        if pin.lock_kind not in _LOCK_KINDS:
+            raise CompositionError(f"{pin.lock_id}: unsupported release lock kind")
         _validate_release_lock(pin, pin.lock_id)
         return pin
 
@@ -151,7 +159,7 @@ class RuntimeAdapterDescriptor:
             "schema_version",
         }
         if set(raw) != field_names:
-            raise CompositionError("runtime descriptor fields do not match the v2 contract")
+            raise CompositionError("runtime descriptor fields do not match the v3 contract")
         dependency_lock_ids = raw["dependency_lock_ids"]
         if not isinstance(dependency_lock_ids, list):
             raise CompositionError("runtime descriptor dependency_lock_ids must be an array")
@@ -185,7 +193,7 @@ class AdapterPin:
     def from_dict(cls, raw: Mapping[str, Any]) -> "AdapterPin":
         """Read the former single-record shape for test/helper compatibility.
 
-        Release manifests are parsed exclusively through the v2 split above.
+        Release manifests are parsed exclusively through the v3 split above.
         """
         fields_v1 = {
             "domain", "source_repository", "source_revision", "artifact_url",
@@ -200,13 +208,18 @@ class AdapterPin:
         domain = raw["domain"]
         lock = ReleaseLock.from_dict({
             "lock_id": domain,
+            "lock_kind": "adapter",
             **{key: raw[key] for key in (
                 "source_repository", "source_revision", "artifact_url", "artifact_sha256",
                 "distribution", "distribution_version",
             )},
         })
         dependencies = tuple(
-            ReleaseLock.from_dict({"lock_id": f"{domain}-dependency-{index}", **item})
+            ReleaseLock.from_dict({
+                "lock_id": f"{domain}-dependency-{index}",
+                "lock_kind": "owner-dependency",
+                **item,
+            })
             for index, item in enumerate(dependencies_raw)
             if isinstance(item, dict)
         )
@@ -261,6 +274,10 @@ class AdapterPin:
         return self.release_lock.distribution
 
     @property
+    def lock_kind(self) -> str:
+        return self.release_lock.lock_kind
+
+    @property
     def distribution_version(self) -> str:
         return self.release_lock.distribution_version
 
@@ -296,9 +313,9 @@ class CompositionManifest:
             raise CompositionError(f"cannot load composition manifest: {path}") from error
         expected_fields = {"schema_version", "release_locks", "runtime_descriptors"}
         if not isinstance(raw, dict) or set(raw) != expected_fields:
-            raise CompositionError("composition manifest must use the v2 top-level shape")
+            raise CompositionError("composition manifest must use the v3 top-level shape")
         if (
-            raw["schema_version"] != "vuoro-composition/v2"
+            raw["schema_version"] != "vuoro-composition/v3"
             or not isinstance(raw["release_locks"], list)
             or not isinstance(raw["runtime_descriptors"], list)
         ):
@@ -317,12 +334,20 @@ class CompositionManifest:
             raise CompositionError("composition contains duplicate lock identifiers")
         if len(distributions) != len(set(distributions)):
             raise CompositionError("composition contains duplicate distributions")
+        filenames = [
+            _release_wheel_identity(lock.source_repository, lock.artifact_url)[1]
+            for lock in locks
+        ]
+        if len(filenames) != len(set(filenames)):
+            raise CompositionError("composition contains colliding artifact filenames")
         if {descriptor.domain for descriptor in descriptors} != _REQUIRED_DOMAINS:
             raise CompositionError("composition must pin exactly work, execution, knowledge, and audit")
         if len(descriptors) != len(_REQUIRED_DOMAINS):
             raise CompositionError("composition contains duplicate runtime domains")
         by_id = {lock.lock_id: lock for lock in locks}
         referenced: list[str] = []
+        primary_references: dict[str, int] = {}
+        dependency_references: dict[str, list[RuntimeAdapterDescriptor]] = {}
         adapters: list[AdapterPin] = []
         for descriptor in descriptors:
             try:
@@ -332,17 +357,50 @@ class CompositionManifest:
                 raise CompositionError(
                     f"{descriptor.domain}: runtime descriptor references an unknown release lock"
                 ) from error
-            if any(
-                dependency.source_repository != release_lock.source_repository
-                for dependency in dependencies
-            ):
+            if release_lock.lock_kind != "adapter":
                 raise CompositionError(
-                    f"{descriptor.domain}: dependencies must come from the same owner repository"
+                    f"{descriptor.domain}: primary release lock must have lock_kind adapter"
                 )
+            primary_references[release_lock.lock_id] = (
+                primary_references.get(release_lock.lock_id, 0) + 1
+            )
+            for dependency in dependencies:
+                dependency_references.setdefault(dependency.lock_id, []).append(descriptor)
+                if dependency.lock_kind == "adapter":
+                    raise CompositionError(
+                        f"{descriptor.domain}: adapter release locks cannot be dependencies"
+                    )
+                if dependency.lock_kind == "owner-dependency":
+                    if dependency.source_repository != release_lock.source_repository:
+                        raise CompositionError(
+                            f"{descriptor.domain}: owner dependencies must come from the same owner repository"
+                        )
+                elif dependency.lock_kind == "shared-dependency":
+                    if dependency.source_repository != _CANONICAL_VUORO_SOURCE_REPOSITORY:
+                        raise CompositionError(
+                            f"{dependency.lock_id}: shared dependencies must come from the canonical Vuoro repository"
+                        )
+                    if dependency.distribution not in _SHARED_DEPENDENCY_DISTRIBUTIONS:
+                        raise CompositionError(
+                            f"{dependency.lock_id}: shared dependency distribution is not allowed"
+                        )
             referenced.extend((descriptor.lock_id, *descriptor.dependency_lock_ids))
             adapters.append(AdapterPin(descriptor, release_lock, dependencies))
-        if len(referenced) != len(set(referenced)):
-            raise CompositionError("release locks cannot be shared by runtime descriptors")
+        for lock in locks:
+            references = dependency_references.get(lock.lock_id, [])
+            if lock.lock_kind == "adapter":
+                if primary_references.get(lock.lock_id) != 1 or references:
+                    raise CompositionError("adapter release locks must be exclusive primaries")
+            elif lock.lock_kind == "owner-dependency":
+                if len(references) != 1:
+                    raise CompositionError(
+                        f"{lock.lock_id}: owner dependency must be referenced by exactly one runtime descriptor"
+                    )
+            elif lock.lock_kind == "shared-dependency":
+                if not references:
+                    raise CompositionError(
+                        f"{lock.lock_id}: shared dependency must be referenced by a runtime descriptor"
+                    )
         if set(referenced) != set(lock_ids):
             raise CompositionError("composition contains an orphan release lock")
         return cls(
@@ -362,24 +420,23 @@ class CompositionManifest:
 def verify_adapter_artifacts(manifest: CompositionManifest, wheel_dir: Path) -> None:
     """Verify bundled release wheels before importing their adapter modules."""
 
-    seen: dict[str, str] = {}
-    for adapter in manifest.adapters:
-        for pin in (adapter, *adapter.dependencies):
-            filename = pin.artifact_url.rsplit("/", 1)[-1]
-            if filename in seen:
-                raise CompositionError(f"artifact filename collision: {filename}")
-            seen[filename] = pin.artifact_sha256
-            artifact = wheel_dir / filename
-            try:
-                digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-            except OSError as error:
-                raise CompositionError(
-                    f"{pin.distribution}: pinned artifact is unavailable"
-                ) from error
-            if digest != pin.artifact_sha256:
-                raise CompositionError(
-                    f"{pin.distribution}: pinned artifact checksum mismatch"
-                )
+    seen: set[str] = set()
+    for pin in manifest.release_locks:
+        filename = pin.artifact_url.rsplit("/", 1)[-1]
+        if filename in seen:
+            raise CompositionError(f"artifact filename collision: {filename}")
+        seen.add(filename)
+        artifact = wheel_dir / filename
+        try:
+            digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+        except OSError as error:
+            raise CompositionError(
+                f"{pin.distribution}: pinned artifact is unavailable"
+            ) from error
+        if digest != pin.artifact_sha256:
+            raise CompositionError(
+                f"{pin.distribution}: pinned artifact checksum mismatch"
+            )
 
 
 def _installed_files_digest(distribution_name: str) -> tuple[str, int]:
@@ -416,13 +473,17 @@ def verify_installed_composition(manifest: CompositionManifest, manifest_path: P
     ):
         raise CompositionError("installed composition attestation does not bind this release lock")
     expected = {lock.distribution: lock for lock in manifest.release_locks}
-    records = {entry.get("distribution"): entry for entry in attestation["distributions"] if isinstance(entry, dict)}
-    if set(records) != set(expected):
+    entries = attestation["distributions"]
+    if not all(isinstance(entry, dict) for entry in entries):
+        raise CompositionError("installed composition attestation distributions must be objects")
+    records = {entry.get("distribution"): entry for entry in entries}
+    if len(records) != len(entries) or set(records) != set(expected):
         raise CompositionError("installed composition attestation distributions do not match release locks")
     for distribution_name, lock in expected.items():
         record = records[distribution_name]
         if (
             record.get("lock_id") != lock.lock_id
+            or record.get("lock_kind") != lock.lock_kind
             or record.get("expected_version") != lock.distribution_version
             or record.get("artifact_sha256") != lock.artifact_sha256
         ):
