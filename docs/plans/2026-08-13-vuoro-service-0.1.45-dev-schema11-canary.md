@@ -64,6 +64,33 @@ operation remains pending a provisioned non-self-asserted identity authority.
 This must be exercised with the real authority boundary; it is not acceptable
 to create a bypass or a test-only served endpoint.
 
-`vuoro-shared` is unchanged: it remains on service 0.1.44 and schema 10. A
-fresh shared backup and quiescence preflight, followed by explicit operator
-approval, are required before any shared migration or image promotion.
+## Shared production activation
+
+The operator explicitly approved the shared activation after the dev evidence.
+Appservice then drained `vuoro-shared` at `2026-08-13T18:23:38Z` and completed
+the backup `vuoro-shared-execution-schema10-20260813t182338z` (UID
+`7ea6fea5-a905-4a89-a79c-333ca2ac44f5`, backup ID `20260813T183614`). It ran
+from `2026-08-13T18:36:14Z` to `2026-08-13T18:36:25Z`; both begin and end WAL
+are `000000010000000500000016`.
+
+The exact shared preflight found the schema ledger at versions 1 through 10,
+seven retained actions, 1,192 retained events, and zero active sessions,
+dispatch roots, nonterminal records, or other clients. Migration applied
+schema 11 with an empty retry set. The post-migration ledger is exactly 1
+through 11 and the retained action/event counts remain 7/1,192.
+
+Both the `vuoro-service` and `actionq-db-proxy` containers were rolled out to
+the same attested 0.1.45 digest:
+`sha256:9ce139991c376855448134544b1d3cc7a5c6bdb1ea4f1aa5acff7509e9141ed3`.
+The shared handshake reports four compatible domains, schema 11, and exactly
+84 catalog operations at revision
+`fc308e37ff1d56eccd9bd1f5372bf782e017936acf44994b22ddba4863e9f196`.
+Authority-negative verification left no forbidden privilege residue: the
+completion ingest/read identities cannot mutate queue lifecycle state, create
+schema objects, or write the migration ledger.
+
+Runtime activation is complete in dev and shared. The positive end-to-end
+session-completion operation remains pending a provisioned non-self-asserted
+identity authority; it remains a functional-canary follow-up, not a block on
+the completed activation. P2.2 schema-runtime consumer migration is an
+independent program and remains unstarted.

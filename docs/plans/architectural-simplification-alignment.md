@@ -45,9 +45,11 @@ scope and boundaries.
   Appservice activated it only in `vuoro-dev` after a backup, drain, and
   schema-11 preflight. The dev structural canary reports schema 11, four
   compatible domains, and the 84-operation revision above. A positive
-  completion invocation remains pending a provisioned identity authority;
-  `vuoro-shared` remains 0.1.44/schema 10 and is not authorized for promotion
-  without fresh evidence and explicit operator approval.
+  completion invocation remains pending a provisioned identity authority.
+  Shared activation was subsequently explicitly approved and completed: after
+  drain, backup, and exact quiescence preflight, schema 11 was applied without
+  retry; the service and proxy both run the same attested 0.1.45 digest. The
+  shared handshake now reports schema 11 and the 84-operation revision above.
 
 ## Owner-local units
 
@@ -146,10 +148,14 @@ dev service runs the attested 0.1.45 image, reports schema 11, and reports the
 `fc308e37ff1d56eccd9bd1f5372bf782e017936acf44994b22ddba4863e9f196`.
 The positive completion-operation canary is still pending a provisioned,
 non-self-asserted identity authority; do not manufacture an identity or weaken
-the authority boundary merely to exercise it. `vuoro-shared` remains on
-0.1.44/schema 10. A fresh shared backup/quiescence check and explicit operator
-approval are mandatory before applying migration 011 or promoting 0.1.45
-there.
+the authority boundary merely to exercise it. Shared activation has completed
+under explicit operator approval after drain, backup, and zero-active-work
+preflight: migration 011 applied schema 11 with no retry, preserved the seven
+retained actions and 1,192 retained events, and left no forbidden completion
+privileges. Both shared containers run the same attested 0.1.45 digest and
+the shared handshake reports schema 11 and the exact 84-operation revision.
+Runtime activation is complete; only the positive identity-backed completion
+canary remains under V-S4.
 
 ## P2.3 — Adapter-kit consumer migration
 
