@@ -13,11 +13,28 @@ import tempfile
 import httpx
 
 from sprintctl import db
-from sprintctl.application import WorkApplication
-from sprintctl.vuoro_adapter import register_work_catalog
+from sprintctl.application import (
+    ProjectMemberApplication,
+    ProjectWorkApplication,
+    WorkApplication,
+)
+from sprintctl.vuoro_adapter import catalog_operation_specs, register_work_catalog
 from vuoro_service.app import ServiceSettings, create_app
 from vuoro_service.catalog import CatalogRegistry
 from vuoro_service.identity import Identity, StaticBearerIdentityResolver
+
+
+_EXPECTED_ADAPTER_KIT = (
+    "https://github.com/bayleafwalker/vuoro/releases/download/"
+    "vuoro-adapter-kit-v0.1.0/vuoro_adapter_kit-0.1.0-py3-none-any.whl"
+)
+_EXPECTED_WORK_OPERATION_COUNT = 43
+_EXPECTED_WORK_METADATA_SHA256 = (
+    "bbe3d142b04eaccc55defb8d91891c38a4e759155c731ae5bf7387fe384934b9"
+)
+_EXPECTED_FOUR_DOMAIN_REVISION = (
+    "fc308e37ff1d56eccd9bd1f5372bf782e017936acf44994b22ddba4863e9f196"
+)
 
 
 def _work_pin(manifest_path: Path) -> dict[str, str]:
@@ -28,7 +45,30 @@ def _work_pin(manifest_path: Path) -> dict[str, str]:
     pin = next(lock for lock in manifest["release_locks"] if lock["lock_id"] == descriptor["lock_id"])
     if pin.get("lock_kind") != "adapter":
         raise SystemExit("work descriptor primary lock must be an adapter")
+    if descriptor.get("dependency_lock_ids") != ["vuoro-adapter-kit"]:
+        raise SystemExit("work descriptor must identify exactly the adapter-kit dependency")
+    locks = {lock["lock_id"]: lock for lock in manifest["release_locks"]}
+    dependency = locks.get("vuoro-adapter-kit")
+    if dependency is None or dependency.get("lock_kind") != "shared-dependency":
+        raise SystemExit("work dependency must be the shared adapter-kit lock")
+    if dependency.get("artifact_url") != _EXPECTED_ADAPTER_KIT:
+        raise SystemExit("work dependency is not the released adapter-kit wheel")
+    if descriptor.get("adapter_module") != "sprintctl.vuoro_adapter":
+        raise SystemExit("work descriptor must use the owner adapter module")
+    if descriptor.get("register") != "register_work_catalog":
+        raise SystemExit("work descriptor must use the owner registration entrypoint")
+    if descriptor.get("api_version") != "work-api/v1":
+        raise SystemExit("work descriptor changed its API compatibility contract")
+    if descriptor.get("schema_version") != "work-schema/v1":
+        raise SystemExit("work descriptor changed its schema compatibility contract")
     return pin
+
+
+def _assert_owner_metadata() -> None:
+    specs = catalog_operation_specs(resource_schema_available=False)
+    assert len(specs) == _EXPECTED_WORK_OPERATION_COUNT
+    encoded = json.dumps(specs, sort_keys=True, separators=(",", ":")).encode()
+    assert hashlib.sha256(encoded).hexdigest() == _EXPECTED_WORK_METADATA_SHA256
 
 
 async def _exercise() -> None:
@@ -45,8 +85,50 @@ async def _exercise() -> None:
             list_records=lambda after, limit: [],
             list_decisions=lambda after, limit: [],
         )
+        capability_id = "mcap:00000000-0000-4000-8000-000000000001"
+        connection.execute(
+            "INSERT INTO maintenance_capability(capability_id,envelope_id,envelope_digest,"
+            "envelope_json,plan_ref,operator_identity,not_before,expires_at,state,revision,"
+            "next_sequence,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                capability_id, "released-envelope", "0" * 64, "{}",
+                "artifact:sha256:" + "0" * 64, "release-gate:reader",
+                "2026-08-13T00:00:00Z", "2026-08-14T00:00:00Z", "prepared", 1,
+                1, "2026-08-13T00:00:00Z", "2026-08-13T00:00:00Z",
+            ),
+        )
+        connection.execute(
+            "INSERT INTO maintenance_resource(resource_ref,capability_id,recovery_floor,current_position) "
+            "VALUES(?,?,?,?)",
+            (
+                "smr1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                capability_id, 0, 1,
+            ),
+        )
+        connection.commit()
+        project = ProjectWorkApplication(
+            project_id="released-project",
+            members=(ProjectMemberApplication("sprintctl", work),),
+            canonical_binding={
+                "project_id": "released-project",
+                "home_repo": "agentops",
+                "backlog_repos": ["sprintctl"],
+            },
+        )
         registry = CatalogRegistry()
-        register_work_catalog(registry, work)
+        register_work_catalog(registry, work, project_application=project)
+        # The initialized SQLite owner exposes the additive resource contract.
+        assert registry.get("work.maintenance.resource.prepare") is not None
+        resource_operation = registry.get("work.maintenance.resource.prepare")
+        assert resource_operation is not None
+        assert callable(resource_operation.result_decoder)
+        assert resource_operation.result_decoder({"repo_id": "sprintctl", "capability_id": capability_id}) == {
+            "schema_version": "resource-reference/v1",
+            "owner": "work",
+            "resource_kind": "work.maintenance-capability",
+            "reference": "smr1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "revision": "sprintctl-maintenance-revision-1",
+        }
         app = create_app(
             settings=ServiceSettings(
                 environment_name="released-wheel-gate",
@@ -60,6 +142,12 @@ async def _exercise() -> None:
                         actor="release-gate:reader",
                         environment="released-wheel-gate",
                         authorities=frozenset({"work:read"}),
+                        repo_ids=frozenset({"sprintctl"}),
+                    ),
+                    "project-reader-token": Identity(
+                        actor="release-gate:project-reader",
+                        environment="released-wheel-gate",
+                        authorities=frozenset({"work:project-read"}),
                         repo_ids=frozenset({"sprintctl"}),
                     ),
                     "unprivileged-token": Identity(
@@ -92,6 +180,21 @@ async def _exercise() -> None:
             assert body["status"] == "accepted"
             assert body["result"]["repo_id"] == "sprintctl"
             assert [row["id"] for row in body["result"]["sprints"]] == [sprint_id]
+
+            project_request = {
+                **request,
+                "request_id": "released-wheel-project",
+                "operation": "work.project.sprints",
+                "repo_id": None,
+            }
+            project = await client.post(
+                "/api/invoke/v1",
+                headers={**protocol, "Authorization": "Bearer project-reader-token"},
+                json=project_request,
+            )
+            assert project.status_code == 200, project.text
+            assert project.json()["result"]["project"]["project_id"] == "released-project"
+            assert project.json()["result"]["repositories"][0]["origin_repo"] == "sprintctl"
 
             forbidden = await client.post(
                 "/api/invoke/v1",
@@ -126,6 +229,7 @@ def main(argv: list[str] | None = None) -> int:
     wheel = wheel_directory / pin["artifact_url"].rsplit("/", 1)[-1]
     assert hashlib.sha256(wheel.read_bytes()).hexdigest() == pin["artifact_sha256"]
     assert importlib.metadata.version(pin["distribution"]) == pin["distribution_version"]
+    _assert_owner_metadata()
     asyncio.run(_exercise())
     return 0
 

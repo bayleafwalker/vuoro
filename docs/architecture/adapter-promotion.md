@@ -144,12 +144,17 @@ Ignoring a filter, preserving input order accidentally, substituting an empty
 response, or replacing the behavior under test must make the fixture fail.
 
 CI fetches the immutable artifacts from the checked-in manifest, verifies
-their digests, installs the pinned Sprintctl wheel with the built
-`vuoro-service` wheel in an isolated environment, and runs
-`scripts/validate_released_work_adapter.py`. The gate proves a populated read
-is accepted and that both missing authority and invalid arguments are rejected
-through the real Vuoro invocation envelope. It does not import Sprintctl from
-a neighboring checkout.
+their digests, installs the pinned Sprintctl wheel and the one locked shared
+`vuoro-adapter-kit` wheel explicitly with `--no-deps` in an isolated
+environment, runs `pip check`, and then runs
+`scripts/validate_released_work_adapter.py`. The gate proves the installed
+metadata identity, exact 43-operation owner metadata hash, the `work-api/v1`
+and `work-schema/v1` descriptor, populated and malformed/unauthorized reads,
+project routing across the canonical member binding, the maintenance-resource
+registration and owner result decoder, and the four-domain composed revision
+(`84` operations, `fc308e37ff1d56eccd9bd1f5372bf782e017936acf44994b22ddba4863e9f196`).
+It does not import Sprintctl from a neighboring checkout or change the
+schema/runtime contract.
 
 ## Source acceptance commands
 

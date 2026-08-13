@@ -62,8 +62,15 @@ jobs:
           uv venv --python 3.12 /tmp/vuoro-released-wheel
           uv pip install --python /tmp/vuoro-released-wheel/bin/python \
             dist/vuoro-service/*.whl \
-            dist/adapters/sprintctl-*.whl \
-            'httpx>=0.27,<1'
+            'httpx>=0.27,<1' 'click>=8.1'
+          # Install the owner and its immutable shared dependency explicitly.
+          # Sprintctl metadata names the same adapter-kit release; --no-deps
+          # keeps this gate from resolving a different artifact.
+          uv pip install --python /tmp/vuoro-released-wheel/bin/python \
+            --no-deps \
+            dist/adapters/vuoro_adapter_kit-*.whl \
+            dist/adapters/sprintctl-*.whl
+          uv pip check --python /tmp/vuoro-released-wheel/bin/python
           /tmp/vuoro-released-wheel/bin/python \
             scripts/validate_released_work_adapter.py \
             packages/vuoro-service/composition/adapter-pins.json \

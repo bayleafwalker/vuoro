@@ -197,17 +197,21 @@ def test_checked_in_work_pin_is_the_maintenance_resource_owner_release() -> None
         pin.api_version,
         pin.schema_version,
     ) == (
-        "159647d80c91fb4d0f7ae2090c7dec413ec91a8f",
-        "0.2.22",
+        "75fd4a7bc01472f941c923444cabe6451bb1afd0",
+        "0.2.24",
         "work-api/v1",
         "work-schema/v1",
     )
     assert pin.artifact_url.endswith(
-        "/v0.2.22/sprintctl-0.2.22-py3-none-any.whl"
+        "/v0.2.24/sprintctl-0.2.24-py3-none-any.whl"
     )
     assert pin.artifact_sha256 == (
-        "bd508ff25f0a586cbcd5fee9a369188361b6f5c54f7a37160ba46e84756a72d8"
+        "30fe8d8e81b397f8f34c05b4f615d9cd7570e2a3acd0b26b94f2c4e35d38776c"
     )
+    assert [
+        (item.lock_id, item.lock_kind, item.distribution, item.distribution_version)
+        for item in pin.dependencies
+    ] == [("vuoro-adapter-kit", "shared-dependency", "vuoro-adapter-kit", "0.1.0")]
     assert (pin.adapter_module, pin.register) == (
         "sprintctl.vuoro_adapter",
         "register_work_catalog",
