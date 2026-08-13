@@ -33,6 +33,12 @@ scope and boundaries.
   Release wheels, not PyPI packages. Kctl 0.1.2, auditctl 0.1.1, and ActionQ
   0.1.21 are the first three adapter-kit consumers; no domain has adopted the
   schema runtime yet. Sprintctl is the remaining P2.3 migration.
+- Sprintctl P2.3 promotion is now prepared against the immutable 0.2.24
+  wheel at source `75fd4a7bc01472f941c923444cabe6451bb1afd0`, with the shared
+  adapter-kit lock reused rather than duplicated. The released-work gate
+  covers the exact 43-operation owner metadata hash, scoped invocation,
+  project routing, resource registration/result decoding, and the unchanged
+  four-domain catalog revision.
 
 ## Owner-local units
 
@@ -127,6 +133,16 @@ a deployment and authority-separation blocker, not a reason to delay P2.3
 consumer migration accounting. No `vuoro-service` 0.1.45 image has been
 released, and this plan authorizes neither an image tag nor Appservice
 activation.
+
+## P2.3 — Adapter-kit consumer migration
+
+The four owner adapters now consume the released shared `vuoro-adapter-kit`
+through composition v3 locks. Kctl, Auditctl, and ActionQ are promoted in the
+main composition; Sprintctl is represented by the pending 0.2.24 composition
+change. Its source and wheel identity are immutable, and the release gate
+proves the owner catalog and invocation boundary without a service release or
+deployment. When this change is accepted, P2.3 is complete at 4/4 consumers;
+ActionQ's separate schema-11 activation prerequisite remains tracked under V-S4.
 
 ## Cross-repository dependencies
 
