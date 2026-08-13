@@ -24,6 +24,14 @@ _EXPECTED_ADAPTER_KIT = (
     "https://github.com/bayleafwalker/vuoro/releases/download/"
     "vuoro-adapter-kit-v0.1.0/vuoro_adapter_kit-0.1.0-py3-none-any.whl"
 )
+_EXPECTED_SCHEMA_RUNTIME = (
+    "https://github.com/bayleafwalker/vuoro/releases/download/"
+    "vuoro-schema-runtime-v0.1.0/vuoro_schema_runtime-0.1.0-py3-none-any.whl"
+)
+_EXPECTED_SCHEMA_RUNTIME_REQUIREMENT = (
+    f"vuoro-schema-runtime @ {_EXPECTED_SCHEMA_RUNTIME}#sha256="
+    "b66c9357c99aa9e1a7353991ce54105a8621958ecfac47f8c121d80b90b77912"
+)
 _EXPECTED_CATALOG_OPERATION_COUNT = 26
 _EXPECTED_CATALOG_METADATA_SHA256 = (
     "8d434e8b347e804c90e48a6598304be84b12f2a61ebc2dbed00a26053239a778"
@@ -104,19 +112,22 @@ class StubApplication:
         }
 
 
-def _pins(path: Path) -> tuple[dict, dict, dict]:
+def _pins(path: Path) -> tuple[dict, dict, dict, dict]:
     manifest = json.loads(path.read_text(encoding="utf-8"))
     if manifest.get("schema_version") != "vuoro-composition/v3":
         raise SystemExit("unsupported composition schema_version")
     descriptor = next(item for item in manifest["runtime_descriptors"] if item["domain"] == "execution")
     locks = {lock["lock_id"]: lock for lock in manifest["release_locks"]}
-    if descriptor["dependency_lock_ids"] != ["execution-contracts", "vuoro-adapter-kit"]:
+    if descriptor["dependency_lock_ids"] != [
+        "execution-contracts", "vuoro-adapter-kit", "vuoro-schema-runtime"
+    ]:
         raise SystemExit(
-            "execution descriptor must identify exactly the contract and shared adapter-kit locks"
+            "execution descriptor must identify exactly the contract, adapter-kit, and schema-runtime locks"
         )
     adapter = locks[descriptor["lock_id"]]
     contracts = locks[descriptor["dependency_lock_ids"][0]]
     shared = locks[descriptor["dependency_lock_ids"][1]]
+    schema_runtime = locks[descriptor["dependency_lock_ids"][2]]
     if adapter.get("lock_kind") != "adapter":
         raise SystemExit("execution descriptor primary lock must be an adapter")
     if contracts.get("lock_kind") != "owner-dependency":
@@ -127,9 +138,16 @@ def _pins(path: Path) -> tuple[dict, dict, dict]:
         raise SystemExit("execution descriptor dependency must include the shared adapter kit")
     if shared.get("artifact_url") != _EXPECTED_ADAPTER_KIT:
         raise SystemExit("execution dependency is not the released adapter-kit wheel")
+    if schema_runtime.get("lock_kind") != "shared-dependency":
+        raise SystemExit("execution schema runtime must be a shared dependency")
+    if schema_runtime.get("artifact_url") != _EXPECTED_SCHEMA_RUNTIME:
+        raise SystemExit("execution dependency is not the released schema-runtime wheel")
+    requirements = importlib.metadata.requires(adapter["distribution"]) or []
+    if _EXPECTED_SCHEMA_RUNTIME_REQUIREMENT not in requirements:
+        raise SystemExit("execution owner metadata does not require the locked schema runtime")
     if descriptor.get("schema_version") != "actionq-schema/v11":
         raise SystemExit("execution descriptor must select actionq-schema/v11")
-    return adapter, contracts, shared
+    return adapter, contracts, shared, schema_runtime
 
 
 async def _exercise() -> None:
@@ -261,8 +279,8 @@ def main(argv: list[str] | None = None) -> int:
     if len(argv) != 2:
         raise SystemExit("usage: validate_released_execution_adapter.py MANIFEST WHEEL_DIRECTORY")
     manifest, wheel_dir = Path(argv[0]), Path(argv[1])
-    adapter, contracts, shared = _pins(manifest)
-    for pin in (adapter, contracts, shared):
+    adapter, contracts, adapter_kit, schema_runtime = _pins(manifest)
+    for pin in (adapter, contracts, adapter_kit, schema_runtime):
         wheel = wheel_dir / pin["artifact_url"].rsplit("/", 1)[-1]
         assert hashlib.sha256(wheel.read_bytes()).hexdigest() == pin["artifact_sha256"]
         assert importlib.metadata.version(pin["distribution"]) == pin["distribution_version"]

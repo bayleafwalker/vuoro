@@ -79,16 +79,17 @@ def test_service_image_publication_keeps_tag_and_source_aliases() -> None:
     assert "vuoro-service:sha-${{ github.sha }}" in workflow
 
 
-def test_service_image_avoids_duplicate_shared_dependency_resolution() -> None:
+def test_service_image_installs_both_locked_shared_dependencies() -> None:
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
 
-    # kctl declares vuoro-adapter-kit as an immutable direct URL. Passing the
-    # same wheel as a second pip candidate makes pip report a false conflict;
-    # resolve owner adapters first, then install the local shared wheel exactly.
+    # Owner adapters declare both shared wheels as immutable direct URLs.
+    # Resolve owners first, then install the two locally verified shared wheels.
     first_install = dockerfile.split("&& python -m pip install", 1)[0]
     assert "./packages/vuoro-service" in first_install
     assert "/opt/vuoro/adapters/*.whl" not in first_install
-    assert "--no-deps /opt/vuoro/adapters/vuoro_adapter_kit-*.whl" in dockerfile
+    assert "python -m pip install --no-cache-dir --no-deps" in dockerfile
+    assert "/opt/vuoro/adapters/vuoro_adapter_kit-*.whl" in dockerfile
+    assert "/opt/vuoro/adapters/vuoro_schema_runtime-*.whl" in dockerfile
     assert "/opt/vuoro/adapters/kctl-*.whl" in dockerfile
 
 
@@ -97,6 +98,7 @@ def test_ci_exercises_the_released_knowledge_composition() -> None:
     assert "name: Exercise pinned released knowledge adapter" in workflow
     assert "dist/adapters/kctl-*.whl" in workflow
     assert "dist/adapters/vuoro_adapter_kit-*.whl" in workflow
+    assert "dist/adapters/vuoro_schema_runtime-*.whl" in workflow
     assert "scripts/validate_released_knowledge_adapter.py" in workflow
 
 
@@ -105,6 +107,7 @@ def test_ci_exercises_the_released_audit_composition() -> None:
     assert "name: Exercise pinned released audit adapter" in workflow
     assert "dist/adapters/auditctl-*.whl" in workflow
     assert "dist/adapters/vuoro_adapter_kit-*.whl" in workflow
+    assert "dist/adapters/vuoro_schema_runtime-*.whl" in workflow
     assert "scripts/validate_released_audit_adapter.py" in workflow
 
 
@@ -115,6 +118,7 @@ def test_ci_exercises_the_released_execution_composition_with_shared_lock() -> N
     assert "dist/adapters/actionq-*.whl" in workflow
     assert "--no-deps" in workflow
     assert "dist/adapters/vuoro_adapter_kit-*.whl" in workflow
+    assert "dist/adapters/vuoro_schema_runtime-*.whl" in workflow
     assert "uv pip check --python" in workflow
     assert "scripts/validate_released_execution_adapter.py" in workflow
     execution_gate = workflow.split("name: Exercise pinned released execution adapter", 1)[1].split(
@@ -128,6 +132,7 @@ def test_ci_exercises_the_complete_released_four_domain_catalog() -> None:
     assert "name: Exercise complete released four-domain catalog" in workflow
     assert "scripts/validate_released_catalog_composition.py" in workflow
     assert "dist/adapters/auditctl-*.whl" in workflow
+    assert "dist/adapters/vuoro_schema_runtime-*.whl" in workflow
 
 
 def test_python_release_workflow_uses_independent_immutable_package_tags() -> None:

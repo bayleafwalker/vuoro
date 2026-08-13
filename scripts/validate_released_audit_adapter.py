@@ -23,9 +23,17 @@ _EXPECTED_ADAPTER_KIT = (
     "https://github.com/bayleafwalker/vuoro/releases/download/"
     "vuoro-adapter-kit-v0.1.0/vuoro_adapter_kit-0.1.0-py3-none-any.whl"
 )
+_EXPECTED_SCHEMA_RUNTIME = (
+    "https://github.com/bayleafwalker/vuoro/releases/download/"
+    "vuoro-schema-runtime-v0.1.0/vuoro_schema_runtime-0.1.0-py3-none-any.whl"
+)
+_EXPECTED_SCHEMA_RUNTIME_REQUIREMENT = (
+    f"vuoro-schema-runtime @ {_EXPECTED_SCHEMA_RUNTIME}#sha256="
+    "b66c9357c99aa9e1a7353991ce54105a8621958ecfac47f8c121d80b90b77912"
+)
 
 
-def _audit_pins(manifest_path: Path) -> tuple[dict, dict]:
+def _audit_pins(manifest_path: Path) -> tuple[dict, dict, dict]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("schema_version") != "vuoro-composition/v3":
         raise SystemExit("unsupported composition schema_version")
@@ -35,8 +43,12 @@ def _audit_pins(manifest_path: Path) -> tuple[dict, dict]:
     locks = {lock["lock_id"]: lock for lock in manifest["release_locks"]}
     if descriptor["lock_id"] not in locks:
         raise SystemExit("audit descriptor has no primary release lock")
-    if descriptor["dependency_lock_ids"] != ["vuoro-adapter-kit"]:
-        raise SystemExit("audit descriptor must identify exactly the adapter-kit dependency")
+    if descriptor["dependency_lock_ids"] != [
+        "vuoro-adapter-kit", "vuoro-schema-runtime"
+    ]:
+        raise SystemExit(
+            "audit descriptor must identify exactly the adapter-kit and schema-runtime dependencies"
+        )
     if descriptor["adapter_module"] != "auditctl.vuoro_adapter":
         raise SystemExit("audit descriptor must use the owner adapter module")
     if descriptor["register"] != "VuoroAuditAdapter.register":
@@ -44,14 +56,23 @@ def _audit_pins(manifest_path: Path) -> tuple[dict, dict]:
     if descriptor["api_version"] != "audit/v1" or descriptor["schema_version"] != "audit-schema/v1":
         raise SystemExit("audit descriptor changed its compatibility contract")
     adapter = locks[descriptor["lock_id"]]
-    dependency = locks[descriptor["dependency_lock_ids"][0]]
+    adapter_kit = locks[descriptor["dependency_lock_ids"][0]]
+    schema_runtime = locks[descriptor["dependency_lock_ids"][1]]
     if adapter.get("lock_kind") != "adapter":
         raise SystemExit("audit descriptor primary lock must be an adapter")
-    if dependency.get("lock_kind") != "shared-dependency":
-        raise SystemExit("audit dependency must be a shared dependency")
-    if dependency.get("artifact_url") != _EXPECTED_ADAPTER_KIT:
+    if any(
+        dependency.get("lock_kind") != "shared-dependency"
+        for dependency in (adapter_kit, schema_runtime)
+    ):
+        raise SystemExit("audit dependencies must be shared dependencies")
+    if adapter_kit.get("artifact_url") != _EXPECTED_ADAPTER_KIT:
         raise SystemExit("audit dependency is not the released adapter-kit wheel")
-    return adapter, dependency
+    if schema_runtime.get("artifact_url") != _EXPECTED_SCHEMA_RUNTIME:
+        raise SystemExit("audit dependency is not the released schema-runtime wheel")
+    requirements = importlib.metadata.requires(adapter["distribution"]) or []
+    if _EXPECTED_SCHEMA_RUNTIME_REQUIREMENT not in requirements:
+        raise SystemExit("audit owner metadata does not require the locked schema runtime")
+    return adapter, adapter_kit, schema_runtime
 
 
 def _assert_wheel(pin: dict, wheel_directory: Path) -> None:
@@ -229,9 +250,9 @@ def main(argv: list[str] | None = None) -> int:
     if len(argv) != 2:
         raise SystemExit("usage: validate_released_audit_adapter.py MANIFEST WHEEL_DIRECTORY")
     manifest, wheel_directory = map(Path, argv)
-    adapter, dependency = _audit_pins(manifest)
-    _assert_wheel(adapter, wheel_directory)
-    _assert_wheel(dependency, wheel_directory)
+    pins = _audit_pins(manifest)
+    for pin in pins:
+        _assert_wheel(pin, wheel_directory)
     asyncio.run(_exercise())
     return 0
 

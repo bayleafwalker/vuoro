@@ -25,7 +25,9 @@ RUN python -m pip install --no-cache-dir "psycopg[binary]>=3.2,<4" "click>=8.1" 
         /opt/vuoro/adapters/auditctl-*.whl \
         /opt/vuoro/adapters/kctl-*.whl \
         /opt/vuoro/adapters/sprintctl-*.whl \
-    && python -m pip install --no-cache-dir --no-deps /opt/vuoro/adapters/vuoro_adapter_kit-*.whl \
+    && python -m pip install --no-cache-dir --no-deps \
+        /opt/vuoro/adapters/vuoro_adapter_kit-*.whl \
+        /opt/vuoro/adapters/vuoro_schema_runtime-*.whl \
     && python -m pip check \
     && python /usr/local/bin/attest-installed-composition \
         /opt/vuoro/composition/adapter-pins.json \

@@ -43,24 +43,9 @@ def test_checked_in_manifest_pins_all_four_domains() -> None:
 
 
 def _shared_dependency_manifest() -> dict:
-    raw = json.loads(
+    return json.loads(
         (ROOT / "composition" / "adapter-pins.json").read_text(encoding="utf-8")
     )
-    raw["release_locks"].append(
-        {
-            "lock_id": "shared-runtime",
-            "lock_kind": "shared-dependency",
-            "source_repository": "https://github.com/bayleafwalker/vuoro",
-            "source_revision": "a" * 40,
-            "artifact_url": "https://github.com/bayleafwalker/vuoro/releases/download/v0.1.42/vuoro-schema-runtime-0.1.0-py3-none-any.whl",
-            "artifact_sha256": "b" * 64,
-            "distribution": "vuoro-schema-runtime",
-            "distribution_version": "0.1.0",
-        }
-    )
-    for descriptor in raw["runtime_descriptors"][:2]:
-        descriptor["dependency_lock_ids"].append("shared-runtime")
-    return raw
 
 
 def test_shared_dependency_is_reusable_and_fetched_and_attested_once(tmp_path: Path) -> None:
@@ -68,7 +53,11 @@ def test_shared_dependency_is_reusable_and_fetched_and_attested_once(tmp_path: P
     path = tmp_path / "manifest.json"
     path.write_text(json.dumps(raw), encoding="utf-8")
     manifest = CompositionManifest.load(path)
-    assert [lock.lock_id for lock in manifest.release_locks].count("shared-runtime") == 1
+    assert [lock.lock_id for lock in manifest.release_locks].count("vuoro-schema-runtime") == 1
+    assert sum(
+        "vuoro-schema-runtime" in descriptor.dependency_lock_ids
+        for descriptor in manifest.runtime_descriptors
+    ) == 3
 
     fetch_spec = importlib.util.spec_from_file_location(
         "fetch_pins", ROOT.parents[1] / "scripts" / "fetch_pinned_adapters.py"
@@ -77,7 +66,7 @@ def test_shared_dependency_is_reusable_and_fetched_and_attested_once(tmp_path: P
     fetcher = importlib.util.module_from_spec(fetch_spec)
     fetch_spec.loader.exec_module(fetcher)
     fetched = fetcher.artifact_pins(raw)
-    assert [lock_id for lock_id, _ in fetched].count("shared-runtime") == 1
+    assert [lock_id for lock_id, _ in fetched].count("vuoro-schema-runtime") == 1
 
     attest_spec = importlib.util.spec_from_file_location(
         "attest_composition", ROOT.parents[1] / "scripts" / "attest_installed_composition.py"
@@ -85,13 +74,16 @@ def test_shared_dependency_is_reusable_and_fetched_and_attested_once(tmp_path: P
     assert attest_spec and attest_spec.loader
     attester = importlib.util.module_from_spec(attest_spec)
     attest_spec.loader.exec_module(attester)
-    assert [entry["lock_id"] for entry in attester._pinned(raw)].count("shared-runtime") == 1
+    assert [entry["lock_id"] for entry in attester._pinned(raw)].count("vuoro-schema-runtime") == 1
 
 
 def test_runtime_and_fetcher_share_v3_dependency_policy(tmp_path: Path) -> None:
     raw = _shared_dependency_manifest()
-    raw["release_locks"][-1]["source_repository"] = "https://github.com/example/vuoro"
-    raw["release_locks"][-1]["artifact_url"] = "https://github.com/example/vuoro/releases/download/v0.1.42/vuoro-schema-runtime-0.1.0-py3-none-any.whl"
+    shared_runtime = next(
+        lock for lock in raw["release_locks"] if lock["lock_id"] == "vuoro-schema-runtime"
+    )
+    shared_runtime["source_repository"] = "https://github.com/example/vuoro"
+    shared_runtime["artifact_url"] = "https://github.com/example/vuoro/releases/download/vuoro-schema-runtime-v0.1.0/vuoro_schema_runtime-0.1.0-py3-none-any.whl"
     path = tmp_path / "manifest.json"
     path.write_text(json.dumps(raw), encoding="utf-8")
     with pytest.raises(CompositionError, match="canonical Vuoro"):
@@ -175,18 +167,20 @@ def test_checked_in_adapter_artifact_urls_are_source_named_or_exact_semver_relea
 def test_checked_in_execution_pin_includes_released_contract_companion() -> None:
     pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("execution")
     assert (pin.source_revision, pin.distribution_version, pin.schema_version) == (
-        "8ef1fc9ae58b96ddc90db0e5be7a323e9be4b85b", "0.1.21", "actionq-schema/v11")
-    assert pin.artifact_url.endswith("/v0.1.21/actionq-0.1.21-py3-none-any.whl")
+        "183c0d79fe98e65e4d3d200563aaa7c903366b81", "0.1.22", "actionq-schema/v11")
+    assert pin.artifact_url.endswith("/v0.1.22/actionq-0.1.22-py3-none-any.whl")
     assert pin.artifact_sha256 == (
-        "7f4c3cbbbe991465ac88fa0640f1bb4420f76c8a07a9e7765e61a0981631220d"
+        "5ffce20b2e9b53305a522b25f8504081442311392b025ea220fc8792e8e50bd2"
     )
     assert [(item.lock_id, item.lock_kind, item.distribution, item.distribution_version)
             for item in pin.dependencies] == [
         ("execution-contracts", "owner-dependency", "actionq-contracts", "0.1.1"),
         ("vuoro-adapter-kit", "shared-dependency", "vuoro-adapter-kit", "0.1.0"),
+        ("vuoro-schema-runtime", "shared-dependency", "vuoro-schema-runtime", "0.1.0"),
     ]
     assert pin.dependencies[0].source_revision == "0e8b21325a7fd3d59a989110e61ce80476c51dea"
     assert pin.dependencies[1].source_revision == "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c"
+    assert pin.dependencies[2].source_revision == "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c"
 
 
 def test_checked_in_work_pin_is_the_maintenance_resource_owner_release() -> None:
@@ -218,7 +212,7 @@ def test_checked_in_work_pin_is_the_maintenance_resource_owner_release() -> None
     )
 
 
-def test_checked_in_knowledge_pin_is_kctl_012_with_released_adapter_kit() -> None:
+def test_checked_in_knowledge_pin_is_kctl_013_with_released_shared_dependencies() -> None:
     manifest = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json")
     pin = manifest.pin("knowledge")
     assert (
@@ -230,11 +224,11 @@ def test_checked_in_knowledge_pin_is_kctl_012_with_released_adapter_kit() -> Non
         pin.artifact_sha256,
     ) == (
         "https://github.com/bayleafwalker/kctl",
-        "f35d0d002999ab66a8d90209c78b92b7b5e8b1cf",
+        "f5c5483b0825219ad90488276b56d143b64f01ad",
         "kctl",
-        "0.1.2",
-        "https://github.com/bayleafwalker/kctl/releases/download/kctl-v0.1.2/kctl-0.1.2-py3-none-any.whl",
-        "71780d286dc3ca88644e479ece323de1ea704210aa736e74873f6f8fd0f75529",
+        "0.1.3",
+        "https://github.com/bayleafwalker/kctl/releases/download/kctl-v0.1.3/kctl-0.1.3-py3-none-any.whl",
+        "789b5aadfc4c31171d574c76b79af9999b08b5cf212969cefc8504eb2e99e43d",
     )
     assert (pin.adapter_module, pin.register, pin.api_version, pin.schema_version) == (
         "kctl.vuoro",
@@ -245,18 +239,29 @@ def test_checked_in_knowledge_pin_is_kctl_012_with_released_adapter_kit() -> Non
     assert [(dependency.lock_id, dependency.lock_kind, dependency.distribution,
              dependency.source_revision, dependency.artifact_url,
              dependency.artifact_sha256, dependency.distribution_version)
-            for dependency in pin.dependencies] == [(
-        "vuoro-adapter-kit",
-        "shared-dependency",
-        "vuoro-adapter-kit",
-        "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c",
-        "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.1.0/vuoro_adapter_kit-0.1.0-py3-none-any.whl",
-        "0037898a4c9f01720a42302365b0172ecd203732070326ea2abdf549a44bf0c2",
-        "0.1.0",
-    )]
+            for dependency in pin.dependencies] == [
+        (
+            "vuoro-adapter-kit",
+            "shared-dependency",
+            "vuoro-adapter-kit",
+            "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c",
+            "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.1.0/vuoro_adapter_kit-0.1.0-py3-none-any.whl",
+            "0037898a4c9f01720a42302365b0172ecd203732070326ea2abdf549a44bf0c2",
+            "0.1.0",
+        ),
+        (
+            "vuoro-schema-runtime",
+            "shared-dependency",
+            "vuoro-schema-runtime",
+            "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c",
+            "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-schema-runtime-v0.1.0/vuoro_schema_runtime-0.1.0-py3-none-any.whl",
+            "b66c9357c99aa9e1a7353991ce54105a8621958ecfac47f8c121d80b90b77912",
+            "0.1.0",
+        ),
+    ]
 
 
-def test_checked_in_audit_pin_is_auditctl_011_with_released_adapter_kit() -> None:
+def test_checked_in_audit_pin_is_auditctl_012_with_released_shared_dependencies() -> None:
     manifest = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json")
     pin = manifest.pin("audit")
     assert (
@@ -268,11 +273,11 @@ def test_checked_in_audit_pin_is_auditctl_011_with_released_adapter_kit() -> Non
         pin.artifact_sha256,
     ) == (
         "https://github.com/bayleafwalker/auditctl",
-        "41e6d4ac5831fda0d85331dcc753c0b85f227332",
+        "613103644f2749a4d0f9ae5cb6913795fa7647a6",
         "auditctl",
-        "0.1.1",
-        "https://github.com/bayleafwalker/auditctl/releases/download/auditctl-v0.1.1/auditctl-0.1.1-py3-none-any.whl",
-        "cc56ec05f7a3bcf84f9b4b4bb787247afb4b3917f9ea90ea0d00d8eebd4e7c5f",
+        "0.1.2",
+        "https://github.com/bayleafwalker/auditctl/releases/download/auditctl-v0.1.2/auditctl-0.1.2-py3-none-any.whl",
+        "b76d9d7aab727c77a7dcfcdc4e5de423b61a07c8f89369101347a4dc6eaf33d1",
     )
     assert (pin.adapter_module, pin.register, pin.api_version, pin.schema_version) == (
         "auditctl.vuoro_adapter",
@@ -283,15 +288,26 @@ def test_checked_in_audit_pin_is_auditctl_011_with_released_adapter_kit() -> Non
     assert [(dependency.lock_id, dependency.lock_kind, dependency.distribution,
              dependency.source_revision, dependency.artifact_url,
              dependency.artifact_sha256, dependency.distribution_version)
-            for dependency in pin.dependencies] == [(
-        "vuoro-adapter-kit",
-        "shared-dependency",
-        "vuoro-adapter-kit",
-        "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c",
-        "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.1.0/vuoro_adapter_kit-0.1.0-py3-none-any.whl",
-        "0037898a4c9f01720a42302365b0172ecd203732070326ea2abdf549a44bf0c2",
-        "0.1.0",
-    )]
+            for dependency in pin.dependencies] == [
+        (
+            "vuoro-adapter-kit",
+            "shared-dependency",
+            "vuoro-adapter-kit",
+            "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c",
+            "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.1.0/vuoro_adapter_kit-0.1.0-py3-none-any.whl",
+            "0037898a4c9f01720a42302365b0172ecd203732070326ea2abdf549a44bf0c2",
+            "0.1.0",
+        ),
+        (
+            "vuoro-schema-runtime",
+            "shared-dependency",
+            "vuoro-schema-runtime",
+            "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c",
+            "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-schema-runtime-v0.1.0/vuoro_schema_runtime-0.1.0-py3-none-any.whl",
+            "b66c9357c99aa9e1a7353991ce54105a8621958ecfac47f8c121d80b90b77912",
+            "0.1.0",
+        ),
+    ]
 
 
 def test_execution_authorizer_is_exact_and_repository_scoped() -> None:
