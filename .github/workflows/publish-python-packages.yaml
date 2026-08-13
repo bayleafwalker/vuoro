@@ -11,7 +11,7 @@ on:
 
 permissions:
   attestations: write
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -74,17 +74,46 @@ jobs:
           mkdir -p dist/publish
           wheel="dist/publish/$(basename "${wheels[0]}")"
           cp -- "${wheels[0]}" "$wheel"
+          wheel_name="$(basename "$wheel")"
+          sha256="$(sha256sum "$wheel" | awk '{print $1}')"
           echo "wheel=$wheel" >> "$GITHUB_OUTPUT"
+          echo "wheel_name=$wheel_name" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
       - name: Validate the selected gated wheel against its tag
         run: >-
           uv run --package vuoro-service --extra test python
           scripts/validate_release_contract.py
           ${{ steps.publication.outputs.wheel }}
           --tag "${GITHUB_REF_NAME}"
+      - name: Attest the selected gated wheel
+        uses: actions/attest@v4
+        with:
+          subject-path: "${{ steps.publication.outputs.wheel }}"
+      - name: Create the draft GitHub release with the selected wheel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          package="${{ steps.package.outputs.name }}"
+          wheel="${{ steps.publication.outputs.wheel }}"
+          wheel_name="${{ steps.publication.outputs.wheel_name }}"
+          sha256="${{ steps.publication.outputs.sha256 }}"
+          notes=$(printf 'tag: %s\ndistribution: %s\nwheel: %s\nsha256: %s\n' \
+            "$tag" "$package" "$wheel_name" "$sha256")
+          gh release create "$tag" \
+            --verify-tag \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --title "$tag — $package — $wheel_name — sha256:$sha256" \
+            --notes "$notes" \
+            "$wheel"
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/publish/
           skip-existing: false
-      - uses: actions/attest@v4
-        with:
-          subject-path: "${{ steps.publication.outputs.wheel }}"
+      - name: Publish the GitHub release after PyPI succeeds
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --draft=false
