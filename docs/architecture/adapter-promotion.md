@@ -38,9 +38,12 @@ following before editing it:
 1. The owner repository has committed the adapter implementation and its
    contract/integration tests. Record the full source commit SHA in
    `source_revision`.
-2. The owner has published an immutable wheel release. The wheel URL must be
-   a GitHub release asset, its SHA-256 must match the downloaded bytes, and
-   its installed distribution version must equal `distribution_version`.
+2. The owner has published an immutable wheel release. For the current
+   single-operator ecosystem, GitHub Releases are the sole artifact authority:
+   the wheel URL must be a GitHub release asset, its SHA-256 must match the
+   downloaded bytes, and its installed distribution version must equal
+   `distribution_version`. A package index is neither required nor an
+   alternative source of truth.
    Reusing a version for a different wheel is not a valid promotion.
 3. The matching runtime descriptor's declared API and schema versions are
    compatible with the owner release. A version change requires the corresponding Vuoro

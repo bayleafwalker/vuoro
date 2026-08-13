@@ -109,11 +109,7 @@ jobs:
             --title "$tag — $package — $wheel_name — sha256:$sha256" \
             --notes "$notes" \
             "$wheel"
-      - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: dist/publish/
-          skip-existing: false
-      - name: Publish the GitHub release after PyPI succeeds
+      - name: Publish the GitHub release after attestation and draft creation
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release edit "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --draft=false
