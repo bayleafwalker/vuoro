@@ -105,6 +105,29 @@ def test_runtime_and_fetcher_share_v3_dependency_policy(tmp_path: Path) -> None:
         fetcher.artifact_pins(raw)
 
 
+@pytest.mark.parametrize("mutation, message", [
+    (lambda raw: raw["release_locks"][0].update(lock_kind="shared-dependency"), "primary"),
+    (lambda raw: raw["release_locks"][2].update(lock_kind="adapter"), "adapter"),
+    (lambda raw: raw["release_locks"][2].update(source_repository="https://github.com/example/actionq", artifact_url="https://github.com/example/actionq/releases/download/vuoro-adapter-v1-0e8b213/actionq_contracts-0.1.1-py3-none-any.whl"), "same owner"),
+    (lambda raw: raw["release_locks"][0].update(artifact_sha256="x" * 64), "artifact"),
+])
+def test_attester_rejects_the_same_v3_policy_mutations_as_runtime(
+    mutation, message: str,
+) -> None:
+    raw = json.loads(
+        (ROOT / "composition" / "adapter-pins.json").read_text(encoding="utf-8")
+    )
+    mutation(raw)
+    spec = importlib.util.spec_from_file_location(
+        "attest_composition", ROOT.parents[1] / "scripts" / "attest_installed_composition.py"
+    )
+    assert spec and spec.loader
+    attester = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(attester)
+    with pytest.raises(SystemExit, match=message):
+        attester._pinned(raw)
+
+
 def test_v3_composition_fails_closed_on_duplicate_and_orphan_release_locks(
     tmp_path: Path,
 ) -> None:

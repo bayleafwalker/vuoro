@@ -193,7 +193,7 @@ class AdapterPin:
     def from_dict(cls, raw: Mapping[str, Any]) -> "AdapterPin":
         """Read the former single-record shape for test/helper compatibility.
 
-        Release manifests are parsed exclusively through the v2 split above.
+        Release manifests are parsed exclusively through the v3 split above.
         """
         fields_v1 = {
             "domain", "source_repository", "source_revision", "artifact_url",
