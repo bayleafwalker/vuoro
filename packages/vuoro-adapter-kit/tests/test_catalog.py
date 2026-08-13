@@ -1,4 +1,5 @@
 import pytest
+from typing import get_origin, get_type_hints
 
 from vuoro_adapter_kit import SCHEMA_DIALECT, object_schema, operation_spec
 
@@ -36,6 +37,14 @@ def test_operation_spec_is_exact_and_deeply_isolated() -> None:
     }
     input_schema["properties"]["value"]["type"] = "integer"
     assert spec["input_schema"]["properties"]["value"]["type"] == "string"
+
+
+def test_operation_spec_type_hints_resolve_public_annotations() -> None:
+    hints = get_type_hints(operation_spec)
+    assert hints["input_schema"]
+    assert hints["result_schema"]
+    assert hints["required_client_schema_features"]
+    assert get_origin(hints["return"]) is dict
 
 
 def test_builders_fail_closed_on_invalid_contracts() -> None:
@@ -95,7 +104,6 @@ def test_operation_spec_rejects_malformed_supported_schema_roots(schema_mutation
         {"idempotency": 1},
         {"repo_scoped": "false"},
         {"required_client_schema_features": "json-schema-draft-2020-12"},
-        {"handler_name": 1},
         {"deprecation": {"deprecated": False}},
         {"deprecation": {"deprecated": "false", "replacement": None, "sunset_at": None}},
         {"result_contract": {"mode": "wrong", "resource_kind": "work.item"}},

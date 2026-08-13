@@ -128,11 +128,10 @@ def operation_spec(
     authority: str | None = None,
     semantics: str | None = None,
     repo_scoped: bool = False,
-    required_client_schema_features: Iterable[str] = SCHEMA_FEATURES,
+    required_client_schema_features: Sequence[str] = SCHEMA_FEATURES,
     deprecation: Mapping[str, Any] | None = None,
     result_contract: Mapping[str, Any] | None = None,
     failure_disclosure: str | None = None,
-    handler_name: str | None = None,
 ) -> dict[str, Any]:
     """Return an isolated, validated operation-spec dictionary."""
 
@@ -216,10 +215,6 @@ def operation_spec(
         if failure_disclosure != "resource-not-found/v1":
             raise ValueError("failure_disclosure must be resource-not-found/v1")
         result["failure_disclosure"] = failure_disclosure
-    if handler_name is not None:
-        if not isinstance(handler_name, str) or not handler_name:
-            raise TypeError("handler_name must be a non-empty string or None")
-        result["_handler_name"] = handler_name
     return result
 
 
