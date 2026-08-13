@@ -26,17 +26,17 @@ ActionQ lifecycle state.
 ## Vuoro composition proof
 
 The checked-in execution descriptor selects `actionq-schema/v11` through
-ActionQ 0.1.21 at
-`8ef1fc9ae58b96ddc90db0e5be7a323e9be4b85b`. Its official release wheel is
-[`actionq-0.1.21-py3-none-any.whl`](https://github.com/bayleafwalker/actionq/releases/download/v0.1.21/actionq-0.1.21-py3-none-any.whl)
+ActionQ 0.1.22 at
+`183c0d79fe98e65e4d3d200563aaa7c903366b81`. Its official release wheel is
+[`actionq-0.1.22-py3-none-any.whl`](https://github.com/bayleafwalker/actionq/releases/download/v0.1.22/actionq-0.1.22-py3-none-any.whl)
 with SHA-256
-`7f4c3cbbbe991465ac88fa0640f1bb4420f76c8a07a9e7765e61a0981631220d`.
+`5ffce20b2e9b53305a522b25f8504081442311392b025ea220fc8792e8e50bd2`.
 That wheel declares the exact `actionq-contracts==0.1.1` dependency, which
 remains a separately locked official owner release at its own source revision,
-and the shared `vuoro-adapter-kit` 0.1.0 lock is reused by all consumers. Each
-wheel is fetched and verified by its exact SHA-256 before installation or
-import; the dependency locks are not rewritten to imply they were published by
-the ActionQ 0.1.21 tag.
+and the shared `vuoro-adapter-kit` and `vuoro-schema-runtime` 0.1.0 locks are
+reused across their declared consumers. Each wheel is fetched and verified by
+its exact SHA-256 before installation or import; the dependency locks are not
+rewritten to imply they were published by the ActionQ 0.1.22 tag.
 
 `scripts/validate_released_execution_adapter.py` runs in an isolated
 environment containing those wheels and the built Vuoro service wheel. It:
@@ -72,7 +72,9 @@ uv pip install --python /tmp/vuoro-released-execution-wheel/bin/python \
   dist/adapters/actionq_contracts-*.whl \
   dist/adapters/actionq-*.whl
 uv pip install --python /tmp/vuoro-released-execution-wheel/bin/python \
-  --no-deps dist/adapters/vuoro_adapter_kit-*.whl
+  --no-deps \
+  dist/adapters/vuoro_adapter_kit-*.whl \
+  dist/adapters/vuoro_schema_runtime-*.whl
 uv pip check --python /tmp/vuoro-released-execution-wheel/bin/python
 /tmp/vuoro-released-execution-wheel/bin/python \
   scripts/validate_released_execution_adapter.py \
@@ -94,15 +96,17 @@ separately authorized Appservice work.
 
 ## Four-domain catalog and deployment prerequisite
 
-With ActionQ 0.1.21's 26 operations, the accepted four-domain service catalog
+With ActionQ 0.1.22's unchanged 26 operations, the accepted four-domain service catalog
 contains 84 operations and has revision
 `fc308e37ff1d56eccd9bd1f5372bf782e017936acf44994b22ddba4863e9f196`. The
 completion operations are additive; the previous 22 execution operation
 descriptors remain byte-identical and stale catalog revisions continue to be
 rejected by the existing `stale-catalog` envelope path.
 
-Schema 11 is not enabled by this source promotion. Before any service image
-can serve completion operations, Appservice must separately coordinate:
+This source promotion does not apply a schema migration. Appservice already
+activated schema 11 and the separated completion identities for Vuoro 0.1.45;
+the schema-runtime consumer releases retain those exact schema contracts. Any
+later environment without that prerequisite must separately coordinate:
 
 - a migration Job using the ActionQ migration identity to apply migration 011;
 - a runtime execution DSN/secret and role for queue lifecycle operations;
@@ -119,10 +123,9 @@ can serve completion operations, Appservice must separately coordinate:
   completion role can mutate queue actions/events, create schema objects, or
   write the migration ledger.
 
-The current appservice/runtime configuration does not provide these completion
-roles, DSNs, secrets, or authority bindings. This PR records the prerequisite
-only; it does not enable completion traffic, run migration 011, publish an
-image, or deploy.
+The P2.2 composition change does not alter completion roles, DSNs, secrets, or
+authority bindings. It neither runs migration 011 nor authorizes image
+publication or deployment.
 
 Vuoro rejects missing, empty, runtime-equal, or ingest/read-equal completion
 DSNs before constructing or registering the ActionQ application. The explicit
