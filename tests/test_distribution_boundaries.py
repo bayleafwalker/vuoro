@@ -8,6 +8,10 @@ import zipfile
 
 ROOT = Path(__file__).parents[1]
 CLIENT_ROOT = ROOT / "packages" / "vuoro-client"
+SHARED_PACKAGES = {
+    "vuoro-schema-runtime": "vuoro_schema_runtime",
+    "vuoro-adapter-kit": "vuoro_adapter_kit",
+}
 FORBIDDEN_CLIENT_TERMS = {
     "adapter",
     "adapters",
@@ -76,3 +80,23 @@ def test_client_and_service_are_distinct_wheels() -> None:
     service = _one_wheel("vuoro-service")
     assert client.name.startswith("vuoro_client-")
     assert service.name.startswith("vuoro_service-")
+
+
+def test_shared_packages_are_stdlib_only_and_have_isolated_wheel_boundaries() -> None:
+    for distribution, module in SHARED_PACKAGES.items():
+        project = _project(ROOT / "packages" / distribution / "pyproject.toml")
+        assert project["version"] == "0.1.0"
+        assert project["requires-python"] == ">=3.11"
+        assert project["dependencies"] == []
+        with zipfile.ZipFile(_one_wheel(distribution)) as wheel:
+            names = wheel.namelist()
+            dist_info = next(name for name in names if name.endswith(".dist-info/METADATA")).split("/", 1)[0]
+            assert any(name.startswith(f"{module}/") for name in names)
+            assert all(
+                name.startswith((f"{module}/", f"{distribution.replace('-', '_')}-"))
+                or name.startswith(f"{dist_info}/")
+                for name in names
+            )
+            metadata_name = next(name for name in names if name.endswith(".dist-info/METADATA"))
+            metadata = BytesParser().parsebytes(wheel.read(metadata_name))
+            assert metadata.get_all("Requires-Dist", failobj=[]) == []

@@ -23,12 +23,24 @@ jobs:
       - run: uv build --package vuoro-client --wheel --out-dir dist/vuoro-client
       - run: uv build --package vuoro-bootstrap --wheel --out-dir dist/vuoro-bootstrap
       - run: uv build --package vuoro-service --wheel --out-dir dist/vuoro-service
+      - run: uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime
+      - run: uv build --package vuoro-adapter-kit --wheel --out-dir dist/vuoro-adapter-kit
       - name: Validate built release identities
         run: >-
           uv run --package vuoro-service --extra test python
           scripts/validate_release_contract.py
           dist/vuoro-client/*.whl dist/vuoro-bootstrap/*.whl dist/vuoro-service/*.whl
+          dist/vuoro-schema-runtime/*.whl dist/vuoro-adapter-kit/*.whl
           --release
+      - name: Exercise shared wheels in an isolated Python 3.11 environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv venv --python 3.11 /tmp/vuoro-shared-wheel-python311
+          uv pip install --python /tmp/vuoro-shared-wheel-python311/bin/python \
+            dist/vuoro-schema-runtime/*.whl dist/vuoro-adapter-kit/*.whl
+          /tmp/vuoro-shared-wheel-python311/bin/python -c \
+            'import vuoro_schema_runtime, vuoro_adapter_kit; assert vuoro_schema_runtime.__version__ == "0.1.0"; assert vuoro_adapter_kit.__version__ == "0.1.0"'
       - name: Exercise built served contract
         shell: bash
         run: |

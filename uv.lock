@@ -4,8 +4,10 @@ requires-python = ">=3.12"
 
 [manifest]
 members = [
+    "vuoro-adapter-kit",
     "vuoro-bootstrap",
     "vuoro-client",
+    "vuoro-schema-runtime",
     "vuoro-service",
     "vuoro-workspace",
 ]
@@ -755,6 +757,22 @@ wheels = [
 ]
 
 [[package]]
+name = "vuoro-adapter-kit"
+version = "0.1.0"
+source = { editable = "packages/vuoro-adapter-kit" }
+
+[package.optional-dependencies]
+test = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" },
+]
+provides-extras = ["test"]
+
+[[package]]
 name = "vuoro-bootstrap"
 version = "0.1.0"
 source = { editable = "packages/vuoro-bootstrap" }
@@ -796,6 +814,22 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27,<1" },
     { name = "jsonschema", specifier = ">=4.23,<5" },
     { name = "pydantic", specifier = ">=2.10,<3" },
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" },
+]
+provides-extras = ["test"]
+
+[[package]]
+name = "vuoro-schema-runtime"
+version = "0.1.0"
+source = { editable = "packages/vuoro-schema-runtime" }
+
+[package.optional-dependencies]
+test = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" },
 ]
 provides-extras = ["test"]

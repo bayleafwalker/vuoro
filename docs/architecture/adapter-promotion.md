@@ -24,6 +24,13 @@ Vuoro source repository and use the `vuoro-schema-runtime` or
 artifact filenames are unique, and each immutable wheel is fetched and
 attested once even when a shared dependency is reused.
 
+The two shared wheels are deliberately stdlib-only. `vuoro-schema-runtime`
+owns generic migration-ledger metadata and fail-closed compatibility plumbing;
+`vuoro-adapter-kit` owns JSON-Schema/object-definition and structural registry
+plumbing. Neither package owns domain migration assets, a database driver, or
+service composition. Domain owners may promote them only as exact,
+digest-verified `shared-dependency` locks.
+
 For every changed release lock, the reviewer must establish all of the
 following before editing it:
 
