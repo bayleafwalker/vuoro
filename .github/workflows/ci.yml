@@ -120,4 +120,21 @@ jobs:
             scripts/validate_released_audit_adapter.py \
             packages/vuoro-service/composition/adapter-pins.json \
             dist/adapters
+      - name: Exercise complete released four-domain catalog
+        shell: bash
+        run: |
+          uv venv --python 3.12 /tmp/vuoro-released-four-domain-wheel
+          uv pip install --python /tmp/vuoro-released-four-domain-wheel/bin/python \
+            dist/vuoro-service/*.whl \
+            'httpx>=0.27,<1' 'click>=8.1' 'psycopg[binary]>=3.2,<4'
+          uv pip install --python /tmp/vuoro-released-four-domain-wheel/bin/python \
+            --no-deps \
+            dist/adapters/actionq_contracts-*.whl \
+            dist/adapters/actionq-*.whl \
+            dist/adapters/vuoro_adapter_kit-*.whl \
+            dist/adapters/sprintctl-*.whl \
+            dist/adapters/kctl-*.whl \
+            dist/adapters/auditctl-*.whl
+          /tmp/vuoro-released-four-domain-wheel/bin/python \
+            scripts/validate_released_catalog_composition.py
       - run: python -m json.tool vuoro.dispatch.json >/dev/null

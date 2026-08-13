@@ -79,7 +79,7 @@
       "adapter_module": "actionq.vuoro",
       "register": "register_operations",
       "api_version": "execution/v1",
-      "schema_version": "actionq-schema/v10"
+      "schema_version": "actionq-schema/v11"
     },
     {
       "domain": "knowledge",

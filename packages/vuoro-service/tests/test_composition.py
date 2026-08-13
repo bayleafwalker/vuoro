@@ -174,7 +174,7 @@ def test_checked_in_adapter_artifact_urls_are_source_named_or_exact_semver_relea
 def test_checked_in_execution_pin_includes_released_contract_companion() -> None:
     pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("execution")
     assert (pin.source_revision, pin.distribution_version, pin.schema_version) == (
-        "8ef1fc9ae58b96ddc90db0e5be7a323e9be4b85b", "0.1.21", "actionq-schema/v10")
+        "8ef1fc9ae58b96ddc90db0e5be7a323e9be4b85b", "0.1.21", "actionq-schema/v11")
     assert pin.artifact_url.endswith("/v0.1.21/actionq-0.1.21-py3-none-any.whl")
     assert pin.artifact_sha256 == (
         "7f4c3cbbbe991465ac88fa0640f1bb4420f76c8a07a9e7765e61a0981631220d"

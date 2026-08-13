@@ -119,6 +119,13 @@ def test_ci_exercises_the_released_execution_composition_with_shared_lock() -> N
     assert "scripts/validate_released_execution_adapter.py" in workflow
 
 
+def test_ci_exercises_the_complete_released_four_domain_catalog() -> None:
+    workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+    assert "name: Exercise complete released four-domain catalog" in workflow
+    assert "scripts/validate_released_catalog_composition.py" in workflow
+    assert "dist/adapters/auditctl-*.whl" in workflow
+
+
 def test_python_release_workflow_uses_independent_immutable_package_tags() -> None:
     workflow = PYTHON_WORKFLOW.read_text()
     for tag in (

@@ -69,6 +69,11 @@ whose published metadata requires `actionq-contracts==0.1.1` and the shared
 companion remains locked at 0.1.1; the shared adapter-kit lock is reused by
 the knowledge and audit descriptors rather than duplicated.
 
+The execution descriptor selects `actionq-schema/v11`. This is a source
+composition declaration, not migration authorization: migration
+`011_session_completion_log.sql` must be applied by an Appservice migration Job
+before the four additive session-completion operations can be served.
+
 Update a lock and its descriptor together. Do not install from a local
 checkout, mutate a downloaded wheel, or substitute a deployment overlay for
 the manifest. The container build fetches exactly these release assets and
@@ -112,6 +117,20 @@ stub application and proves all 26 operations, the frozen owner metadata hash,
 portable candidate/group surface, exact identity-derived provenance, schema
 rejection, and absence of migration or runner operations. It opens no database
 and runs no startup or migration code.
+
+The gate also proves the exact 26-operation owner catalog hash, the four
+completion-operation authorities, schema-11 compatibility, migration-011
+packaging, byte equality of the old 22-operation subset, and stale-catalog
+rejection. The accepted composed service total is 84 operations with revision
+`fc308e37ff1d56eccd9bd1f5372bf782e017936acf44994b22ddba4863e9f196`.
+
+Completion serving remains deployment-blocked until Appservice supplies
+separate execution-runtime, completion-ingest, and completion-read DSNs and
+secrets. The completion roles must be distinct from the queue runtime role;
+ingest receives append/projection privileges only, read receives SELECT only,
+and neither receives queue lifecycle DML, schema CREATE, or migration-ledger
+writes. The served authorities are
+`execution.session-completion.ingest` and `execution.session-completion.read`.
 
 Parity fixtures must be falsifiable. For every supported filter, include at
 least one independently excluded record; supply matching records out of their
