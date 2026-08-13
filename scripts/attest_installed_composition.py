@@ -18,14 +18,29 @@ import sys
 
 def _pinned(manifest: dict) -> list[dict]:
     entries: list[dict] = []
-    if manifest.get("schema_version") != "vuoro-composition/v2":
+    if manifest.get("schema_version") != "vuoro-composition/v3":
         raise SystemExit("unsupported composition schema_version")
-    for lock in manifest.get("release_locks", []):
+    locks = manifest.get("release_locks")
+    if not isinstance(locks, list):
+        raise SystemExit("release locks must be an array")
+    seen_ids: set[str] = set()
+    seen_distributions: set[str] = set()
+    for lock in locks:
         if not isinstance(lock, dict):
             raise SystemExit("release locks must be objects")
+        if set(lock) != {
+            "lock_id", "lock_kind", "source_repository", "source_revision",
+            "artifact_url", "artifact_sha256", "distribution", "distribution_version",
+        }:
+            raise SystemExit("release lock fields do not match the v3 contract")
+        if lock["lock_id"] in seen_ids or lock["distribution"] in seen_distributions:
+            raise SystemExit("duplicate release lock identifier or distribution")
+        seen_ids.add(lock["lock_id"])
+        seen_distributions.add(lock["distribution"])
         entries.append(
             {
                 "lock_id": lock["lock_id"],
+                "lock_kind": lock["lock_kind"],
                 "distribution": lock["distribution"],
                 "expected_version": lock["distribution_version"],
                 "artifact_url": lock["artifact_url"],

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 
@@ -35,10 +36,76 @@ def test_checked_in_manifest_pins_all_four_domains() -> None:
     assert {pin.domain for pin in manifest.adapters} == {"work", "execution", "knowledge", "audit"}
     assert all(len(pin.source_revision) == 40 for pin in manifest.adapters)
     assert all(len(pin.artifact_sha256) == 64 for pin in manifest.adapters)
+    assert all(pin.lock_kind == "adapter" for pin in manifest.adapters)
+    assert manifest.pin("execution").dependencies[0].lock_kind == "owner-dependency"
     assert all("migration_entrypoint" not in descriptor.__dict__ for descriptor in manifest.runtime_descriptors)
 
 
-def test_v2_composition_fails_closed_on_duplicate_and_orphan_release_locks(
+def _shared_dependency_manifest() -> dict:
+    raw = json.loads(
+        (ROOT / "composition" / "adapter-pins.json").read_text(encoding="utf-8")
+    )
+    raw["release_locks"].append(
+        {
+            "lock_id": "shared-runtime",
+            "lock_kind": "shared-dependency",
+            "source_repository": "https://github.com/bayleafwalker/vuoro",
+            "source_revision": "a" * 40,
+            "artifact_url": "https://github.com/bayleafwalker/vuoro/releases/download/v0.1.42/vuoro-schema-runtime-0.1.0-py3-none-any.whl",
+            "artifact_sha256": "b" * 64,
+            "distribution": "vuoro-schema-runtime",
+            "distribution_version": "0.1.0",
+        }
+    )
+    for descriptor in raw["runtime_descriptors"][:2]:
+        descriptor["dependency_lock_ids"].append("shared-runtime")
+    return raw
+
+
+def test_shared_dependency_is_reusable_and_fetched_and_attested_once(tmp_path: Path) -> None:
+    raw = _shared_dependency_manifest()
+    path = tmp_path / "manifest.json"
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    manifest = CompositionManifest.load(path)
+    assert [lock.lock_id for lock in manifest.release_locks].count("shared-runtime") == 1
+
+    fetch_spec = importlib.util.spec_from_file_location(
+        "fetch_pins", ROOT.parents[1] / "scripts" / "fetch_pinned_adapters.py"
+    )
+    assert fetch_spec and fetch_spec.loader
+    fetcher = importlib.util.module_from_spec(fetch_spec)
+    fetch_spec.loader.exec_module(fetcher)
+    fetched = fetcher.artifact_pins(raw)
+    assert [lock_id for lock_id, _ in fetched].count("shared-runtime") == 1
+
+    attest_spec = importlib.util.spec_from_file_location(
+        "attest_composition", ROOT.parents[1] / "scripts" / "attest_installed_composition.py"
+    )
+    assert attest_spec and attest_spec.loader
+    attester = importlib.util.module_from_spec(attest_spec)
+    attest_spec.loader.exec_module(attester)
+    assert [entry["lock_id"] for entry in attester._pinned(raw)].count("shared-runtime") == 1
+
+
+def test_runtime_and_fetcher_share_v3_dependency_policy(tmp_path: Path) -> None:
+    raw = _shared_dependency_manifest()
+    raw["release_locks"][-1]["source_repository"] = "https://github.com/example/vuoro"
+    raw["release_locks"][-1]["artifact_url"] = "https://github.com/example/vuoro/releases/download/v0.1.42/vuoro-schema-runtime-0.1.0-py3-none-any.whl"
+    path = tmp_path / "manifest.json"
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(CompositionError, match="canonical Vuoro"):
+        CompositionManifest.load(path)
+    fetch_spec = importlib.util.spec_from_file_location(
+        "fetch_pins", ROOT.parents[1] / "scripts" / "fetch_pinned_adapters.py"
+    )
+    assert fetch_spec and fetch_spec.loader
+    fetcher = importlib.util.module_from_spec(fetch_spec)
+    fetch_spec.loader.exec_module(fetcher)
+    with pytest.raises(SystemExit, match="canonical Vuoro"):
+        fetcher.artifact_pins(raw)
+
+
+def test_v3_composition_fails_closed_on_duplicate_and_orphan_release_locks(
     tmp_path: Path,
 ) -> None:
     source = ROOT / "composition" / "adapter-pins.json"
@@ -55,7 +122,7 @@ def test_v2_composition_fails_closed_on_duplicate_and_orphan_release_locks(
     raw = json.loads(source.read_text(encoding="utf-8"))
     raw["runtime_descriptors"][1]["dependency_lock_ids"] = []
     path.write_text(json.dumps(raw), encoding="utf-8")
-    with pytest.raises(CompositionError, match="orphan"):
+    with pytest.raises(CompositionError, match="owner dependency|orphan"):
         CompositionManifest.load(path)
 
 
@@ -497,6 +564,7 @@ def test_installed_attestation_binds_each_runtime_import_to_the_release_lock(tmp
         "distributions": [
             {
                 "lock_id": lock.lock_id,
+                "lock_kind": lock.lock_kind,
                 "distribution": lock.distribution,
                 "expected_version": lock.distribution_version,
                 "artifact_sha256": lock.artifact_sha256,

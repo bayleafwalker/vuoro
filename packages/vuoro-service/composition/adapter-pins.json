@@ -1,8 +1,9 @@
 {
-  "schema_version": "vuoro-composition/v2",
+  "schema_version": "vuoro-composition/v3",
   "release_locks": [
     {
       "lock_id": "work-adapter",
+      "lock_kind": "adapter",
       "source_repository": "https://github.com/bayleafwalker/sprintctl",
       "source_revision": "159647d80c91fb4d0f7ae2090c7dec413ec91a8f",
       "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/v0.2.22/sprintctl-0.2.22-py3-none-any.whl",
@@ -12,6 +13,7 @@
     },
     {
       "lock_id": "execution-adapter",
+      "lock_kind": "adapter",
       "source_repository": "https://github.com/bayleafwalker/actionq",
       "source_revision": "0e8b21325a7fd3d59a989110e61ce80476c51dea",
       "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/v0.1.19/actionq-0.1.19-py3-none-any.whl",
@@ -21,6 +23,7 @@
     },
     {
       "lock_id": "execution-contracts",
+      "lock_kind": "owner-dependency",
       "source_repository": "https://github.com/bayleafwalker/actionq",
       "source_revision": "0e8b21325a7fd3d59a989110e61ce80476c51dea",
       "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/vuoro-adapter-v1-0e8b213/actionq_contracts-0.1.1-py3-none-any.whl",
@@ -30,6 +33,7 @@
     },
     {
       "lock_id": "knowledge-adapter",
+      "lock_kind": "adapter",
       "source_repository": "https://github.com/bayleafwalker/kctl",
       "source_revision": "f06e0100d04fdffde8313718fad25d34c97b7487",
       "artifact_url": "https://github.com/bayleafwalker/kctl/releases/download/vuoro-adapter-v1-f06e010/kctl-0.1.1-py3-none-any.whl",
@@ -39,6 +43,7 @@
     },
     {
       "lock_id": "audit-adapter",
+      "lock_kind": "adapter",
       "source_repository": "https://github.com/bayleafwalker/auditctl",
       "source_revision": "0bd1d46c4efb932426ad26b4b1f338f77d0f9ab6",
       "artifact_url": "https://github.com/bayleafwalker/auditctl/releases/download/vuoro-adapter-v1-0bd1d46/auditctl-0.1.0-py3-none-any.whl",

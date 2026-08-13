@@ -30,17 +30,17 @@ def _adapter() -> dict:
         "api_version": "execution/v1", "schema_version": "owner-schema/v1"}
 
 
-def _release_lock(lock_id: str, raw: dict) -> dict:
+def _release_lock(lock_id: str, raw: dict, *, lock_kind: str = "adapter") -> dict:
     fields = {
         "source_repository", "source_revision", "artifact_url", "artifact_sha256",
         "distribution", "distribution_version",
     }
-    return {"lock_id": lock_id, **{field: raw[field] for field in fields}}
+    return {"lock_id": lock_id, "lock_kind": lock_kind, **{field: raw[field] for field in fields}}
 
 
-def _v2_manifest(*locks: dict) -> dict:
+def _v3_manifest(*locks: dict) -> dict:
     return {
-        "schema_version": "vuoro-composition/v2",
+        "schema_version": "vuoro-composition/v3",
         "release_locks": list(locks),
         "runtime_descriptors": [],
     }
@@ -75,7 +75,7 @@ def test_fetcher_rejects_dependency_filename_collisions() -> None:
     spec.loader.exec_module(module)
     dependency = _dependency() | {"artifact_url": _adapter()["artifact_url"], "distribution": "companion"}
     with pytest.raises(SystemExit, match="filename collision"):
-        module.artifact_pins(_v2_manifest(
+        module.artifact_pins(_v3_manifest(
             _release_lock("owner", _adapter()), _release_lock("companion", dependency)
         ))
 
@@ -103,7 +103,7 @@ def test_runtime_and_fetcher_reject_ambiguous_release_urls(artifact_url: str) ->
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     with pytest.raises(SystemExit, match="canonical|release wheel"):
-        module.artifact_pins(_v2_manifest(_release_lock("owner", raw)))
+        module.artifact_pins(_v3_manifest(_release_lock("owner", raw)))
 
 
 def test_adapter_load_fails_before_import_on_companion_version_mismatch(monkeypatch) -> None:
