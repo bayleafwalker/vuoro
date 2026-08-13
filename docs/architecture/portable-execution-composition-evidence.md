@@ -107,9 +107,11 @@ can serve completion operations, Appservice must separately coordinate:
 - a migration Job using the ActionQ migration identity to apply migration 011;
 - a runtime execution DSN/secret and role for queue lifecycle operations;
 - a distinct completion-ingest DSN/secret and
+  `VUORO_EXECUTION_COMPLETION_INGEST_DSN`,
   `ACTIONQ_COMPLETION_INGEST_ROLE`, with authority
   `execution.session-completion.ingest`;
 - a distinct completion-read DSN/secret and
+  `VUORO_EXECUTION_COMPLETION_READ_DSN`,
   `ACTIONQ_COMPLETION_READ_ROLE`, with authority
   `execution.session-completion.read`; and
 - privilege verification that ingest has only completion projection append
@@ -121,3 +123,9 @@ The current appservice/runtime configuration does not provide these completion
 roles, DSNs, secrets, or authority bindings. This PR records the prerequisite
 only; it does not enable completion traffic, run migration 011, publish an
 image, or deploy.
+
+Vuoro rejects missing, empty, runtime-equal, or ingest/read-equal completion
+DSNs before constructing or registering the ActionQ application. The explicit
+factories are passed to `ActionQApplication`; its fallback to the execution
+runtime connection is therefore unreachable for schema-v11 completion
+handlers. Local-only fixtures must provide three explicit disposable DSNs.

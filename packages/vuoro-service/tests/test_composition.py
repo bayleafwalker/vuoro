@@ -16,6 +16,7 @@ from vuoro_service.composition import (
     verify_adapter_artifacts,
     verify_installed_composition,
     _execution_authorizer,
+    _execution_completion_connection_factories,
     _bind_work_resource_visibility,
     _load_work_resource_observation_authorizer,
     _load_project_binding_for_composition,
@@ -303,6 +304,51 @@ def test_execution_authorizer_is_exact_and_repository_scoped() -> None:
     assert not _execution_authorizer(scoped, "execution.group.manage", "delete")
     assert not _execution_authorizer(scoped, "execution.candidate-action.create", "update")
     assert not _execution_authorizer(scoped, "execution.anything", "create")
+
+
+def test_schema_v11_requires_explicit_distinct_completion_dsns(monkeypatch) -> None:
+    execution_pin = CompositionManifest.load(
+        ROOT / "composition" / "adapter-pins.json"
+    ).pin("execution")
+    with pytest.raises(CompositionError, match="VUORO_EXECUTION_COMPLETION_INGEST_DSN"):
+        _execution_completion_connection_factories(
+            execution_pin=execution_pin,
+            execution_runtime_dsn="postgresql://runtime/db",
+            environ={},
+        )
+    with pytest.raises(CompositionError, match="distinct from the execution runtime"):
+        _execution_completion_connection_factories(
+            execution_pin=execution_pin,
+            execution_runtime_dsn="postgresql://runtime/db",
+            environ={
+                "VUORO_EXECUTION_COMPLETION_INGEST_DSN": "postgresql://runtime/db",
+                "VUORO_EXECUTION_COMPLETION_READ_DSN": "postgresql://read/db",
+            },
+        )
+    with pytest.raises(CompositionError, match="ingest and read DSNs must be distinct"):
+        _execution_completion_connection_factories(
+            execution_pin=execution_pin,
+            execution_runtime_dsn="postgresql://runtime/db",
+            environ={
+                "VUORO_EXECUTION_COMPLETION_INGEST_DSN": "postgresql://completion/db",
+                "VUORO_EXECUTION_COMPLETION_READ_DSN": "postgresql://completion/db",
+            },
+        )
+    seen: list[str] = []
+    monkeypatch.setattr(
+        "vuoro_service.composition._pg_connection_factory",
+        lambda dsn: seen.append(dsn) or (lambda: None),
+    )
+    factories = _execution_completion_connection_factories(
+        execution_pin=execution_pin,
+        execution_runtime_dsn="postgresql://runtime/db",
+        environ={
+            "VUORO_EXECUTION_COMPLETION_INGEST_DSN": "postgresql://ingest/db",
+            "VUORO_EXECUTION_COMPLETION_READ_DSN": "postgresql://read/db",
+        },
+    )
+    assert factories is not None and len(factories) == 2
+    assert seen == ["postgresql://ingest/db", "postgresql://read/db"]
 
 
 def test_work_resource_visibility_requires_a_separate_injected_policy() -> None:

@@ -131,6 +131,11 @@ ingest receives append/projection privileges only, read receives SELECT only,
 and neither receives queue lifecycle DML, schema CREATE, or migration-ledger
 writes. The served authorities are
 `execution.session-completion.ingest` and `execution.session-completion.read`.
+Vuoro requires these DSNs as `VUORO_EXECUTION_COMPLETION_INGEST_DSN` and
+`VUORO_EXECUTION_COMPLETION_READ_DSN`, rejects missing/empty or equal values
+before application construction, and passes explicit connection factories so
+ActionQ cannot fall back to the queue runtime DSN. Local fixtures must set all
+three DSNs explicitly.
 
 Parity fixtures must be falsifiable. For every supported filter, include at
 least one independently excluded record; supply matching records out of their

@@ -752,6 +752,41 @@ def _pg_connection_factory(dsn: str) -> Callable[[], Any]:
     return lambda: psycopg.connect(dsn, row_factory=dict_row)
 
 
+def _execution_completion_connection_factories(
+    *, execution_pin: AdapterPin, execution_runtime_dsn: str, environ: Mapping[str, str]
+) -> tuple[Callable[[], Any], Callable[[], Any]] | None:
+    """Require capability-specific DSNs for ActionQ schema-v11 completion APIs.
+
+    ActionQ's application intentionally falls back to its queue runtime
+    connection when completion factories are absent. Vuoro cannot permit that
+    fallback for a composed schema-v11 service: completion ingest/read roles
+    are separate database principals with separate credentials.
+    """
+
+    if execution_pin.schema_version != "actionq-schema/v11":
+        return None
+    ingest_dsn = _runtime_env(
+        "VUORO_EXECUTION_COMPLETION_INGEST_DSN", environ
+    )
+    read_dsn = _runtime_env("VUORO_EXECUTION_COMPLETION_READ_DSN", environ)
+    values = {
+        "VUORO_EXECUTION_RUNTIME_DSN": execution_runtime_dsn,
+        "VUORO_EXECUTION_COMPLETION_INGEST_DSN": ingest_dsn,
+        "VUORO_EXECUTION_COMPLETION_READ_DSN": read_dsn,
+    }
+    if any(not isinstance(value, str) or not value.strip() for value in values.values()):
+        raise CompositionError("execution runtime and completion DSNs must be non-empty")
+    if ingest_dsn == execution_runtime_dsn or read_dsn == execution_runtime_dsn:
+        raise CompositionError(
+            "execution completion DSNs must be distinct from the execution runtime DSN"
+        )
+    if ingest_dsn == read_dsn:
+        raise CompositionError(
+            "execution completion ingest and read DSNs must be distinct"
+        )
+    return _pg_connection_factory(ingest_dsn), _pg_connection_factory(read_dsn)
+
+
 def _compatibility(domain: str, record: Mapping[str, Any], pin: AdapterPin) -> DomainCompatibility:
     compatible = record.get("compatible")
     if compatible is None:
@@ -1002,14 +1037,24 @@ def create_composed_app(
     from actionq.application import ActionQApplication
     from actionq import vuoro as execution_adapter
 
+    execution_runtime_dsn = _runtime_env(
+        "VUORO_EXECUTION_RUNTIME_DSN",
+        environ,
+        aliases=("VUORO_EXECUTION_DSN",),
+    )
+    completion_factories = _execution_completion_connection_factories(
+        execution_pin=execution_pin,
+        execution_runtime_dsn=execution_runtime_dsn,
+        environ=environ,
+    )
     execution_application = ActionQApplication(
         schema=_runtime_env("VUORO_EXECUTION_SCHEMA", environ),
-        connection_factory=_pg_connection_factory(
-            _runtime_env(
-                "VUORO_EXECUTION_RUNTIME_DSN",
-                environ,
-                aliases=("VUORO_EXECUTION_DSN",),
-            )
+        connection_factory=_pg_connection_factory(execution_runtime_dsn),
+        completion_ingest_connection_factory=(
+            completion_factories[0] if completion_factories else None
+        ),
+        completion_read_connection_factory=(
+            completion_factories[1] if completion_factories else None
         ),
         authorizer=_execution_authorizer,
     )
