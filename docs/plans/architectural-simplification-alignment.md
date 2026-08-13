@@ -27,6 +27,11 @@ scope and boundaries.
   (`vuoro_service.recovery.RecoveryReconciler`) was dead code — never wired
   into `create_composed_app()` — and was deleted on 2026-08-13 to close V-S2
   as disposition option 1.
+- Composition v3 is released: it separates adapter release locks from
+  owner/shared dependency locks without generalizing away domain construction.
+  `vuoro-adapter-kit` and `vuoro-schema-runtime` 0.1.0 are immutable GitHub
+  Release wheels, not PyPI packages. Kctl 0.1.2 is the first adapter-kit
+  consumer; no domain has adopted the schema runtime yet.
 
 ## Owner-local units
 
@@ -79,6 +84,17 @@ schema, compatibility, credential, or migration-role boundaries.
 Gate with composition tests, immutable-artifact checks, both package builds,
 and the repository boundary suite.
 
+**Completed 2026-08-13.** Composition v3 gives every released artifact one
+`release_lock` and lets the runtime descriptor name its adapter lock plus
+explicit `owner-dependency` or `shared-dependency` locks. The service verifies
+the locked artifact bytes and installed distribution identity before loading
+the descriptor. Vuoro released `vuoro-adapter-kit-v0.1.0` and
+`vuoro-schema-runtime-v0.1.0` through GitHub Releases only, and promoted
+kctl 0.1.2 as the first released adapter-kit consumer. This resolves the
+lock/descriptor boundary; it does not make adapter or schema-runtime consumer
+migration generic. Domain owners retain their handlers, operation schemas,
+migration runners, database policy, and release authority.
+
 ## Cross-repository dependencies
 
 - Agentops owns browser/MCP dispatch-contract projections and cockpit
@@ -86,5 +102,7 @@ and the repository boundary suite.
 - Sprintctl owns local/served mode retirement and owner-only Postgres
   administration.
 - Actionq owns the canonical execution kernel and coordinator lifecycle.
-- Deployment, release publication, and Appservice configuration require their
-  owning repositories and are outside this plan.
+- Appservice owns deployment configuration and production rollout. Vuoro
+  release publication requires the release workflow and its immutable
+  artifacts; this plan records its composition consequences but does not grant
+  Vuoro authority to alter appservice state.
