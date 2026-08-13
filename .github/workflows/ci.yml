@@ -81,4 +81,19 @@ jobs:
             scripts/validate_released_execution_adapter.py \
             packages/vuoro-service/composition/adapter-pins.json \
             dist/adapters
+      - name: Exercise pinned released knowledge adapter
+        shell: bash
+        run: |
+          uv venv --python 3.12 /tmp/vuoro-released-knowledge-wheel
+          uv pip install --python /tmp/vuoro-released-knowledge-wheel/bin/python \
+            dist/vuoro-service/*.whl \
+            'httpx>=0.27,<1'
+          uv pip install --python /tmp/vuoro-released-knowledge-wheel/bin/python \
+            --no-deps \
+            dist/adapters/vuoro_adapter_kit-*.whl \
+            dist/adapters/kctl-*.whl
+          /tmp/vuoro-released-knowledge-wheel/bin/python \
+            scripts/validate_released_knowledge_adapter.py \
+            packages/vuoro-service/composition/adapter-pins.json \
+            dist/adapters
       - run: python -m json.tool vuoro.dispatch.json >/dev/null

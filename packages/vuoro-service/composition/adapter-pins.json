@@ -35,11 +35,21 @@
       "lock_id": "knowledge-adapter",
       "lock_kind": "adapter",
       "source_repository": "https://github.com/bayleafwalker/kctl",
-      "source_revision": "f06e0100d04fdffde8313718fad25d34c97b7487",
-      "artifact_url": "https://github.com/bayleafwalker/kctl/releases/download/vuoro-adapter-v1-f06e010/kctl-0.1.1-py3-none-any.whl",
-      "artifact_sha256": "580da5a858637f2d972ef6216cf3a506ab8a33904c7cd7a9e378e6ad4ce6af29",
+      "source_revision": "f35d0d002999ab66a8d90209c78b92b7b5e8b1cf",
+      "artifact_url": "https://github.com/bayleafwalker/kctl/releases/download/kctl-v0.1.2/kctl-0.1.2-py3-none-any.whl",
+      "artifact_sha256": "71780d286dc3ca88644e479ece323de1ea704210aa736e74873f6f8fd0f75529",
       "distribution": "kctl",
-      "distribution_version": "0.1.1"
+      "distribution_version": "0.1.2"
+    },
+    {
+      "lock_id": "vuoro-adapter-kit",
+      "lock_kind": "shared-dependency",
+      "source_repository": "https://github.com/bayleafwalker/vuoro",
+      "source_revision": "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c",
+      "artifact_url": "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.1.0/vuoro_adapter_kit-0.1.0-py3-none-any.whl",
+      "artifact_sha256": "0037898a4c9f01720a42302365b0172ecd203732070326ea2abdf549a44bf0c2",
+      "distribution": "vuoro-adapter-kit",
+      "distribution_version": "0.1.0"
     },
     {
       "lock_id": "audit-adapter",
@@ -74,7 +84,7 @@
     {
       "domain": "knowledge",
       "lock_id": "knowledge-adapter",
-      "dependency_lock_ids": [],
+      "dependency_lock_ids": ["vuoro-adapter-kit"],
       "adapter_module": "kctl.vuoro",
       "register": "register_operations",
       "api_version": "knowledge/v1",

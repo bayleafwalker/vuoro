@@ -8,6 +8,7 @@ import pytest
 ROOT = Path(__file__).parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "publish-service-image.yaml"
 PYTHON_WORKFLOW = ROOT / ".github" / "workflows" / "publish-python-packages.yaml"
+CI_WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
 
 
 def _assert_python_release_order(workflow: str) -> None:
@@ -76,6 +77,14 @@ def test_service_image_publication_keeps_tag_and_source_aliases() -> None:
 
     assert "vuoro-service:${{ github.ref_name }}" in workflow
     assert "vuoro-service:sha-${{ github.sha }}" in workflow
+
+
+def test_ci_exercises_the_released_knowledge_composition() -> None:
+    workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+    assert "name: Exercise pinned released knowledge adapter" in workflow
+    assert "dist/adapters/kctl-*.whl" in workflow
+    assert "dist/adapters/vuoro_adapter_kit-*.whl" in workflow
+    assert "scripts/validate_released_knowledge_adapter.py" in workflow
 
 
 def test_python_release_workflow_uses_independent_immutable_package_tags() -> None:

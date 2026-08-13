@@ -163,7 +163,10 @@ def test_checked_in_adapter_artifact_urls_are_source_named_or_exact_semver_relea
         tag = pin.artifact_url.split("/releases/download/", 1)[1].split("/", 1)[0]
         exact_owner_semver = (
             pin.artifact_url.startswith(pin.source_repository.rstrip("/") + "/releases/download/")
-            and tag == f"v{pin.distribution_version}"
+            and tag in {
+                f"v{pin.distribution_version}",
+                f"{pin.distribution}-v{pin.distribution_version}",
+            }
         )
         assert pin.source_revision[:7] in tag or exact_owner_semver
 
@@ -203,6 +206,44 @@ def test_checked_in_work_pin_is_the_maintenance_resource_owner_release() -> None
         "sprintctl.vuoro_adapter",
         "register_work_catalog",
     )
+
+
+def test_checked_in_knowledge_pin_is_kctl_012_with_released_adapter_kit() -> None:
+    manifest = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json")
+    pin = manifest.pin("knowledge")
+    assert (
+        pin.source_repository,
+        pin.source_revision,
+        pin.distribution,
+        pin.distribution_version,
+        pin.artifact_url,
+        pin.artifact_sha256,
+    ) == (
+        "https://github.com/bayleafwalker/kctl",
+        "f35d0d002999ab66a8d90209c78b92b7b5e8b1cf",
+        "kctl",
+        "0.1.2",
+        "https://github.com/bayleafwalker/kctl/releases/download/kctl-v0.1.2/kctl-0.1.2-py3-none-any.whl",
+        "71780d286dc3ca88644e479ece323de1ea704210aa736e74873f6f8fd0f75529",
+    )
+    assert (pin.adapter_module, pin.register, pin.api_version, pin.schema_version) == (
+        "kctl.vuoro",
+        "register_operations",
+        "knowledge/v1",
+        "knowledge-schema/v1",
+    )
+    assert [(dependency.lock_id, dependency.lock_kind, dependency.distribution,
+             dependency.source_revision, dependency.artifact_url,
+             dependency.artifact_sha256, dependency.distribution_version)
+            for dependency in pin.dependencies] == [(
+        "vuoro-adapter-kit",
+        "shared-dependency",
+        "vuoro-adapter-kit",
+        "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c",
+        "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.1.0/vuoro_adapter_kit-0.1.0-py3-none-any.whl",
+        "0037898a4c9f01720a42302365b0172ecd203732070326ea2abdf549a44bf0c2",
+        "0.1.0",
+    )]
 
 
 def test_execution_authorizer_is_exact_and_repository_scoped() -> None:
