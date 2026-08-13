@@ -23,8 +23,10 @@ scope and boundaries.
 - `docs/architecture/portable-execution.md` is ratified. Vuoro composes
   released execution capabilities and does not own plans, claims, leases,
   runner isolation, candidate publication, or audit findings.
-- Client recovery export exists, while the service-side in-memory reconciler
-  has no durable catalog-backed owner path.
+- Client recovery export exists. The service-side in-memory reconciler
+  (`vuoro_service.recovery.RecoveryReconciler`) was dead code — never wired
+  into `create_composed_app()` — and was deleted on 2026-08-13 to close V-S2
+  as disposition option 1.
 
 ## Owner-local units
 
@@ -43,10 +45,23 @@ Gate with client and service package tests plus the repository boundary suite.
 
 **Sprintctl:** Vuoro #2042.
 
-Inventory runbook and API consumers, then choose one:
+**Resolved 2026-08-13: disposition option 1.** Inventory (grep across the
+composed service and its consumers) confirmed `RecoveryReconciler` had zero
+references outside its own module and its own dedicated test —
+`create_composed_app()` never imported or wired it. The hard constraint
+(Vuoro must not become recovery authority; no in-memory production decision
+path) was not being violated in practice, since the path was unreachable,
+but the disposition itself had never been formally chosen. Deleted
+`packages/vuoro-service/src/vuoro_service/recovery.py` and
+`packages/vuoro-service/tests/test_recovery_reconciler.py`; retained
+`vuoro-client`'s `RecoveryLog`/CLI export path (`vuoro recovery
+begin|observe|request-command|export`) as the sole recovery surface. Full
+`vuoro-service` test suite (174 tests) passes unchanged after the removal.
 
-1. retain local client export and remove the disconnected service reconciler;
-   or
+Original options considered:
+
+1. ~~retain local client export and remove the disconnected service
+   reconciler~~ — **chosen**; or
 2. route versioned recovery operations to a durable domain-owned adapter.
 
 Vuoro must not become recovery authority and an in-memory production decision
