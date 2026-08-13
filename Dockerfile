@@ -18,7 +18,14 @@ COPY README.md pyproject.toml uv.lock ./
 COPY packages/vuoro-service ./packages/vuoro-service
 # A build log showing the right wheels being fetched is not evidence of what
 # ended up installed, so verify it and keep the result in the image.
-RUN python -m pip install --no-cache-dir "psycopg[binary]>=3.2,<4" ./packages/vuoro-service /opt/vuoro/adapters/*.whl \
+RUN python -m pip install --no-cache-dir "psycopg[binary]>=3.2,<4" "click>=8.1" ./packages/vuoro-service \
+    && python -m pip install --no-cache-dir \
+        /opt/vuoro/adapters/actionq_contracts-*.whl \
+        /opt/vuoro/adapters/actionq-*.whl \
+        /opt/vuoro/adapters/auditctl-*.whl \
+        /opt/vuoro/adapters/kctl-*.whl \
+        /opt/vuoro/adapters/sprintctl-*.whl \
+    && python -m pip install --no-cache-dir --no-deps /opt/vuoro/adapters/vuoro_adapter_kit-*.whl \
     && python -m pip check \
     && python /usr/local/bin/attest-installed-composition \
         /opt/vuoro/composition/adapter-pins.json \
