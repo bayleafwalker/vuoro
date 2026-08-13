@@ -117,6 +117,10 @@ def test_ci_exercises_the_released_execution_composition_with_shared_lock() -> N
     assert "dist/adapters/vuoro_adapter_kit-*.whl" in workflow
     assert "uv pip check --python" in workflow
     assert "scripts/validate_released_execution_adapter.py" in workflow
+    execution_gate = workflow.split("name: Exercise pinned released execution adapter", 1)[1].split(
+        "name: Exercise pinned released knowledge adapter", 1
+    )[0]
+    assert "'psycopg[binary]>=3.2,<4'" in execution_gate
 
 
 def test_ci_exercises_the_complete_released_four_domain_catalog() -> None:
