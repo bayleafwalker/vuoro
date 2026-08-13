@@ -1,41 +1,23 @@
-"""Small, stdlib-only building blocks for Vuoro protocol adapters."""
+"""Pure, stdlib-only JSON-Schema and operation-spec builders."""
 
 from .catalog import (
-    AdapterOperation,
-    CatalogOperation,
     CatalogRegistry,
-    Definition,
-    OperationDefinition,
     SCHEMA_DIALECT,
     SCHEMA_FEATURES,
-    definition,
-    object_schema,
-    operation,
-    operation_definition,
     build_object_schema,
-    build_operation_definition,
-    register,
-    register_catalog,
-    register_operations,
+    build_operation_spec,
+    object_schema,
+    operation_spec,
 )
 
 __all__ = [
-    "AdapterOperation",
-    "CatalogOperation",
     "CatalogRegistry",
-    "Definition",
-    "OperationDefinition",
     "SCHEMA_DIALECT",
     "SCHEMA_FEATURES",
-    "definition",
-    "object_schema",
-    "operation",
-    "operation_definition",
     "build_object_schema",
-    "build_operation_definition",
-    "register",
-    "register_catalog",
-    "register_operations",
+    "build_operation_spec",
+    "object_schema",
+    "operation_spec",
 ]
 
 __version__ = "0.1.0"

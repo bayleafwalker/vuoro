@@ -1,44 +1,37 @@
-"""Shared central-schema runtime primitives.
-
-The package intentionally contains no database-driver dependency.  Owners
-provide migration assets and a DB-API-compatible connection to
-:class:`SchemaRuntime`.
-"""
+"""Pure central-schema contract and migration-asset helpers."""
 
 from .runtime import (
-    Compatibility,
-    MigrationAsset,
-    SchemaCompatibility,
     CentralSchemaError,
-    Migration,
+    CompatibilityReport,
+    MigrationAsset,
     MigrationDriftError,
     MigrationResult,
-    MigrationRoleError,
     SchemaCompatibilityError,
-    SchemaRuntime,
     check_compatibility,
+    compatibility_report,
     identifier,
-    load_migrations,
-    migrate,
-    require_runtime_compatibility,
+    migration_asset,
+    quote_identifier,
+    render_schema_sql,
+    sha256_text,
+    validate_contiguous_migrations,
 )
 
 __all__ = [
     "CentralSchemaError",
-    "Migration",
+    "CompatibilityReport",
+    "MigrationAsset",
     "MigrationDriftError",
     "MigrationResult",
-    "MigrationRoleError",
     "SchemaCompatibilityError",
-    "SchemaRuntime",
-    "Compatibility",
-    "MigrationAsset",
-    "SchemaCompatibility",
     "check_compatibility",
+    "compatibility_report",
     "identifier",
-    "load_migrations",
-    "migrate",
-    "require_runtime_compatibility",
+    "migration_asset",
+    "quote_identifier",
+    "render_schema_sql",
+    "sha256_text",
+    "validate_contiguous_migrations",
 ]
 
 __version__ = "0.1.0"

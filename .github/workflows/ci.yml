@@ -40,7 +40,7 @@ jobs:
           uv pip install --python /tmp/vuoro-shared-wheel-python311/bin/python \
             dist/vuoro-schema-runtime/*.whl dist/vuoro-adapter-kit/*.whl
           /tmp/vuoro-shared-wheel-python311/bin/python -c \
-            'import vuoro_schema_runtime, vuoro_adapter_kit; assert vuoro_schema_runtime.__version__ == "0.1.0"; assert vuoro_adapter_kit.__version__ == "0.1.0"'
+            'from vuoro_schema_runtime import migration_asset, render_schema_sql; from vuoro_adapter_kit import object_schema, operation_spec; a=migration_asset(1, "initial", "CREATE SCHEMA __SCHEMA__"); assert render_schema_sql(a.sql, "central") == "CREATE SCHEMA \\\"central\\\""; s=object_schema({"value": {"type": "string"}}, required=("value",)); assert operation_spec("work.read.items", input_schema=s, result_schema=object_schema({}), execution_semantics="read", idempotency="not-allowed")["owning_domain"] == "work"'
       - name: Exercise built served contract
         shell: bash
         run: |

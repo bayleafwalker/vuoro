@@ -62,12 +62,13 @@ evidence and must not be reused.
 ## Shared contract wheels
 
 `vuoro-schema-runtime` and `vuoro-adapter-kit` are independent, versioned,
-stdlib-only wheels. The former provides owner-configured migration metadata
-and read-only, fail-closed schema compatibility checks; the latter provides
+stdlib-only wheels. The former provides owner-configured migration assets,
+rendering, and pure read-only, fail-closed schema compatibility reports; the latter provides
 strict Draft 2020-12 object schemas, operation metadata, and a structural
 catalog registration protocol. They do not import the service shell, a
-database driver, Pydantic, or any domain owner. Domain repositories retain
-their migration assets, database policy, operation schemas, and handlers.
+database driver, Pydantic, or any domain owner, and never execute SQL or DDL.
+Domain repositories retain migration runners, database policy, operation
+schemas, and handlers.
 
 ## Versioning
 

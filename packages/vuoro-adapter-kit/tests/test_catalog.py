@@ -1,43 +1,49 @@
-from vuoro_adapter_kit import (
-    SCHEMA_DIALECT,
-    AdapterOperation,
-    definition,
-    object_schema,
-    register_operations,
-)
+import pytest
+
+from vuoro_adapter_kit import SCHEMA_DIALECT, object_schema, operation_spec
 
 
-def test_object_schema_is_strict_and_supports_local_defs() -> None:
-    schema = object_schema({"value": {"type": "string"}}, required=("value",))
-    assert schema == {
+def test_object_schema_matches_wire_shape_and_is_mutation_isolated() -> None:
+    properties = {"value": {"type": "string"}}
+    schema = object_schema(properties, required=("value",))
+    expected = {
         "$schema": SCHEMA_DIALECT,
         "type": "object",
         "properties": {"value": {"type": "string"}},
         "additionalProperties": False,
         "required": ["value"],
     }
+    assert schema == expected
+    properties["value"]["type"] = "integer"
+    assert schema == expected
 
 
-def test_definition_and_registration_preserve_order() -> None:
-    first = definition(
-        "work.read.items",
-        input_schema=object_schema({}), result_schema=object_schema({}),
-        authority="work.read", semantics="read", idempotency="not-allowed",
+def test_operation_spec_is_exact_and_deeply_isolated() -> None:
+    input_schema = object_schema({"value": {"type": "string"}}, required=("value",))
+    result_schema = object_schema({"ok": {"type": "boolean"}}, required=("ok",))
+    spec = operation_spec(
+        "work.read.items", input_schema=input_schema, result_schema=result_schema,
+        required_authority="work.read", execution_semantics="read",
+        idempotency="not-allowed",
     )
-    second = definition(
-        "work.item.note", input_schema=object_schema({}), result_schema=object_schema({}),
-        authority="work.write", semantics="write", idempotency="required",
-    )
-    calls = []
-    register_operations(calls_registry := _Registry(calls), [
-        AdapterOperation(first, lambda *_: None), (second, lambda *_: None)
-    ])
-    assert [item[0]["name"] for item in calls] == ["work.read.items", "work.item.note"]
+    assert spec == {
+        "name": "work.read.items", "owning_domain": "work",
+        "input_schema": input_schema, "result_schema": result_schema,
+        "required_authority": "work.read", "execution_semantics": "read",
+        "idempotency": "not-allowed", "repo_scoped": False,
+        "deprecation": {"deprecated": False, "replacement": None, "sunset_at": None},
+        "required_client_schema_features": ["json-schema-draft-2020-12"],
+    }
+    input_schema["properties"]["value"]["type"] = "integer"
+    assert spec["input_schema"]["properties"]["value"]["type"] == "string"
 
 
-class _Registry:
-    def __init__(self, calls):
-        self.calls = calls
-
-    def register(self, definition, handler):
-        self.calls.append((definition, handler))
+def test_builders_fail_closed_on_invalid_contracts() -> None:
+    with pytest.raises(ValueError):
+        object_schema({"value": {}}, required=("missing",))
+    with pytest.raises(ValueError):
+        operation_spec(
+            "Work.read.items", input_schema=object_schema({}),
+            result_schema=object_schema({}), execution_semantics="read",
+            idempotency="not-allowed",
+        )

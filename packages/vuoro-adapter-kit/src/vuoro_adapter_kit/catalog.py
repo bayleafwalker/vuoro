@@ -1,80 +1,33 @@
-"""Common catalog and JSON-Schema construction primitives.
-
-The registry is a Protocol on purpose: adapters can register into Vuoro's
-service registry, a small owner-side test double, or another compatible
-runtime without importing the service package.
-"""
+"""Pure JSON-Schema and operation-spec builders for Vuoro adapters."""
 
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
+from copy import deepcopy
+import re
 from typing import Any, Protocol
 
 
 SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema"
 SCHEMA_FEATURES = ("json-schema-draft-2020-12",)
+_NAME = re.compile(r"^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*){2,}$")
+_DOMAIN = re.compile(r"^[a-z][a-z0-9-]*$")
+_SEMANTICS = {"read", "write", "enqueue", "admin"}
+_IDEMPOTENCY = {"not-allowed", "optional", "required"}
 
 
 class CatalogRegistry(Protocol):
-    """Structural registry surface required by adapter registration."""
+    """Typing-only structural surface; no registration implementation lives here."""
 
     def register(self, definition: Any, handler: Callable[..., Any]) -> None: ...
 
 
-@dataclass(frozen=True, slots=True)
-class Definition:
-    """Immutable, driver-neutral operation definition.
-
-    ``as_dict`` emits the wire-compatible shape consumed by the Vuoro service
-    while keeping the kit free of Pydantic and service imports.
-    """
-
-    name: str
-    owning_domain: str
-    input_schema: dict[str, Any]
-    result_schema: dict[str, Any]
-    required_authority: str | None
-    execution_semantics: str
-    idempotency: str
-    repo_scoped: bool = False
-    required_client_schema_features: tuple[str, ...] = SCHEMA_FEATURES
-    deprecation: Mapping[str, Any] | None = None
-    result_contract: Mapping[str, Any] | None = None
-    failure_disclosure: str | None = None
-
-    def as_dict(self) -> dict[str, Any]:
-        result: dict[str, Any] = {
-            "name": self.name,
-            "owning_domain": self.owning_domain,
-            "input_schema": self.input_schema,
-            "result_schema": self.result_schema,
-            "required_authority": self.required_authority,
-            "execution_semantics": self.execution_semantics,
-            "idempotency": self.idempotency,
-            "repo_scoped": self.repo_scoped,
-            "deprecation": dict(self.deprecation or {
-                "deprecated": False, "replacement": None, "sunset_at": None
-            }),
-            "required_client_schema_features": list(self.required_client_schema_features),
-        }
-        if self.result_contract is not None:
-            result["result_contract"] = dict(self.result_contract)
-        if self.failure_disclosure is not None:
-            result["failure_disclosure"] = self.failure_disclosure
-        return result
-
-
-@dataclass(frozen=True, slots=True)
-class AdapterOperation:
-    """An operation definition paired with its owner handler."""
-
-    definition: Any
-    handler: Callable[..., Any]
-
-
-OperationDefinition = Definition
-CatalogOperation = AdapterOperation
+def _copy_mapping(value: Mapping[str, Any], label: str) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        raise TypeError(f"{label} must be a mapping")
+    if any(not isinstance(key, str) or not key for key in value):
+        raise ValueError(f"{label} keys must be non-empty strings")
+    return deepcopy(dict(value))
 
 
 def object_schema(
@@ -82,126 +35,104 @@ def object_schema(
     *,
     required: Iterable[str] = (),
     additional_properties: bool = False,
-    additional: bool | None = None,
     definitions: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Build the strict object-schema skeleton used by all adapters.
+    """Return a strict Draft 2020-12 object schema with isolated inputs."""
 
-    ``additional`` is accepted as the historical spelling used by ActionQ;
-    ``additional_properties`` is the descriptive spelling used by Auditctl.
-    ``definitions`` is emitted as ``$defs`` for local references.
-    """
-
-    if additional is not None:
-        additional_properties = additional
-    schema: dict[str, Any] = {
+    copied_properties = _copy_mapping(properties, "properties")
+    required_values = tuple(required)
+    if any(not isinstance(item, str) or not item for item in required_values):
+        raise ValueError("required names must be non-empty strings")
+    if len(required_values) != len(set(required_values)):
+        raise ValueError("required names must be unique")
+    missing = sorted(set(required_values) - set(copied_properties))
+    if missing:
+        raise ValueError(f"required properties are undeclared: {missing}")
+    if not isinstance(additional_properties, bool):
+        raise TypeError("additional_properties must be bool")
+    result: dict[str, Any] = {
         "$schema": SCHEMA_DIALECT,
         "type": "object",
-        "properties": dict(properties),
+        "properties": copied_properties,
         "additionalProperties": additional_properties,
     }
-    required_values = tuple(required)
     if required_values:
-        schema["required"] = list(required_values)
-    if definitions:
-        schema["$defs"] = dict(definitions)
-    return schema
+        result["required"] = list(required_values)
+    if definitions is not None:
+        result["$defs"] = _copy_mapping(definitions, "definitions")
+    return result
 
 
-# Existing adapters use both private helper spellings. Public aliases make a
-# future owner migration mechanical without forcing a wire-contract change.
-_object_schema = object_schema
-_object = object_schema
-build_object_schema = object_schema
+def _schema(value: Mapping[str, Any], label: str) -> dict[str, Any]:
+    result = _copy_mapping(value, label)
+    if result.get("$schema") != SCHEMA_DIALECT:
+        raise ValueError(f"{label}.$schema must be {SCHEMA_DIALECT}")
+    if result.get("type") != "object":
+        raise ValueError(f"{label}.type must be object")
+    return result
 
 
-def definition(
+def operation_spec(
     name: str,
     *,
     owning_domain: str | None = None,
-    input_schema: dict[str, Any],
-    result_schema: dict[str, Any],
+    input_schema: Mapping[str, Any],
+    result_schema: Mapping[str, Any],
     required_authority: str | None = None,
-    authority: str | None = None,
     execution_semantics: str | None = None,
-    semantics: str | None = None,
     idempotency: str,
+    authority: str | None = None,
+    semantics: str | None = None,
     repo_scoped: bool = False,
     required_client_schema_features: Iterable[str] = SCHEMA_FEATURES,
     deprecation: Mapping[str, Any] | None = None,
     result_contract: Mapping[str, Any] | None = None,
     failure_disclosure: str | None = None,
-    handler_name: str | None = None,
-) -> dict[str, Any] | Definition:
-    """Create a wire-compatible operation definition.
+) -> dict[str, Any]:
+    """Return an isolated, validated operation-spec dictionary."""
 
-    By default this returns a dict, matching the historical ActionQ, Kctl,
-    and Auditctl helpers. ``owning_domain`` may be omitted when callers only
-    need the metadata dict and can be inferred by their service boundary.
-    """
-
-    domain = owning_domain or (name.split(".", 1)[0] if "." in name else "")
-    authority_value = required_authority if required_authority is not None else authority
-    semantics_value = execution_semantics if execution_semantics is not None else semantics
-    if not domain:
-        raise ValueError("owning_domain is required for an operation without a domain prefix")
-    if not semantics_value:
-        raise ValueError("execution_semantics is required")
+    if not isinstance(name, str) or not _NAME.fullmatch(name):
+        raise ValueError("name must be a three-segment lowercase operation name")
+    domain = owning_domain or name.split(".", 1)[0]
+    if not _DOMAIN.fullmatch(domain) or not name.startswith(domain + "."):
+        raise ValueError("owning_domain must match the operation name prefix")
+    if required_authority is None:
+        required_authority = authority
+    if execution_semantics is None:
+        execution_semantics = semantics
+    if execution_semantics not in _SEMANTICS:
+        raise ValueError(f"execution_semantics must be one of {sorted(_SEMANTICS)}")
+    if idempotency not in _IDEMPOTENCY:
+        raise ValueError(f"idempotency must be one of {sorted(_IDEMPOTENCY)}")
+    if not isinstance(repo_scoped, bool):
+        raise TypeError("repo_scoped must be bool")
+    features = tuple(required_client_schema_features)
+    if any(not isinstance(feature, str) or not feature for feature in features):
+        raise ValueError("required client schema features must be non-empty strings")
+    if SCHEMA_FEATURES[0] not in features:
+        raise ValueError("required client schema features must include the JSON-Schema dialect")
     result: dict[str, Any] = {
         "name": name,
         "owning_domain": domain,
-        "input_schema": input_schema,
-        "result_schema": result_schema,
-        "required_authority": authority_value,
-        "execution_semantics": semantics_value,
+        "input_schema": _schema(input_schema, "input_schema"),
+        "result_schema": _schema(result_schema, "result_schema"),
+        "required_authority": required_authority,
+        "execution_semantics": execution_semantics,
         "idempotency": idempotency,
         "repo_scoped": repo_scoped,
-        "deprecation": dict(deprecation or {
+        "deprecation": deepcopy(dict(deprecation or {
             "deprecated": False, "replacement": None, "sunset_at": None
-        }),
-        "required_client_schema_features": list(required_client_schema_features),
+        })),
+        "required_client_schema_features": list(features),
     }
     if result_contract is not None:
-        result["result_contract"] = dict(result_contract)
+        result["result_contract"] = _copy_mapping(result_contract, "result_contract")
     if failure_disclosure is not None:
+        if not isinstance(failure_disclosure, str) or not failure_disclosure:
+            raise ValueError("failure_disclosure must be a non-empty string")
         result["failure_disclosure"] = failure_disclosure
-    if handler_name is not None:
-        result["_handler_name"] = handler_name
     return result
 
 
-_operation = definition
-_definition = definition
-build_operation_definition = definition
-operation_definition = definition
-
-
-def operation(definition_value: Any, handler: Callable[..., Any]) -> AdapterOperation:
-    return AdapterOperation(definition_value, handler)
-
-
-def register(
-    registry: CatalogRegistry,
-    definition_value: Any,
-    handler: Callable[..., Any],
-) -> None:
-    """Register one operation using only the structural registry protocol."""
-
-    registry.register(definition_value, handler)
-
-
-def register_operations(
-    registry: CatalogRegistry,
-    operations: Iterable[AdapterOperation | tuple[Any, Callable[..., Any]]],
-) -> None:
-    """Register a sequence of operation/handler pairs in declared order."""
-
-    for item in operations:
-        if isinstance(item, AdapterOperation):
-            register(registry, item.definition, item.handler)
-        else:
-            definition_value, handler = item
-            register(registry, definition_value, handler)
-
-
-register_catalog = register_operations
+build_object_schema = object_schema
+build_operation_spec = operation_spec
