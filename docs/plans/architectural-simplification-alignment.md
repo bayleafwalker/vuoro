@@ -30,15 +30,26 @@ scope and boundaries.
 - Composition v3 is released: it separates adapter release locks from
   owner/shared dependency locks without generalizing away domain construction.
   `vuoro-adapter-kit` and `vuoro-schema-runtime` 0.1.0 are immutable GitHub
-  Release wheels, not PyPI packages. Kctl 0.1.2, auditctl 0.1.1, and ActionQ
-  0.1.21 are the first three adapter-kit consumers; no domain has adopted the
-  schema runtime yet. Sprintctl is the remaining P2.3 migration.
-- Sprintctl P2.3 promotion is now prepared against the immutable 0.2.24
-  wheel at source `75fd4a7bc01472f941c923444cabe6451bb1afd0`, with the shared
-  adapter-kit lock reused rather than duplicated. The released-work gate
-  covers the exact 43-operation owner metadata hash, scoped invocation,
-  project routing, resource registration/result decoding, and the unchanged
-  four-domain catalog revision.
+  Release wheels, not PyPI packages. Kctl 0.1.2, auditctl 0.1.1, ActionQ
+  0.1.21, and Sprintctl 0.2.24 are the four adapter-kit consumers. No domain
+  has adopted the schema runtime yet.
+- Sprintctl completed the final P2.3 promotion at source
+  `75fd4a7bc01472f941c923444cabe6451bb1afd0`; Vuoro composition `c4e3357`
+  reuses the shared adapter-kit lock rather than duplicating it. The
+  released-work gate covers the exact 43-operation owner metadata hash,
+  scoped invocation, project routing, resource registration/result decoding,
+  and the exact four-domain catalog revision
+  `fc308e37ff1d56eccd9bd1f5372bf782e017936acf44994b22ddba4863e9f196`.
+- `vuoro-service` 0.1.45 is a released, attested artifact at
+  `sha256:9ce139991c376855448134544b1d3cc7a5c6bdb1ea4f1aa5acff7509e9141ed3`.
+  Appservice activated it only in `vuoro-dev` after a backup, drain, and
+  schema-11 preflight. The dev structural canary reports schema 11, four
+  compatible domains, and the 84-operation revision above. A positive
+  completion invocation remains pending a provisioned identity authority.
+  Shared activation was subsequently explicitly approved and completed: after
+  drain, backup, and exact quiescence preflight, schema 11 was applied without
+  retry; the service and proxy both run the same attested 0.1.45 digest. The
+  shared handshake now reports schema 11 and the 84-operation revision above.
 
 ## Owner-local units
 
@@ -109,40 +120,55 @@ builders but its wheel publication was not accepted as a dependency artifact;
 the associated immutable image remains evidence only. The corrective ActionQ
 0.1.21 release is the selected wheel. Vuoro composition promotion `f615404`
 pins that release, selects `actionq-schema/v11`, and proves the four-domain
-catalog at 84 operations. This leaves Sprintctl as the final P2.3 consumer.
+catalog at 84 operations. Sprintctl 0.2.24 is pinned by `c4e3357`, closing
+P2.3 at four of four consumers.
 
 ### V-S4 — Activate ActionQ schema 11 only with separated completion authority
 
 **Appservice-owned prerequisite; not a Vuoro service release.**
 
-The ActionQ adapter composition is source-ready but schema 11 completion
-operations must remain inactive until Appservice does all of the following:
+The ActionQ adapter composition was source-ready. Appservice has now completed
+the following checks in `vuoro-dev` only; they are evidence for the dev
+structural canary, not authorization to alter `vuoro-shared`:
 
-1. runs ActionQ migration 011 using the migration identity;
-2. provisions separate queue-runtime, completion-ingest, and completion-read
+1. ran ActionQ migration 011 using the migration identity, after a completed
+   backup and a drained/preflight-clean dev database;
+2. provisioned separate queue-runtime, completion-ingest, and completion-read
    roles, secrets, and DSNs;
-3. grants completion ingest only append/projection rights and completion read
+3. granted completion ingest only append/projection rights and completion read
    only SELECT rights; and
-4. proves neither completion identity can mutate queue actions/events, create
+4. proved neither completion identity can mutate queue actions/events, create
    schema objects, or write the migration ledger.
 
 The composed service rejects missing, empty, runtime-equal, or
 ingest/read-equal completion DSNs before constructing the ActionQ application;
-explicit factories prevent a fallback to the queue-runtime connection. This is
-a deployment and authority-separation blocker, not a reason to delay P2.3
-consumer migration accounting. No `vuoro-service` 0.1.45 image has been
-released, and this plan authorizes neither an image tag nor Appservice
-activation.
+explicit factories prevent a fallback to the queue-runtime connection. The
+dev service runs the attested 0.1.45 image, reports schema 11, and reports the
+84-operation catalog revision
+`fc308e37ff1d56eccd9bd1f5372bf782e017936acf44994b22ddba4863e9f196`.
+The positive completion-operation canary is still pending a provisioned,
+non-self-asserted identity authority; do not manufacture an identity or weaken
+the authority boundary merely to exercise it. Shared activation has completed
+under explicit operator approval after drain, backup, and zero-active-work
+preflight: migration 011 applied schema 11 with no retry, preserved the seven
+retained actions and 1,192 retained events, and left no forbidden completion
+privileges. Both shared containers run the same attested 0.1.45 digest and
+the shared handshake reports schema 11 and the exact 84-operation revision.
+Runtime activation is complete; only the positive identity-backed completion
+canary remains under V-S4.
 
 ## P2.3 — Adapter-kit consumer migration
 
-The four owner adapters now consume the released shared `vuoro-adapter-kit`
-through composition v3 locks. Kctl, Auditctl, and ActionQ are promoted in the
-main composition; Sprintctl is represented by the pending 0.2.24 composition
-change. Its source and wheel identity are immutable, and the release gate
-proves the owner catalog and invocation boundary without a service release or
-deployment. When this change is accepted, P2.3 is complete at 4/4 consumers;
-ActionQ's separate schema-11 activation prerequisite remains tracked under V-S4.
+**Completed 2026-08-13 — 4/4 consumers.** The four owner adapters now consume
+the released shared `vuoro-adapter-kit` through composition v3 locks: kctl
+0.1.2, auditctl 0.1.1, ActionQ 0.1.21, and Sprintctl 0.2.24. Sprintctl's
+source and immutable release wheel were accepted by the released-work gate,
+then pinned in composition `c4e3357`. The assembled service catalog contains
+exactly 84 operations at revision
+`fc308e37ff1d56eccd9bd1f5372bf782e017936acf44994b22ddba4863e9f196`.
+P2.3 completion does not itself authorize a service rollout. V-S4 retains the
+remaining positive functional canary and separately approval-gated shared
+promotion.
 
 ## Cross-repository dependencies
 
