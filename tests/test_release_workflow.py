@@ -79,6 +79,19 @@ def test_service_image_publication_keeps_tag_and_source_aliases() -> None:
     assert "vuoro-service:sha-${{ github.sha }}" in workflow
 
 
+def test_service_image_avoids_duplicate_shared_dependency_resolution() -> None:
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+
+    # kctl declares vuoro-adapter-kit as an immutable direct URL. Passing the
+    # same wheel as a second pip candidate makes pip report a false conflict;
+    # resolve owner adapters first, then install the local shared wheel exactly.
+    first_install = dockerfile.split("&& python -m pip install", 1)[0]
+    assert "./packages/vuoro-service" in first_install
+    assert "/opt/vuoro/adapters/*.whl" not in first_install
+    assert "--no-deps /opt/vuoro/adapters/vuoro_adapter_kit-*.whl" in dockerfile
+    assert "/opt/vuoro/adapters/kctl-*.whl" in dockerfile
+
+
 def test_ci_exercises_the_released_knowledge_composition() -> None:
     workflow = CI_WORKFLOW.read_text(encoding="utf-8")
     assert "name: Exercise pinned released knowledge adapter" in workflow
