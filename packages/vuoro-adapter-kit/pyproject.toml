@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "vuoro-adapter-kit"
 version = "0.1.0"
-description = "Dependency-free JSON-Schema and catalog registration primitives for Vuoro adapters"
+description = "Pure JSON-Schema and catalog definition builders for Vuoro adapters"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []

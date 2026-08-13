@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "vuoro-schema-runtime"
 version = "0.1.0"
-description = "Dependency-free central-schema compatibility and migration runtime"
+description = "Pure central-schema contract and migration-asset utilities"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []

@@ -47,3 +47,65 @@ def test_builders_fail_closed_on_invalid_contracts() -> None:
             result_schema=object_schema({}), execution_semantics="read",
             idempotency="not-allowed",
         )
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"required": "value"},
+        {"required": ["value", "value"]},
+        {"additional_properties": "false"},
+        {"definitions": []},
+    ],
+)
+def test_object_schema_rejects_malformed_root_builder_fields(kwargs) -> None:
+    with pytest.raises((TypeError, ValueError)):
+        object_schema({"value": {"type": "string"}}, **kwargs)
+
+
+@pytest.mark.parametrize(
+    "schema_mutation",
+    [
+        lambda schema: schema.update(properties=[]),
+        lambda schema: schema.update(additionalProperties="false"),
+        lambda schema: schema.update(required="value"),
+        lambda schema: schema.update(required=["value", "value"]),
+        lambda schema: schema.update(required=["missing"]),
+        lambda schema: schema.update({"$defs": []}),
+        lambda schema: schema.update(title="unsupported"),
+    ],
+    ids=("properties", "additional-properties", "required-type", "required-duplicate", "required-missing", "defs-type", "root-extra"),
+)
+def test_operation_spec_rejects_malformed_supported_schema_roots(schema_mutation) -> None:
+    schema = object_schema({"value": {"type": "string"}}, required=("value",))
+    schema_mutation(schema)
+    with pytest.raises((TypeError, ValueError)):
+        operation_spec(
+            "work.read.items", input_schema=schema, result_schema=object_schema({}),
+            execution_semantics="read", idempotency="not-allowed",
+        )
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"required_authority": 1},
+        {"owning_domain": 1},
+        {"execution_semantics": 1},
+        {"idempotency": 1},
+        {"repo_scoped": "false"},
+        {"required_client_schema_features": "json-schema-draft-2020-12"},
+        {"handler_name": 1},
+        {"deprecation": {"deprecated": False}},
+        {"deprecation": {"deprecated": "false", "replacement": None, "sunset_at": None}},
+        {"result_contract": {"mode": "wrong", "resource_kind": "work.item"}},
+        {"failure_disclosure": "resource-not-found/v2"},
+    ],
+)
+def test_operation_spec_rejects_malformed_scalar_and_metadata_fields(kwargs) -> None:
+    with pytest.raises((TypeError, ValueError)):
+        operation_spec(
+            "work.read.items", input_schema=object_schema({}),
+            result_schema=object_schema({}), execution_semantics="read",
+            idempotency="not-allowed", **kwargs,
+        )
