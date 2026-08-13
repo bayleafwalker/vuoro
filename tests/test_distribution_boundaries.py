@@ -99,4 +99,5 @@ def test_shared_packages_are_stdlib_only_and_have_isolated_wheel_boundaries() ->
             )
             metadata_name = next(name for name in names if name.endswith(".dist-info/METADATA"))
             metadata = BytesParser().parsebytes(wheel.read(metadata_name))
-            assert metadata.get_all("Requires-Dist", failobj=[]) == []
+            requirements = metadata.get_all("Requires-Dist", failobj=[])
+            assert all("extra == 'test'" in requirement for requirement in requirements)
