@@ -30,8 +30,9 @@ scope and boundaries.
 - Composition v3 is released: it separates adapter release locks from
   owner/shared dependency locks without generalizing away domain construction.
   `vuoro-adapter-kit` and `vuoro-schema-runtime` 0.1.0 are immutable GitHub
-  Release wheels, not PyPI packages. Kctl 0.1.2 is the first adapter-kit
-  consumer; no domain has adopted the schema runtime yet.
+  Release wheels, not PyPI packages. Kctl 0.1.2, auditctl 0.1.1, and ActionQ
+  0.1.21 are the first three adapter-kit consumers; no domain has adopted the
+  schema runtime yet. Sprintctl is the remaining P2.3 migration.
 
 ## Owner-local units
 
@@ -94,6 +95,38 @@ kctl 0.1.2 as the first released adapter-kit consumer. This resolves the
 lock/descriptor boundary; it does not make adapter or schema-runtime consumer
 migration generic. Domain owners retain their handlers, operation schemas,
 migration runners, database policy, and release authority.
+
+The completed consumer promotions are deliberately narrower than a runtime
+rollout. Kctl 0.1.2 and auditctl 0.1.1 promote their released adapter-kit
+adapters through exact release locks. ActionQ 0.1.20 introduced the shared
+builders but its wheel publication was not accepted as a dependency artifact;
+the associated immutable image remains evidence only. The corrective ActionQ
+0.1.21 release is the selected wheel. Vuoro composition promotion `f615404`
+pins that release, selects `actionq-schema/v11`, and proves the four-domain
+catalog at 84 operations. This leaves Sprintctl as the final P2.3 consumer.
+
+### V-S4 — Activate ActionQ schema 11 only with separated completion authority
+
+**Appservice-owned prerequisite; not a Vuoro service release.**
+
+The ActionQ adapter composition is source-ready but schema 11 completion
+operations must remain inactive until Appservice does all of the following:
+
+1. runs ActionQ migration 011 using the migration identity;
+2. provisions separate queue-runtime, completion-ingest, and completion-read
+   roles, secrets, and DSNs;
+3. grants completion ingest only append/projection rights and completion read
+   only SELECT rights; and
+4. proves neither completion identity can mutate queue actions/events, create
+   schema objects, or write the migration ledger.
+
+The composed service rejects missing, empty, runtime-equal, or
+ingest/read-equal completion DSNs before constructing the ActionQ application;
+explicit factories prevent a fallback to the queue-runtime connection. This is
+a deployment and authority-separation blocker, not a reason to delay P2.3
+consumer migration accounting. No `vuoro-service` 0.1.45 image has been
+released, and this plan authorizes neither an image tag nor Appservice
+activation.
 
 ## Cross-repository dependencies
 
