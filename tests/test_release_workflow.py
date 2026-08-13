@@ -108,6 +108,17 @@ def test_ci_exercises_the_released_audit_composition() -> None:
     assert "scripts/validate_released_audit_adapter.py" in workflow
 
 
+def test_ci_exercises_the_released_execution_composition_with_shared_lock() -> None:
+    workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+    assert "name: Exercise pinned released execution adapter" in workflow
+    assert "dist/adapters/actionq_contracts-*.whl" in workflow
+    assert "dist/adapters/actionq-*.whl" in workflow
+    assert "--no-deps" in workflow
+    assert "dist/adapters/vuoro_adapter_kit-*.whl" in workflow
+    assert "uv pip check --python" in workflow
+    assert "scripts/validate_released_execution_adapter.py" in workflow
+
+
 def test_python_release_workflow_uses_independent_immutable_package_tags() -> None:
     workflow = PYTHON_WORKFLOW.read_text()
     for tag in (

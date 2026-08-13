@@ -74,9 +74,18 @@ jobs:
           uv venv --python 3.12 /tmp/vuoro-released-execution-wheel
           uv pip install --python /tmp/vuoro-released-execution-wheel/bin/python \
             dist/vuoro-service/*.whl \
-            dist/adapters/actionq_contracts-*.whl \
-            dist/adapters/actionq-*.whl \
             'httpx>=0.27,<1'
+          # Install the owner wheels before the shared dependency.  ActionQ's
+          # metadata names the same immutable adapter-kit URL; keeping this
+          # step explicit prevents resolver drift while preserving pip check.
+          uv pip install --python /tmp/vuoro-released-execution-wheel/bin/python \
+            --no-deps \
+            dist/adapters/actionq_contracts-*.whl \
+            dist/adapters/actionq-*.whl
+          uv pip install --python /tmp/vuoro-released-execution-wheel/bin/python \
+            --no-deps \
+            dist/adapters/vuoro_adapter_kit-*.whl
+          uv pip check --python /tmp/vuoro-released-execution-wheel/bin/python
           /tmp/vuoro-released-execution-wheel/bin/python \
             scripts/validate_released_execution_adapter.py \
             packages/vuoro-service/composition/adapter-pins.json \

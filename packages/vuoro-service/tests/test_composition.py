@@ -174,13 +174,18 @@ def test_checked_in_adapter_artifact_urls_are_source_named_or_exact_semver_relea
 def test_checked_in_execution_pin_includes_released_contract_companion() -> None:
     pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("execution")
     assert (pin.source_revision, pin.distribution_version, pin.schema_version) == (
-        "0e8b21325a7fd3d59a989110e61ce80476c51dea", "0.1.19", "actionq-schema/v10")
-    assert [(item.distribution, item.distribution_version) for item in pin.dependencies] == [
-        ("actionq-contracts", "0.1.1")]
+        "8ef1fc9ae58b96ddc90db0e5be7a323e9be4b85b", "0.1.21", "actionq-schema/v10")
+    assert pin.artifact_url.endswith("/v0.1.21/actionq-0.1.21-py3-none-any.whl")
     assert pin.artifact_sha256 == (
-        "99449924645fb838ed202f572ccc6da3c96eee0e6b7442a246643fb74f55a4ec"
+        "7f4c3cbbbe991465ac88fa0640f1bb4420f76c8a07a9e7765e61a0981631220d"
     )
+    assert [(item.lock_id, item.lock_kind, item.distribution, item.distribution_version)
+            for item in pin.dependencies] == [
+        ("execution-contracts", "owner-dependency", "actionq-contracts", "0.1.1"),
+        ("vuoro-adapter-kit", "shared-dependency", "vuoro-adapter-kit", "0.1.0"),
+    ]
     assert pin.dependencies[0].source_revision == "0e8b21325a7fd3d59a989110e61ce80476c51dea"
+    assert pin.dependencies[1].source_revision == "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c"
 
 
 def test_checked_in_work_pin_is_the_maintenance_resource_owner_release() -> None:

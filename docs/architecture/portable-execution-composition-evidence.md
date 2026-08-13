@@ -25,22 +25,26 @@ ActionQ lifecycle state.
 
 ## Vuoro composition proof
 
-The checked-in execution descriptor selects `actionq-schema/v8` through
-ActionQ 0.1.18 at
-`cbc426ff938053d2e695f3caf5a4871e701b4661`. Its official release wheel is
-[`actionq-0.1.18-py3-none-any.whl`](https://github.com/bayleafwalker/actionq/releases/download/v0.1.18/actionq-0.1.18-py3-none-any.whl)
+The checked-in execution descriptor selects `actionq-schema/v10` through
+ActionQ 0.1.21 at
+`8ef1fc9ae58b96ddc90db0e5be7a323e9be4b85b`. Its official release wheel is
+[`actionq-0.1.21-py3-none-any.whl`](https://github.com/bayleafwalker/actionq/releases/download/v0.1.21/actionq-0.1.21-py3-none-any.whl)
 with SHA-256
-`613cd8a625cd14021c1333df5fa3f73018180bc4f208b6d7b42516878ca8515d`.
+`7f4c3cbbbe991465ac88fa0640f1bb4420f76c8a07a9e7765e61a0981631220d`.
 That wheel declares the exact `actionq-contracts==0.1.1` dependency, which
-remains a separately locked official owner release at its own source revision.
-Each wheel is fetched and verified by its exact SHA-256 before installation or
-import; the dependency lock is not rewritten to imply it was published by the
-ActionQ 0.1.18 tag.
+remains a separately locked official owner release at its own source revision,
+and the shared `vuoro-adapter-kit` 0.1.0 lock is reused by all consumers. Each
+wheel is fetched and verified by its exact SHA-256 before installation or
+import; the dependency locks are not rewritten to imply they were published by
+the ActionQ 0.1.21 tag.
 
 `scripts/validate_released_execution_adapter.py` runs in an isolated
 environment containing those wheels and the built Vuoro service wheel. It:
 
-- registers the real owner catalog and requires the candidate/group surface;
+- registers the real owner catalog and requires all 26 operations, including
+  the candidate/group surface;
+- verifies the frozen owner catalog metadata hash
+  `8d434e8b347e804c90e48a6598304be84b12f2a61ebc2dbed00a26053239a778`;
 - invokes immutable-candidate creation and group realization through Vuoro's
   authenticated invocation shell;
 - proves actor and repository provenance reach the owner adapter unchanged;
@@ -57,9 +61,14 @@ uv build --package vuoro-service --wheel --out-dir dist/vuoro-service
 uv venv --python 3.12 /tmp/vuoro-released-execution-wheel
 uv pip install --python /tmp/vuoro-released-execution-wheel/bin/python \
   dist/vuoro-service/*.whl \
-  dist/adapters/actionq_contracts-*.whl \
-  dist/adapters/actionq-*.whl \
   'httpx>=0.27,<1'
+uv pip install --python /tmp/vuoro-released-execution-wheel/bin/python \
+  --no-deps \
+  dist/adapters/actionq_contracts-*.whl \
+  dist/adapters/actionq-*.whl
+uv pip install --python /tmp/vuoro-released-execution-wheel/bin/python \
+  --no-deps dist/adapters/vuoro_adapter_kit-*.whl
+uv pip check --python /tmp/vuoro-released-execution-wheel/bin/python
 /tmp/vuoro-released-execution-wheel/bin/python \
   scripts/validate_released_execution_adapter.py \
   packages/vuoro-service/composition/adapter-pins.json dist/adapters

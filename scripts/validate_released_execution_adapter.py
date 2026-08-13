@@ -19,6 +19,16 @@ from vuoro_service.composition import _execution_authorizer
 from vuoro_service.identity import Identity, StaticBearerIdentityResolver
 
 
+_EXPECTED_ADAPTER_KIT = (
+    "https://github.com/bayleafwalker/vuoro/releases/download/"
+    "vuoro-adapter-kit-v0.1.0/vuoro_adapter_kit-0.1.0-py3-none-any.whl"
+)
+_EXPECTED_CATALOG_OPERATION_COUNT = 26
+_EXPECTED_CATALOG_METADATA_SHA256 = (
+    "8d434e8b347e804c90e48a6598304be84b12f2a61ebc2dbed00a26053239a778"
+)
+
+
 class StubApplication:
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict, object]] = []
@@ -50,26 +60,40 @@ def _pins(path: Path) -> tuple[dict, dict]:
         raise SystemExit("unsupported composition schema_version")
     descriptor = next(item for item in manifest["runtime_descriptors"] if item["domain"] == "execution")
     locks = {lock["lock_id"]: lock for lock in manifest["release_locks"]}
-    if len(descriptor["dependency_lock_ids"]) != 1:
-        raise SystemExit("execution descriptor must identify exactly one contract dependency lock")
+    if descriptor["dependency_lock_ids"] != ["execution-contracts", "vuoro-adapter-kit"]:
+        raise SystemExit(
+            "execution descriptor must identify exactly the contract and shared adapter-kit locks"
+        )
     adapter = locks[descriptor["lock_id"]]
-    dependency = locks[descriptor["dependency_lock_ids"][0]]
+    contracts = locks[descriptor["dependency_lock_ids"][0]]
+    shared = locks[descriptor["dependency_lock_ids"][1]]
     if adapter.get("lock_kind") != "adapter":
         raise SystemExit("execution descriptor primary lock must be an adapter")
-    if dependency.get("lock_kind") != "owner-dependency":
+    if contracts.get("lock_kind") != "owner-dependency":
         raise SystemExit("execution descriptor dependency must be an owner dependency")
-    return adapter, dependency
+    if contracts.get("distribution_version") != "0.1.1":
+        raise SystemExit("execution descriptor must keep execution-contracts 0.1.1")
+    if shared.get("lock_kind") != "shared-dependency":
+        raise SystemExit("execution descriptor dependency must include the shared adapter kit")
+    if shared.get("artifact_url") != _EXPECTED_ADAPTER_KIT:
+        raise SystemExit("execution dependency is not the released adapter-kit wheel")
+    return adapter, contracts, shared
 
 
 async def _exercise() -> None:
     stub = StubApplication()
     registry = CatalogRegistry()
     register_operations(registry, application=stub)
-    metadata = {item["name"]: item for item in catalog_metadata()}
+    owner_metadata = catalog_metadata()
+    assert len(owner_metadata) == _EXPECTED_CATALOG_OPERATION_COUNT
+    assert hashlib.sha256(
+        json.dumps(owner_metadata, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest() == _EXPECTED_CATALOG_METADATA_SHA256
+    metadata = {item["name"]: item for item in owner_metadata}
     required = {"execution.action.create-immutable-candidate", "execution.group.realize",
                 "execution.group.stop-new-claims", "execution.group.show", "execution.group.list"}
     assert required <= metadata.keys()
-    expected = {
+    projections = {
         "execution.action.create-immutable-candidate":
             ("execution.candidate-action.create", "enqueue", "required"),
         "execution.group.realize": ("execution.group.manage", "write", "required"),
@@ -79,7 +103,12 @@ async def _exercise() -> None:
         "execution.group.list": ("execution.read", "read", "not-allowed"),
     }
     registered = {item.name: item.model_dump(mode="json") for item in registry.catalog().operations}
-    for name, projection in expected.items():
+    expected = {
+        name: {**definition, "repo_scoped": False}
+        for name, definition in metadata.items()
+    }
+    assert registered == expected
+    for name, projection in projections.items():
         owner = metadata[name]
         assert (
             owner["required_authority"], owner["execution_semantics"], owner["idempotency"]
@@ -142,8 +171,8 @@ def main(argv: list[str] | None = None) -> int:
     if len(argv) != 2:
         raise SystemExit("usage: validate_released_execution_adapter.py MANIFEST WHEEL_DIRECTORY")
     manifest, wheel_dir = Path(argv[0]), Path(argv[1])
-    adapter, dependency = _pins(manifest)
-    for pin in (adapter, dependency):
+    adapter, contracts, shared = _pins(manifest)
+    for pin in (adapter, contracts, shared):
         wheel = wheel_dir / pin["artifact_url"].rsplit("/", 1)[-1]
         assert hashlib.sha256(wheel.read_bytes()).hexdigest() == pin["artifact_sha256"]
         assert importlib.metadata.version(pin["distribution"]) == pin["distribution_version"]

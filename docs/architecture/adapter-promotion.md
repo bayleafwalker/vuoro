@@ -62,11 +62,12 @@ refused.
 Owner releases may use either a source-SHA tag or an exact semantic-version
 tag. For a semantic-version tag, evidence must show that the tag resolves to
 `source_revision`; the release URL, full revision, digest, and installed
-version remain independently checked. ActionQ `v0.1.19` resolves to
-`0e8b21325a7fd3d59a989110e61ce80476c51dea` and ships `actionq` 0.1.19,
-whose published metadata requires `actionq-contracts==0.1.1`. The separately
-released companion is locked to the same immutable release revision because
-the 0.1.19 execution contract added the dispatch-result settlement fields.
+version remain independently checked. ActionQ `v0.1.21` resolves to
+`8ef1fc9ae58b96ddc90db0e5be7a323e9be4b85b` and ships `actionq` 0.1.21,
+whose published metadata requires `actionq-contracts==0.1.1` and the shared
+`vuoro-adapter-kit` 0.1.0 release wheel. The separately released contracts
+companion remains locked at 0.1.1; the shared adapter-kit lock is reused by
+the knowledge and audit descriptors rather than duplicated.
 
 Update a lock and its descriptor together. Do not install from a local
 checkout, mutate a downloaded wheel, or substitute a deployment overlay for
@@ -103,13 +104,14 @@ merged. A catalog operation's presence alone is insufficient: the test must
 include accepted and rejected invocations appropriate to its authority and
 idempotency contract.
 
-The released execution gate installs both the pinned ActionQ adapter and its
-contracts companion, then runs `scripts/validate_released_execution_adapter.py`.
-It registers the real owner catalog into the Vuoro shell with a side-effect-free
-stub application and proves the portable candidate/group surface, exact owner
-metadata, identity-derived provenance, schema rejection, and absence of
-migration or runner operations. It opens no database and runs no startup or
-migration code.
+The released execution gate installs the pinned ActionQ adapter and its
+contracts companion before installing the shared adapter-kit wheel with
+`--no-deps`, then runs `scripts/validate_released_execution_adapter.py`. It
+registers the real owner catalog into the Vuoro shell with a side-effect-free
+stub application and proves all 26 operations, the frozen owner metadata hash,
+portable candidate/group surface, exact identity-derived provenance, schema
+rejection, and absence of migration or runner operations. It opens no database
+and runs no startup or migration code.
 
 Parity fixtures must be falsifiable. For every supported filter, include at
 least one independently excluded record; supply matching records out of their
@@ -146,8 +148,10 @@ not treat Vuoro's manifest-shape test as evidence that an adapter implements
 new operations.
 
 For a changed execution adapter, install the pinned adapter and every pinned
-companion wheel into an isolated environment with the built service wheel,
-then run `scripts/validate_released_execution_adapter.py`. The gate exercises
+companion wheel into an isolated environment with the built service wheel. The
+owner wheels are installed first and the shared adapter-kit wheel is installed
+with `--no-deps` to honor the immutable shared lock, then run
+`scripts/validate_released_execution_adapter.py`. The gate exercises
 the owner-published catalog through Vuoro's invocation shell, including
 authenticated provenance, required authority, idempotency, and schema-negative
 paths. It must not substitute an editable ActionQ checkout or a runner wheel
