@@ -16,6 +16,7 @@ from vuoro_service.composition import (
     verify_adapter_artifacts,
     verify_installed_composition,
     _execution_authorizer,
+    _execution_completion_connection_factories,
     _bind_work_resource_visibility,
     _load_work_resource_observation_authorizer,
     _load_project_binding_for_composition,
@@ -174,13 +175,18 @@ def test_checked_in_adapter_artifact_urls_are_source_named_or_exact_semver_relea
 def test_checked_in_execution_pin_includes_released_contract_companion() -> None:
     pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("execution")
     assert (pin.source_revision, pin.distribution_version, pin.schema_version) == (
-        "0e8b21325a7fd3d59a989110e61ce80476c51dea", "0.1.19", "actionq-schema/v10")
-    assert [(item.distribution, item.distribution_version) for item in pin.dependencies] == [
-        ("actionq-contracts", "0.1.1")]
+        "8ef1fc9ae58b96ddc90db0e5be7a323e9be4b85b", "0.1.21", "actionq-schema/v11")
+    assert pin.artifact_url.endswith("/v0.1.21/actionq-0.1.21-py3-none-any.whl")
     assert pin.artifact_sha256 == (
-        "99449924645fb838ed202f572ccc6da3c96eee0e6b7442a246643fb74f55a4ec"
+        "7f4c3cbbbe991465ac88fa0640f1bb4420f76c8a07a9e7765e61a0981631220d"
     )
+    assert [(item.lock_id, item.lock_kind, item.distribution, item.distribution_version)
+            for item in pin.dependencies] == [
+        ("execution-contracts", "owner-dependency", "actionq-contracts", "0.1.1"),
+        ("vuoro-adapter-kit", "shared-dependency", "vuoro-adapter-kit", "0.1.0"),
+    ]
     assert pin.dependencies[0].source_revision == "0e8b21325a7fd3d59a989110e61ce80476c51dea"
+    assert pin.dependencies[1].source_revision == "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c"
 
 
 def test_checked_in_work_pin_is_the_maintenance_resource_owner_release() -> None:
@@ -298,6 +304,51 @@ def test_execution_authorizer_is_exact_and_repository_scoped() -> None:
     assert not _execution_authorizer(scoped, "execution.group.manage", "delete")
     assert not _execution_authorizer(scoped, "execution.candidate-action.create", "update")
     assert not _execution_authorizer(scoped, "execution.anything", "create")
+
+
+def test_schema_v11_requires_explicit_distinct_completion_dsns(monkeypatch) -> None:
+    execution_pin = CompositionManifest.load(
+        ROOT / "composition" / "adapter-pins.json"
+    ).pin("execution")
+    with pytest.raises(CompositionError, match="VUORO_EXECUTION_COMPLETION_INGEST_DSN"):
+        _execution_completion_connection_factories(
+            execution_pin=execution_pin,
+            execution_runtime_dsn="postgresql://runtime/db",
+            environ={},
+        )
+    with pytest.raises(CompositionError, match="distinct from the execution runtime"):
+        _execution_completion_connection_factories(
+            execution_pin=execution_pin,
+            execution_runtime_dsn="postgresql://runtime/db",
+            environ={
+                "VUORO_EXECUTION_COMPLETION_INGEST_DSN": "postgresql://runtime/db",
+                "VUORO_EXECUTION_COMPLETION_READ_DSN": "postgresql://read/db",
+            },
+        )
+    with pytest.raises(CompositionError, match="ingest and read DSNs must be distinct"):
+        _execution_completion_connection_factories(
+            execution_pin=execution_pin,
+            execution_runtime_dsn="postgresql://runtime/db",
+            environ={
+                "VUORO_EXECUTION_COMPLETION_INGEST_DSN": "postgresql://completion/db",
+                "VUORO_EXECUTION_COMPLETION_READ_DSN": "postgresql://completion/db",
+            },
+        )
+    seen: list[str] = []
+    monkeypatch.setattr(
+        "vuoro_service.composition._pg_connection_factory",
+        lambda dsn: seen.append(dsn) or (lambda: None),
+    )
+    factories = _execution_completion_connection_factories(
+        execution_pin=execution_pin,
+        execution_runtime_dsn="postgresql://runtime/db",
+        environ={
+            "VUORO_EXECUTION_COMPLETION_INGEST_DSN": "postgresql://ingest/db",
+            "VUORO_EXECUTION_COMPLETION_READ_DSN": "postgresql://read/db",
+        },
+    )
+    assert factories is not None and len(factories) == 2
+    assert seen == ["postgresql://ingest/db", "postgresql://read/db"]
 
 
 def test_work_resource_visibility_requires_a_separate_injected_policy() -> None:
