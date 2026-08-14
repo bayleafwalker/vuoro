@@ -166,9 +166,16 @@ consumers. The composition gate proves their exact released metadata, the
 single shared runtime lock, unchanged domain schema descriptors, and the
 unchanged 84-operation catalog revision. A subsequent Vuoro service release
 and rollout remain separate actions; no migration is required by this source
-promotion. Source preparation for `vuoro-service` 0.1.46 is merged at
-`6bc23212edd611965f067781fb6c6af090ac1ed5`, but its annotated tag object has
-not been published pending the separate release-safety approval.
+promotion. `vuoro-service-v0.1.46` is now published from source
+`6bc23212edd611965f067781fb6c6af090ac1ed5`, with wheel SHA-256
+`978ef5a764932957636f9e6915e92f75ec773967f15a16dc5f9834a5ed71e938` and
+attested OCI digest
+`sha256:aeeb8088b8485c9637526b63d8557a68db618772979330ed5950f0e09c4a0f5c`.
+Provenance verification passed. Appservice deployed the same digest via dev
+Flux revision `648be1` (canary PASS) and shared revision `352b32` (deployment
+PASS). Both handshakes report schema 11 and the unchanged 84-operation
+revision; retained counts are dev queue/completion `0/1` and shared
+queue/events/completion `7/1192/1`.
 
 ## P2.2 — Schema-runtime consumer migration
 

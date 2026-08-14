@@ -96,6 +96,20 @@ verification is also complete, with no authority-negative residue. P2.2
 schema-runtime consumer migration is independent: kctl 0.1.3, auditctl 0.1.2,
 and ActionQ 0.1.22 are released candidates whose Vuoro composition acceptance
 is complete. The accepted composition retains the same 84-operation catalog
-revision and requires no runtime migration. `vuoro-service` 0.1.46 source is
-merged at `6bc23212edd611965f067781fb6c6af090ac1ed5`; its annotated release tag
-has not been published pending separate release-safety approval.
+revision and requires no runtime migration.
+
+## 0.1.46 release and deployed canaries
+
+`vuoro-service-v0.1.46` is published from source
+`6bc23212edd611965f067781fb6c6af090ac1ed5`. The released wheel SHA-256 is
+`978ef5a764932957636f9e6915e92f75ec773967f15a16dc5f9834a5ed71e938`; the
+provenance verification passed. The attested OCI artifact is
+`sha256:aeeb8088b8485c9637526b63d8557a68db618772979330ed5950f0e09c4a0f5c`.
+
+Appservice deployed this digest through dev Flux revision `648be1` (canary
+PASS) and shared Flux revision `352b32` (deployment PASS). Both handshakes
+report compatible domains, schema 11, and exactly 84 catalog operations at
+revision `fc308e37ff1d56eccd9bd1f5372bf782e017936acf44994b22ddba4863e9f196`.
+The retained database counts are dev queue `0` / completion `1`, and shared
+queue `7` / events `1,192` / completion `1`. P2.2 is now fully released,
+composed, and deployed.
