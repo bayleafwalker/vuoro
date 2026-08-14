@@ -30,9 +30,10 @@ scope and boundaries.
 - Composition v3 is released: it separates adapter release locks from
   owner/shared dependency locks without generalizing away domain construction.
   `vuoro-adapter-kit` and `vuoro-schema-runtime` 0.1.0 are immutable GitHub
-  Release wheels, not PyPI packages. Kctl 0.1.2, auditctl 0.1.1, ActionQ
-  0.1.21, and Sprintctl 0.2.24 are the four adapter-kit consumers. No domain
-  has adopted the schema runtime yet.
+  Release wheels, not PyPI packages. Kctl 0.1.3, auditctl 0.1.2, ActionQ
+  0.1.22, and Sprintctl 0.2.24 are the four adapter-kit consumers. P2.2 is
+  source-complete: the first three releases also reuse the one exact
+  `vuoro-schema-runtime` 0.1.0 lock. Sprintctl remains adapter-kit-only.
 - Sprintctl completed the final P2.3 promotion at source
   `75fd4a7bc01472f941c923444cabe6451bb1afd0`; Vuoro composition `c4e3357`
   reuses the shared adapter-kit lock rather than duplicating it. The
@@ -44,8 +45,10 @@ scope and boundaries.
   `sha256:9ce139991c376855448134544b1d3cc7a5c6bdb1ea4f1aa5acff7509e9141ed3`.
   Appservice activated it only in `vuoro-dev` after a backup, drain, and
   schema-11 preflight. The dev structural canary reports schema 11, four
-  compatible domains, and the 84-operation revision above. A positive
-  completion invocation remains pending a provisioned identity authority.
+  compatible domains, and the 84-operation revision above. Positive
+  completion canaries subsequently passed in both dev and shared through the
+  real identity authority. Cleanup/revocation structural verification is also
+  complete.
   Shared activation was subsequently explicitly approved and completed: after
   drain, backup, and exact quiescence preflight, schema 11 was applied without
   retry; the service and proxy both run the same attested 0.1.45 digest. The
@@ -146,16 +149,54 @@ explicit factories prevent a fallback to the queue-runtime connection. The
 dev service runs the attested 0.1.45 image, reports schema 11, and reports the
 84-operation catalog revision
 `fc308e37ff1d56eccd9bd1f5372bf782e017936acf44994b22ddba4863e9f196`.
-The positive completion-operation canary is still pending a provisioned,
-non-self-asserted identity authority; do not manufacture an identity or weaken
-the authority boundary merely to exercise it. Shared activation has completed
-under explicit operator approval after drain, backup, and zero-active-work
-preflight: migration 011 applied schema 11 with no retry, preserved the seven
-retained actions and 1,192 retained events, and left no forbidden completion
-privileges. Both shared containers run the same attested 0.1.45 digest and
-the shared handshake reports schema 11 and the exact 84-operation revision.
-Runtime activation is complete; only the positive identity-backed completion
-canary remains under V-S4.
+Positive completion-operation canaries have passed in dev and shared through
+the provisioned non-self-asserted identity authority. Cleanup/revocation is
+structurally complete; do not weaken the authority boundary in future
+exercises. Shared activation completed under explicit operator approval after
+drain, backup, and zero-active-work preflight: migration 011 applied schema 11
+with no retry, preserved the seven retained actions and 1,192 retained events,
+and left no forbidden completion privileges. Both shared containers run the
+same attested 0.1.45 digest and the shared handshake reports schema 11 and the
+exact 84-operation revision. V-S4 runtime activation and its functional canary
+are complete.
+
+P2.2 remains separate from the completed schema-11 activation. Kctl 0.1.3,
+auditctl 0.1.2, and ActionQ 0.1.22 are accepted immutable schema-runtime
+consumers. The composition gate proves their exact released metadata, the
+single shared runtime lock, unchanged domain schema descriptors, and the
+unchanged 84-operation catalog revision. A subsequent Vuoro service release
+and rollout remain separate actions; no migration is required by this source
+promotion. `vuoro-service-v0.1.46` is now published from source
+`6bc23212edd611965f067781fb6c6af090ac1ed5`, with wheel SHA-256
+`978ef5a764932957636f9e6915e92f75ec773967f15a16dc5f9834a5ed71e938` and
+attested OCI digest
+`sha256:aeeb8088b8485c9637526b63d8557a68db618772979330ed5950f0e09c4a0f5c`.
+Provenance verification passed. Appservice deployed the same digest via dev
+Flux revision `648be1` (canary PASS) and shared revision `352b32` (deployment
+PASS). Both handshakes report schema 11 and the unchanged 84-operation
+revision; retained counts are dev queue/completion `0/1` and shared
+queue/events/completion `7/1192/1`.
+
+## P2.2 — Schema-runtime consumer migration
+
+**Completed 2026-08-13 — 3/3 consumers.** Kctl 0.1.3, Auditctl 0.1.2, and
+ActionQ 0.1.22 declare the exact digest-pinned `vuoro-schema-runtime` 0.1.0
+wheel in their published metadata. Composition v3 records that wheel once and
+references it from knowledge, audit, and execution alongside the existing
+adapter-kit and ActionQ contracts locks. The released-wheel gates install and
+attest all locks, run `pip check`, and preserve `knowledge-schema/v1`,
+`audit-schema/v1`, and `actionq-schema/v11`. The complete catalog remains 84
+operations at revision
+`fc308e37ff1d56eccd9bd1f5372bf782e017936acf44994b22ddba4863e9f196`.
+
+The accepted adapter artifacts are kctl 0.1.3
+(`789b5aadfc4c31171d574c76b79af9999b08b5cf212969cefc8504eb2e99e43d`),
+auditctl 0.1.2
+(`b76d9d7aab727c77a7dcfcdc4e5de423b61a07c8f89369101347a4dc6eaf33d1`),
+and ActionQ 0.1.22
+(`5ffce20b2e9b53305a522b25f8504081442311392b025ea220fc8792e8e50bd2`).
+Each reuses the one `vuoro-schema-runtime` 0.1.0 wheel
+(`b66c9357c99aa9e1a7353991ce54105a8621958ecfac47f8c121d80b90b77912`).
 
 ## P2.3 — Adapter-kit consumer migration
 
@@ -166,9 +207,10 @@ source and immutable release wheel were accepted by the released-work gate,
 then pinned in composition `c4e3357`. The assembled service catalog contains
 exactly 84 operations at revision
 `fc308e37ff1d56eccd9bd1f5372bf782e017936acf44994b22ddba4863e9f196`.
-P2.3 completion does not itself authorize a service rollout. V-S4 retains the
-remaining positive functional canary and separately approval-gated shared
-promotion.
+P2.3 completion did not itself authorize a service rollout; the separately
+approved V-S4 activation and positive canaries are now complete. P2.2 is also
+source-complete, while its service release and deployment remain independently
+controlled.
 
 ## Cross-repository dependencies
 
