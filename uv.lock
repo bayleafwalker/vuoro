@@ -832,7 +832,7 @@ provides-extras = ["test"]
 
 [[package]]
 name = "vuoro-service"
-version = "0.1.50"
+version = "0.1.51"
 source = { editable = "packages/vuoro-service" }
 dependencies = [
     { name = "cryptography" },

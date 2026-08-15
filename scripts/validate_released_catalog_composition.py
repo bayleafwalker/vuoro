@@ -26,10 +26,14 @@ class WorkStub:
         return False
 
 
+class ExecutionStub:
+    managed_dispatch_policy = None
+
+
 def main() -> int:
     registry = CatalogRegistry()
     register_work_catalog(registry, WorkStub())
-    register_execution(registry, application=object())
+    register_execution(registry, application=ExecutionStub())
     register_knowledge(registry, application=object())
     VuoroAuditAdapter(connection_factory=lambda: None).register(registry)
     catalog = registry.catalog().model_dump(mode="json")
