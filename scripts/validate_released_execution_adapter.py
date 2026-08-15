@@ -105,8 +105,8 @@ class StubApplication:
     @staticmethod
     def compatibility():
         return {
-            "observed_schema_version": 11,
-            "maximum_schema_version": 11,
+            "observed_schema_version": 12,
+            "maximum_schema_version": 12,
             "compatible": True,
             "detail": None,
         }
@@ -145,8 +145,8 @@ def _pins(path: Path) -> tuple[dict, dict, dict, dict]:
     requirements = importlib.metadata.requires(adapter["distribution"]) or []
     if _EXPECTED_SCHEMA_RUNTIME_REQUIREMENT not in requirements:
         raise SystemExit("execution owner metadata does not require the locked schema runtime")
-    if descriptor.get("schema_version") != "actionq-schema/v11":
-        raise SystemExit("execution descriptor must select actionq-schema/v11")
+    if descriptor.get("schema_version") != "actionq-schema/v12":
+        raise SystemExit("execution descriptor must select actionq-schema/v12")
     return adapter, contracts, shared, schema_runtime
 
 
@@ -165,7 +165,7 @@ async def _exercise() -> None:
     assert {
         name: metadata[name]["required_authority"] for name in _COMPLETION_OPERATIONS
     } == _COMPLETION_AUTHORITIES
-    assert compatibility_record(stub)["schema_version"] == "11"
+    assert compatibility_record(stub)["schema_version"] == "12"
     assert compatibility_record(stub)["state"] == "compatible"
     # The old 22-operation catalog is a compatibility subset: its canonical
     # bytes remain unchanged, while the four completion operations are additive.
@@ -202,7 +202,18 @@ async def _exercise() -> None:
         name: {**definition, "repo_scoped": False}
         for name, definition in metadata.items()
     }
-    assert registered == expected
+    managed_dispatch_operation = "execution.managed-dispatch.enqueue"
+    # The ordinary metadata catalog deliberately remains unchanged until the
+    # served composition supplies its managed-dispatch policy.  Registration
+    # carries the additional operation so that the policy-aware service can
+    # bind it without widening the ordinary dispatch catalog.
+    assert managed_dispatch_operation not in metadata
+    assert set(registered) == set(expected) | {managed_dispatch_operation}
+    assert registered[managed_dispatch_operation]["required_authority"] == "execution.enqueue"
+    assert registered[managed_dispatch_operation]["execution_semantics"] == "enqueue"
+    assert registered[managed_dispatch_operation]["idempotency"] == "required"
+    for name, definition in expected.items():
+        assert registered[name] == definition
     for name, projection in projections.items():
         owner = metadata[name]
         assert (
@@ -287,7 +298,10 @@ def main(argv: list[str] | None = None) -> int:
     with zipfile.ZipFile(wheel_dir / adapter["artifact_url"].rsplit("/", 1)[-1]) as wheel:
         schema = wheel.read("actionq/schema.py").decode()
         migration = wheel.read("actionq/migrations/011_session_completion_log.sql").decode()
-    assert "MAX_SCHEMA_VERSION = 11" in schema
+        managed_dispatch_migration = wheel.read(
+            "actionq/migrations/012_managed_dispatch_envelopes.sql"
+        ).decode()
+    assert "MAX_SCHEMA_VERSION = 12" in schema
     assert "ACTIONQ_COMPLETION_INGEST_ROLE" in schema
     assert "ACTIONQ_COMPLETION_READ_ROLE" in schema
     assert "completion database roles must be distinct from ACTIONQ_RUNTIME_ROLE" in schema
@@ -299,6 +313,7 @@ def main(argv: list[str] | None = None) -> int:
         "session_completion_watermarks",
     ):
         assert relation in migration
+    assert "managed_dispatch_envelopes" in managed_dispatch_migration
     asyncio.run(_exercise())
     return 0
 
