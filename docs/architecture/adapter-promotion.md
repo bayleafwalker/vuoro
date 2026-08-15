@@ -62,18 +62,18 @@ refused.
 Owner releases may use either a source-SHA tag or an exact semantic-version
 tag. For a semantic-version tag, evidence must show that the tag resolves to
 `source_revision`; the release URL, full revision, digest, and installed
-version remain independently checked. ActionQ `v0.1.22` resolves to
-`183c0d79fe98e65e4d3d200563aaa7c903366b81` and ships `actionq` 0.1.22,
+version remain independently checked. ActionQ `v0.1.26` resolves to
+`0f13e76f953bcacafbf16c41d29e830ffd84f755` and ships `actionq` 0.1.26,
 whose published metadata requires `actionq-contracts==0.1.1` and the shared
 `vuoro-adapter-kit` and `vuoro-schema-runtime` 0.1.0 release wheels. The
 separately released contracts companion remains locked at 0.1.1. Kctl 0.1.3,
 Auditctl 0.1.2, and ActionQ 0.1.22 reuse the single schema-runtime lock rather
 than duplicating it; Sprintctl remains an adapter-kit-only consumer.
 
-The execution descriptor selects `actionq-schema/v11`. This is a source
+The execution descriptor selects `actionq-schema/v12`. This is a source
 composition declaration, not migration authorization: migration
-`011_session_completion_log.sql` must be applied by an Appservice migration Job
-before the four additive session-completion operations can be served.
+`012_managed_dispatch_envelopes.sql` must be applied by an Appservice migration
+Job before the managed-dispatch operation can be served.
 
 Update a lock and its descriptor together. Do not install from a local
 checkout, mutate a downloaded wheel, or substitute a deployment overlay for

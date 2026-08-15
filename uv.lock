@@ -767,9 +767,7 @@ test = [
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" },
-]
+requires-dist = [{ name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" }]
 provides-extras = ["test"]
 
 [[package]]
@@ -829,14 +827,12 @@ test = [
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" },
-]
+requires-dist = [{ name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" }]
 provides-extras = ["test"]
 
 [[package]]
 name = "vuoro-service"
-version = "0.1.46"
+version = "0.1.47"
 source = { editable = "packages/vuoro-service" }
 dependencies = [
     { name = "cryptography" },

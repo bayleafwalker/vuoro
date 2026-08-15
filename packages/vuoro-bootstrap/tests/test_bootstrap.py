@@ -301,12 +301,17 @@ def test_cli_reuses_saved_session_for_exchange(monkeypatch, tmp_path: Path, caps
 
     monkeypatch.setattr(cli, "BootstrapApi", FakeApi)
     root = tmp_path / "repo"
-    assert cli.main(["bootstrap", "https://api.vuoro.cloud", "--repo-id", "repo-1", "--root", str(root)]) == 0
+    credential_dir = tmp_path / "credentials"
+    args = [
+        "bootstrap", "https://api.vuoro.cloud", "--repo-id", "repo-1", "--root", str(root),
+        "--credential-dir", str(credential_dir),
+    ]
+    assert cli.main(args) == 0
     capsys.readouterr()
     session_file = root / ".vuoro" / "bootstrap-session.json"
     assert session_file.is_file()
 
-    assert cli.main(["bootstrap", "https://api.vuoro.cloud", "--repo-id", "repo-1", "--root", str(root)]) == 0
+    assert cli.main(args) == 0
     capsys.readouterr()
     assert FakeApi.creates == 1
     assert FakeApi.exchanges == 1
