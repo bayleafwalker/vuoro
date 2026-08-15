@@ -371,6 +371,24 @@ def test_schema_v11_requires_explicit_distinct_completion_dsns(monkeypatch) -> N
     assert seen == ["postgresql://ingest/db", "postgresql://read/db"]
 
 
+def test_schema_v12_retains_completion_role_separation(monkeypatch) -> None:
+    seen: list[str] = []
+    monkeypatch.setattr(
+        "vuoro_service.composition._pg_connection_factory",
+        lambda dsn: seen.append(dsn) or (lambda: None),
+    )
+    factories = _execution_completion_connection_factories(
+        execution_pin=SimpleNamespace(schema_version="actionq-schema/v12"),
+        execution_runtime_dsn="postgresql://runtime/db",
+        environ={
+            "VUORO_EXECUTION_COMPLETION_INGEST_DSN": "postgresql://ingest/db",
+            "VUORO_EXECUTION_COMPLETION_READ_DSN": "postgresql://read/db",
+        },
+    )
+    assert factories is not None
+    assert seen == ["postgresql://ingest/db", "postgresql://read/db"]
+
+
 def test_work_resource_visibility_requires_a_separate_injected_policy() -> None:
     captured = {}
 

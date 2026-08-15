@@ -755,15 +755,15 @@ def _pg_connection_factory(dsn: str) -> Callable[[], Any]:
 def _execution_completion_connection_factories(
     *, execution_pin: AdapterPin, execution_runtime_dsn: str, environ: Mapping[str, str]
 ) -> tuple[Callable[[], Any], Callable[[], Any]] | None:
-    """Require capability-specific DSNs for ActionQ schema-v11 completion APIs.
+    """Require capability-specific DSNs for ActionQ schema-v11/v12 completion APIs.
 
     ActionQ's application intentionally falls back to its queue runtime
     connection when completion factories are absent. Vuoro cannot permit that
-    fallback for a composed schema-v11 service: completion ingest/read roles
+    fallback for a composed schema-v11/v12 service: completion ingest/read roles
     are separate database principals with separate credentials.
     """
 
-    if execution_pin.schema_version != "actionq-schema/v11":
+    if execution_pin.schema_version not in {"actionq-schema/v11", "actionq-schema/v12"}:
         return None
     ingest_dsn = _runtime_env(
         "VUORO_EXECUTION_COMPLETION_INGEST_DSN", environ
@@ -1030,6 +1030,10 @@ def create_composed_app(
     execution_pin = manifest.pin("execution")
     from actionq.application import ActionQApplication
     from actionq import vuoro as execution_adapter
+    from actionq.managed_dispatch import (
+        ManagedDispatchRejected,
+        load_managed_dispatch_policy,
+    )
 
     execution_runtime_dsn = _runtime_env(
         "VUORO_EXECUTION_RUNTIME_DSN",
@@ -1041,6 +1045,13 @@ def create_composed_app(
         execution_runtime_dsn=execution_runtime_dsn,
         environ=environ,
     )
+    managed_dispatch_policy = None
+    policy_path = environ.get("VUORO_MANAGED_DISPATCH_POLICY_PATH", "").strip()
+    if policy_path:
+        try:
+            managed_dispatch_policy = load_managed_dispatch_policy(policy_path)
+        except ManagedDispatchRejected as exc:
+            raise CompositionError("managed dispatch policy is invalid") from exc
     execution_application = ActionQApplication(
         schema=_runtime_env("VUORO_EXECUTION_SCHEMA", environ),
         connection_factory=_pg_connection_factory(execution_runtime_dsn),
@@ -1051,6 +1062,7 @@ def create_composed_app(
             completion_factories[1] if completion_factories else None
         ),
         authorizer=_execution_authorizer,
+        managed_dispatch_policy=managed_dispatch_policy,
     )
     _load_function(execution_pin)(registry, application=execution_application)
     execution_state = _compatibility("execution", execution_adapter.compatibility_record(execution_application), execution_pin)
