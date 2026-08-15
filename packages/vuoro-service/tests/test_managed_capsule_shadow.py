@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,7 @@ from vuoro_service.managed_capsule_shadow import (
 )
 
 
-AGENTOPS = Path(__file__).parents[4] / "agentops"
+AGENTOPS = Path(os.environ.get("VUORO_AGENTOPS_ROOT", Path(__file__).parents[4] / "agentops"))
 SCRIPT = AGENTOPS / "templates/dispatch/scripts/render_managed_capsule.py"
 SPEC = importlib.util.spec_from_file_location("managed_renderer", SCRIPT)
 assert SPEC and SPEC.loader

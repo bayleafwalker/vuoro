@@ -17,6 +17,8 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      VUORO_AGENTOPS_ROOT: ${{ github.workspace }}/.agentops
     steps:
       - uses: actions/checkout@v6
       - name: Checkout pinned managed-capsule renderer
@@ -24,7 +26,7 @@ jobs:
         with:
           repository: bayleafwalker/agentops
           ref: 67b9ec347ce781923907896efe03796a0df5d364
-          path: ../agentops
+          path: .agentops
       - uses: astral-sh/setup-uv@v8.3.2
         with:
           python-version: "3.12"
