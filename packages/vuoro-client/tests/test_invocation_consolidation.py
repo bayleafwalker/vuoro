@@ -21,7 +21,7 @@ CATALOG = {
 }
 
 
-def _run_invoke(*, credentials=None, status_code=200, envelope=None):
+def _run_invoke(*, status_code=200, envelope=None):
     requests: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -31,7 +31,7 @@ def _run_invoke(*, credentials=None, status_code=200, envelope=None):
                 json={
                     "client_protocol": {"minimum": 1, "maximum": 1},
                     "environment": {"name": "dev", "environment_class": "development"},
-                    "invocation_schema_versions": ["invocation/v1", "invocation/v2"],
+                    "invocation_schema_versions": ["invocation/v1"],
                 },
             )
         if request.url.path == "/api/catalog/v1":
@@ -52,7 +52,6 @@ def _run_invoke(*, credentials=None, status_code=200, envelope=None):
                 basis_revision="basis-1",
                 idempotency_key="key-1",
                 repo_id="repo-1",
-                transient_credentials=credentials,
             )
             return result, client
 
@@ -69,31 +68,14 @@ def test_v1_request_bytes_and_endpoint_are_frozen() -> None:
         b'"operation":"work.example","arguments":{},"catalog_revision":"catalog-1",'
         b'"basis_revision":"basis-1","idempotency_key":"key-1","repo_id":"repo-1"}'
     )
+    # Regression guard: the retired invocation/v2 proof carrier must not
+    # reappear on the wire. v1 is the only envelope the client emits.
     assert b"transient_credentials" not in requests[0].content
 
 
-def test_v2_request_bytes_and_endpoint_are_frozen() -> None:
-    result, _client, requests = _run_invoke(credentials={"claim": "proof"})
-    assert result == {"ok": True}
-    assert requests[0].url.path == "/api/invoke/v2"
-    assert requests[0].content == (
-        b'{"schema_version":"invocation/v2","request_id":"request-1",'
-        b'"operation":"work.example","arguments":{},"catalog_revision":"catalog-1",'
-        b'"basis_revision":"basis-1","idempotency_key":"key-1","repo_id":"repo-1",'
-        b'"transient_credentials":{"claim":"proof"}}'
-    )
-
-
-def test_empty_credentials_keep_v1_and_never_emit_the_field() -> None:
-    _result, _client, requests = _run_invoke(credentials={})
-    assert requests[0].url.path == "/api/invoke/v1"
-    assert b"transient_credentials" not in requests[0].content
-
-
-@pytest.mark.parametrize("credentials", [None, {"claim": "proof"}])
-def test_versions_keep_error_mapping_and_stale_catalog_reset(credentials) -> None:
+def test_error_mapping_and_stale_catalog_reset() -> None:
     envelope = {"status": "rejected", "error": {"code": "stale-catalog", "message": "refresh"}}
     with pytest.raises(InvocationRejectedError) as exc_info:
-        _run_invoke(credentials=credentials, status_code=409, envelope=envelope)
+        _run_invoke(status_code=409, envelope=envelope)
     assert exc_info.value.code == "stale-catalog"
     assert exc_info.value.status_code == 409

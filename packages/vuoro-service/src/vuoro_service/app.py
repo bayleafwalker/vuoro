@@ -29,7 +29,6 @@ from vuoro_service.contracts import (
     HandshakeResponse,
     InvocationError,
     InvocationRequest,
-    InvocationRequestV2,
     InvocationResponse,
     ServiceReleaseIdentity,
 )
@@ -38,7 +37,6 @@ from vuoro_service.identity import (
     IdentityResolutionError,
     IdentityResolver,
     InvocationContext,
-    TransientCredentials,
     deny_all_identities,
 )
 
@@ -80,7 +78,7 @@ class ServiceSettings:
             "invocation": "invocation/v1",
         }
     )
-    invocation_schema_versions: tuple[str, ...] = ("invocation/v1", "invocation/v2")
+    invocation_schema_versions: tuple[str, ...] = ("invocation/v1",)
     domains: Mapping[str, DomainCompatibility] = field(default_factory=dict)
     compatibility_state: Literal["compatible", "degraded", "incompatible"] = "degraded"
     client_protocol_minimum: int = 1
@@ -150,19 +148,13 @@ def create_app(
     async def invalid_request_envelope(
         request: Request, error: RequestValidationError
     ) -> JSONResponse:
-        if request.url.path not in ("/api/invoke/v1", "/api/invoke/v2"):
+        if request.url.path != "/api/invoke/v1":
             return await request_validation_exception_handler(request, error)
         body = error.body if isinstance(error.body, dict) else {}
         request_id = body.get("request_id")
         operation = body.get("operation")
         error_code = "invalid-invocation-envelope"
         error_message = "invocation envelope is invalid"
-        if request.url.path == "/api/invoke/v2" and any(
-            "transient_credentials" in detail.get("loc", ())
-            for detail in error.errors()
-        ):
-            error_code = "invalid-transient-binding"
-            error_message = "transient_credentials binding is invalid"
         return _invocation_response(
             request_id=(
                 request_id
@@ -269,7 +261,6 @@ def create_app(
         basis_revision: str | None,
         idempotency_key: str | None,
         repo_id: str | None,
-        transient_credentials: TransientCredentials,
     ) -> JSONResponse:
         revision = registry.revision
         if not _protocol_supported(settings, request):
@@ -397,7 +388,6 @@ def create_app(
                     idempotency_requirement=operation.definition.idempotency,
                     idempotency_key=idempotency_key,
                     repo_id=repo_id,
-                    transient_credentials=transient_credentials,
                 ),
             )
         except InvocationInputValidationError as error:
@@ -465,23 +455,6 @@ def create_app(
             basis_revision=invocation.basis_revision,
             idempotency_key=invocation.idempotency_key,
             repo_id=invocation.repo_id,
-            transient_credentials=TransientCredentials.empty(),
-        )
-
-    @app.post("/api/invoke/v2")
-    async def invoke_v2(
-        request: Request, invocation: InvocationRequestV2
-    ) -> JSONResponse:
-        return await _dispatch(
-            request,
-            operation_name=invocation.operation,
-            arguments=invocation.arguments,
-            request_id=invocation.request_id,
-            catalog_revision=invocation.catalog_revision,
-            basis_revision=invocation.basis_revision,
-            idempotency_key=invocation.idempotency_key,
-            repo_id=invocation.repo_id,
-            transient_credentials=TransientCredentials(invocation.transient_credentials),
         )
 
     return app

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import httpx
 import pytest
 
@@ -623,3 +625,60 @@ async def test_repo_scoped_operation_honors_the_wildcard_authorization() -> None
         )
     assert response.status_code == 200
     assert observed == "any-repo-at-all"
+
+
+@pytest.mark.anyio
+async def test_handshake_advertises_the_configured_invocation_schema_versions() -> None:
+    _, app = configured_service()
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        handshake = (await client.get("/api/meta/v1/handshake")).json()
+    assert handshake["invocation_schema_versions"] == ["invocation/v1"]
+    assert handshake["schema_versions"]["invocation"] == "invocation/v1"
+
+
+@pytest.mark.anyio
+async def test_unexpected_handler_exception_fails_closed_without_leaking_arguments(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Drives the ``LOGGER.exception(...)`` path in ``app.py``'s ``_dispatch``.
+
+    ``logging.Logger.exception`` captures a full traceback by default, so a
+    handler that stringifies the whole invocation context while crashing is
+    the highest-value adversarial case: neither the traceback text nor the
+    error envelope may carry the invocation's own data back out.
+    """
+
+    sentinel = 424_242
+
+    def handler(arguments, context):
+        raise Exception(f"handler exploded while holding context={context!r}")
+
+    registry, app = configured_service(handler)
+    caplog.set_level(logging.DEBUG, logger="vuoro_service")
+    request = {
+        "schema_version": "invocation/v1",
+        "request_id": "handler-failure",
+        "operation": "work.pilot.transition",
+        "arguments": {"value": sentinel},
+        "catalog_revision": registry.revision,
+        "idempotency_key": "transition-7",
+    }
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/api/invoke/v1",
+            headers={
+                "X-Vuoro-Client-Protocol": "1",
+                "Authorization": "Bearer dev-token",
+            },
+            json=request,
+        )
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "operation-handler-failed"
+    assert str(sentinel) not in response.text
+    assert any(record.exc_info for record in caplog.records), (
+        "expected LOGGER.exception to have fired with exc_info attached"
+    )
