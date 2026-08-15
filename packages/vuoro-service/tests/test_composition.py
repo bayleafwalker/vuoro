@@ -183,7 +183,7 @@ def test_checked_in_execution_pin_includes_released_contract_companion() -> None
     assert pin.dependencies[2].source_revision == "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c"
 
 
-def test_checked_in_work_pin_is_the_maintenance_resource_owner_release() -> None:
+def test_checked_in_work_pin_is_the_reservation_model_release() -> None:
     pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("work")
     assert (
         pin.source_revision,
@@ -191,16 +191,16 @@ def test_checked_in_work_pin_is_the_maintenance_resource_owner_release() -> None
         pin.api_version,
         pin.schema_version,
     ) == (
-        "75fd4a7bc01472f941c923444cabe6451bb1afd0",
-        "0.2.24",
+        "15afc8762ce99beb3ec0239a5ce4a8713dd6f934",
+        "0.3.0",
         "work-api/v1",
         "work-schema/v1",
     )
     assert pin.artifact_url.endswith(
-        "/v0.2.24/sprintctl-0.2.24-py3-none-any.whl"
+        "/v0.3.0/sprintctl-0.3.0-py3-none-any.whl"
     )
     assert pin.artifact_sha256 == (
-        "30fe8d8e81b397f8f34c05b4f615d9cd7570e2a3acd0b26b94f2c4e35d38776c"
+        "b2b81526509da84830fe12c646bddfdb99bbba31b2a45625f743c4233d829fe4"
     )
     assert [
         (item.lock_id, item.lock_kind, item.distribution, item.distribution_version)
