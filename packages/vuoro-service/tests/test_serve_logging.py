@@ -3,11 +3,11 @@ or credential-bearing logging.
 
 ``uvicorn.run``'s default access-log formatter only ever emits
 ``client_addr``, the request line (method + path + protocol), and the status
-code — never headers or the request body, so a transient credential value
-(which only ever travels in the JSON body) cannot reach it. This test proves
-the CLI's ``serve`` command does not override that default with a custom
+code — never headers or the request body. This test proves the CLI's
+``serve`` command does not override that default with a custom
 ``log_config`` or ``access_log`` setting that could start logging bodies, and
-proves no deployment asset configures logging either.
+proves no deployment asset configures logging either. Invocation arguments
+travel only in the JSON body, so they stay out of the access log.
 """
 
 from __future__ import annotations
