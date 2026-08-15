@@ -14,9 +14,9 @@ from sprintctl.vuoro_adapter import register_work_catalog
 from vuoro_service.catalog import CatalogRegistry
 
 
-EXPECTED_TOTAL = 84
-EXPECTED_REVISION = "fc308e37ff1d56eccd9bd1f5372bf782e017936acf44994b22ddba4863e9f196"
-EXPECTED_DOMAIN_COUNTS = {"work": 43, "execution": 26, "knowledge": 10, "audit": 5}
+EXPECTED_TOTAL = 85
+EXPECTED_REVISION = "23cfc276ed1fb4a51b94864a963cfd4b0e70a02a73dc3522e13a96e0c9b33c9a"
+EXPECTED_DOMAIN_COUNTS = {"work": 44, "execution": 26, "knowledge": 10, "audit": 5}
 EXPECTED_EXECUTION_HASH = "8d434e8b347e804c90e48a6598304be84b12f2a61ebc2dbed00a26053239a778"
 
 
