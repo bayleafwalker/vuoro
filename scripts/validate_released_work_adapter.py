@@ -28,9 +28,9 @@ _EXPECTED_ADAPTER_KIT = (
     "https://github.com/bayleafwalker/vuoro/releases/download/"
     "vuoro-adapter-kit-v0.1.0/vuoro_adapter_kit-0.1.0-py3-none-any.whl"
 )
-_EXPECTED_WORK_OPERATION_COUNT = 43
+_EXPECTED_WORK_OPERATION_COUNT = 44
 _EXPECTED_WORK_METADATA_SHA256 = (
-    "bbe3d142b04eaccc55defb8d91891c38a4e759155c731ae5bf7387fe384934b9"
+    "5988b1117763aa4f517724222f4530b948d9c088463eaca098e6b7c7036b9ff1"
 )
 _EXPECTED_FOUR_DOMAIN_REVISION = (
     "fc308e37ff1d56eccd9bd1f5372bf782e017936acf44994b22ddba4863e9f196"
