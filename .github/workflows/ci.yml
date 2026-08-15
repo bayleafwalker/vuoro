@@ -13,6 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout pinned managed-capsule renderer
+        uses: actions/checkout@v4
+        with:
+          repository: bayleafwalker/agentops
+          ref: 67b9ec347ce781923907896efe03796a0df5d364
+          path: ../agentops
       - uses: astral-sh/setup-uv@v8.3.2
         with:
           python-version: "3.12"
