@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "repo_id": "1deb57d0-af6f-479c-811a-b5b7254841f9",
   "adoption_level": "guidance-only",
   "routing": {
@@ -17,7 +17,6 @@
     "template_root": "/projects/dev/agentops/templates/dispatch/skills",
     "selected": [
       "dispatch-plan",
-      "dispatch-wave",
       "dispatch-build",
       "dispatch-review",
       "code-change-verification",
@@ -30,6 +29,72 @@
       ".agents/overlays/vuoro.boundaries.md",
       ".agents/overlays/vuoro.hybrid-worker.md"
     ]
+  },
+  "instruction_set": {
+    "schema_version": 1,
+    "discovery": "native",
+    "sources": [
+      {
+        "id": "vuoro-agents",
+        "path": "AGENTS.md",
+        "kind": "AGENTS.md",
+        "digest": "c23ae311e498aeeb8db9886fe6ee2cd4a08137bd4d2d8045aa9a2898a1e5d53c",
+        "source_rev": "git:4c9c0fa0aa62f5060b570583f605bb4bfea91d9b",
+        "refs": [],
+        "rules": [],
+        "hooks": [],
+        "line_budget": 180
+      },
+      {
+        "id": "vuoro-claude",
+        "path": "CLAUDE.md",
+        "kind": "CLAUDE.md",
+        "digest": "ad9ef0da7195b71a060631a1bca61b944adedfe852ffcad8b0b865198001d52b",
+        "source_rev": "git:4c9c0fa0aa62f5060b570583f605bb4bfea91d9b",
+        "refs": [],
+        "rules": [],
+        "hooks": [],
+        "line_budget": 20
+      }
+    ],
+    "applicability": {
+      "paths": ["."],
+      "roles": ["planner", "worker", "reviewer"]
+    },
+    "entrypoints": {
+      "architecture": [
+        "docs/architecture/portable-execution.md",
+        "docs/architecture/project-composition.md",
+        "docs/architecture/packaging.md"
+      ],
+      "plan": ["docs/plans/architectural-simplification-alignment.md"],
+      "runbook": [
+        "/projects/dev/agentops/docs/runbooks/hybrid-dispatch.md",
+        "/projects/dev/agentops/docs/runbooks/vuoro-workstation-cutover.md"
+      ]
+    },
+    "role_presets": {
+      "planner": { "model": "Sol", "behavior": "xhigh", "tool_mode": "read-only" },
+      "worker": { "model": "Luna", "behavior": "high", "tool_mode": "write" },
+      "reviewer": { "model": "Sol", "behavior": "xhigh", "tool_mode": "read-only" }
+    },
+    "provider_adapters": [
+      {
+        "provider": "claude",
+        "path": "CLAUDE.md",
+        "digest": "ad9ef0da7195b71a060631a1bca61b944adedfe852ffcad8b0b865198001d52b"
+      }
+    ],
+    "skill_lock": {
+      "dispatch-plan": "8da2efaaa4f760a468e5b642d2aa47162df594b52b813138e875189726cf34d6",
+      "dispatch-build": "f895830df38ea72b79f13864130fd2e3ffca3488b261d38744c86cfc79995a1f",
+      "dispatch-review": "0bf4c6f46b30f8ea33c5e226f90f000919291bbe199e0ae14d39cb1c219ea678",
+      "code-change-verification": "da8dca1568f93ca1cb7f73ff88d75849c5c58676c4b3274516069a3197fe13a3",
+      "backlog-refinement": "0a03f2f9ca85fbc1968f1702f0a6d5bd01b55f1d1f99bdda9c8f09df000239f2",
+      "item-done": "441b9b333890d50fc6486f78e60662e8ebbdcefb51c57f34374b44fced32d68d",
+      "verify-state-protocols": "53e405447abb8ff83f35b49fecf0131652bc30f5452d52acebd300960888995c",
+      "reconcile-project-contracts": "3161e7ac4455bfccf20d783a4e9af5ac507c233d4a0afd3acad2857dafccad70"
+    }
   },
   "scope": {
     "allowed_path_roots": [
@@ -45,6 +110,7 @@
       ".envrc.example",
       ".python-version",
       "AGENTS.md",
+      "CLAUDE.md",
       "README.md",
       "CHANGELOG.md",
       "pyproject.toml",
