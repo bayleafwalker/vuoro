@@ -1,0 +1,1359 @@
+apiVersion: planner.vuoro.cloud/v1alpha1
+kind: ImplementationPlan
+metadata:
+  name: vuoro-multi-host-control-plane
+  planId: VUORO-CP-2026-01
+  baselineDate: '2026-08-15'
+  status: ready-for-backlog-decomposition
+spec:
+  assumptions:
+  - OpenBao is available.
+  - An existing cred-broker implementation is available and is part of the OpenBao rollout.
+  - The initial deployment is a namespaced internal control plane used by two or more hosts.
+  target:
+    controlPlane: namespaced Helm/Flux release
+    edge: host-local vuoro-runnerd
+    coreAdoptions:
+    - ACP
+    - OPA
+    - OpenBao
+    - existing cred-broker
+    deferred:
+    - RTK operational adoption
+    - ToolHive
+    - DBOS
+    - Beads
+    - NTM
+    - hcom
+    - CASS
+    - Agent Mail
+  repositoryOwnership:
+  - area: Vuoro / runner protocol
+    owner: IdentitySchema, runner protocol, runnerd, session/incarnation lineage, composition contracts.
+  - area: ActionQ
+    owner: Run attempts, leases, reconciliation, placement, child-run delegation, capacity allocation.
+  - area: Sprintctl
+    owner: Work authority, readiness, plan/work-item lifecycle, portfolio projections.
+  - area: Outctl
+    owner: Evidence capture, redaction, projection, local spool, manifests, command lifecycle.
+  - area: cred-broker
+    owner: CredentialTicket validation, logical catalog mapping, OpenBao interaction, lease delivery and provider audit.
+  - area: Policy / politctl
+    owner: Rego source, tests, bundle release; PolicyInput schema remains in Vuoro core.
+  - area: Infrastructure / appservice
+    owner: Helm chart composition, Flux deployment, secrets references, NetworkPolicies, release promotion.
+  milestones:
+  - id: M0
+    name: Contracts and reuse baseline locked
+    purpose: Freeze ownership and determine exactly what the existing cred-broker already supplies.
+    requires:
+    - FND-001
+    - FND-002
+    - FND-003
+    - FND-004
+    - EVD-001
+    - CRED-000
+    exit:
+    - Core schemas are versioned
+    - cred-broker reuse/gap matrix exists
+    - No duplicate authority or broker is planned
+  - id: M1
+    name: Evidence-complete single-host control path
+    purpose: Prove evidence, API, leases, and local durability before ACP and cross-host complexity.
+    requires:
+    - CTL-001
+    - CTL-002
+    - CTL-003
+    - CTL-004
+    - CTL-005
+    - RUN-001
+    - RUN-002
+    - RUN-003
+    - RUN-004
+    - EVD-002
+    - EVD-003
+    - EVD-004
+    - EVD-005
+    exit:
+    - One run claims, executes, uploads evidence, and settles
+    - Runner/API restart preserves state
+  - id: M2
+    name: ACP and two-host operation
+    purpose: Establish the missing meta-layer and actual cross-host workflow.
+    requires:
+    - RUN-005
+    - RUN-006
+    - RUN-007
+    - ACP-001
+    - ACP-002
+    - ACP-003
+    - ACP-004
+    - ACP-005
+    exit:
+    - Workstation and devbox run concurrently
+    - ACP updates survive partition
+    - Human-started session can be adopted and detached
+  - id: M3
+    name: OpenBao/cred-broker credential surface
+    purpose: Make logical credentials stable while preserving short-lived secret and lease semantics.
+    requires:
+    - CRED-001
+    - CRED-002
+    - CRED-003
+    - CRED-004
+    - CRED-005
+    - CRED-006
+    - CRED-007
+    - CRED-008
+    - CRED-009
+    exit:
+    - Baseline credentials rotate without agent contract changes
+    - Effect-bound grants reject payload drift
+    - No secret enters canonical events
+  - id: M4
+    name: Policy observation complete
+    purpose: Validate PolicyInput/v1 and Rego against real choices before enforcement.
+    requires:
+    - POL-001
+    - POL-002
+    - POL-003
+    - POL-004
+    - POL-005
+    exit:
+    - Full backlog decision coverage
+    - False positives and channels classified
+    - ToolHive decision recorded
+  - id: M5
+    name: Bounded autonomous work paths
+    purpose: Enable semi-independent paths without swarm semantics.
+    requires:
+    - AUT-001
+    - AUT-002
+    - AUT-003
+    - AUT-004
+    - AUT-005
+    - AUT-006
+    - AUT-007
+    exit:
+    - Cross-host builder-test-review path completes
+    - Capacity/policy stops work
+    - No uncertain effect is replayed automatically
+  - id: M6
+    name: Production commissioning
+    purpose: Prove recovery, compatibility, disclosure controls, and rollback.
+    requires:
+    - OPS-001
+    - OPS-002
+    - OPS-003
+    - OPS-004
+    - OPS-005
+    - OPS-006
+    - OPS-007
+    exit:
+    - Restore and N-1 upgrade drills pass
+    - Known limits are explicit
+    - Optional dependencies remain optional
+  workstreams:
+  - id: FND
+    name: Architecture, contracts, and ownership
+    objective: Freeze the small Vuoro-owned identity and protocol surface before distributed implementation branches.
+    gate: Every externally visible schema is versioned, owned, compatibility-tested, and independent of any single adapter
+      or provider.
+  - id: EVD
+    name: Outctl evidence envelope
+    objective: Create a loss-aware, redaction-aware evidence substrate that remains useful even if every later adoption
+      is abandoned.
+    gate: Large and sensitive outputs remain auditable without leaking plaintext centrally, and every projection is traceable
+      to its exact input.
+  - id: CTL
+    name: Namespaced Kubernetes control plane
+    objective: Deploy shared authority, event ingestion, reconciliation, and evidence metadata as a clean Helm/Flux release.
+    gate: The control plane survives restart and upgrade while two hosts continue or reconcile work without direct database
+      access.
+  - id: RUN
+    name: Host runner and multi-host execution
+    objective: Provide a small unprivileged host daemon for workspaces, processes, local durability, and interactive
+      session handling.
+    gate: Workstation and devbox can run independent sessions concurrently, reconnect after partition, and cannot act
+      with stale epochs.
+  - id: ACP
+    name: ACP harness boundary
+    objective: Retire harness-specific session control behind a negotiated local ACP adapter and durable update sink.
+    gate: One real backlog runs through ACP on two hosts with no silent update loss, and a second harness proves the
+      boundary.
+  - id: CRED
+    name: OpenBao and existing cred-broker rollout
+    objective: Reuse the existing cred-broker as the stable credential delivery surface while OpenBao owns secret and
+      lease lifecycle.
+    gate: Agents and other actors consume logical credential references; leases rotate and revoke cleanly; no secret
+      value enters canonical Vuoro state.
+  - id: POL
+    name: OPA policy observation and enforcement
+    objective: Adopt OPA behind a Vuoro-owned decision schema, author Rego directly, and enforce only after measured
+      observation.
+    gate: A full backlog has tested decisions, effect-channel classification, and measured divergence from operator choices.
+  - id: AUT
+    name: Bounded autonomous work paths
+    objective: Enable semi-independent multi-session execution with explicit budgets, capacity pools, stop conditions,
+      and handoffs.
+    gate: A builder-test-review path crosses two hosts without supervision and stops correctly at every injected authority
+      or capacity boundary.
+  - id: OPS
+    name: Operations, upgrades, and commissioning
+    objective: Make the bundle supportable through migrations, compatibility, backup/restore, fault drills, and rollback.
+    gate: N-1 runners drain safely, restore is demonstrated, and failures result in explicit recoverable states rather
+      than duplicate effects.
+  - id: OPT
+    name: Gated optional adoptions
+    objective: Evaluate RTK, ToolHive, DBOS, and Beads only after a named failure or topology measurement justifies them.
+    gate: Each adoption has a trigger, bounded proof, owned-contract boundary, and written exit path.
+  workItems:
+  - id: FND-001
+    workstream: FND
+    title: Ratify the hybrid control-plane ADR
+    purpose: Record the Kubernetes/host boundary, authority ownership, cred-broker placement, and explicit non-goals.
+    priority: P0
+    size: S
+    dependsOn: []
+    outputs:
+    - Accepted ADR
+    - Architecture diagram
+    - Non-goal register
+    acceptance:
+    - No full-swarm or transparent live-migration requirement remains implied
+    - No second credential broker is introduced
+  - id: FND-002
+    workstream: FND
+    title: Define IdentitySchema/v1
+    purpose: Formalize stable identities for actors, work, paths, sessions, incarnations, runs, hosts, runner boots,
+      leases, credentials, grants, policy decisions, and evidence.
+    priority: P0
+    size: M
+    dependsOn:
+    - FND-001
+    outputs:
+    - JSON Schema
+    - ID generation and immutability rules
+    - Example lineage records
+    acceptance:
+    - Every mutating event carries the required identity tuple
+    - Opaque provider session IDs are never treated as portable global IDs
+  - id: FND-003
+    workstream: FND
+    title: Define protocol compatibility and migration policy
+    purpose: Set additive-change, N-1 runner, unknown-major, deprecation, and expand/contract migration rules.
+    priority: P0
+    size: M
+    dependsOn:
+    - FND-002
+    outputs:
+    - Compatibility matrix
+    - Schema-version negotiation
+    - Unknown-major behavior
+    acceptance:
+    - N-1 runners can drain safely
+    - Unknown major versions fail before claiming work
+  - id: FND-004
+    workstream: FND
+    title: Assign state and repository ownership
+    purpose: Map each durable state to its owning repository and prohibit duplicated authority.
+    priority: P0
+    size: S
+    dependsOn:
+    - FND-001
+    outputs:
+    - Ownership matrix
+    - Adapter boundary checklist
+    - Dependency exit-note template
+    acceptance:
+    - Sprintctl, ActionQ, Outctl, Vuoro, cred-broker, and policy ownership are explicit
+    - Every adopted dependency has a replacement path
+  - id: EVD-001
+    workstream: EVD
+    title: Specify EvidenceManifest/v1
+    purpose: Define capture class, raw artifact handling, redaction, projection, hashes, retention, and decision/grant
+      references.
+    priority: P0
+    size: M
+    dependsOn:
+    - FND-002
+    - FND-003
+    outputs:
+    - EvidenceManifest/v1
+    - Standard/sensitive/restricted examples
+    acceptance:
+    - Projector input hash identifies the exact transformed source
+    - Manifest contains no secret material
+  - id: EVD-002
+    workstream: EVD
+    title: Implement encrypted local evidence spool
+    purpose: Capture stdout/stderr and events crash-safely before upload or projection.
+    priority: P0
+    size: L
+    dependsOn:
+    - EVD-001
+    outputs:
+    - Encrypted spool
+    - Ack/watermark compaction
+    - Quota/backpressure behavior
+    acceptance:
+    - Runner restart preserves unacknowledged evidence
+    - Quota exhaustion is explicit and never silently deletes required evidence
+  - id: EVD-003
+    workstream: EVD
+    title: Implement capture classification and recorded redaction
+    purpose: Support standard, sensitive, and restricted handling with deliberate lossy transformations.
+    priority: P0
+    size: L
+    dependsOn:
+    - EVD-001
+    - EVD-002
+    outputs:
+    - Redaction pipeline
+    - Ruleset versioning
+    - In-memory exact-secret registration
+    acceptance:
+    - Credential values are removed before central persistence
+    - Manifest records input/output hashes, match counts, and raw expiry
+  - id: EVD-004
+    workstream: EVD
+    title: Implement projection adapters
+    purpose: Provide native structured, bounded raw, and optional jc projections behind a stable interface.
+    priority: P1
+    size: M
+    dependsOn:
+    - EVD-001
+    outputs:
+    - Projector/v1
+    - bounded-text projector
+    - jc adapter where useful
+    acceptance:
+    - Projection cannot alter command exit status
+    - Every lossy view reports omitted bytes and source hash
+  - id: EVD-005
+    workstream: EVD
+    title: Implement central evidence ingest and retrieval
+    purpose: Persist manifests in PostgreSQL and artifacts in object storage through bounded upload plans.
+    priority: P0
+    size: L
+    dependsOn:
+    - EVD-001
+    - CTL-002
+    outputs:
+    - Evidence API
+    - Presigned upload/download flow
+    - Retention index
+    acceptance:
+    - Hosts never receive database credentials
+    - Missing or expired raw artifacts remain explicit
+  - id: EVD-006
+    workstream: EVD
+    title: Run evidence fault and disclosure tests
+    purpose: Exercise 200 MB output, synthetic credentials, partial upload, projector failure, and spool exhaustion.
+    priority: P0
+    size: M
+    dependsOn:
+    - EVD-002
+    - EVD-003
+    - EVD-004
+    - EVD-005
+    outputs:
+    - Automated test suite
+    - Disclosure review report
+    acceptance:
+    - Sensitive plaintext is not centrally retained
+    - Every loss, expiry, or omission is represented in metadata
+  - id: CTL-001
+    workstream: CTL
+    title: Create vuoro-control Helm/Flux skeleton
+    purpose: Package namespaced workloads without installing hidden cluster-wide operators.
+    priority: P0
+    size: M
+    dependsOn:
+    - FND-001
+    - FND-004
+    outputs:
+    - Helm chart
+    - Flux examples
+    - Values schema
+    acceptance:
+    - Install/uninstall is namespace-bounded
+    - cred-broker can run in-release or reference an existing endpoint
+  - id: CTL-002
+    workstream: CTL
+    title: Create explicit database schemas and migration jobs
+    purpose: Separate domain ownership and use expand/contract migrations.
+    priority: P0
+    size: L
+    dependsOn:
+    - FND-003
+    - FND-004
+    outputs:
+    - Schema ownership map
+    - Migration Job
+    - Rollback-safe procedure
+    acceptance:
+    - Application startup performs no uncontrolled DDL
+    - Migrations are idempotent or fail clearly
+  - id: CTL-003
+    workstream: CTL
+    title: Implement host, session, incarnation, run, and work-path APIs
+    purpose: Expose canonical resources to runners and operator tooling.
+    priority: P0
+    size: L
+    dependsOn:
+    - FND-002
+    - CTL-002
+    outputs:
+    - Versioned API
+    - OpenAPI specification
+    - Idempotency keys
+    acceptance:
+    - All mutating requests are idempotent
+    - Harness/provider metadata cannot become canonical authority
+  - id: CTL-004
+    workstream: CTL
+    title: Implement fenced leases and global capacity pools
+    purpose: Prevent stale runner instances from settling work and model shared provider slots.
+    priority: P0
+    size: L
+    dependsOn:
+    - CTL-003
+    outputs:
+    - Lease epochs
+    - Capacity reservations
+    - blocked_capacity state
+    acceptance:
+    - Old epochs cannot settle, redeem credentials/grants, or create authoritative children
+    - Capacity exhaustion is not recorded as execution failure
+  - id: CTL-005
+    workstream: CTL
+    title: Implement durable event ingest and watermarks
+    purpose: Accept host outbox and ACP update batches with deduplication.
+    priority: P0
+    size: L
+    dependsOn:
+    - CTL-003
+    - FND-003
+    outputs:
+    - Event endpoint
+    - Origin sequence key
+    - Watermark reconciliation
+    acceptance:
+    - Duplicate batches are harmless
+    - Control-plane restart causes no silent event loss
+  - id: CTL-006
+    workstream: CTL
+    title: Implement run reconciler
+    purpose: Classify disconnected, uncertain, interrupted, orphaned, and settled runs without dangerous replay.
+    priority: P0
+    size: L
+    dependsOn:
+    - CTL-004
+    - CTL-005
+    outputs:
+    - Reconciliation state machine
+    - Operator actions
+    - Safe retry rules
+    acceptance:
+    - Uncertain external effects block automatic replay
+    - Healthy hosts continue when another host disappears
+  - id: CTL-007
+    workstream: CTL
+    title: Harden namespace networking and service identity
+    purpose: Apply least-privilege service accounts, private ingress, and explicit service-to-service network policy.
+    priority: P0
+    size: M
+    dependsOn:
+    - CTL-001
+    - CTL-003
+    outputs:
+    - RBAC
+    - Default-deny NetworkPolicies
+    - PDBs
+    - Private ingress
+    acceptance:
+    - Only cred-broker reaches OpenBao
+    - Hosts reach only the public/private Vuoro API surface
+  - id: RUN-001
+    workstream: RUN
+    title: Create vuoro-runnerd service shell
+    purpose: Build the unprivileged daemon, configuration, health, and local state layout.
+    priority: P0
+    size: L
+    dependsOn:
+    - FND-002
+    - FND-003
+    outputs:
+    - Daemon
+    - Systemd service
+    - Config schema
+    - Health endpoint
+    acceptance:
+    - Restart preserves local session and spool state
+    - Daemon runs without root by default
+  - id: RUN-002
+    workstream: RUN
+    title: Implement runner identity and registration
+    purpose: Use the existing Ed25519 identity for signed registration and one boot incarnation.
+    priority: P0
+    size: M
+    dependsOn:
+    - RUN-001
+    - CTL-003
+    outputs:
+    - Registration flow
+    - host_ref/runner_instance_ref
+    - Key rotation path
+    acceptance:
+    - Stale boot identity cannot act as current runner
+    - Control plane stores public identity only
+  - id: RUN-003
+    workstream: RUN
+    title: Implement pull-based claim and lease renewal
+    purpose: Let runners advertise capability and claim eligible work without inbound host control.
+    priority: P0
+    size: L
+    dependsOn:
+    - RUN-002
+    - CTL-004
+    outputs:
+    - Long-poll/stream client
+    - Capability advertisement
+    - Lease renewal
+    acceptance:
+    - Cluster never needs SSH into the host
+    - Lost connectivity stops new claims but not permitted local continuation
+  - id: RUN-004
+    workstream: RUN
+    title: Implement runner outbox and disconnected mode
+    purpose: Buffer events, evidence, and status until acknowledged.
+    priority: P0
+    size: L
+    dependsOn:
+    - RUN-001
+    - CTL-005
+    - EVD-002
+    outputs:
+    - Local WAL/outbox
+    - Replay logic
+    - Offline policy
+    acceptance:
+    - Reconnect resumes from watermark
+    - Offline runner cannot obtain new elevated authority
+  - id: RUN-005
+    workstream: RUN
+    title: Implement workspace/worktree adapter
+    purpose: Create, validate, fingerprint, and clean up authorized repository workspaces.
+    priority: P0
+    size: L
+    dependsOn:
+    - RUN-003
+    outputs:
+    - Workspace adapter
+    - Head/diff fingerprints
+    - Cleanup policy
+    acceptance:
+    - Run cannot write outside authorized roots
+    - Handoff carries Git/evidence references rather than a process assumption
+  - id: RUN-006
+    workstream: RUN
+    title: Implement adopt, attach, detach, and handoff UX
+    purpose: Support human-started sessions and explicit successor sessions across hosts.
+    priority: P1
+    size: M
+    dependsOn:
+    - RUN-003
+    - RUN-005
+    - CTL-003
+    outputs:
+    - CLI commands
+    - tmux mapping
+    - SSH target resolution
+    - Handoff artifact
+    acceptance:
+    - Manual session can be adopted without losing lineage
+    - Cross-host continuation creates a successor incarnation
+  - id: RUN-007
+    workstream: RUN
+    title: Package runner for workstation and devbox
+    purpose: Deliver reproducible installation, upgrade, and rollback for actual hosts.
+    priority: P0
+    size: M
+    dependsOn:
+    - RUN-001
+    - RUN-002
+    - RUN-004
+    outputs:
+    - Nix package/module
+    - Arch/systemd path
+    - Version reporting
+    acceptance:
+    - Both hosts can roll back independently
+    - Configuration contains references, not long-lived embedded secrets
+  - id: ACP-001
+    workstream: ACP
+    title: Define Vuoro Runner/v1 harness contract
+    purpose: Create the internal interface implemented by ACP and temporary legacy adapters.
+    priority: P0
+    size: M
+    dependsOn:
+    - FND-002
+    - FND-004
+    outputs:
+    - Runner/v1
+    - Capability model
+    - Normalized lifecycle
+    acceptance:
+    - ActionQ contains no ACP-specific authority fields
+    - Adapter replacement leaves canonical data intact
+  - id: ACP-002
+    workstream: ACP
+    title: Implement first local ACP adapter
+    purpose: Integrate the primary harness through local stdio and pin protocol/adapter versions.
+    priority: P0
+    size: L
+    dependsOn:
+    - ACP-001
+    - RUN-001
+    outputs:
+    - ACP client
+    - Session new/load/prompt/cancel mapping
+    - Capability record
+    acceptance:
+    - Negotiated capabilities persist per incarnation
+    - Unsupported operations fail explicitly
+  - id: ACP-003
+    workstream: ACP
+    title: Implement durable ACP update sink
+    purpose: Fsync every session/update locally and forward with origin sequence and watermarks.
+    priority: P0
+    size: L
+    dependsOn:
+    - ACP-002
+    - RUN-004
+    - CTL-005
+    outputs:
+    - Per-session update WAL
+    - Stream epoch
+    - Central normalization
+    acceptance:
+    - Runner/control restart loses no acknowledged update
+    - Run cannot settle before prior updates are durable or explicitly unavailable
+  - id: ACP-004
+    workstream: ACP
+    title: Implement resume, cancellation, and uncertain-turn rules
+    purpose: Handle capability differences without pretending opaque sessions migrate between hosts.
+    priority: P0
+    size: L
+    dependsOn:
+    - ACP-003
+    - CTL-006
+    outputs:
+    - Capability matrix
+    - Same-host resume
+    - Successor-session path
+    - Cancel reconciliation
+    acceptance:
+    - Cross-host recovery never reuses opaque ID without proof
+    - Cancellation ends in an explicit final state
+  - id: ACP-005
+    workstream: ACP
+    title: Cut over one real runner profile
+    purpose: Use ACP as the sole path for one substantial low-consequence backlog.
+    priority: P0
+    size: L
+    dependsOn:
+    - ACP-004
+    - RUN-007
+    - EVD-006
+    outputs:
+    - Cutover record
+    - Smoke-test results
+    - Intervention log
+    acceptance:
+    - Old path is non-authoritative and deletable
+    - Accepted result, intervention, and retry metrics are captured
+  - id: ACP-006
+    workstream: ACP
+    title: Prove second harness and retire PTY fallback
+    purpose: Validate the abstraction and force an explicit fallback sunset decision.
+    priority: P1
+    size: L
+    dependsOn:
+    - ACP-005
+    outputs:
+    - Second adapter
+    - Compatibility report
+    - PTY removal or exception ADR
+    acceptance:
+    - No automatic PTY fallback
+    - Sunset reviewed by 15 November 2026
+  - id: CRED-000
+    workstream: CRED
+    title: Assess existing cred-broker against target contracts
+    purpose: Inventory current authentication, logical naming, OpenBao engines, wrapping, lease operations, audit, idempotency,
+      HA, and failure behavior.
+    priority: P0
+    size: M
+    dependsOn:
+    - FND-001
+    - FND-004
+    outputs:
+    - Capability matrix
+    - Gap list
+    - Reuse decision
+    - Upgrade/compatibility note
+    acceptance:
+    - No duplicate broker is planned
+    - Every later CRED task is marked reuse, extension, or configuration
+  - id: CRED-001
+    workstream: CRED
+    title: Define CredentialCatalog/v1
+    purpose: Expose stable credential_ref names independent of OpenBao mount/path layout.
+    priority: P0
+    size: M
+    dependsOn:
+    - FND-002
+    - CRED-000
+    outputs:
+    - Catalog schema
+    - Naming rules
+    - Git/S3/Kubernetes/release/SMTP examples
+    acceptance:
+    - Agents request logical references, never raw OpenBao paths
+    - Catalog changes are versioned and reviewable
+  - id: CRED-002
+    workstream: CRED
+    title: Define credential ticket and actor binding
+    purpose: Specify the short-lived signed authorization passed to cred-broker for runners, sessions, services, CI,
+      and humans.
+    priority: P0
+    size: L
+    dependsOn:
+    - CRED-001
+    - RUN-002
+    outputs:
+    - CredentialTicket/v1
+    - Actor/auth matrix
+    - Replay and expiry rules
+    acceptance:
+    - Agent sessions hold no long-lived OpenBao token
+    - Ticket binds actor, work, session, host, runner boot, credential_ref, and effect digest where required
+  - id: CRED-003
+    workstream: CRED
+    title: Commission cred-broker as the OpenBao delivery plane
+    purpose: Deploy or reference the existing broker, align it to CredentialTicket/v1, and keep OpenBao path/role mapping
+      inside the broker.
+    priority: P0
+    size: L
+    dependsOn:
+    - CRED-000
+    - CRED-002
+    - CTL-001
+    - CTL-007
+    outputs:
+    - Namespaced deployment or external endpoint mode
+    - OpenBao mapping configuration
+    - Health and lease operations
+    acceptance:
+    - vuoro-control does not implement a second provider adapter
+    - Only cred-broker needs OpenBao provider access
+  - id: CRED-004
+    workstream: CRED
+    title: Integrate runner credential retrieval and injection
+    purpose: Retrieve brokered/wrapped credentials and inject them into one process without prompt or event exposure.
+    priority: P0
+    size: L
+    dependsOn:
+    - CRED-003
+    - RUN-003
+    - EVD-003
+    outputs:
+    - Runner client
+    - Delivery modes
+    - tmpfs/memfd cleanup
+    - Redaction registration
+    acceptance:
+    - Secret values never enter prompts or canonical events
+    - Revoked/expired material is removed and cannot renew
+  - id: CRED-005
+    workstream: CRED
+    title: Implement credential classes and lease policy
+    purpose: Support baseline renewable, scoped work, effect-bound elevated, and break-glass classes.
+    priority: P0
+    size: M
+    dependsOn:
+    - CRED-003
+    - CRED-004
+    outputs:
+    - Class policy
+    - TTL/renewal defaults
+    - Offline behavior
+    acceptance:
+    - Offline runner can use only explicitly allowed low-risk leases
+    - Break-glass is human-only and separately audited
+  - id: CRED-006
+    workstream: CRED
+    title: Implement Vuoro grant ledger above broker delivery
+    purpose: Add issued, prepared, consumed, revoked, expired, and aborted semantics.
+    priority: P0
+    size: L
+    dependsOn:
+    - CRED-003
+    - CTL-004
+    outputs:
+    - Grant API/tables
+    - Atomic consumption
+    - Human authority reference
+    acceptance:
+    - One-shot meaning is enforced by Vuoro state
+    - Duplicate consume requests remain one use
+  - id: CRED-007
+    workstream: CRED
+    title: Implement payload-bound EffectDescriptor/v1
+    purpose: Bind grants to resolved manifests, stdin, scripts, patches, targets, refs, and workspace snapshots.
+    priority: P0
+    size: L
+    dependsOn:
+    - CRED-006
+    - RUN-005
+    - EVD-001
+    outputs:
+    - Canonicalization library
+    - Prepare/commit comparison
+    - Kubectl/git/script fixtures
+    acceptance:
+    - Digest mismatch blocks execution
+    - Arbitrary elevated shell is classified as a broader approval class
+  - id: CRED-008
+    workstream: CRED
+    title: Correlate credential, grant, policy, and evidence audit
+    purpose: Link broker/OpenBao lease references to actor, session, effect, Outctl run, and result.
+    priority: P0
+    size: M
+    dependsOn:
+    - CRED-004
+    - CRED-006
+    - CRED-007
+    - EVD-005
+    outputs:
+    - Audit schema
+    - Operator query/report
+    acceptance:
+    - Reviewer can reconstruct the authorization and result without seeing secret values
+  - id: CRED-009
+    workstream: CRED
+    title: Exercise rotation, revocation, expiry, and outage
+    purpose: Prove routine and emergency credential lifecycle behavior.
+    priority: P0
+    size: M
+    dependsOn:
+    - CRED-005
+    - CRED-008
+    outputs:
+    - Rotation drill
+    - Revocation drill
+    - Broker/OpenBao outage test
+    - Break-glass test
+    acceptance:
+    - Revoked leases stop renewal/future use
+    - Unrelated local-safe work continues during credential-plane outage
+  - id: POL-001
+    workstream: POL
+    title: Define PolicyInput/v1 and PolicyDecision/v1
+    purpose: Design Vuoro-native policy context around identity, authority, workspace, effect, credential class, and
+      prior grants.
+    priority: P0
+    size: L
+    dependsOn:
+    - FND-002
+    - CRED-007
+    outputs:
+    - JSON Schemas
+    - Fixtures
+    - Secret-exclusion rules
+    acceptance:
+    - Input is sufficient to explain decisions
+    - No OPA-specific field enters canonical domain state
+  - id: POL-002
+    workstream: POL
+    title: Deploy OPA as a namespaced decision service
+    purpose: Run OPA separately with versioned policy delivery and masked decision logs.
+    priority: P0
+    size: M
+    dependsOn:
+    - CTL-001
+    - CTL-007
+    - POL-001
+    outputs:
+    - Deployment/service
+    - Bundle/config delivery
+    - Log masking
+    acceptance:
+    - Decision ID and policy revision persist in Vuoro
+    - OPA can be replaced behind the decision adapter
+  - id: POL-003
+    workstream: POL
+    title: Author baseline Rego and tests
+    purpose: Write direct Rego with fixtures and opa test from the first commit.
+    priority: P0
+    size: L
+    dependsOn:
+    - POL-001
+    - POL-002
+    outputs:
+    - Baseline policy
+    - Unit tests
+    - Negative fixtures
+    - Explain examples
+    acceptance:
+    - Every deny/grant branch has a named test
+    - Policy review does not rely on production logs
+  - id: POL-004
+    workstream: POL
+    title: Run observation mode over a full backlog
+    purpose: Record would-allow, would-deny, and would-require-grant without blocking.
+    priority: P0
+    size: L
+    dependsOn:
+    - POL-003
+    - CRED-008
+    - ACP-005
+    outputs:
+    - Decision capture
+    - Operator comparison
+    - False-positive labels
+    acceptance:
+    - All encountered consequential effect families are covered
+    - OPA outage is recorded but does not block observe-mode work
+  - id: POL-005
+    workstream: POL
+    title: Classify effect channels and decide ToolHive gate
+    purpose: Measure shell, git, Kubernetes, filesystem, network, secret, MCP, and other channels.
+    priority: P1
+    size: M
+    dependsOn:
+    - POL-004
+    outputs:
+    - Effect-channel report
+    - ToolHive adoption/rejection ADR
+    acceptance:
+    - Decision is based on consequential MCP share and lifecycle ownership, not fashion
+  - id: POL-006
+    workstream: POL
+    title: Promote selected families to enforcement
+    purpose: Enforce only well-tested families with explicit unavailable-policy behavior and rollback.
+    priority: P1
+    size: L
+    dependsOn:
+    - POL-004
+    - CRED-009
+    - OPS-004
+    outputs:
+    - Enforcement matrix
+    - Feature flags
+    - Rollback playbook
+    acceptance:
+    - Consequential effects fail closed where declared
+    - Local-safe work continues where declared
+  - id: AUT-001
+    workstream: AUT
+    title: Implement work_path domain and lineage
+    purpose: Group sessions and runs into explicit semi-independent paths.
+    priority: P0
+    size: M
+    dependsOn:
+    - CTL-003
+    - FND-002
+    outputs:
+    - Work-path API/state
+    - Parent/child lineage
+    - Status projection
+    acceptance:
+    - Every child run has a sponsoring path and authority scope
+    - No peer consensus is introduced
+  - id: AUT-002
+    workstream: AUT
+    title: Implement delegation and continuation budgets
+    purpose: Bound repositories, profiles, child runs, concurrency, expiry, credentials, and effects.
+    priority: P0
+    size: L
+    dependsOn:
+    - AUT-001
+    - CTL-004
+    - POL-001
+    outputs:
+    - Delegation/v1
+    - Budget accounting
+    - Expiry handling
+    acceptance:
+    - Coordinator cannot widen its own delegation
+    - Budget exhaustion yields explicit stop reason
+  - id: AUT-003
+    workstream: AUT
+    title: Implement child-run creation and readiness selection
+    purpose: Allow coordinators to request ready work and spawn bounded children through ActionQ.
+    priority: P0
+    size: L
+    dependsOn:
+    - AUT-002
+    - CTL-004
+    outputs:
+    - Child-run API
+    - Readiness integration
+    - Idempotent spawn
+    acceptance:
+    - Duplicate spawn creates one child
+    - No peer-to-peer scheduler authority appears
+  - id: AUT-004
+    workstream: AUT
+    title: Implement provider capacity allocation
+    purpose: Reserve global subscription/API slots across hosts and work paths.
+    priority: P0
+    size: M
+    dependsOn:
+    - CTL-004
+    - AUT-002
+    outputs:
+    - Capacity allocator
+    - Reservations
+    - Fairness policy
+    acceptance:
+    - Two hosts cannot overbook one pool
+    - blocked_capacity differs from blocked_work
+  - id: AUT-005
+    workstream: AUT
+    title: Implement portable handoff and successor sessions
+    purpose: Move work through Git, plans, evidence, questions, notes, and completion-contract state.
+    priority: P0
+    size: L
+    dependsOn:
+    - RUN-006
+    - ACP-004
+    - AUT-001
+    outputs:
+    - Handoff artifact
+    - Successor API
+    - Operator UX
+    acceptance:
+    - Cross-host continuation does not assume conversation-store portability
+    - Unresolved risks and current evidence are included
+  - id: AUT-006
+    workstream: AUT
+    title: Implement stop conditions and escalation
+    purpose: Stop on denial, authority conflict, completion failure, capacity exhaustion, or uncertain external effect.
+    priority: P0
+    size: M
+    dependsOn:
+    - AUT-003
+    - POL-004
+    - CRED-006
+    - CTL-006
+    outputs:
+    - Stop engine
+    - Escalation event
+    - Operator commands
+    acceptance:
+    - No autonomous retry crosses uncertain effect
+    - Escalation preserves evidence and pending work
+  - id: AUT-007
+    workstream: AUT
+    title: Run cross-host builder-test-review pilot
+    purpose: Exercise a bounded path across workstation and devbox with minimal intervention.
+    priority: P0
+    size: L
+    dependsOn:
+    - AUT-004
+    - AUT-005
+    - AUT-006
+    - ACP-006
+    outputs:
+    - Pilot report
+    - Accepted result
+    - Intervention and spend record
+    acceptance:
+    - At least three child runs complete across two hosts
+    - Path stops correctly at injected gates
+  - id: OPS-001
+    workstream: OPS
+    title: Implement health, metrics, and operator status
+    purpose: Expose runner, lease, spool, credential, policy, evidence, and capacity health.
+    priority: P1
+    size: M
+    dependsOn:
+    - CTL-003
+    - RUN-004
+    - CRED-008
+    outputs:
+    - Metrics
+    - Health endpoints
+    - Operator status view
+    acceptance:
+    - One view identifies blocked capacity, disconnected runners, stale leases, failed uploads, and broker/policy errors
+  - id: OPS-002
+    workstream: OPS
+    title: Implement backup, restore, and evidence reconciliation
+    purpose: Protect PostgreSQL state and reconcile object artifacts after restore.
+    priority: P0
+    size: L
+    dependsOn:
+    - CTL-002
+    - EVD-005
+    outputs:
+    - Backup policy
+    - Restore drill
+    - Orphan reconciliation
+    acceptance:
+    - Restore preserves identities, grants, watermarks, and audit linkage
+    - Missing artifacts remain explicit
+  - id: OPS-003
+    workstream: OPS
+    title: Implement version report card and compatibility gates
+    purpose: Report control, runner, adapter, broker, OpenBao contract, OPA policy, and schema compatibility.
+    priority: P0
+    size: M
+    dependsOn:
+    - FND-003
+    - RUN-007
+    - ACP-002
+    - CRED-000
+    outputs:
+    - Version report card
+    - Compatibility endpoint
+    - Drain/reject behavior
+    acceptance:
+    - N-1 runners drain safely
+    - Incompatible components fail before claiming or issuing credentials
+  - id: OPS-004
+    workstream: OPS
+    title: Write operational runbooks
+    purpose: Document outage, orphan, stale lease, credential compromise, policy failure, migration, and rollback.
+    priority: P0
+    size: M
+    dependsOn:
+    - CTL-006
+    - CRED-009
+    - POL-004
+    outputs:
+    - Runbook set
+    - Operator command examples
+    acceptance:
+    - Every high-risk state has a bounded recovery path and do-not-do list
+  - id: OPS-005
+    workstream: OPS
+    title: Implement controlled release and rollback
+    purpose: Use digest-pinned images, explicit migrations, feature flags, and Helm rollback.
+    priority: P0
+    size: L
+    dependsOn:
+    - CTL-001
+    - CTL-002
+    - FND-003
+    outputs:
+    - Release pipeline
+    - Rollback procedure
+    - Provenance metadata
+    acceptance:
+    - Rollback cannot reactivate stale epochs
+    - Database rollback follows expand/contract rules
+  - id: OPS-006
+    workstream: OPS
+    title: Run distributed failure-injection suite
+    purpose: Exercise API restart, partition, runner reboot, stale replay, harness death, broker/OpenBao outage, OPA
+      outage, and N-1 upgrade.
+    priority: P0
+    size: L
+    dependsOn:
+    - EVD-006
+    - ACP-005
+    - CRED-009
+    - POL-004
+    - OPS-003
+    outputs:
+    - Automated drill harness
+    - Results report
+    - Remediation backlog
+    acceptance:
+    - No silent event loss or automatic duplicate external effect
+    - Healthy paths continue when one host fails
+  - id: OPS-007
+    workstream: OPS
+    title: Commission production-ready multi-host bundle
+    purpose: Run disclosure, restore, upgrade, rollback, and bounded autonomy reviews.
+    priority: P0
+    size: L
+    dependsOn:
+    - AUT-007
+    - OPS-002
+    - OPS-005
+    - OPS-006
+    outputs:
+    - Commissioning report
+    - Go/no-go decision
+    - Known-limit register
+    acceptance:
+    - All milestone gates pass or have accepted exceptions
+    - Deferred dependencies remain disabled
+  - id: OPT-001
+    workstream: OPT
+    title: Measure RTK as shadow projection
+    purpose: Compare RTK output against the actual consumed view without making it authoritative.
+    priority: P2
+    size: S
+    dependsOn:
+    - EVD-004
+    - ACP-005
+    outputs:
+    - Token/diagnostic/retry comparison
+    acceptance:
+    - Adoption requires net reduction after retry cost and ACP structured updates
+  - id: OPT-002
+    workstream: OPT
+    title: Evaluate ToolHive only after channel measurement
+    purpose: Decide whether MCP carries enough consequential effects and choose one lifecycle owner.
+    priority: P2
+    size: S
+    dependsOn:
+    - POL-005
+    outputs:
+    - Adoption/rejection ADR
+    acceptance:
+    - No installation without gate
+    - Separate release if adopted
+  - id: OPT-003
+    workstream: OPT
+    title: Evaluate DBOS only against named ActionQ failure
+    purpose: Fully cut one low-consequence profile only if current durability is insufficient.
+    priority: P2
+    size: M
+    dependsOn:
+    - OPS-006
+    outputs:
+    - Failure statement
+    - Exit note
+    - Cutover pilot
+    acceptance:
+    - No permanent shadow scheduler
+    - Old path remains deletable
+  - id: OPT-004
+    workstream: OPT
+    title: Evaluate Beads only against named task-layer failure
+    purpose: Preserve explicit per-item authority and one-way versioned adapters.
+    priority: P2
+    size: M
+    dependsOn:
+    - AUT-007
+    outputs:
+    - Failure statement
+    - Authority ADR
+    - Importer proof
+    acceptance:
+    - No transparent bidirectional sync
+    - Unknown major versions fail closed
+  failureTests:
+  - scenario: Control API restart during active ACP turn
+    expected: Runner replays updates from watermark; no duplicate prompt; run remains recoverable.
+  - scenario: Runner loses cluster connectivity
+    expected: Existing allowed local work continues; no new claims or elevated credentials; events spool.
+  - scenario: Runner restarts with unacknowledged events
+    expected: New runner_instance_ref; WAL replays; stale boot cannot settle.
+  - scenario: Old runner reconnects after replacement
+    expected: Lease epoch rejects writes, credential tickets, grants, and child creation.
+  - scenario: Harness dies after external effect
+    expected: Run becomes uncertain/interrupted; Outctl evidence is available; no automatic replay.
+  - scenario: Duplicate event and settle requests
+    expected: Idempotency produces one event sequence and one final result.
+  - scenario: cred-broker unavailable
+    expected: No new credentials; grant state remains intact; unrelated work continues.
+  - scenario: OpenBao unavailable behind broker
+    expected: Broker reports provider failure; no secret fallback; unrelated work continues.
+  - scenario: Credential expires mid-run
+    expected: Renewal follows class policy; failure is explicit; material is removed.
+  - scenario: OPA unavailable in observe mode
+    expected: Evaluation failure recorded; work continues.
+  - scenario: OPA unavailable in enforcement mode
+    expected: Declared consequential effects fail closed; local-safe work follows policy.
+  - scenario: 200 MB output contains synthetic secrets
+    expected: No plaintext central retention; manifest records redaction and raw expiry.
+  - scenario: N-1 runner/broker during upgrade
+    expected: Compatible work drains; incompatible claims/tickets are rejected before effect.
+  - scenario: Cross-host handoff
+    expected: Successor receives Git/evidence/plan state; opaque provider session is not assumed portable.
+  - scenario: Capacity pool exhausted
+    expected: Path enters blocked_capacity and resumes after slot release.
+  risks:
+  - risk: Duplicate external effect after partition
+    severity: Critical
+    why: Fenced leases do not undo an effect already started.
+    mitigation: Payload-bound grants, prepare/commit verification, uncertain state, no automatic replay.
+  - risk: Credential leakage through evidence
+    severity: Critical
+    why: Tools may echo tokens or files.
+    mitigation: Short leases, process-scoped injection, in-memory exact redaction, sensitive capture, disclosure tests.
+  - risk: cred-broker and Vuoro duplicate authority
+    severity: High
+    why: A broker that decides work policy becomes a second control plane.
+    mitigation: Broker validates signed tickets and provider constraints; Vuoro owns work, grant, and policy authority.
+  - risk: OpenBao path coupling
+    severity: High
+    why: Domain or agents may depend on mount layout.
+    mitigation: Logical CredentialCatalog/v1; mapping stays inside cred-broker; exit note required.
+  - risk: ACP adapter churn
+    severity: High
+    why: Adapters may lag protocol or capabilities.
+    mitigation: Pin versions, persist capabilities, internal Runner/v1, explicit failures.
+  - risk: Policy input omits decisive context
+    severity: High
+    why: OPA can make precise but wrong decisions.
+    mitigation: Treat input schema as core; observe full backlog; test every deny/grant branch.
+  - risk: Local spool exhaustion
+    severity: High
+    why: Long outages or huge logs can fill disk.
+    mitigation: Quotas, backpressure, alerts, bounded continuation, no silent deletion.
+  - risk: Subscription capacity misdiagnosed
+    severity: Medium
+    why: More sessions do not create more provider quota.
+    mitigation: Global capacity pools and blocked_capacity state.
+  - risk: Upgrade strands old runners/broker
+    severity: High
+    why: Version skew can stall or corrupt execution.
+    mitigation: N-1 matrix, report card, drain/reject, additive schemas.
+  - risk: Optional integration sprawl
+    severity: Medium
+    why: Maintenance rises faster than value.
+    mitigation: Named-failure gates, one-at-a-time pilots, exit note before adoption.
+  dependencyExitNotes:
+  - dependency: ACP
+    value: Standardized local harness session control and structured updates.
+    contracts:
+    - Runner/v1
+    - HarnessCapabilities/v1
+    - NormalizedSessionEvent/v1
+    exit: Replace the adapter behind Runner/v1. Canonical run, session, event, evidence, credential, and grant state
+      remains Vuoro-native.
+  - dependency: OPA
+    value: Policy evaluation, tests, decision IDs, bundles, and decision logging.
+    contracts:
+    - PolicyInput/v1
+    - PolicyDecision/v1
+    exit: Swap the decision adapter while retaining Vuoro schemas and persisted decisions. Rego is the bounded migration
+      surface.
+  - dependency: OpenBao
+    value: Secret storage, issuance, lease, renewal, rotation, revocation, and wrapping.
+    contracts:
+    - CredentialCatalog/v1
+    - CredentialTicket/v1
+    - CredentialLeaseRef/v1
+    - Grant/v1
+    - EffectDescriptor/v1
+    exit: Implement another provider behind cred-broker and remap logical credentials. Secret values are not migration
+      data; Vuoro keeps metadata and audit linkage.
+  - dependency: cred-broker (first-party existing component)
+    value: Stable actor-facing credential delivery and OpenBao provider translation.
+    contracts:
+    - CredentialTicket/v1
+    - CredentialLeaseRef/v1
+    - CredentialCatalog/v1
+    exit: Move provider mapping/delivery behind another service that accepts the same tickets. Do not reimplement grant
+      or policy authority inside the replacement.
