@@ -8,6 +8,14 @@ supersedes: []
 
 # Vuoro architectural simplification alignment
 
+> **Alignment update, 2026-08-20.** Completed release, migration, and canary
+> evidence below remains historical fact. For future execution ownership,
+> [Native-runtime and execution-federation alignment](2026-08-20-execution-federation-alignment.md)
+> supersedes references to ActionQ as an execution kernel/coordinator and to
+> the portable-runner plan. ActionQ's target is federation without a daemon,
+> queue, claims, leases, runner, or fan-out engine; Sprintctl reservations are
+> advisory; Outctl is outside the canonical Vuoro project.
+
 This owner-local plan aligns Vuoro with the cross-repository
 `vuoro-substrate-simplification-refactoring` assessment in Agentops. Sprintctl
 items remain the execution authority; this document records only Vuoro-owned

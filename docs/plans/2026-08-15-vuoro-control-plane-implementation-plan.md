@@ -1,14 +1,20 @@
 ---
 doc_id: vuoro-cp-2026-01-multi-host-control-plane
-status: draft
+status: superseded
 supersedes: null
 ---
 
 # Vuoro Multi-Host Control Plane — Implementation Planner
 
+> **Superseded for implementation on 2026-08-20.** The historical task body
+> below is retained for provenance, but it must not be decomposed into a live
+> backlog. [Native-runtime and execution-federation alignment](2026-08-20-execution-federation-alignment.md)
+> replaces its `vuoro-runnerd`, ActionQ daemon/queue/lease/placement, Outctl,
+> and namespaced execution-control-plane assumptions.
+
 **Plan ID:** VUORO-CP-2026-01  
 **Baseline:** 15 August 2026  
-**Status:** Ready for backlog decomposition  
+**Status:** Superseded; not ready for backlog decomposition
 **Key assumption:** The existing `cred-broker` is reused as part of the OpenBao rollout; this plan does not create a second broker.
 
 ## Executive direction
