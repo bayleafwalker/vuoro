@@ -1,7 +1,15 @@
 # Portable governed execution
 
-Status: ratified direction. Implementation remains owner-staged and
-evidence-gated.
+Status: superseded as a future-state implementation plan on 2026-08-20.
+Historical contracts and evidence remain preserved below.
+
+> Apply [Native-runtime and execution-federation alignment](../plans/2026-08-20-execution-federation-alignment.md).
+> ActionQ's current target deletes the daemon, queue, leases, runner, and
+> fan-out engine while retaining a thin federation layer for references,
+> assurance, acceptance, and reconciliation. Native products execute
+> directly; Sprintctl reservations are advisory; Outctl is not a required
+> Vuoro member. The owner-staged runner design below records the superseded
+> direction and must not seed new implementation work.
 
 The current devbox dispatcher is an implementation, not the execution
 architecture. Governed execution should cross a stable contract that a devbox

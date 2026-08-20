@@ -1,6 +1,15 @@
 Vuoro_Interface_Agent_Runtime
 # Vuoro Operator Interface and Agent Runtime — Design Handoff
 
+> **Future-state alignment, 2026-08-20.** Preserve this handoff as design
+> history, but apply [the native-runtime and execution-federation alignment](2026-08-20-execution-federation-alignment.md)
+> before using its roadmap. Product-native runtimes are now the execution
+> baseline; ActionQ federates their external references and assurance rather
+> than owning a daemon, queue, claims, leases, runner, or harness process.
+> Sprintctl reservations are advisory, and Outctl is not a required Vuoro
+> dependency. The provisional schemas, shared adapter, and Vuoro-native
+> runtime below are not authorized implementation targets.
+
 ## Status
 
 Assessed 2026-07-29. The operator-interface direction remains useful, but

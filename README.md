@@ -71,18 +71,20 @@ resources. Vuoro standardizes reference, snapshot, change, and delivery
 envelopes while the owning domain retains lifecycle authority; see
 [Domain-owned observable resources](docs/architecture/observable-resources.md).
 
-The current devbox dispatcher is one implementation of governed execution,
-not the placement contract. The staged portable boundary between Sprintctl
-plans, Actionq lifecycle authority, interchangeable runners, immutable Git
-candidate artifacts, Auditctl evidence, and Vuoro composition is defined in
-[Portable governed execution](docs/architecture/portable-execution.md).
+Future governed execution uses product-native runtimes directly. ActionQ is a
+thin federation layer for external execution references, binding assurance,
+acceptance, and reconciliation; it is not the future owner of a daemon, queue,
+leases, runner, or fan-out engine. Sprintctl reservations are advisory
+coordination rather than exclusive execution claims. Vuoro only transports
+and composes the released owner capabilities. See
+[Native-runtime and execution-federation alignment](docs/plans/2026-08-20-execution-federation-alignment.md).
 
-Command-output mediation is provided by the adjacent
-[`outctl`](https://github.com/bayleafwalker/outctl) substrate repository. It
-runs at the runner/harness boundary to retain recoverable raw stdout/stderr and
-return deterministic bounded projections. Vuoro may advertise opaque capture
-references, but it does not own raw logs, subprocess lifecycle, retention, or
-projection policy.
+Raw runtime output may remain host-local. Git holds authored artifacts,
+Auditctl holds durable findings, and ActionQ may retain bounded evidence
+references alongside an external execution. Outctl is not a required Vuoro
+member or service dependency. The earlier runner/Outctl design is preserved
+as historical planning in
+[Portable governed execution](docs/architecture/portable-execution.md).
 
 ## Development
 
