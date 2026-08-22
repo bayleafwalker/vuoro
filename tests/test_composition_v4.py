@@ -58,6 +58,7 @@ def _provider(**overrides) -> dict:
             "distribution": "actionq",
             "distribution_version": "0.1.26",
             "artifact_sha256": "a" * 64,
+            "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/v0.1.26/actionq-0.1.26-py3-none-any.whl",
         },
         "capabilities": ["execution/v1"],
         **overrides,
@@ -69,6 +70,7 @@ def _adapter(**overrides) -> dict:
         "adapter_id": "execution-adapter",
         "provider_id": "actionq-execution",
         "module": "actionq.vuoro",
+        "build": "build",
         "register": "register_operations",
         **overrides,
     }
@@ -195,6 +197,7 @@ def test_digest_fields_must_be_digests() -> None:
         Provider.from_dict(_provider(artifact={
             "distribution": "actionq", "distribution_version": "0.1.26",
             "artifact_sha256": "not-a-digest",
+            "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/v0.1.26/actionq-0.1.26-py3-none-any.whl",
         }))
 
 
@@ -206,7 +209,8 @@ def test_one_repository_may_ship_two_providers() -> None:
             _provider(provider_id="actionq-federation", release_unit="actionq-federation",
                       capabilities=["federation.grant/v1"],
                       artifact={"distribution": "actionq", "distribution_version": "0.1.26",
-                                "artifact_sha256": "f" * 64}),
+                                "artifact_sha256": "f" * 64,
+                                "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/v0.1.26/actionq_federation-0.1.26-py3-none-any.whl"}),
         ],
     ))
     units = {provider.release_unit for provider in profile.providers}
@@ -227,7 +231,8 @@ def test_the_v3_dependency_edge_survives_as_a_declared_closure() -> None:
                   role="shared-dependency", capabilities=[],
                   source_repository="https://github.com/bayleafwalker/vuoro",
                   artifact={"distribution": "vuoro-adapter-kit", "distribution_version": "0.1.0",
-                            "artifact_sha256": "1" * 64}),
+                            "artifact_sha256": "1" * 64,
+                            "artifact_url": "https://github.com/bayleafwalker/vuoro/releases/download/v0.1.0/vuoro_adapter_kit-0.1.0-py3-none-any.whl"}),
     ]))
     assert profile.provider("actionq-execution").dependencies == ("vuoro-adapter-kit",)
 
@@ -253,15 +258,29 @@ def test_an_adapter_has_nowhere_to_declare_canonical_state() -> None:
     ).closure.schema_version == "actionq-schema/v12"
 
 
-def test_module_and_register_are_declared_together() -> None:
-    with pytest.raises(CompositionV4Error, match="declared together"):
+@pytest.mark.parametrize("declared", [
+    {"module": "actionq.vuoro"},
+    {"module": "actionq.vuoro", "register": "register_operations"},
+    {"build": "build", "register": "register_operations"},
+])
+def test_the_three_entrypoints_are_declared_together(declared: dict) -> None:
+    """A module with no build is the shape uniform construction abolishes."""
+    with pytest.raises(CompositionV4Error, match="declared together or not at all"):
         Adapter.from_dict({"adapter_id": "execution-adapter",
-                           "provider_id": "actionq-execution", "module": "actionq.vuoro"})
+                           "provider_id": "actionq-execution", **declared})
 
 
 def test_an_external_adapter_needs_no_module() -> None:
     adapter = Adapter.from_dict({"adapter_id": "openbao-shim", "provider_id": "openbao"})
-    assert (adapter.module, adapter.register) == (None, None)
+    assert (adapter.module, adapter.build, adapter.register) == (None, None, None)
+
+
+def test_an_adapter_pins_its_runtime_settings_by_name() -> None:
+    """What `build(RuntimeConfiguration)` receives is declared, not compiled in."""
+    adapter = Adapter.from_dict(_adapter(runtime_settings={
+        "dsn": "VUORO_EXECUTION_RUNTIME_DSN", "schema": "VUORO_EXECUTION_SCHEMA",
+    }))
+    assert adapter.runtime_settings["schema"] == "VUORO_EXECUTION_SCHEMA"
 
 
 def test_an_adapter_references_exactly_one_provider() -> None:
@@ -380,3 +399,572 @@ def test_the_loader_does_not_enforce_at_most_one_exclusive_binding_per_scope() -
         _binding(provider_id="actionq-execution", adapter_id="execution-adapter"),
     ]))
     assert len(profile.bindings_for("execution/v1")) == 2
+
+
+# =============================================================================
+# The freeze's falsifiers. Each test below is named by a `planned_test` entry in
+# docs/plans/2026-08-22-composition-v4-design-freeze.md, and the gate in
+# tests/test_falsifier_coverage.py binds each declared scope to the docstring of
+# the test that claims it.
+# =============================================================================
+
+import subprocess
+import sys
+import textwrap
+from types import ModuleType, SimpleNamespace
+
+from vuoro_service.catalog import CatalogRegistry
+from vuoro_service.composition_v4_runtime import (
+    RuntimeConfiguration,
+    compose,
+    satisfies_uniform_construction,
+)
+from vuoro_service.composition_v4_validator import (
+    CONFORMANCE_HARNESSES,
+    V3_SOURCE_ALLOWLIST,
+    closure_digest,
+    scan_sources,
+    violations,
+)
+from vuoro_service.contracts import OperationDefinition
+
+ROOT = Path(__file__).parents[1]
+COMPOSITION = ROOT / "packages/vuoro-service/composition"
+SUPPORT_MANIFEST = COMPOSITION / "support-manifest.json"
+SHARED_PROFILE = COMPOSITION / "profiles/shared.json"
+V3_MANIFEST = COMPOSITION / "adapter-pins.json"
+
+OBJECT_SCHEMA = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {},
+    "additionalProperties": False,
+}
+
+
+def reference() -> tuple[SupportManifest, CompositionProfile]:
+    return SupportManifest.load(SUPPORT_MANIFEST), CompositionProfile.load(SHARED_PROFILE)
+
+
+def _operation(name: str) -> OperationDefinition:
+    return OperationDefinition(
+        name=name,
+        owning_domain=name.split(".", 1)[0],
+        input_schema=OBJECT_SCHEMA,
+        result_schema=OBJECT_SCHEMA,
+        execution_semantics="read",
+        idempotency="not-allowed",
+    )
+
+
+def _stub_adapter(name: str, domain: str, *, build_arity: int = 1) -> ModuleType:
+    """An adapter that satisfies the protocol, in the smallest form that can.
+
+    Registers one operation named for its domain, so a registry can be checked
+    for having composed it without any owner being installed.
+    """
+    module = ModuleType(name)
+
+    def build(runtime):
+        return SimpleNamespace(capability_id=runtime.capability_id, settings=dict(runtime.settings))
+
+    def build_wrong(runtime, extra):  # pragma: no cover - never called
+        return None
+
+    def register(registry, application):
+        registry.register(_operation(f"{domain}.thing.get"), lambda arguments, context: arguments)
+
+    module.build = build if build_arity == 1 else build_wrong
+    module.register = register
+    sys.modules[name] = module
+    return module
+
+
+def _runtime(capability_id: str = "execution/v1") -> RuntimeConfiguration:
+    return RuntimeConfiguration(
+        capability_id=capability_id,
+        environment_name="devbox",
+        environment_class="development",
+        settings={},
+    )
+
+
+def test_adding_a_contract_touches_no_python() -> None:
+    """The rule the whole freeze exists for, checked in both directions.
+
+    Scope: adding a contract to the support manifest changes no .py file, and no
+    module under scripts/ or in the service package contains a contract-name
+    literal set.
+    """
+    manifest, profile = reference()
+    added = SupportManifest.from_dict({
+        "schema_version": "vuoro-support-manifest/v1",
+        "origin_allowlist": list(manifest.origin_allowlist),
+        "contracts": [
+            *(vars(contract) | {"capability_id": contract.capability_id}
+              for contract in manifest.contracts),
+            _contract(capability_id="federation.claim/v1", required=False, frozen=False,
+                      scope_kind="project", owner=None),
+        ],
+    })
+    # The required set moved, from records alone.
+    assert added.contract("federation.claim/v1").scope_kind == "project"
+    assert len(added.contracts) == len(manifest.contracts) + 1
+
+    # And no Vuoro module names it, or names any other contract as a literal set.
+    tracked = subprocess.run(
+        ["git", "grep", "-l", "federation.claim/v1", "--",
+         "packages/vuoro-service/src", "scripts"],
+        cwd=ROOT, capture_output=True, text=True,
+    )
+    assert tracked.stdout == "", f"a .py file names the new contract: {tracked.stdout}"
+    assert scan_sources(ROOT, profile, added) == []
+
+
+def test_new_contract_composes_without_service_code_change() -> None:
+    """What makes a fifth contract composable rather than merely declarable.
+
+    Scope: a profile declaring a contract whose adapter does not satisfy
+    build/register is rejected, and composing it registers that contract's
+    operations without any owner-specific branch.
+    """
+    manifest = SupportManifest.from_dict(_support(contracts=[
+        _contract(capability_id="federation.grant/v1", cardinality="exclusive",
+                  required=False, scope_kind="global", frozen=False, owner="actionq"),
+    ]))
+    _stub_adapter("v4_stub_federation", "federation")
+    profile = CompositionProfile.from_dict(_profile(
+        providers=[_provider(provider_id="actionq-federation", capabilities=["federation.grant/v1"])],
+        adapters=[_adapter(adapter_id="federation-catalog", provider_id="actionq-federation",
+                           module="v4_stub_federation", build="build", register="register")],
+        bindings=[_binding(capability_id="federation.grant/v1", provider_id="actionq-federation",
+                           adapter_id="federation-catalog")],
+    ))
+    composed = compose(profile, manifest, environ={}, environment_name="devbox",
+                       environment_class="development")
+    assert [item.capability_id for item in composed.composed] == ["federation.grant/v1"]
+    assert "federation.thing.get" in composed.registry.catalog().model_dump()["operations"][0]["name"]
+
+    # An adapter that does not satisfy the protocol is rejected, not composed.
+    _stub_adapter("v4_stub_broken", "federation", build_arity=2)
+    broken = CompositionProfile.from_dict(_profile(
+        providers=[_provider(provider_id="actionq-federation", capabilities=["federation.grant/v1"])],
+        adapters=[_adapter(adapter_id="federation-catalog", provider_id="actionq-federation",
+                           module="v4_stub_broken", build="build", register="register")],
+        bindings=[_binding(capability_id="federation.grant/v1", provider_id="actionq-federation",
+                           adapter_id="federation-catalog")],
+    ))
+    assert any("build must accept one" in item for item in violations(broken, manifest))
+    with pytest.raises(CompositionV4Error, match="build must accept one"):
+        compose(broken, manifest, environ={}, environment_name="devbox",
+                environment_class="development")
+
+
+def test_cardinality_is_rejected_outside_capability_records() -> None:
+    """Cardinality belongs to the capability, never to a plane or a provider.
+
+    Scope: a cardinality declared anywhere but on a capability contract is
+    rejected, and required is accepted independently of cardinality.
+    """
+    for record, payload in (
+        (Provider, _provider(cardinality="exclusive")),
+        (Adapter, _adapter(cardinality="exclusive")),
+        (AuthorityBinding, _binding(cardinality="exclusive")),
+    ):
+        with pytest.raises(CompositionV4Error, match="unknown fields"):
+            record.from_dict(payload)
+    for cardinality in ("exclusive", "multi", "projection"):
+        for required in (True, False):
+            contract = CapabilityContract.from_dict(
+                _contract(cardinality=cardinality, required=required)
+            )
+            assert (contract.cardinality, contract.required) == (cardinality, required)
+
+
+def test_frozen_and_iterative_capabilities_need_separate_release_units() -> None:
+    """One repository, two providers -- the normal case, not a special one.
+
+    Scope: two providers sharing source_repository but differing in release unit
+    are accepted, and one provider record bound to two frozen-and-iterative
+    capabilities is rejected.
+    """
+    manifest = SupportManifest.from_dict(_support(contracts=[
+        _contract(capability_id="execution/v1", frozen=True,
+                  operation_hashes="e" * 64),
+        _contract(capability_id="federation.grant/v1", frozen=False, required=False),
+    ]))
+    shared_unit = _profile(
+        providers=[_provider(capabilities=["execution/v1", "federation.grant/v1"])],
+        bindings=[
+            _binding(capability_id="execution/v1"),
+            _binding(capability_id="federation.grant/v1"),
+        ],
+    )
+    found = violations(CompositionProfile.from_dict(shared_unit), manifest,
+                       check_entrypoints=False)
+    assert any("frozen and an iterative" in item for item in found)
+
+    split = _profile(
+        providers=[
+            _provider(),
+            _provider(provider_id="actionq-federation", release_unit="actionq-federation",
+                      capabilities=["federation.grant/v1"],
+                      artifact={"distribution": "actionq-federation",
+                                "distribution_version": "0.1.26",
+                                "artifact_sha256": "f" * 64,
+                                "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/v0.1.26/actionq_federation-0.1.26-py3-none-any.whl"}),
+        ],
+        adapters=[_adapter(), _adapter(adapter_id="federation-catalog",
+                                       provider_id="actionq-federation")],
+        bindings=[
+            _binding(capability_id="execution/v1"),
+            _binding(capability_id="federation.grant/v1", provider_id="actionq-federation",
+                     adapter_id="federation-catalog"),
+        ],
+    )
+    found = violations(CompositionProfile.from_dict(split), manifest, check_entrypoints=False)
+    assert not any("frozen and an iterative" in item for item in found)
+
+
+def test_adapter_records_cannot_declare_canonical_state() -> None:
+    """An adapter with state of its own is a provider.
+
+    Scope: an adapter record declaring a schema or store is rejected; the same
+    declaration on a provider record is accepted.
+    """
+    for field_name in ("schema", "schema_version", "store", "dsn"):
+        with pytest.raises(CompositionV4Error, match="unknown fields"):
+            Adapter.from_dict(_adapter(**{field_name: "audit-schema/v1"}))
+    provider = Provider.from_dict(_provider(closure={"schema_version": "audit-schema/v1"}))
+    assert provider.closure.schema_version == "audit-schema/v1"
+    assert violations(CompositionProfile.from_dict(_profile()), reference()[0],
+                      check_entrypoints=False) is not None
+    assert not any(
+        item.startswith("rule 5")
+        for item in violations(CompositionProfile.from_dict(_profile()), reference()[0],
+                               check_entrypoints=False)
+    )
+
+
+def test_no_scope_has_two_authorities() -> None:
+    """The v3 exclusive-primary guarantee, relocated to the binding.
+
+    Scope: two authority bindings for one exclusive capability and one scope are
+    rejected, across every profile.
+    """
+    manifest, _ = reference()
+    for profile_name in ("local", "shared", "served", "cloud"):
+        doubled = CompositionProfile.from_dict(_profile(
+            profile=profile_name,
+            providers=[_provider(), _provider(provider_id="second", release_unit="second",
+                                              capabilities=["execution/v1"],
+                                              artifact={"distribution": "actionq-alt",
+                                                        "distribution_version": "0.1.26",
+                                                        "artifact_sha256": "b" * 64,
+                                                        "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/v0.1.26/actionq_alt-0.1.26-py3-none-any.whl"})],
+            adapters=[_adapter(), _adapter(adapter_id="second-catalog", provider_id="second")],
+            bindings=[_binding(), _binding(provider_id="second", adapter_id="second-catalog")],
+        ))
+        found = violations(doubled, manifest, check_entrypoints=False)
+        assert any("exclusive and has two bindings" in item for item in found), profile_name
+
+    # One binding per scope instance of the same capability is not a violation.
+    manifest_env = SupportManifest.from_dict(_support(contracts=[
+        _contract(capability_id="federation.resource/v1", scope_kind="environment",
+                  required=False, frozen=False),
+    ]))
+    scoped = CompositionProfile.from_dict(_profile(bindings=[
+        _binding(capability_id="federation.resource/v1", scope_kind="environment",
+                 scope_instance="development"),
+        _binding(capability_id="federation.resource/v1", scope_kind="environment",
+                 scope_instance="production"),
+    ]))
+    assert not any(
+        "two bindings" in item
+        for item in violations(scoped, manifest_env, check_entrypoints=False)
+    )
+
+
+def test_federation_change_leaves_execution_v1_binding_identical() -> None:
+    """Coupling is declared, not absent -- which is what v3 guaranteed structurally.
+
+    Scope: a profile binding federation and execution/v1 to the same provider
+    release unit, without an explicit coupling declaration, is rejected by the
+    validator.
+    """
+    manifest = SupportManifest.from_dict(_support(contracts=[
+        _contract(capability_id="execution/v1", frozen=False),
+        _contract(capability_id="federation.grant/v1", frozen=False, required=False),
+    ]))
+    shared_unit = CompositionProfile.from_dict(_profile(
+        providers=[_provider(capabilities=["execution/v1", "federation.grant/v1"])],
+        bindings=[
+            _binding(capability_id="execution/v1"),
+            _binding(capability_id="federation.grant/v1"),
+        ],
+    ))
+    assert any(
+        "without declaring the coupling" in item
+        for item in violations(shared_unit, manifest, check_entrypoints=False)
+    )
+    declared = CompositionProfile.from_dict(_profile(
+        providers=[_provider(capabilities=["execution/v1", "federation.grant/v1"])],
+        bindings=[
+            _binding(capability_id="execution/v1", coupled_with=["federation.grant/v1"]),
+            _binding(capability_id="federation.grant/v1", coupled_with=["execution/v1"]),
+        ],
+    ))
+    assert not any(
+        "coupling" in item
+        for item in violations(declared, manifest, check_entrypoints=False)
+    )
+
+
+def test_multiple_telemetry_exporters_validate() -> None:
+    """Multi cardinality means several simultaneous providers, not a fallback list.
+
+    Scope: two or more bindings on a multi-cardinality telemetry.export
+    capability validate.
+    """
+    manifest = SupportManifest.from_dict({
+        "schema_version": "vuoro-support-manifest/v1",
+        "origin_allowlist": ["https://registry.example/"],
+        "contracts": [_contract(capability_id="telemetry.export/v1", cardinality="multi",
+                                required=False, scope_kind="environment", frozen=False,
+                                conformance="probe", owner="otel")],
+    })
+    def collector(index: int) -> dict:
+        return _provider(
+            provider_id=f"otel-collector-{index}", release_unit=f"otel-collector-{index}",
+            artifact_kind="image", role="external",
+            source_repository="https://registry.example/otel",
+            artifact={"image_reference": f"https://registry.example/otel-{index}",
+                      "image_digest": "sha256:" + str(index) * 64},
+            capabilities=["telemetry.export/v1"],
+            closure={"configuration_digest": str(index) * 64, "protocol_version": "1",
+                     "probe_evidence": f"probe-{index}"},
+        )
+    providers = []
+    for index in (1, 2):
+        record = collector(index)
+        record["closure"]["attestation"] = closure_digest(Provider.from_dict(record))
+        providers.append(record)
+    profile = CompositionProfile.from_dict(_profile(
+        providers=providers,
+        adapters=[{"adapter_id": f"otel-{index}", "provider_id": f"otel-collector-{index}"}
+                  for index in (1, 2)],
+        bindings=[_binding(capability_id="telemetry.export/v1", scope_kind="environment",
+                           scope_instance="production",
+                           provider_id=f"otel-collector-{index}", adapter_id=f"otel-{index}")
+                  for index in (1, 2)],
+    ))
+    assert violations(profile, manifest, check_entrypoints=False) == ()
+
+
+def test_unchanged_image_with_changed_closure_fails() -> None:
+    """A digest over the image is not a digest over what was deployed.
+
+    Scope: an unchanged image digest with a changed configuration digest or
+    schema version fails validation until the closure is re-attested.
+    """
+    manifest = SupportManifest.from_dict({
+        "schema_version": "vuoro-support-manifest/v1",
+        "origin_allowlist": ["https://registry.example/"],
+        "contracts": [_contract(capability_id="secret.lease/v1", scope_kind="environment",
+                                required=False, frozen=False, conformance="probe",
+                                owner="openbao")],
+    })
+    record = _provider(
+        provider_id="openbao", release_unit="openbao", artifact_kind="image", role="external",
+        source_repository="https://registry.example/openbao",
+        artifact={"image_reference": "https://registry.example/openbao",
+                  "image_digest": "sha256:" + "b" * 64},
+        capabilities=["secret.lease/v1"],
+        closure={"configuration_digest": "c" * 64, "protocol_version": "1",
+                 "probe_evidence": "probe-2026-08-22"},
+    )
+    record["closure"]["attestation"] = closure_digest(Provider.from_dict(record))
+    def profile_with(closure: dict) -> CompositionProfile:
+        return CompositionProfile.from_dict(_profile(
+            providers=[record | {"closure": closure}],
+            adapters=[{"adapter_id": "openbao-shim", "provider_id": "openbao"}],
+            bindings=[_binding(capability_id="secret.lease/v1", scope_kind="environment",
+                               scope_instance="production", provider_id="openbao",
+                               adapter_id="openbao-shim")],
+        ))
+    assert violations(profile_with(record["closure"]), manifest, check_entrypoints=False) == ()
+
+    # Same image, moved configuration, stale attestation.
+    moved = dict(record["closure"], configuration_digest="d" * 64)
+    found = violations(profile_with(moved), manifest, check_entrypoints=False)
+    assert any("was not re-attested" in item for item in found)
+
+    # Re-attesting is what makes it pass again.
+    reattested = dict(moved)
+    reattested["attestation"] = closure_digest(
+        Provider.from_dict(record | {"closure": moved})
+    )
+    assert violations(profile_with(reattested), manifest, check_entrypoints=False) == ()
+
+
+def test_v3_reference_composition_migrates_losslessly() -> None:
+    """The migration proof, and the reason a revision change is a fleet cutover.
+
+    Scope: a CatalogRegistry built from the migrated v4 profile has a
+    byte-identical revision to one built from the v3 manifest, and the migrated
+    providers, sha256 values, execution/v1 operation hashes, bindings and
+    dependency closure equal adapter-pins.json.
+    """
+    from vuoro_service.composition import CompositionManifest
+
+    manifest, profile = reference()
+    v3 = CompositionManifest.load(V3_MANIFEST)
+    raw = json.loads(V3_MANIFEST.read_text(encoding="utf-8"))
+
+    # Pins, digests and provenance, lock by lock.
+    by_id = {provider.provider_id: provider for provider in profile.providers}
+    assert set(by_id) == {lock.lock_id for lock in v3.release_locks}
+    for lock in v3.release_locks:
+        provider = by_id[lock.lock_id]
+        assert provider.artifact["distribution"] == lock.distribution
+        assert provider.artifact["distribution_version"] == lock.distribution_version
+        assert provider.artifact["artifact_sha256"] == lock.artifact_sha256
+        assert provider.artifact["artifact_url"] == lock.artifact_url
+        assert provider.source_repository == lock.source_repository
+        assert provider.source_revision == lock.source_revision
+
+    # Bindings and the dependency closure, descriptor by descriptor.
+    for descriptor in v3.runtime_descriptors:
+        bindings = profile.bindings_for(descriptor.api_version)
+        assert len(bindings) == 1, descriptor.api_version
+        assert bindings[0].provider_id == descriptor.lock_id
+        assert bindings[0].scope == ("global", None)
+        assert by_id[descriptor.lock_id].dependencies == descriptor.dependency_lock_ids
+        assert by_id[descriptor.lock_id].closure.schema_version == descriptor.schema_version
+
+    # execution/v1's frozen operation hashes, against the digest the released
+    # adapter validator already pins.
+    assert manifest.contract("execution/v1").operation_hashes == (
+        "8d434e8b347e804c90e48a6598304be84b12f2a61ebc2dbed00a26053239a778"
+    )
+    assert by_id["execution-adapter"].closure.operation_hashes == (
+        manifest.contract("execution/v1").operation_hashes
+    )
+    assert profile.migrated_from.manifest_sha256 == hashlib.sha256(
+        V3_MANIFEST.read_bytes()
+    ).hexdigest()
+
+    # The observable catalog. Both registries are built from the same adapters;
+    # what differs is only how each path found them, which is exactly the thing
+    # that must not move the revision. Owner wheels are not installed here, so
+    # the adapters are stubs -- this proves the composition path is
+    # revision-neutral, not what ActionQ's catalog contains, which
+    # scripts/validate_v4_reference_profile.py proves where the wheels exist.
+    domains = {descriptor.api_version: descriptor.domain for descriptor in v3.runtime_descriptors}
+    for capability_id, domain in domains.items():
+        _stub_adapter(f"vuoro_adapter_kit.adapters.{domain}", domain)
+
+    v3_registry = CatalogRegistry()
+    for descriptor in v3.runtime_descriptors:  # v3's own order: work, execution, knowledge, audit
+        sys.modules[f"vuoro_adapter_kit.adapters.{descriptor.domain}"].register(
+            v3_registry, object()
+        )
+    environ = {
+        variable: "pinned-by-deployment"
+        for adapter in profile.adapters
+        for variable in adapter.runtime_settings.values()
+    }
+    composed = compose(profile, manifest, environ=environ, environment_name="devbox",
+                       environment_class="development")
+    assert composed.revision == v3_registry.revision
+    assert len(composed.composed) == len(raw["runtime_descriptors"])
+
+
+def test_owner_capabilities_recover_without_vuoro() -> None:
+    """Deliberately still a declared gap; this test asserts only that it is one.
+
+    The claim needs sprintctl's and actionq's CLIs run against their own stores
+    with vuoro-service absent, and neither owner distribution is installed in
+    this workspace -- so a test here could only assert something weaker than the
+    claim while appearing to discharge it. The freeze keeps the gap declared and
+    this records why it cannot be closed from this repository.
+    """
+    assert "sprintctl" not in sys.modules
+    with pytest.raises(ImportError):
+        __import__("sprintctl")
+
+
+def test_reissued_identity_owns_nothing_historical() -> None:
+    """Identity is forever, so a reissued actor must not inherit ownership.
+
+    Scope: the federation.principal/v1 contract declares ownership
+    non-transferable and no bound provider passes conformance without evidence
+    for it.
+    """
+    manifest, _ = reference()
+    principal = manifest.contract("federation.principal/v1")
+    assert principal.ownership == "non-transferable"
+    assert principal.frozen is True
+
+    unproven = _provider(provider_id="actionq-federation", release_unit="actionq-federation",
+                         capabilities=["federation.principal/v1"],
+                         closure={"configuration_digest": "a" * 64, "protocol_version": "1",
+                                  "schema_version": "actionq-schema/v12",
+                                  "operation_hashes": "9" * 64})
+    unproven["closure"]["attestation"] = closure_digest(Provider.from_dict(unproven))
+    profile = CompositionProfile.from_dict(_profile(
+        providers=[unproven],
+        adapters=[_adapter(adapter_id="principal-catalog", provider_id="actionq-federation")],
+        bindings=[_binding(capability_id="federation.principal/v1",
+                           provider_id="actionq-federation", adapter_id="principal-catalog")],
+    ))
+    found = violations(profile, manifest, check_entrypoints=False)
+    assert any("ownership_evidence" in item for item in found)
+
+
+def test_the_migrated_reference_profile_states_exactly_what_it_still_lacks() -> None:
+    """Not a falsifier: a pin on the honest gaps, so closing one is a visible edit.
+
+    v3 records a pinned catalog-metadata digest for work and execution and none
+    for knowledge or audit, so the migrated profile cannot carry operation-hash
+    conformance evidence for two of its four bindings. Asserting the exact
+    violation set means the day an owner publishes one, this test fails and the
+    profile gets updated -- rather than the gap quietly persisting behind a
+    validator nobody runs.
+    """
+    manifest, profile = reference()
+    found = violations(profile, manifest, root=ROOT, check_entrypoints=False)
+    assert set(found) == {
+        "rule 3: audit/v1 declares operation-hashes conformance and audit-adapter "
+        "records no operation_hashes",
+        "rule 3: knowledge/v1 declares operation-hashes conformance and "
+        "knowledge-adapter records no operation_hashes",
+    }
+
+
+def test_the_rule_7_allowlists_are_the_v3_code_and_the_conformance_harnesses() -> None:
+    """Both allowlists name files that exist, and the v3 one has an expiry.
+
+    A scan whose allowlist silently accumulates entries is worth nothing, so the
+    entries are asserted to exist and to be exactly the two categories the
+    validator documents: the v3 composition code v4 replaces, and the
+    per-provider conformance harnesses rule 3 names as evidence.
+    """
+    for relative in V3_SOURCE_ALLOWLIST + CONFORMANCE_HARNESSES:
+        assert (ROOT / relative).is_file(), relative
+    assert all("composition" in item or "scripts/" in item for item in V3_SOURCE_ALLOWLIST)
+    assert all(item.startswith("scripts/") for item in CONFORMANCE_HARNESSES)
+
+
+def test_the_shared_profile_is_the_migration_of_the_v3_manifest() -> None:
+    """Drift between adapter-pins.json and the migrated profile fails here.
+
+    The profile is generated, so the only way it can disagree with its source is
+    an edit to one and not the other -- which is exactly what a checked-in
+    derived artifact invites.
+    """
+    completed = subprocess.run(
+        [sys.executable, "scripts/migrate_v3_composition.py", "--check"],
+        cwd=ROOT, capture_output=True, text=True,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr

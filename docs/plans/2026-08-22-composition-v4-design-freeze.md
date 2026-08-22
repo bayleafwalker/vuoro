@@ -367,115 +367,98 @@ ownership. This is a contract-level claim and is a prerequisite of any federatio
 
 ## 9. Falsifiers
 
-Every marked claim above names the test that would fail if it were untrue. **None of these tests
-exist yet**, so every entry is a declared gap with its intended test in `planned_test`, and the
-document declares `minimum_coverage: 0.0`.
+Every marked claim above names the test that would fail if it were untrue. Eleven of the twelve
+now do; the document declares `minimum_coverage: 0.9`, and the number moved because the candidate
+landed, which is what it was there to show. The freeze was written at 0.0 with every entry a
+declared gap — the gate's own encoding for that state — precisely so this movement would be
+visible rather than asserted.
 
-That is the gate's own encoding for exactly this state, and it is deliberate: coverage is 0.0
-today and rises to 1.0 as the candidate lands, which is a number a reviewer can watch move. An
-earlier draft instead named ten tests in a file that does not exist, which fails the gate on file
-existence — the wrong signal, and one that masks the intended one. Scope strings must be restated
-in each test's docstring, and no two claims may share a scope.
+The twelfth, `v4-direct-recovery-without-vuoro`, stays a declared gap and is not expected to
+close here: it needs sprintctl's and actionq's CLIs run against their own stores with
+vuoro-service absent, and neither owner distribution is installed in this workspace. A test that
+asserted something weaker while appearing to discharge the claim would be worse than the gap, so
+the test that exists asserts only that the gap is real.
+
+Scope strings are restated in each test's docstring — the gate binds them, so widening a claim
+fails until someone edits the test — and no two claims share a scope.
 
 ```falsifiers
 {
-  "minimum_coverage": 0.0,
+  "minimum_coverage": 0.9,
   "falsifiers": [
     {
       "id": "v4-declarative-contract-set",
       "claim": "The set of required contracts is read from the support manifest, and no service or script code carries a contract-name literal set.",
       "scope": "adding a contract to the support manifest changes no .py file, and no module under scripts/ or in the service package contains a contract-name literal set",
-      "test": null,
-      "gap": "Candidate deliverable; the v4 loader does not exist yet.",
-      "planned_test": "tests/test_composition_v4.py::test_adding_a_contract_touches_no_python"
+      "test": "tests/test_composition_v4.py::test_adding_a_contract_touches_no_python"
     },
     {
       "id": "v4-uniform-construction",
       "claim": "Every wheel provider is constructed through one protocol; no owner name, module path or registration convention appears in Vuoro service code.",
       "scope": "a profile declaring a contract whose adapter does not satisfy build/register is rejected, and composing it registers that contract's operations without any owner-specific branch",
-      "test": null,
-      "gap": "Candidate deliverable; this is the rule that makes a fifth contract composable rather than merely declarable.",
-      "planned_test": "tests/test_composition_v4.py::test_new_contract_composes_without_service_code_change"
+      "test": "tests/test_composition_v4.py::test_new_contract_composes_without_service_code_change"
     },
     {
       "id": "v4-direct-recovery-without-vuoro",
       "claim": "Removing Vuoro does not prevent direct or local recovery of owner capabilities.",
       "scope": "with the vuoro-service package absent, sprintctl and actionq direct CLIs complete their documented break-glass paths against their own stores",
       "test": null,
-      "gap": "Candidate deliverable; the v4 loader and validator do not exist yet.",
+      "gap": "Still a gap, and not one this repository can close: the claim needs sprintctl's and actionq's CLIs run against their own stores with vuoro-service absent, and neither owner distribution is installed in this workspace. tests/test_composition_v4.py::test_owner_capabilities_recover_without_vuoro asserts only that the gap is real.",
       "planned_test": "tests/test_composition_v4.py::test_owner_capabilities_recover_without_vuoro"
     },
     {
       "id": "v4-cardinality-is-per-capability",
       "claim": "Cardinality belongs to the capability, never to the plane or the provider.",
       "scope": "a cardinality declared anywhere but on a capability contract is rejected, and required is accepted independently of cardinality",
-      "test": null,
-      "gap": "Candidate deliverable; the v4 loader and validator do not exist yet.",
-      "planned_test": "tests/test_composition_v4.py::test_cardinality_is_rejected_outside_capability_records"
+      "test": "tests/test_composition_v4.py::test_cardinality_is_rejected_outside_capability_records"
     },
     {
       "id": "v4-independent-release-units",
       "claim": "Two authoritative capabilities that must evolve independently are separate release units even from one repository.",
       "scope": "two providers sharing source_repository but differing in release unit are accepted, and one provider record bound to two frozen-and-iterative capabilities is rejected",
-      "test": null,
-      "gap": "Candidate deliverable; the v4 loader and validator do not exist yet.",
-      "planned_test": "tests/test_composition_v4.py::test_frozen_and_iterative_capabilities_need_separate_release_units"
+      "test": "tests/test_composition_v4.py::test_frozen_and_iterative_capabilities_need_separate_release_units"
     },
     {
       "id": "v4-adapters-own-no-state",
       "claim": "An adapter owns no canonical state.",
       "scope": "an adapter record declaring a schema or store is rejected; the same declaration on a provider record is accepted",
-      "test": null,
-      "gap": "Candidate deliverable; the v4 loader and validator do not exist yet.",
-      "planned_test": "tests/test_composition_v4.py::test_adapter_records_cannot_declare_canonical_state"
+      "test": "tests/test_composition_v4.py::test_adapter_records_cannot_declare_canonical_state"
     },
     {
       "id": "v4-single-authority-per-scope",
       "claim": "No scope has two active canonical authorities.",
       "scope": "two authority bindings for one exclusive capability and one scope are rejected, across every profile",
-      "test": null,
-      "gap": "Candidate deliverable; the v4 loader and validator do not exist yet.",
-      "planned_test": "tests/test_composition_v4.py::test_no_scope_has_two_authorities"
+      "test": "tests/test_composition_v4.py::test_no_scope_has_two_authorities"
     },
     {
       "id": "v4-federation-cannot-repin-execution",
       "claim": "Changing the federation provider cannot repin frozen execution/v1.",
       "scope": "a profile binding federation and execution/v1 to the same provider release unit, without an explicit coupling declaration, is rejected by the validator",
-      "test": null,
-      "gap": "Candidate deliverable; the v4 loader and validator do not exist yet.",
-      "planned_test": "tests/test_composition_v4.py::test_federation_change_leaves_execution_v1_binding_identical"
+      "test": "tests/test_composition_v4.py::test_federation_change_leaves_execution_v1_binding_identical"
     },
     {
       "id": "v4-multi-sinks-legal",
       "claim": "Multiple observability sinks remain legal.",
       "scope": "two or more bindings on a multi-cardinality telemetry.export capability validate",
-      "test": null,
-      "gap": "Candidate deliverable; the v4 loader and validator do not exist yet.",
-      "planned_test": "tests/test_composition_v4.py::test_multiple_telemetry_exporters_validate"
+      "test": "tests/test_composition_v4.py::test_multiple_telemetry_exporters_validate"
     },
     {
       "id": "v4-closure-not-just-image",
       "claim": "A provider update cannot pass using only an unchanged image while configuration or schema changed.",
       "scope": "an unchanged image digest with a changed configuration digest or schema version fails validation until the closure is re-attested",
-      "test": null,
-      "gap": "Candidate deliverable; the v4 loader and validator do not exist yet.",
-      "planned_test": "tests/test_composition_v4.py::test_unchanged_image_with_changed_closure_fails"
+      "test": "tests/test_composition_v4.py::test_unchanged_image_with_changed_closure_fails"
     },
     {
       "id": "v4-lossless-semantic-migration",
       "claim": "The v3 reference composition migrates to v4 with pins, operation hashes, bindings and observable semantics preserved.",
       "scope": "a CatalogRegistry built from the migrated v4 profile has a byte-identical revision to one built from the v3 manifest, and the migrated providers, sha256 values, execution/v1 operation hashes, bindings and dependency closure equal adapter-pins.json",
-      "test": null,
-      "gap": "Candidate deliverable; the v4 loader and validator do not exist yet.",
-      "planned_test": "tests/test_composition_v4.py::test_v3_reference_composition_migrates_losslessly"
+      "test": "tests/test_composition_v4.py::test_v3_reference_composition_migrates_losslessly"
     },
     {
       "id": "v4-reissued-identity-no-ownership",
       "claim": "A reissued actor identity cannot acquire historical ownership.",
       "scope": "the federation.principal/v1 contract declares ownership non-transferable and no bound provider passes conformance without evidence for it",
-      "test": null,
-      "gap": "Candidate deliverable; the v4 loader and validator do not exist yet.",
-      "planned_test": "tests/test_composition_v4.py::test_reissued_identity_owns_nothing_historical"
+      "test": "tests/test_composition_v4.py::test_reissued_identity_owns_nothing_historical"
     }
   ]
 }

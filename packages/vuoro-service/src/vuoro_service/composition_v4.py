@@ -56,12 +56,16 @@ PREDECESSOR_SCHEMA = "vuoro-composition/v3"
 CARDINALITIES = frozenset({"exclusive", "multi", "projection"})
 SCOPE_KINDS = frozenset({"tenant", "project", "environment", "global"})
 CONFORMANCE_KINDS = frozenset({"operation-hashes", "probe"})
+# Freeze §7: an identity contract must forbid a reissued actor from acquiring a
+# historical principal's ownership. Declared on the contract because it is a
+# contract-level obligation, and a prerequisite of any provider binding to it.
+OWNERSHIP_KINDS = frozenset({"non-transferable"})
 ARTIFACT_KINDS = frozenset({"wheel", "image", "chart", "binary"})
 PROVIDER_ROLES = frozenset({"adapter", "owner-dependency", "shared-dependency", "external"})
 PROFILE_NAMES = frozenset({"local", "shared", "served", "cloud"})
 
 # `<name>/v<N>`, the v3 api_version syntax carried forward as the contract id.
-CAPABILITY_ID = re.compile(r"^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)*/v[1-9][0-9]*$")
+CAPABILITY_ID = re.compile(r"^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*/v[1-9][0-9]*$")
 RECORD_ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -70,7 +74,9 @@ _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 # is frozen only together with its closure -- which is why the closure is a
 # separate record rather than more fields here.
 ARTIFACT_IDENTITY_FIELDS: Mapping[str, frozenset[str]] = {
-    "wheel": frozenset({"distribution", "distribution_version", "artifact_sha256"}),
+    "wheel": frozenset(
+        {"distribution", "distribution_version", "artifact_sha256", "artifact_url"}
+    ),
     "image": frozenset({"image_reference", "image_digest"}),
     "chart": frozenset({"chart", "chart_version", "chart_digest", "values_digest"}),
     "binary": frozenset({"artifact_url", "artifact_sha256"}),
@@ -135,6 +141,8 @@ class CapabilityContract:
     frozen: bool
     conformance: str
     owner: str | None = None
+    operation_hashes: str | None = None
+    ownership: str | None = None
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any]) -> "CapabilityContract":
@@ -142,7 +150,7 @@ class CapabilityContract:
         data = _strict(
             raw,
             {"capability_id", "cardinality", "required", "scope_kind", "frozen", "conformance"},
-            {"owner"},
+            {"owner", "operation_hashes", "ownership"},
             label,
         )
         capability_id = _text(data["capability_id"], f"{label}: capability_id")
@@ -154,6 +162,12 @@ class CapabilityContract:
             # owner as proposed and unsettled, and a loader that forced a name
             # would launder that open question into a pin.
             owner = _text(owner, f"{label}: owner")
+        baseline = data.get("operation_hashes")
+        if baseline is not None and not _SHA256.fullmatch(_text(baseline, f"{label}: operation_hashes")):
+            raise CompositionV4Error(f"{label}: operation_hashes must be a SHA-256 digest")
+        ownership = data.get("ownership")
+        if ownership is not None:
+            ownership = _member(ownership, OWNERSHIP_KINDS, f"{label}: ownership")
         return cls(
             capability_id=capability_id,
             cardinality=_member(data["cardinality"], CARDINALITIES, f"{label}: cardinality"),
@@ -162,6 +176,8 @@ class CapabilityContract:
             frozen=_flag(data["frozen"], f"{label}: frozen"),
             conformance=_member(data["conformance"], CONFORMANCE_KINDS, f"{label}: conformance"),
             owner=owner,
+            operation_hashes=baseline,
+            ownership=ownership,
         )
 
 
@@ -176,6 +192,7 @@ class SupportManifest:
 
     schema_version: str
     contracts: tuple[CapabilityContract, ...]
+    origin_allowlist: tuple[str, ...] = ()
 
     @classmethod
     def load(cls, path: Path) -> "SupportManifest":
@@ -183,7 +200,9 @@ class SupportManifest:
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any]) -> "SupportManifest":
-        data = _strict(raw, {"schema_version", "contracts"}, set(), "support manifest")
+        data = _strict(
+            raw, {"schema_version", "contracts"}, {"origin_allowlist"}, "support manifest"
+        )
         if data["schema_version"] != SUPPORT_MANIFEST_SCHEMA:
             raise CompositionV4Error(
                 f"support manifest: unsupported schema_version {data['schema_version']!r}"
@@ -194,7 +213,17 @@ class SupportManifest:
         ids = [contract.capability_id for contract in contracts]
         if len(ids) != len(set(ids)):
             raise CompositionV4Error("support manifest: duplicate capability ids")
-        return cls(schema_version=data["schema_version"], contracts=contracts)
+        return cls(
+            schema_version=data["schema_version"],
+            contracts=contracts,
+            # A digest binds content, not provenance, so image/chart/binary
+            # artifacts need a stated origin (rule 8). It is declared here
+            # rather than constant in code for the same reason the required
+            # contract set is.
+            origin_allowlist=_identifiers(
+                data.get("origin_allowlist", []), "support manifest: origin_allowlist"
+            ),
+        )
 
     def contract(self, capability_id: str) -> CapabilityContract:
         for contract in self.contracts:
@@ -216,13 +245,22 @@ class DeploymentClosure:
     Every field is optional at load time. An unchanged image with a changed
     configuration digest is a changed closure and must fail -- but that is rule
     2's job, and a rule whose input cannot be malformed cannot be falsified.
+
+    ``attestation`` is what "must re-validate" means mechanically: a digest over
+    the artifact identity and every other field here. Change the configuration
+    digest or the schema version without re-attesting and the recomputation no
+    longer matches, which is the freeze's image-with-a-changed-closure case
+    failing for the reason the freeze gives rather than by coincidence.
     """
 
     configuration_digest: str | None = None
     schema_version: str | None = None
     migration_version: str | None = None
     protocol_version: str | None = None
+    operation_hashes: str | None = None
     probe_evidence: str | None = None
+    ownership_evidence: str | None = None
+    attestation: str | None = None
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any], label: str) -> "DeploymentClosure":
@@ -251,6 +289,7 @@ class Provider:
     source_repository: str
     artifact: Mapping[str, str]
     capabilities: tuple[str, ...]
+    source_revision: str | None = None
     dependencies: tuple[str, ...] = ()
     closure: DeploymentClosure = field(default_factory=DeploymentClosure)
 
@@ -261,7 +300,7 @@ class Provider:
             raw,
             {"provider_id", "release_unit", "artifact_kind", "role",
              "source_repository", "artifact", "capabilities"},
-            {"dependencies", "closure"},
+            {"source_revision", "dependencies", "closure"},
             label,
         )
         provider_id = _text(data["provider_id"], f"{label}: provider_id")
@@ -295,6 +334,10 @@ class Provider:
             source_repository=_text(data["source_repository"], f"{label}: source_repository"),
             artifact=dict(artifact),
             capabilities=capabilities,
+            source_revision=(
+                None if data.get("source_revision") is None
+                else _text(data["source_revision"], f"{label}: source_revision")
+            ),
             dependencies=dependencies,
             closure=DeploymentClosure.from_dict(data.get("closure", {}), label),
         )
@@ -314,24 +357,45 @@ class Adapter:
     adapter_id: str
     provider_id: str
     module: str | None = None
+    build: str | None = None
     register: str | None = None
+    runtime_settings: Mapping[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any]) -> "Adapter":
         label = f"adapter {raw.get('adapter_id', '?')!r}"
-        data = _strict(raw, {"adapter_id", "provider_id"}, {"module", "register"}, label)
+        data = _strict(
+            raw,
+            {"adapter_id", "provider_id"},
+            {"module", "build", "register", "runtime_settings"},
+            label,
+        )
         adapter_id = _text(data["adapter_id"], f"{label}: adapter_id")
         if not RECORD_ID.fullmatch(adapter_id):
             raise CompositionV4Error(f"{label}: adapter_id must be lowercase kebab-case")
-        module = data.get("module")
-        register = data.get("register")
-        if (module is None) != (register is None):
-            raise CompositionV4Error(f"{label}: module and register are declared together")
+        entrypoints = {name: data.get(name) for name in ("module", "build", "register")}
+        declared = {name for name, value in entrypoints.items() if value is not None}
+        if declared not in (set(), {"module", "build", "register"}):
+            # All three or none: a module with no build is the shape the uniform
+            # construction protocol exists to abolish, and naming two of the
+            # three is how a half-migrated adapter would slip past rule 7.
+            raise CompositionV4Error(
+                f"{label}: module, build and register are declared together or not at all"
+            )
+        settings = data.get("runtime_settings", {})
+        if not isinstance(settings, Mapping):
+            raise CompositionV4Error(f"{label}: runtime_settings must be an object")
+        for name, source in settings.items():
+            _text(name, f"{label}: runtime_settings key")
+            _text(source, f"{label}: runtime_settings[{name}]")
         return cls(
             adapter_id=adapter_id,
             provider_id=_text(data["provider_id"], f"{label}: provider_id"),
-            module=None if module is None else _text(module, f"{label}: module"),
-            register=None if register is None else _text(register, f"{label}: register"),
+            **{
+                name: None if value is None else _text(value, f"{label}: {name}")
+                for name, value in entrypoints.items()
+            },
+            runtime_settings=dict(settings),
         )
 
 
@@ -398,10 +462,13 @@ class MigratedFrom:
 
     schema_version: str
     manifest_sha256: str
+    equivalence_proof: str | None = None
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any]) -> "MigratedFrom":
-        data = _strict(raw, {"schema_version", "manifest_sha256"}, set(), "migrated_from")
+        data = _strict(
+            raw, {"schema_version", "manifest_sha256"}, {"equivalence_proof"}, "migrated_from"
+        )
         digest = _text(data["manifest_sha256"], "migrated_from: manifest_sha256")
         if not _SHA256.fullmatch(digest):
             raise CompositionV4Error("migrated_from: manifest_sha256 must be a SHA-256 digest")
@@ -409,7 +476,14 @@ class MigratedFrom:
             raise CompositionV4Error(
                 f"migrated_from: unsupported predecessor schema {data['schema_version']!r}"
             )
-        return cls(schema_version=data["schema_version"], manifest_sha256=digest)
+        proof = data.get("equivalence_proof")
+        return cls(
+            schema_version=data["schema_version"],
+            manifest_sha256=digest,
+            equivalence_proof=(
+                None if proof is None else _text(proof, "migrated_from: equivalence_proof")
+            ),
+        )
 
 
 @dataclass(frozen=True)

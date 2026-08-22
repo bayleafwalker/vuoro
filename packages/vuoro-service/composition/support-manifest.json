@@ -1,0 +1,116 @@
+{
+  "schema_version": "vuoro-support-manifest/v1",
+  "origin_allowlist": [],
+  "contracts": [
+    {
+      "capability_id": "work-api/v1",
+      "cardinality": "exclusive",
+      "required": true,
+      "scope_kind": "global",
+      "frozen": false,
+      "conformance": "operation-hashes",
+      "owner": "sprintctl"
+    },
+    {
+      "capability_id": "execution/v1",
+      "cardinality": "exclusive",
+      "required": true,
+      "scope_kind": "global",
+      "frozen": true,
+      "conformance": "operation-hashes",
+      "owner": "actionq",
+      "operation_hashes": "8d434e8b347e804c90e48a6598304be84b12f2a61ebc2dbed00a26053239a778"
+    },
+    {
+      "capability_id": "knowledge/v1",
+      "cardinality": "exclusive",
+      "required": true,
+      "scope_kind": "global",
+      "frozen": false,
+      "conformance": "operation-hashes",
+      "owner": "kctl"
+    },
+    {
+      "capability_id": "audit/v1",
+      "cardinality": "exclusive",
+      "required": true,
+      "scope_kind": "global",
+      "frozen": false,
+      "conformance": "operation-hashes",
+      "owner": "auditctl"
+    },
+    {
+      "capability_id": "federation.principal/v1",
+      "cardinality": "exclusive",
+      "required": false,
+      "scope_kind": "global",
+      "frozen": true,
+      "conformance": "operation-hashes",
+      "owner": null,
+      "ownership": "non-transferable"
+    },
+    {
+      "capability_id": "federation.grant/v1",
+      "cardinality": "exclusive",
+      "required": false,
+      "scope_kind": "project",
+      "frozen": false,
+      "conformance": "operation-hashes",
+      "owner": "actionq"
+    },
+    {
+      "capability_id": "federation.resource/v1",
+      "cardinality": "exclusive",
+      "required": false,
+      "scope_kind": "environment",
+      "frozen": false,
+      "conformance": "operation-hashes",
+      "owner": "actionq"
+    },
+    {
+      "capability_id": "secret.lease/v1",
+      "cardinality": "exclusive",
+      "required": false,
+      "scope_kind": "environment",
+      "frozen": false,
+      "conformance": "probe",
+      "owner": "openbao"
+    },
+    {
+      "capability_id": "policy.decision/v1",
+      "cardinality": "exclusive",
+      "required": false,
+      "scope_kind": "global",
+      "frozen": false,
+      "conformance": "probe",
+      "owner": "opa"
+    },
+    {
+      "capability_id": "metrics.storage/v1",
+      "cardinality": "exclusive",
+      "required": false,
+      "scope_kind": "environment",
+      "frozen": false,
+      "conformance": "probe",
+      "owner": "prometheus"
+    },
+    {
+      "capability_id": "telemetry.export/v1",
+      "cardinality": "multi",
+      "required": false,
+      "scope_kind": "environment",
+      "frozen": false,
+      "conformance": "probe",
+      "owner": "otel"
+    },
+    {
+      "capability_id": "analytics.derived/v1",
+      "cardinality": "projection",
+      "required": false,
+      "scope_kind": "environment",
+      "frozen": false,
+      "conformance": "probe",
+      "owner": "homelab-analytics"
+    }
+  ]
+}

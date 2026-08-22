@@ -1,0 +1,250 @@
+{
+  "schema_version": "vuoro-composition/v4",
+  "profile": "shared",
+  "providers": [
+    {
+      "provider_id": "audit-adapter",
+      "release_unit": "audit-adapter",
+      "artifact_kind": "wheel",
+      "role": "adapter",
+      "source_repository": "https://github.com/bayleafwalker/auditctl",
+      "source_revision": "613103644f2749a4d0f9ae5cb6913795fa7647a6",
+      "artifact": {
+        "distribution": "auditctl",
+        "distribution_version": "0.1.2",
+        "artifact_sha256": "b76d9d7aab727c77a7dcfcdc4e5de423b61a07c8f89369101347a4dc6eaf33d1",
+        "artifact_url": "https://github.com/bayleafwalker/auditctl/releases/download/auditctl-v0.1.2/auditctl-0.1.2-py3-none-any.whl"
+      },
+      "capabilities": [
+        "audit/v1"
+      ],
+      "dependencies": [
+        "vuoro-adapter-kit",
+        "vuoro-schema-runtime"
+      ],
+      "closure": {
+        "configuration_digest": "cc8469ddd5562e2b61d94c0d653780fe0dfbba69a47b39d22251537fac322fe4",
+        "schema_version": "audit-schema/v1",
+        "protocol_version": "1",
+        "attestation": "97924f59c2e96516503706d80900044c73fe4e0da35d2374744ead297a934278"
+      }
+    },
+    {
+      "provider_id": "execution-adapter",
+      "release_unit": "execution-adapter",
+      "artifact_kind": "wheel",
+      "role": "adapter",
+      "source_repository": "https://github.com/bayleafwalker/actionq",
+      "source_revision": "0f13e76f953bcacafbf16c41d29e830ffd84f755",
+      "artifact": {
+        "distribution": "actionq",
+        "distribution_version": "0.1.26",
+        "artifact_sha256": "c0307882804a5e49fdbf6208cffc113ae17aa6cdb72cfb5880c28d9762a85d43",
+        "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/v0.1.26/actionq-0.1.26-py3-none-any.whl"
+      },
+      "capabilities": [
+        "execution/v1"
+      ],
+      "dependencies": [
+        "execution-contracts",
+        "vuoro-adapter-kit",
+        "vuoro-schema-runtime"
+      ],
+      "closure": {
+        "configuration_digest": "35af932f2b3507cf6214991e67c9badc76b8332d0ea8e414525462484710a22d",
+        "schema_version": "actionq-schema/v12",
+        "protocol_version": "1",
+        "operation_hashes": "8d434e8b347e804c90e48a6598304be84b12f2a61ebc2dbed00a26053239a778",
+        "attestation": "3d2f06fa9a079587d5756fa3217a47cee2662c5d1519b39b7762b4dc7f9cda12"
+      }
+    },
+    {
+      "provider_id": "execution-contracts",
+      "release_unit": "execution-contracts",
+      "artifact_kind": "wheel",
+      "role": "owner-dependency",
+      "source_repository": "https://github.com/bayleafwalker/actionq",
+      "source_revision": "0e8b21325a7fd3d59a989110e61ce80476c51dea",
+      "artifact": {
+        "distribution": "actionq-contracts",
+        "distribution_version": "0.1.1",
+        "artifact_sha256": "23236d0f662a1dc58eacbc7c5d9a3dcd27f11fb34be2b725945518452119d3df",
+        "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/vuoro-adapter-v1-0e8b213/actionq_contracts-0.1.1-py3-none-any.whl"
+      },
+      "capabilities": [],
+      "closure": {
+        "configuration_digest": "e06023c9faee316195d0f6c68ab624790995d4832f520efbdf3ae0be58393b25",
+        "attestation": "0de972b18bbd1aa0004a8d2a3c2751bcdd8e2d1375faabd1074e7aeef96f7b6a"
+      }
+    },
+    {
+      "provider_id": "knowledge-adapter",
+      "release_unit": "knowledge-adapter",
+      "artifact_kind": "wheel",
+      "role": "adapter",
+      "source_repository": "https://github.com/bayleafwalker/kctl",
+      "source_revision": "f5c5483b0825219ad90488276b56d143b64f01ad",
+      "artifact": {
+        "distribution": "kctl",
+        "distribution_version": "0.1.3",
+        "artifact_sha256": "789b5aadfc4c31171d574c76b79af9999b08b5cf212969cefc8504eb2e99e43d",
+        "artifact_url": "https://github.com/bayleafwalker/kctl/releases/download/kctl-v0.1.3/kctl-0.1.3-py3-none-any.whl"
+      },
+      "capabilities": [
+        "knowledge/v1"
+      ],
+      "dependencies": [
+        "vuoro-adapter-kit",
+        "vuoro-schema-runtime"
+      ],
+      "closure": {
+        "configuration_digest": "8dc85c1b045d02eef4acc9ef3458074dc2211396962074ff738b4555780af025",
+        "schema_version": "knowledge-schema/v1",
+        "protocol_version": "1",
+        "attestation": "86985c783808c64c7daf4aaf00fa0b655305a43d89f03e266f965694b616d9ce"
+      }
+    },
+    {
+      "provider_id": "vuoro-adapter-kit",
+      "release_unit": "vuoro-adapter-kit",
+      "artifact_kind": "wheel",
+      "role": "shared-dependency",
+      "source_repository": "https://github.com/bayleafwalker/vuoro",
+      "source_revision": "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c",
+      "artifact": {
+        "distribution": "vuoro-adapter-kit",
+        "distribution_version": "0.1.0",
+        "artifact_sha256": "0037898a4c9f01720a42302365b0172ecd203732070326ea2abdf549a44bf0c2",
+        "artifact_url": "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.1.0/vuoro_adapter_kit-0.1.0-py3-none-any.whl"
+      },
+      "capabilities": [],
+      "closure": {
+        "configuration_digest": "3cde8191b7a0c054273dc475f3cc7cfe4329d4b8154cace5642f34f8d03d7504",
+        "attestation": "d05444db67bee87035f51c946be44c7e65f6676f035720291f67defe8a149261"
+      }
+    },
+    {
+      "provider_id": "vuoro-schema-runtime",
+      "release_unit": "vuoro-schema-runtime",
+      "artifact_kind": "wheel",
+      "role": "shared-dependency",
+      "source_repository": "https://github.com/bayleafwalker/vuoro",
+      "source_revision": "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c",
+      "artifact": {
+        "distribution": "vuoro-schema-runtime",
+        "distribution_version": "0.1.0",
+        "artifact_sha256": "b66c9357c99aa9e1a7353991ce54105a8621958ecfac47f8c121d80b90b77912",
+        "artifact_url": "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-schema-runtime-v0.1.0/vuoro_schema_runtime-0.1.0-py3-none-any.whl"
+      },
+      "capabilities": [],
+      "closure": {
+        "configuration_digest": "5d04ecb20605e4c1fd43865948c2b432e14f380a1c73dadb5e5bf8b4f0859f31",
+        "attestation": "e1b97edb5d22c62a384308a8410e2e5361b2e8db5d23cf2df8e33674d1ef583a"
+      }
+    },
+    {
+      "provider_id": "work-adapter",
+      "release_unit": "work-adapter",
+      "artifact_kind": "wheel",
+      "role": "adapter",
+      "source_repository": "https://github.com/bayleafwalker/sprintctl",
+      "source_revision": "15afc8762ce99beb3ec0239a5ce4a8713dd6f934",
+      "artifact": {
+        "distribution": "sprintctl",
+        "distribution_version": "0.3.0",
+        "artifact_sha256": "b2b81526509da84830fe12c646bddfdb99bbba31b2a45625f743c4233d829fe4",
+        "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/v0.3.0/sprintctl-0.3.0-py3-none-any.whl"
+      },
+      "capabilities": [
+        "work-api/v1"
+      ],
+      "dependencies": [
+        "vuoro-adapter-kit"
+      ],
+      "closure": {
+        "configuration_digest": "34af0b9116d444436b291bcf0815b7f546ff328d2cd85e221a6e5f838e4eaa80",
+        "schema_version": "work-schema/v1",
+        "protocol_version": "1",
+        "operation_hashes": "5988b1117763aa4f517724222f4530b948d9c088463eaca098e6b7c7036b9ff1",
+        "attestation": "9e8316e4c719ceb7daa348bba575b43e4fa4d777db49b47deaf43062d56e07d8"
+      }
+    }
+  ],
+  "adapters": [
+    {
+      "adapter_id": "audit-catalog",
+      "provider_id": "audit-adapter",
+      "module": "vuoro_adapter_kit.adapters.audit",
+      "build": "build",
+      "register": "register",
+      "runtime_settings": {
+        "dsn": "VUORO_AUDIT_RUNTIME_DSN",
+        "schema": "VUORO_AUDIT_SCHEMA"
+      }
+    },
+    {
+      "adapter_id": "execution-catalog",
+      "provider_id": "execution-adapter",
+      "module": "vuoro_adapter_kit.adapters.execution",
+      "build": "build",
+      "register": "register",
+      "runtime_settings": {
+        "dsn": "VUORO_EXECUTION_RUNTIME_DSN",
+        "schema": "VUORO_EXECUTION_SCHEMA"
+      }
+    },
+    {
+      "adapter_id": "knowledge-catalog",
+      "provider_id": "knowledge-adapter",
+      "module": "vuoro_adapter_kit.adapters.knowledge",
+      "build": "build",
+      "register": "register",
+      "runtime_settings": {
+        "dsn": "VUORO_KNOWLEDGE_RUNTIME_DSN",
+        "schema": "VUORO_KNOWLEDGE_SCHEMA"
+      }
+    },
+    {
+      "adapter_id": "work-catalog",
+      "provider_id": "work-adapter",
+      "module": "vuoro_adapter_kit.adapters.work",
+      "build": "build",
+      "register": "register",
+      "runtime_settings": {
+        "dsn": "VUORO_WORK_RUNTIME_DSN",
+        "repository_id": "VUORO_WORK_REPOSITORY_ID"
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "capability_id": "audit/v1",
+      "scope_kind": "global",
+      "provider_id": "audit-adapter",
+      "adapter_id": "audit-catalog"
+    },
+    {
+      "capability_id": "execution/v1",
+      "scope_kind": "global",
+      "provider_id": "execution-adapter",
+      "adapter_id": "execution-catalog"
+    },
+    {
+      "capability_id": "knowledge/v1",
+      "scope_kind": "global",
+      "provider_id": "knowledge-adapter",
+      "adapter_id": "knowledge-catalog"
+    },
+    {
+      "capability_id": "work-api/v1",
+      "scope_kind": "global",
+      "provider_id": "work-adapter",
+      "adapter_id": "work-catalog"
+    }
+  ],
+  "migrated_from": {
+    "schema_version": "vuoro-composition/v3",
+    "manifest_sha256": "6d2f9739c1ffa1a5fa3a9cfdf8dd22b81ed71d5a93eff211fa1db134ae8902f1",
+    "equivalence_proof": "tests/test_composition_v4.py::test_v3_reference_composition_migrates_losslessly"
+  }
+}
