@@ -62,9 +62,10 @@ test churn. Where a choice exists between a clean break and a staged transition,
    client's cached revision and trip ActionQ's `stale-catalog` fence fleet-wide.
 10. **Proof cases**, wheel-first: `execution/v1` carried forward frozen and exclusive is the one
     that must pass this sprint. The external-provider cases (OpenBao `secret.lease/v1`, OTel
-    `telemetry.export/v1`) exercise `image`/`chart` closures and probe conformance; run them if
-    week 3 has room, defer them without guilt if it does not — they prove a different half of the
-    ontology and nothing downstream waits on them.
+    `telemetry.export/v1`) exercise `image`/`chart` closures and probe conformance; **dropped from
+    this sprint** — the 2026-08-22 EventStorming board (`docs/evidence/`) shows nothing observed
+    needs them proven now, and they prove a different half of the ontology that nothing
+    downstream waits on.
 
 ## Week 4 — W4 rescope in ActionQ
 
