@@ -4,7 +4,8 @@
 **Date:** 2026-08-22  
 **Audience:** future planner, architect, reviewer, and implementer sessions  
 **Scope:** intended product and architecture direction; not an implementation authorization  
-**Plan of record for implementation:** `2026-08-22-extended-sprint-plan.md` (composition v4 candidate, four weeks). This document sits above it and after it — see §0.
+**Plan of record for implementation:** `2026-08-22-extended-sprint-plan.md` (composition v4 candidate, four weeks). This document sits above it and after it — see §0.  
+**Evidence input:** `docs/evidence/2026-08-22-agentic-eventstorm.html` — a big-picture EventStorming pass over Codex, OpenCode, Claude Code and local-inference session logs on this host and the devbox (1,730 / 239 / 194 sessions sampled, $33.50 hosted spend). Its six ranked hotspots are the first evidence Vuoro has about itself; §0.1 records how they reorder §11.
 
 ## 0. Assessment and reconciliation (2026-08-22)
 
@@ -42,7 +43,36 @@ amendments were applied inline, each marked `[reconciled]` where it lands:
    applied to R1–R8 *once, before any lane runs*, and the classified spec is then the frozen
    baseline. Classification is not a licence to re-open requirements mid-comparison.
 
-Not changed, and worth stating: the draft's `WorkRelease`-first priority order is kept; the
+### 0.1 Board reflection (2026-08-22, second pass)
+
+Reflecting the EventStorming board against this document changed it in four places, marked
+`[board]`:
+
+- **Validated with receipts.** Hotspot 01 (deepseek→kimi billing failover at a reconstructed
+  100–400× per-session cost, no event logged; local inference serving ~17% of OpenCode traffic
+  at $0 and visible only by join) is the exact failure `WorkRelease`/`RecipeRevision` exist to
+  prevent: the recipe changed mid-work with no release, grant or decision. Hotspot 06 (devbox
+  and workstation never reconcile) is the authority-binding concept, observed. Hotspot 03
+  (`vuoro-dispatch-ready` / `outctl-ready` name a gate that emits no transition) is our own
+  naming and yields the enforcement rule in §13 falsifier 11.
+- **Corrected.** An earlier critique held that Git already supplies portable checkpoints for
+  coding work. Hotspot 02 refutes it: 78 handoff losses, 43 irrecoverable, are observations of
+  *live infrastructure* before a fix — not committable, dead at the session boundary in all
+  three tools. `EvidenceSet` is load-bearing beyond Git, and needs a **validity window** (§5.1).
+- **Reprioritized.** Hotspot 04 (denial→adapt→retry is the ordinary loop; 92 permission-mode
+  changes in one session) makes grant escalation a runtime lifecycle, not a launch envelope
+  (§11 Priority 4). And none of the six hotspots is touched by Provider Kit, OCI artifacts or
+  SBOM machinery; all six are missing *events* plus one reconciled *projection* (§9.2).
+- **Reframed.** Codex's `shadow_selection_experiment` silently varies which skill activates: an
+  ungoverned experiment already running *on* this stack. The experiment ledger earns its place
+  as consent before it earns it as measurement (§3.6, §11 Priority 6).
+
+The composition v4 sprint is not redirected by this: it is where the ledger contracts get
+declared, and it fixes no hotspot by itself. What the board does settle is that the
+external-provider proof cases (OpenBao, OTel) are dropped from the sprint rather than
+"run if week 3 has room".
+
+Not changed, and worth stating: the draft's `WorkRelease`-first priority order is kept in spirit but reordered by the board in §11; the
 Restate pilot stays an unstarted, separately authorized qualification exercise; W5 and W7 stay
 operator-owned / unauthorized; ActionQ PR #40 disposition matches what is already recorded.
 
@@ -143,6 +173,8 @@ At current volume, provider and model promotion cannot pretend to be statistical
 - how to revert.
 
 Automated promotion thresholds become justified only when repeated comparable work produces enough evidence.
+
+Before either, the record is **consent**: a vendor- or harness-side experiment that varies the effective recipe without a `Decision` is exactly what hotspot 01 and Codex's `shadow_selection_experiment` show happening today. Adaptation is a governed workflow because ungoverned adaptation is already running. `[board]`
 
 ## 4. The intended operating loop
 
@@ -248,9 +280,13 @@ A payload- or scope-bound authorization for consequential effects. It records pr
 
 It must never imply automatic replay after an uncertain outcome.
 
+A grant has a **runtime lifecycle**, not only a launch envelope: requested → granted | denied → adapted → re-requested, each an event (`GrantEscalated`). Denial history feeds policy *inputs* — as a `Decision`, never as automated policy mutation, and never written into OPA, which evaluates but does not own source policy (§3.3). Without this the cockpit's authorization pane is a 92-clicks-per-session approval mill spending the scarce resource exactly where it should not. `[board]`
+
 #### `EvidenceSet`
 
 A correlated set of durable references and integrity metadata. It may contain Git commits, diffs, tests, artifacts, command captures, logs, reviewer reports, evaluator scores, or non-Git checkpoint material.
+
+Every item carries a **validity window** declared by its collector (Outctl/Auditctl-class tooling, or the harness): the period over which an observation of a live system may be trusted in place of re-acquiring it. Git-backed items are valid indefinitely at their hash; live-infrastructure observations (`flux reconcile`, `sprintctl doctor`, node state) expire. The reader-side rule is a projection: trust within the window, re-acquire outside it, and emit `EvidenceExpired` rather than silently rerunning. This is the fix for hotspots 02 and 05 together, and it does not grow Outctl or Auditctl beyond bounded evidence acquisition. `[board]`
 
 #### `Decision`
 
@@ -453,7 +489,7 @@ The long-term topology may include:
 - team and cloud distributions;
 - public provider admission and compatibility matrices.
 
-This is not the next-six-month roadmap. It activates when at least one of the following becomes true:
+This is not the next-six-month roadmap. The 2026-08-22 board makes the point sharply: zero of its six ranked hotspots is addressed by any item above, and all six are addressed by events and one projection. `[board]` It activates when at least one of the following becomes true:
 
 - a second independently operated deployment consumes the contracts;
 - an adapter is maintained outside the primary repository or by another person;
@@ -503,33 +539,40 @@ construction protocol, validator rules 1–9, byte-identical migration proof, wh
 case, W4 rescope. Every priority below declares its objects as capability contracts inside this
 composition, so it is a prerequisite, not a parallel track. `[reconciled]`
 
-### Priority 1 — `WorkRelease` and authority binding
+### Priority 1 — first-class events for the shadow domains `[board]`
 
-Implement the mutable-task/immutable-release split and explicit binding to the owning task authority. Include supersession, stale completion, and fresh-context takeover.
+Emit `ProviderSwitched`, cost attribution (including $0 local-inference sessions),
+`GrantEscalated` / denied / adapted, and lifecycle transitions for anything named `-ready`, into
+auditctl. Cheapest move on the board: it closes hotspot 01, half of 04, all of 03, and makes local
+inference exist in the ledger.
 
-### Priority 2 — `EffectGrant`
+### Priority 2 — `EvidenceSet` with validity windows `[board]`
 
-Implement payload- or scope-bound effect grants, principal binding, policy-decision reference, expiry, and uncertain-use handling. This is `federation.grant/v1` over `federation.principal/v1`; the Identity → `FederationPrincipal` stable-identifier rule (sprint week 4) is its prerequisite. OPA and OpenBao are evaluators/providers at their existing boundaries (`policy.decision/v1`, `secret.lease/v1`); Vuoro owns grant and decision lineage as contract. `[reconciled]`
+Collector-declared validity on live-infrastructure observations, reader-side trust-or-reacquire
+projection, `EvidenceExpired` event. Closes hotspots 02 and 05. This is the object the draft was
+missing.
 
-### Priority 3 — `EvidenceSet` and `Decision`
+### Priority 3 — `WorkRelease` and authority binding
 
-Correlate existing Outctl/Auditctl/Git/object-store evidence with explicit acceptance, rejection, revision, and supersession decisions. Evidence must be durable before acknowledgement where loss would make settlement unverifiable.
+Implement the mutable-task/immutable-release split and explicit binding to the owning task authority, with `RecipeRevision` bound at issue so a mid-work provider change is definitionally a new release requiring a `Decision`. Include supersession, stale completion, and fresh-context takeover.
 
-### Priority 4 — episodic-supervisor coordination
+### Priority 4 — `EffectGrant` runtime lifecycle
 
-Change the coordinator so that frontier supervisors are called on semantic gates, not polling loops. Measure subscription/frontier utilization before and after.
+Implement payload- or scope-bound effect grants, principal binding, policy-decision reference, expiry, uncertain-use handling, and the escalation lifecycle from §5.1 with denial-history → policy-input feedback as `Decision`s. This is `federation.grant/v1` over `federation.principal/v1`; the Identity → `FederationPrincipal` stable-identifier rule (sprint week 4) is its prerequisite. OPA and OpenBao are evaluators/providers at their existing boundaries (`policy.decision/v1`, `secret.lease/v1`); Vuoro owns grant and decision lineage as contract. `[reconciled]`
 
-### Priority 5 — `AgentProfileRevision` and recipe binding
+### Priority 5 — cross-host authority reconciliation `[board]`
 
-Add the cross-harness logical identity, skill, hook, context, policy, and handoff layer. Flatten effective inheritance into each work release. Keep native harness behavior provider-specific.
+One projection over devbox and workstation (hotspot 06), per the existing cursor/watermark
+pattern. Two writable hosts that never reconcile is the mirror image of the two-writable-task-
+authorities rule Sprintctl already forbids.
 
-### Priority 6 — experiment memory
+### Priority 6 — `Decision` correlation, `AgentProfileRevision`, experiment memory
 
-Record recipe revisions, challenger evidence, intervention, reviewer findings, switch rationale, and rollback. Do not automate promotion.
+Correlate Outctl/Auditctl/Git/object-store evidence with explicit acceptance, rejection, revision and supersession decisions (evidence durable before acknowledgement where loss would make settlement unverifiable). Add the cross-harness logical identity, skill, hook, context, policy and handoff layer, flattened into each release. Record recipe revisions, challenger evidence, intervention, reviewer findings, switch rationale and rollback — reframed as memory *and consent*, surfacing vendor-side experiments such as `shadow_selection`. Do not automate promotion.
 
-### Priority 7 — honest external-provider pilot
+### Priority 7 — episodic-supervisor coordination and the external-provider pilot
 
-Run one provider-neutral workload through the incumbent, minimization control, and one market durable-workflow challenger. The previously proposed ActionQ review loop on the appservice cluster remains a reasonable pilot workload if separately authorized.
+Change the coordinator so that frontier supervisors are called on semantic gates, not polling loops; measure subscription/frontier utilization before and after. Then run one provider-neutral workload through the incumbent, minimization control, and one market durable-workflow challenger. The previously proposed ActionQ review loop on the appservice cluster remains a reasonable pilot workload if separately authorized.
 
 ### Explicitly deferred
 
@@ -571,6 +614,7 @@ The direction is wrong or overbuilt if any of the following cannot be demonstrat
 8. An experiment record helps explain or reverse a provider/recipe change even when the sample is too small for statistical promotion.
 9. The cockpit provides material operational value beyond concatenating native provider UIs.
 10. Deferred ecosystem packaging remains absent until an activation trigger is observed.
+11. Every ledger contract names the lifecycle events its transitions emit, and those events are observed in auditctl. A Vuoro object that emits no lifecycle events is not an object, it is a name — `vuoro-dispatch-ready` is the counterexample already on record. `[board]`
 
 If ordinary solo work remains neutral or negative and multi-agent bursts do not compensate for the carrying cost, minimization or removal remains a valid outcome.
 
