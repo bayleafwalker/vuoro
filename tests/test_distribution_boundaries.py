@@ -12,6 +12,12 @@ SHARED_PACKAGES = {
     "vuoro-schema-runtime": "vuoro_schema_runtime",
     "vuoro-adapter-kit": "vuoro_adapter_kit",
 }
+SHARED_PACKAGE_VERSIONS = {
+    "vuoro-schema-runtime": "0.1.0",
+    # 0.1.1 adds vuoro_adapter_kit.adapters: the uniform construction shims the
+    # v4 profile names. The pinned 0.1.0 wheel does not contain them.
+    "vuoro-adapter-kit": "0.1.1",
+}
 FORBIDDEN_CLIENT_TERMS = {
     "adapter",
     "adapters",
@@ -85,7 +91,13 @@ def test_client_and_service_are_distinct_wheels() -> None:
 def test_shared_packages_are_stdlib_only_and_have_isolated_wheel_boundaries() -> None:
     for distribution, module in SHARED_PACKAGES.items():
         project = _project(ROOT / "packages" / distribution / "pyproject.toml")
-        assert project["version"] == "0.1.0"
+        # Pinned per package rather than as one literal, because these versions
+        # are what the composition pins: bumping one here without repinning
+        # adapter-pins.json ships a release whose manifest names a wheel that no
+        # longer matches the source. During a release the source leads the pin
+        # for exactly as long as it takes the tag to build, which is why this is
+        # a table and not a comparison against the manifest.
+        assert project["version"] == SHARED_PACKAGE_VERSIONS[distribution]
         assert project["requires-python"] == ">=3.11"
         assert project["dependencies"] == []
         with zipfile.ZipFile(_one_wheel(distribution)) as wheel:
