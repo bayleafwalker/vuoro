@@ -69,7 +69,7 @@ another.
 | Coordination | run requests, reconciliation, session lineage, external-execution references | ActionQ federation (external-execution references, assurance, reconciliation) |
 | Execution | product-native runtimes (Claude Code, Codex, OpenCode, Copilot), ACP, worktrees | external, qualified per `docs/evidence/2026-08-19-native-harness-qualification.md`; no Vuoro-owned runner |
 | Authority and policy | identity, principals, grants, policy decisions, credential/secret leases | federation principals and grants; OPA (decisions); OpenBao (secret leases); cred-broker |
-| Evidence and provenance | command capture, manifests, audit ledger, artifacts, retention | auditctl (`audit/v1`), federation retention export (W3), kctl (`knowledge/v1`) |
+| Evidence and provenance | command capture, manifests, knowledge artifacts, audit ledger, retention | auditctl (`audit/v1`), kctl (`knowledge/v1`), federation retention export (W3) |
 | Observability and analytics | telemetry collection, metrics, traces, dashboards, derived analytics | OTel collectors → Prometheus; homelab-analytics |
 
 Evidence is first-class and is **not** folded into observability: telemetry may be lossy,
@@ -104,14 +104,16 @@ Each contract declares:
 Cardinality belongs to the capability, never to the plane or the provider.
 <!-- claim: v4-cardinality-is-per-capability -->
 
-Initial contracts beyond the four carried forward, all provisional until their owner freezes them:
+Initial contracts beyond the four carried forward. Federation is **three** contracts, not one: identity is frozen forever, grants iterate, and the resource ledger has a different scope from both — one contract would force a single frozen/iterative status and a single scope onto three things that differ in exactly those properties. Contract ids are settled here; their operation sets are the owners' to freeze:
 
 | Contract | Cardinality | Owner | Note |
 | --- | --- | --- | --- |
-| `federation.principal/v1`, `federation.grant/v1`, `federation.resource/v1` | exclusive | ActionQ | the W4 rescoping decides the split; packaging follows ownership, not the reverse |
-| `secret.lease/v1` | exclusive | OpenBao | mechanics only — not identity, grants or decisions |
-| `policy.decision/v1` | exclusive | OPA | |
-| `metrics.storage/v1` | exclusive per scope | Prometheus | storage and query only |
+| `federation.principal/v1` | exclusive, scope `global`, frozen | ActionQ | identity is forever (§7); a principal id must not depend on environment or project |
+| `federation.grant/v1` | exclusive, scope `project` | ActionQ | ACL; iterates independently of identity |
+| `federation.resource/v1` | exclusive, scope `environment` | ActionQ | the append-only ledger (W3); matches the W3 identity namespace `(mapping_version, environment, source_id, id)` |
+| `secret.lease/v1` | exclusive, scope `environment` | OpenBao | mechanics only — not identity, grants or decisions; one vault per deployable environment class |
+| `policy.decision/v1` | exclusive, scope `global` | OPA | one policy authority, decisions parameterised by tenant/project |
+| `metrics.storage/v1` | exclusive, scope `environment` | Prometheus | storage and query only |
 | `telemetry.export/v1` | multi | OTel collectors | |
 | `analytics.derived/v1` | projection | homelab-analytics | never authoritative |
 
@@ -318,9 +320,12 @@ docstring; no two claims may share a scope.
 ]
 ```
 
-## 10. Open decisions for the owner
+## 10. Decisions taken in this freeze
 
-- Contract ids for federation (one contract or three) — decided in W4 rescoping, after §6.
-- Whether `knowledge/v1` (kctl) sits in evidence or a seventh plane. Plane placement is
-  render-only, so this can change without a validator change.
-- `scope_kind` for `secret.lease/v1` and `policy.decision/v1`: `environment` or `tenant`.
+- Federation is three contracts (`principal` global/frozen, `grant` project, `resource`
+  environment) — §3.2.
+- `knowledge/v1` (kctl) is in the evidence and provenance plane: knowledge artifacts are
+  retained provenance, not telemetry. Plane placement is render-only, so this costs nothing to
+  revisit.
+- `scope_kind`: `secret.lease/v1` and `metrics.storage/v1` are per `environment` (matching the
+  deployable environment classes v3 already enforces); `policy.decision/v1` is `global`.
