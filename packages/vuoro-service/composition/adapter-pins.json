@@ -45,11 +45,11 @@
       "lock_id": "vuoro-adapter-kit",
       "lock_kind": "shared-dependency",
       "source_repository": "https://github.com/bayleafwalker/vuoro",
-      "source_revision": "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c",
-      "artifact_url": "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.1.0/vuoro_adapter_kit-0.1.0-py3-none-any.whl",
-      "artifact_sha256": "0037898a4c9f01720a42302365b0172ecd203732070326ea2abdf549a44bf0c2",
+      "source_revision": "1b6a51397e693c5e1d37ca71658dd3a5d5d0dd77",
+      "artifact_url": "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.1.1/vuoro_adapter_kit-0.1.1-py3-none-any.whl",
+      "artifact_sha256": "0dac880d790857fbed1085906f0e2ffd151c509ab61d527a351b68f3775ee16f",
       "distribution": "vuoro-adapter-kit",
-      "distribution_version": "0.1.0"
+      "distribution_version": "0.1.1"
     },
     {
       "lock_id": "vuoro-schema-runtime",
@@ -76,7 +76,9 @@
     {
       "domain": "work",
       "lock_id": "work-adapter",
-      "dependency_lock_ids": ["vuoro-adapter-kit"],
+      "dependency_lock_ids": [
+        "vuoro-adapter-kit"
+      ],
       "adapter_module": "sprintctl.vuoro_adapter",
       "register": "register_work_catalog",
       "api_version": "work-api/v1",
@@ -85,7 +87,11 @@
     {
       "domain": "execution",
       "lock_id": "execution-adapter",
-      "dependency_lock_ids": ["execution-contracts", "vuoro-adapter-kit", "vuoro-schema-runtime"],
+      "dependency_lock_ids": [
+        "execution-contracts",
+        "vuoro-adapter-kit",
+        "vuoro-schema-runtime"
+      ],
       "adapter_module": "actionq.vuoro",
       "register": "register_operations",
       "api_version": "execution/v1",
@@ -94,7 +100,10 @@
     {
       "domain": "knowledge",
       "lock_id": "knowledge-adapter",
-      "dependency_lock_ids": ["vuoro-adapter-kit", "vuoro-schema-runtime"],
+      "dependency_lock_ids": [
+        "vuoro-adapter-kit",
+        "vuoro-schema-runtime"
+      ],
       "adapter_module": "kctl.vuoro",
       "register": "register_operations",
       "api_version": "knowledge/v1",
@@ -103,7 +112,10 @@
     {
       "domain": "audit",
       "lock_id": "audit-adapter",
-      "dependency_lock_ids": ["vuoro-adapter-kit", "vuoro-schema-runtime"],
+      "dependency_lock_ids": [
+        "vuoro-adapter-kit",
+        "vuoro-schema-runtime"
+      ],
       "adapter_module": "auditctl.vuoro_adapter",
       "register": "VuoroAuditAdapter.register",
       "api_version": "audit/v1",
