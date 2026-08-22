@@ -1,0 +1,401 @@
+<title>Agentic Workflow Storming</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --board:#E3DDCE; --board-2:#D8D0BC; --ink:#2A251E; --ink-dim:#5B5346; --rule:#B9AF97;
+    --lane-accent:#2F5058; --lane-accent-ink:#EAF1F1;
+    --cmd-bg:#7EA0C6; --cmd-ink:#132436;
+    --evt-bg:#D98A46; --evt-ink:#3A2110;
+    --act-bg:#D7BA52; --act-ink:#332A08;
+    --vie-bg:#7CA891; --vie-ink:#12261D;
+    --hot-bg:#C56B72; --hot-ink:#380D10;
+    --card-shadow: 0 3px 8px rgba(30,24,12,0.22), 0 1px 2px rgba(30,24,12,0.18);
+    --stat-bg:#FBF8F0;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --board:#211E19; --board-2:#2A2620; --ink:#ECE4D3; --ink-dim:#B7AC96; --rule:#4B4438;
+      --lane-accent:#7FB8C2; --lane-accent-ink:#0D1E21;
+      --cmd-bg:#4E718F; --cmd-ink:#DCE9F5;
+      --evt-bg:#A9622F; --evt-ink:#FBE7D4;
+      --act-bg:#93791F; --act-ink:#FAF2D2;
+      --vie-bg:#4C7362; --vie-ink:#DCEEE5;
+      --hot-bg:#8F3E45; --hot-ink:#F7DEE0;
+      --card-shadow: 0 3px 10px rgba(0,0,0,0.45), 0 1px 2px rgba(0,0,0,0.35);
+      --stat-bg:#2C2822;
+    }
+  }
+  :root[data-theme="dark"]{
+    --board:#211E19; --board-2:#2A2620; --ink:#ECE4D3; --ink-dim:#B7AC96; --rule:#4B4438;
+    --lane-accent:#7FB8C2; --lane-accent-ink:#0D1E21;
+    --cmd-bg:#4E718F; --cmd-ink:#DCE9F5;
+    --evt-bg:#A9622F; --evt-ink:#FBE7D4;
+    --act-bg:#93791F; --act-ink:#FAF2D2;
+    --vie-bg:#4C7362; --vie-ink:#DCEEE5;
+    --hot-bg:#8F3E45; --hot-ink:#F7DEE0;
+    --card-shadow: 0 3px 10px rgba(0,0,0,0.45), 0 1px 2px rgba(0,0,0,0.35);
+    --stat-bg:#2C2822;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    background:var(--board); color:var(--ink);
+    font-family:"IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    margin:0; padding:0 clamp(16px,4vw,56px) 80px;
+  }
+  .wrap{max-width:1360px; margin:0 auto;}
+
+  header.masthead{
+    padding:56px 0 28px; border-bottom:1px solid var(--rule);
+  }
+  .eyebrow{
+    font-family:"IBM Plex Mono", monospace; font-size:12.5px; letter-spacing:0.14em;
+    text-transform:uppercase; color:var(--lane-accent); font-weight:600;
+  }
+  h1{
+    font-family:"IBM Plex Sans Condensed", sans-serif; font-weight:700;
+    font-size:clamp(34px,5vw,58px); line-height:1.02; margin:10px 0 14px; text-wrap:balance;
+    letter-spacing:-0.01em;
+  }
+  .dek{
+    max-width:62ch; font-size:16.5px; line-height:1.55; color:var(--ink-dim); margin:0 0 18px;
+  }
+  .legend{
+    display:flex; flex-wrap:wrap; gap:10px 20px; margin-top:22px;
+    font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--ink-dim);
+  }
+  .legend span{display:inline-flex; align-items:center; gap:7px;}
+  .swatch{width:11px; height:11px; border-radius:2px; display:inline-block;}
+
+  .stats{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px;
+    background:var(--rule); border:1px solid var(--rule); margin:26px 0 8px;
+  }
+  .stat{background:var(--stat-bg); padding:16px 18px;}
+  .stat .n{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; font-size:26px; font-weight:600;}
+  .stat .l{font-size:12px; color:var(--ink-dim); margin-top:2px;}
+
+  section.lane{padding:40px 0 8px; border-bottom:1px solid var(--rule);}
+  .lane-head{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:6px;}
+  .lane-tag{
+    font-family:"IBM Plex Mono",monospace; font-size:12px; font-weight:600; letter-spacing:0.08em;
+    background:var(--lane-accent); color:var(--lane-accent-ink); padding:3px 9px; border-radius:3px;
+  }
+  h2.lane-title{
+    font-family:"IBM Plex Sans Condensed",sans-serif; font-weight:700; font-size:26px; margin:0;
+  }
+  .lane-sub{font-size:14px; color:var(--ink-dim); margin:2px 0 22px; max-width:70ch;}
+
+  .cat{margin-bottom:20px;}
+  .cat-label{
+    font-family:"IBM Plex Mono",monospace; font-size:11.5px; letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--ink-dim); margin-bottom:10px; display:flex; align-items:center; gap:7px;
+  }
+  .row{display:flex; flex-wrap:wrap; gap:14px;}
+  .note{
+    box-shadow:var(--card-shadow); border-radius:2px; padding:12px 14px; width:236px;
+    font-size:13.5px; line-height:1.42;
+  }
+  .note b{display:block; font-size:14px; margin-bottom:4px;}
+  .note .meta{
+    font-family:"IBM Plex Mono",monospace; font-size:11px; opacity:0.85; margin-top:6px; display:block;
+  }
+  .note.cmd{background:var(--cmd-bg); color:var(--cmd-ink); transform:rotate(-0.6deg);}
+  .note.evt{background:var(--evt-bg); color:var(--evt-ink); transform:rotate(0.5deg);}
+  .note.act{background:var(--act-bg); color:var(--act-ink); transform:rotate(-0.4deg);}
+  .note.vie{background:var(--vie-bg); color:var(--vie-ink); transform:rotate(0.6deg);}
+  .note.hot{background:var(--hot-bg); color:var(--hot-ink); transform:rotate(-0.5deg);}
+  .note:nth-child(3n){transform:rotate(0.8deg);}
+  .note:nth-child(4n){transform:rotate(-0.9deg);}
+
+  .cluster{padding:44px 0 20px;}
+  .cluster h2{
+    font-family:"IBM Plex Sans Condensed",sans-serif; font-size:28px; font-weight:700; margin:0 0 6px;
+  }
+  .cluster .lane-sub{margin-bottom:26px;}
+  .cluster-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px;}
+  .cluster-card{
+    background:var(--hot-bg); color:var(--hot-ink); border-radius:3px; padding:18px 20px;
+    box-shadow:var(--card-shadow);
+  }
+  .cluster-card .rank{
+    font-family:"IBM Plex Mono",monospace; font-size:12px; font-weight:600; opacity:0.75;
+  }
+  .cluster-card b{display:block; font-family:"IBM Plex Sans Condensed",sans-serif; font-size:18px; font-weight:700; margin:4px 0 6px;}
+  .cluster-card p{margin:0; font-size:13.5px; line-height:1.5;}
+
+  .caveat{
+    margin-top:36px; padding:16px 20px; border:1px dashed var(--rule); border-radius:3px;
+    font-size:13.5px; color:var(--ink-dim); line-height:1.6;
+  }
+  .caveat b{color:var(--ink);}
+
+  footer{
+    margin-top:48px; padding-top:20px; border-top:1px solid var(--rule);
+    font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink-dim); line-height:1.8;
+  }
+
+  @media (max-width:640px){
+    .note{width:100%;}
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <div class="eyebrow">EventStorming · Big-Picture pass</div>
+    <h1>How the agents actually get told what to do</h1>
+    <p class="dek">A domain model of agentic coding workflows on this host and devbox — Codex, OpenCode, Claude Code, and the local inference server underneath them — built from each tool's own session logs, SQLite state, and config, sampled by seven exploration agents. Sticky-note colors follow Brandolini's convention.</p>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--cmd-bg)"></i>Command — operator prompt / triggered action</span>
+      <span><i class="swatch" style="background:var(--evt-bg)"></i>Domain Event — what happened</span>
+      <span><i class="swatch" style="background:var(--act-bg)"></i>Actor / Aggregate — who or what holds the state</span>
+      <span><i class="swatch" style="background:var(--vie-bg)"></i>View — shown before a command</span>
+      <span><i class="swatch" style="background:var(--hot-bg)"></i>Hotspot — friction, ambiguity, bottleneck</span>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="n">1,730</div><div class="l">Codex threads tracked</div></div>
+      <div class="stat"><div class="n">194</div><div class="l">Claude Code session transcripts sampled</div></div>
+      <div class="stat"><div class="n">239</div><div class="l">OpenCode sessions logged</div></div>
+      <div class="stat"><div class="n">121</div><div class="l">free local-inference sessions</div></div>
+      <div class="stat"><div class="n">$33.50</div><div class="l">total hosted-model spend observed</div></div>
+    </div>
+  </header>
+
+  <!-- CODEX -->
+  <section class="lane">
+    <div class="lane-head">
+      <span class="lane-tag">CODEX</span>
+      <h2 class="lane-title">Goal-and-queue orchestration</h2>
+    </div>
+    <p class="lane-sub">Model configured: <code>gpt-5.6-luna</code>, high reasoning effort. The richest internal state of the three tools — a real goal tracker, work queue, memory-consolidation pipeline, and thread history, all in local SQLite.</p>
+
+    <div class="cat">
+      <div class="cat-label"><i class="swatch" style="background:var(--act-bg)"></i>Actors / Aggregates</div>
+      <div class="row">
+        <div class="note act"><b>Thread</b>owns cwd, sandbox policy, model, token budget<span class="meta">state_5.sqlite · 1,730 rows</span></div>
+        <div class="note act"><b>Goal</b>objective + status enum + token/time budget<span class="meta">goals_1.sqlite · 6 complete / 9 blocked / 3 paused</span></div>
+        <div class="note act"><b>Async Job</b>kind, worker_id, lease + retry state<span class="meta">memories_1.sqlite · 31 done / 1 error / 1 pending</span></div>
+        <div class="note act"><b>Memory artifact</b>raw_memory → phase-1 → selected_for_phase2<span class="meta">stage1_outputs table</span></div>
+        <div class="note act"><b>Rate limiter</b>credit/usage RPC with timeout fallback</div>
+        <div class="note act"><b>Skill registry</b>system skills + shadow_selection_experiment A/B</div>
+      </div>
+    </div>
+    <div class="cat">
+      <div class="cat-label"><i class="swatch" style="background:var(--cmd-bg)"></i>Commands (operator prompts, paraphrased)</div>
+      <div class="row">
+        <div class="note cmd"><b>"Dispatch sol to plan 1119"</b>names a sub-agent, hands it a specific plan id</div>
+        <div class="note cmd"><b>"Continue from paused session"</b>resumes a goal left mid-flight</div>
+        <div class="note cmd"><b>Wave-1 sprint directive</b>350+ lines, 11-step procedure, explicit "do not restart #961/#962/#1159" gates</div>
+        <div class="note cmd"><b>"Dispatch a session to dogfood the local inference"</b>infra-experimentation request</div>
+      </div>
+    </div>
+    <div class="cat">
+      <div class="cat-label"><i class="swatch" style="background:var(--evt-bg)"></i>Domain Events</div>
+      <div class="row">
+        <div class="note evt"><b>reasoning</b>20,331 steps logged<span class="meta">thread_history_1.sqlite</span></div>
+        <div class="note evt"><b>commandExecution</b>15,487 shell/tool invocations</div>
+        <div class="note evt"><b>subAgentActivity</b>832 sub-agent dispatch confirmations</div>
+        <div class="note evt"><b>permission denied</b>denial_class: cluster_identity / read_only_policy / require_outctl</div>
+        <div class="note evt"><b>provider connectivity failure</b>46 WebSocket/DNS errors to chatgpt.com backend</div>
+      </div>
+    </div>
+    <div class="cat">
+      <div class="cat-label"><i class="swatch" style="background:var(--vie-bg)"></i>Views</div>
+      <div class="row">
+        <div class="note vie"><b>Command allowlist</b>prefix-rule patterns shown before execution<span class="meta">rules/default.rules · 200KB</span></div>
+        <div class="note vie"><b>Sandbox policy</b>read/write roots + network restriction, per thread</div>
+        <div class="note vie"><b>Goal status board</b>active / paused / blocked / usage_limited / budget_limited / complete</div>
+      </div>
+    </div>
+    <div class="cat">
+      <div class="cat-label"><i class="swatch" style="background:var(--hot-bg)"></i>Hotspots</div>
+      <div class="row">
+        <div class="note hot"><b>Half the goals are stuck</b>9 of 18 goals blocked — missing authority DB in backup snapshots, missing CNPG init permissions</div>
+        <div class="note hot"><b>Egress denial mistaken for outage</b>"Sprint DB connectivity" scare traced back to sandbox egress policy, not a real DB problem</div>
+        <div class="note hot"><b>Rate-limit fatigue</b><code>hide_rate_limit_model_nudge=true</code> — operator suppressed the nudge rather than fixing the cause</div>
+        <div class="note hot"><b>Unexplained skill A/B test</b><code>shadow_selection_experiment</code> silently varies which skill gets activated</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OPENCODE -->
+  <section class="lane">
+    <div class="lane-head">
+      <span class="lane-tag">OPENCODE</span>
+      <h2 class="lane-title">Provider routing, thin event log</h2>
+    </div>
+    <p class="lane-sub">Session/event data lives in a compact SQLite DB — but the event table only records message and session lifecycle, not cost or provider-switch events. Cost had to be reconstructed by joining session rows to provider/model.</p>
+
+    <div class="cat">
+      <div class="cat-label"><i class="swatch" style="background:var(--act-bg)"></i>Actors / Aggregates</div>
+      <div class="row">
+        <div class="note act"><b>Session</b>agent mode (build/plan/explore/general) + model + cost<span class="meta">176 build · 35 plan sessions</span></div>
+        <div class="note act"><b>Hosted provider</b>opencode-go: kimi-k3, kimi-k2.7-code, deepseek-v4-flash</div>
+        <div class="note act"><b>Permission ruleset</b>per-session allow/deny/ask patterns</div>
+        <div class="note act"><b>Project snapshot</b>181 git-hash-keyed directories</div>
+      </div>
+    </div>
+    <div class="cat">
+      <div class="cat-label"><i class="swatch" style="background:var(--cmd-bg)"></i>Commands</div>
+      <div class="row">
+        <div class="note cmd"><b>opencode --model local3090/worker-fast</b>explicit route to the free local provider</div>
+        <div class="note cmd"><b>Permission grant/deny</b>e.g. allow <code>python scripts/verify_manifest.py</code>, deny <code>ls -la .git</code></div>
+        <div class="note cmd"><b>Skill dispatch</b>pr-handoff-summary, dispatch-build, dispatch-review</div>
+      </div>
+    </div>
+    <div class="cat">
+      <div class="cat-label"><i class="swatch" style="background:var(--evt-bg)"></i>Domain Events</div>
+      <div class="row">
+        <div class="note evt"><b>message.part.updated</b>12,478 — streamed response chunks</div>
+        <div class="note evt"><b>session.created</b>239 total sessions</div>
+        <div class="note evt"><b>AI_APICallError: insufficient balance</b>deepseek-v4-flash cut off mid-use, 2026-08-19/20</div>
+        <div class="note evt"><b>permission.asked</b>escalates unmatched tool pattern to operator</div>
+      </div>
+    </div>
+    <div class="cat">
+      <div class="cat-label"><i class="swatch" style="background:var(--vie-bg)"></i>Views</div>
+      <div class="row">
+        <div class="note vie"><b>Permission prompt</b>pattern + proposed action, before the call runs</div>
+        <div class="note vie"><b>Session list</b>slug, model, token + cost breakdown</div>
+      </div>
+    </div>
+    <div class="cat">
+      <div class="cat-label"><i class="swatch" style="background:var(--hot-bg)"></i>Hotspots</div>
+      <div class="row">
+        <div class="note hot"><b>Silent billing failover</b>deepseek quota ran out → kimi-k3 took over at 100–400× the per-session cost, with no failover event logged</div>
+        <div class="note hot"><b>Write-only snapshot store</b>181 project snapshots, zero <code>rollback</code>/<code>reverted</code> events — never actually used to recover</div>
+        <div class="note hot"><b>Runtime model flag doesn't persist</b><code>--model</code> switches don't stick; operator must hand-edit config to keep it</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLAUDE CODE -->
+  <section class="lane">
+    <div class="lane-head">
+      <span class="lane-tag">CLAUDE CODE</span>
+      <h2 class="lane-title">Task queue + subagent dispatch, widest domain</h2>
+    </div>
+    <p class="lane-sub">Spans infra orchestration (sprintctl-orchestrator, vuoro-dispatch-ready/outctl-ready, appservice) and non-infra work (CV editing, 3D render QA, game design, media transcoding) — same Command/Event shape, very different Actors.</p>
+
+    <div class="cat">
+      <div class="cat-label"><i class="swatch" style="background:var(--act-bg)"></i>Actors / Aggregates</div>
+      <div class="row">
+        <div class="note act"><b>Subagent</b>spawned via Agent tool, typed by subagent_type (Explore, Plan, general-purpose…)</div>
+        <div class="note act"><b>Task queue</b>TaskCreate → TaskUpdate → TaskStop lifecycle</div>
+        <div class="note act"><b>Inter-agent message</b>SendMessage to other agents by opaque hex id</div>
+        <div class="note act"><b>Composite dispatch project</b>vuoro-outctl-ready/members/{agentops,vuoro,sprintctl,kctl,…}</div>
+        <div class="note act"><b>Non-infra artifacts</b>render receipt.json, CV document pair (EN/FI), game design spec, transcode config</div>
+      </div>
+    </div>
+    <div class="cat">
+      <div class="cat-label"><i class="swatch" style="background:var(--cmd-bg)"></i>Commands</div>
+      <div class="row">
+        <div class="note cmd"><b>"Bump the Talos version"</b>triggers a skill that cascades into 7 TaskCreate calls (failover, drain, preflight, validate…)</div>
+        <div class="note cmd"><b>"Count cross-session command reruns"</b>Explore subagent dispatched for a retrospective over 190+ transcripts</div>
+        <div class="note cmd"><b>CV regeneration</b>governed by disclosure level, provenance notes, hedge-preservation rules</div>
+        <div class="note cmd"><b>Art-direction negotiation</b>"paper realism for landscapes, origami for structures…"</div>
+      </div>
+    </div>
+    <div class="cat">
+      <div class="cat-label"><i class="swatch" style="background:var(--evt-bg)"></i>Domain Events</div>
+      <div class="row">
+        <div class="note evt"><b>pr-link</b>116 in one session — 11 links to a single PR in 15 minutes</div>
+        <div class="note evt"><b>queue-operation</b>120 enqueues in one session, sparse matching dequeues logged</div>
+        <div class="note evt"><b>UEFI NVRAM corruption</b>node install failed 3× (BackoffLimitExceeded), node left cordoned</div>
+        <div class="note evt"><b>subagent completed</b>e.g. "classified reruns into TP-IRRECOVERABLE / RECOVERABLE-FROM-GIT / RECOVERABLE-FROM-ARTIFACT"</div>
+      </div>
+    </div>
+    <div class="cat">
+      <div class="cat-label"><i class="swatch" style="background:var(--vie-bg)"></i>Views</div>
+      <div class="row">
+        <div class="note vie"><b>activeForm task description</b>"Draining k8s-worker-3", shown live during multi-step work</div>
+        <div class="note vie"><b>Pre-flight checklist</b>"all nodes on Talos v1.13.7, gates disarmed, no failed jobs"</div>
+        <div class="note vie"><b>Render receipt</b>codec gates, seam-ratio metrics, human-gate checklist</div>
+      </div>
+    </div>
+    <div class="cat">
+      <div class="cat-label"><i class="swatch" style="background:var(--hot-bg)"></i>Hotspots</div>
+      <div class="row">
+        <div class="note hot"><b>78 handoff-loss instances</b>agents re-asking "what did it look like before the fix" — 43 of those states are gone for good, unreplayable</div>
+        <div class="note hot"><b>Costly command reruns</b><code>flux reconcile source git</code> rerun 5× over 11 days; live infra state can't be cached across sessions</div>
+        <div class="note hot"><b>"-ready" implies a gate that isn't there</b>vuoro-dispatch-ready / outctl-ready read as a readiness state machine, but are just worktree snapshots — no transition events exist</div>
+        <div class="note hot"><b>92 permission-mode changes in one session</b>heavy approval churn under high task load</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LOCAL INFERENCE -->
+  <section class="lane">
+    <div class="lane-head">
+      <span class="lane-tag">LOCAL INFERENCE</span>
+      <h2 class="lane-title">The workhorse no one logs as a cost event</h2>
+    </div>
+    <p class="lane-sub"><code>llama-swap</code>, live on <code>127.0.0.1:8020</code>, lazily loads whichever of 5 models a request needs. It's an actor shared across OpenCode sessions — but it only appears in the data by inference, never as a first-class event.</p>
+    <div class="cat">
+      <div class="cat-label"><i class="swatch" style="background:var(--act-bg)"></i>Actors</div>
+      <div class="row">
+        <div class="note act"><b>worker-fast</b>Qwen 3.6-35B MoE (3B active) — primary lane</div>
+        <div class="note act"><b>devstral</b>24B AWQ, tool-calling</div>
+        <div class="note act"><b>writer-gemma / writer-mistral / writer-cydonia</b>24–27B writing finetunes</div>
+      </div>
+    </div>
+    <div class="cat">
+      <div class="cat-label"><i class="swatch" style="background:var(--evt-bg)"></i>Domain Events</div>
+      <div class="row">
+        <div class="note evt"><b>121 sessions served</b>566K in / 36K out tokens, <b>$0.00</b> total</div>
+        <div class="note evt"><b>Lazy model load</b>models sit unloaded until first call reaches them</div>
+      </div>
+    </div>
+    <div class="cat">
+      <div class="cat-label"><i class="swatch" style="background:var(--hot-bg)"></i>Hotspot</div>
+      <div class="row">
+        <div class="note hot"><b>Invisible in the ledger</b>~17% of all OpenCode session traffic runs here at zero cost, but nothing in the event table marks a session as "went local" — you have to join session→model to see it at all</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CROSS-CUTTING HOTSPOT CLUSTER -->
+  <section class="cluster">
+    <h2>Hotspot cluster — where the friction actually concentrates</h2>
+    <p class="lane-sub">The EventStorming move at this point is to pull every pink note into one pile and rank it. Six patterns recur across all three agents, not just one.</p>
+    <div class="cluster-grid">
+      <div class="cluster-card">
+        <div class="rank">01</div>
+        <b>Cost and quota failover is a shadow domain</b>
+        <p>Codex's rate-limit resets, OpenCode's deepseek→kimi failover, and local inference's invisible free tier all share one gap: none of them are modeled as a first-class event. You reconstruct them after the fact, from gaps and joins — not from a log line that says "provider switched."</p>
+      </div>
+      <div class="cluster-card">
+        <div class="rank">02</div>
+        <b>State dies at the session boundary</b>
+        <p>Codex has 9 goals blocked on evidence that no longer exists; Claude Code has 78 handoff-loss instances where an agent has to re-ask what a now-repaired system looked like broken. Transient infra state is the recurring casualty — none of the three tools treat it as worth preserving past the turn that produced it.</p>
+      </div>
+      <div class="cluster-card">
+        <div class="rank">03</div>
+        <b>Naming promises a state machine that isn't there</b>
+        <p>"vuoro-dispatch-ready", "vuoro-outctl-ready", Codex's <code>shadow_selection_experiment</code> — all read as a gated transition with a trigger and a check. None of them log an actual transition event. The name is doing work the system isn't.</p>
+      </div>
+      <div class="cluster-card">
+        <div class="rank">04</div>
+        <b>Denial is a workflow step, not a failure</b>
+        <p>Codex's cluster_identity/read_only_policy denials, OpenCode's permission.ask escalations, Claude Code's 92-per-session permission-mode churn — all three tools have normalized "get denied, adapt, retry" as the ordinary shape of getting work done, not an exception path.</p>
+      </div>
+      <div class="cluster-card">
+        <div class="rank">05</div>
+        <b>Repetition costs more than anyone notices</b>
+        <p>Claude Code reruns expensive live-infra commands (<code>flux reconcile</code>, <code>sprintctl doctor</code>) days to weeks apart because no result is cached or trusted across sessions — the same command, the same cost, paid again each time context is lost.</p>
+      </div>
+      <div class="cluster-card">
+        <div class="rank">06</div>
+        <b>Devbox and workstation don't reconcile</b>
+        <p>Independent zvol clones, per-host cost logs, a long-lived OAuth token that's inference-only (so <code>/remote-control</code> permanently fails there) — devbox is structurally the same three tools, running in a state that never merges back with the workstation's.</p>
+      </div>
+    </div>
+    <div class="caveat">
+      <b>Caveat on the devbox lane:</b> the survey agent that compared devbox to the workstation enumerated file paths for several credential stores there (auth.json, a token env file, actionq-env) to establish parity/absence — it reported only existence and size, never contents, and the two internal LB IPs it cited were already recorded in prior project notes rather than newly surfaced. The harness still flagged the pattern of enumerating credential-store paths on a remote host as worth a human look, so it's called out here rather than folded in silently.
+    </div>
+  </section>
+
+  <footer>
+    Sources: 7 background survey passes (Haiku 4.5) over ~/.codex, ~/.config/opencode + ~/.local/share/opencode, ~/.claude/projects (23 project dirs, ~194 transcripts sampled), and one devbox-agent SSH comparison · compiled 2026-08-22 · secrets and credential contents redacted throughout
+  </footer>
+</div>
