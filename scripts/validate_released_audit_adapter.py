@@ -105,7 +105,6 @@ def _observation() -> dict[str, Any]:
         "record_class": "observation",
         "event_type": "released-wheel-gate",
         "actor": "release-gate",
-        "principal_id": "vuoro-static:release-gate:0",
         "runtime_session_id": None,
         "occurred_at": "2026-08-13T00:00:00Z",
         "basis_revision": "a" * 40,
