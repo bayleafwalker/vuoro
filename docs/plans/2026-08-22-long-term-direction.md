@@ -286,7 +286,7 @@ A grant has a **runtime lifecycle**, not only a launch envelope: requested → g
 
 A correlated set of durable references and integrity metadata. It may contain Git commits, diffs, tests, artifacts, command captures, logs, reviewer reports, evaluator scores, or non-Git checkpoint material.
 
-Every item carries a **validity window** declared by its collector (Outctl/Auditctl-class tooling, or the harness): the period over which an observation of a live system may be trusted in place of re-acquiring it. Git-backed items are valid indefinitely at their hash; live-infrastructure observations (`flux reconcile`, `sprintctl doctor`, node state) expire. The reader-side rule is a projection: trust within the window, re-acquire outside it, and emit `EvidenceExpired` rather than silently rerunning. This is the fix for hotspots 02 and 05 together, and it does not grow Outctl or Auditctl beyond bounded evidence acquisition. `[board]`
+Every item carries a **validity window** declared by its collector (Auditctl-class tooling, or the harness): the period over which an observation of a live system may be trusted in place of re-acquiring it. Git-backed items are valid indefinitely at their hash; live-infrastructure observations (`flux reconcile`, `sprintctl doctor`, node state) expire. The reader-side rule is a projection: trust within the window, re-acquire outside it, and emit `EvidenceExpired` rather than silently rerunning. This is the fix for hotspots 02 and 05 together, and it does not grow Auditctl beyond bounded evidence acquisition. `[board]`
 
 #### `Decision`
 
@@ -343,7 +343,7 @@ Planes are an operator taxonomy, not a demand for six new network services. Vali
 | Coordination | ActionQ today; Restate, Hatchet, DBOS, Temporal-class challengers | Dispatch intent, declared checkpoints, opaque references, reconciliation |
 | Execution | Codex, Claude Code, OpenCode, `local3090`, CI, Kubernetes | Agent profile, handoff, grants, attachment and evidence edge |
 | Authority and policy | OIDC, OPA, OpenBao | Stable principal binding, effect grants, policy inputs and decision lineage |
-| Evidence and provenance | Git, object storage, Outctl, Auditctl | Correlation, completeness, integrity, acceptance and recovery references |
+| Evidence and provenance | Git, object storage, Auditctl | Correlation, completeness, integrity, acceptance and recovery references |
 | Observability and analytics | OpenTelemetry, Prometheus, evaluation products | Correlation identifiers, required signals, scorecard and experiment decision |
 
 Capabilities declare cardinality:
@@ -410,9 +410,9 @@ ActionQ remains the current durable run authority until a challenger qualifies. 
 
 Sprintctl remains the reference local work authority. External task systems may replace it only with explicit authority fencing and reconciliation. Transparent dual-writer synchronization remains disallowed.
 
-#### Outctl and Auditctl
+#### Auditctl (and Outctl, retired)
 
-Their distinctive value is thin, bounded, policy-aware evidence acquisition and provenance. They should not grow into general log or analytics platforms.
+Auditctl's distinctive value is thin, bounded, policy-aware evidence acquisition and provenance. It should not grow into a general log or analytics platform. Outctl was retired from the Vuoro project binding on 2026-08-20 (agentops `67f1f6d`) and stays retired unless evidence indicates a revival; its role here is historical. `[reconciled]`
 
 #### Beads and Gas Town
 
@@ -568,7 +568,7 @@ authorities rule Sprintctl already forbids.
 
 ### Priority 6 — `Decision` correlation, `AgentProfileRevision`, experiment memory
 
-Correlate Outctl/Auditctl/Git/object-store evidence with explicit acceptance, rejection, revision and supersession decisions (evidence durable before acknowledgement where loss would make settlement unverifiable). Add the cross-harness logical identity, skill, hook, context, policy and handoff layer, flattened into each release. Record recipe revisions, challenger evidence, intervention, reviewer findings, switch rationale and rollback — reframed as memory *and consent*, surfacing vendor-side experiments such as `shadow_selection`. Do not automate promotion.
+Correlate Auditctl/Git/object-store evidence with explicit acceptance, rejection, revision and supersession decisions (evidence durable before acknowledgement where loss would make settlement unverifiable). Add the cross-harness logical identity, skill, hook, context, policy and handoff layer, flattened into each release. Record recipe revisions, challenger evidence, intervention, reviewer findings, switch rationale and rollback — reframed as memory *and consent*, surfacing vendor-side experiments such as `shadow_selection`. Do not automate promotion.
 
 ### Priority 7 — episodic-supervisor coordination and the external-provider pilot
 
