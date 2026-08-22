@@ -159,4 +159,24 @@ jobs:
           uv pip check --python /tmp/vuoro-released-four-domain-wheel/bin/python
           /tmp/vuoro-released-four-domain-wheel/bin/python \
             scripts/validate_released_catalog_composition.py
+      - name: Exercise the v4 reference profile against the same released wheels
+        shell: bash
+        run: |
+          # Same environment as the step above -- the released owner wheels,
+          # unchanged -- so the two scripts prove the same catalog by two paths:
+          # v3 calls the four owner registrations directly, v4 goes through the
+          # support manifest, profile lock and uniform construction. Equal
+          # revisions is the whole claim, and it is worth nothing unless both
+          # run.
+          #
+          # The adapter kit is the exception, and deliberately: the uniform
+          # construction shims do not exist in the pinned 0.1.0 release, so the
+          # locally built wheel is installed over it. The profile repins to the
+          # released kit once the shims ship, and until then this step is
+          # proving the candidate's shims against released owner wheels, which
+          # is the honest half.
+          uv pip install --python /tmp/vuoro-released-four-domain-wheel/bin/python \
+            --no-deps --force-reinstall dist/vuoro-adapter-kit/*.whl
+          /tmp/vuoro-released-four-domain-wheel/bin/python \
+            scripts/validate_v4_reference_profile.py
       - run: python -m json.tool vuoro.dispatch.json >/dev/null

@@ -39,3 +39,27 @@ def test_specialist_pre_migration_proofs_are_unchanged_and_indexed() -> None:
 def test_generic_results_contain_only_shared_verification_records() -> None:
     for result in (ROOT / "verification/results").glob("*.json"):
         assert json.loads(result.read_text())["schema_version"] == "verification-result/v1"
+
+
+def test_every_validator_script_is_invoked_by_ci() -> None:
+    """A validator nobody runs proves nothing, and looks like it proves something.
+
+    The v4 reference-profile validator carried the strongest claim in the
+    composition work -- the real 85 operations and the pinned catalog revision --
+    and for one commit it carried it nowhere: no CI step, no test, one comment
+    referencing it. Reviewers caught that; this makes the next one mechanical.
+
+    Scoped to ``scripts/validate_*.py`` deliberately. The other scripts here are
+    operator tools (fetch, attest, migrate, pre-migration startup) that run
+    against a deployment or are covered by their own ``--check`` test; a script
+    whose name says it validates something and which nothing invokes is the
+    specific shape worth failing on.
+    """
+    root = Path(__file__).parents[1]
+    workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    uninvoked = sorted(
+        path.name
+        for path in (root / "scripts").glob("validate_*.py")
+        if path.name not in workflow
+    )
+    assert not uninvoked, f"validator scripts no CI step runs: {uninvoked}"

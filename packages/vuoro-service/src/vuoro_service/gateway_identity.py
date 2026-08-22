@@ -25,6 +25,7 @@ _NBF_CLOCK_SKEW_SECONDS = 2
 _REQUIRED_CLAIMS = (
     "actor",
     "authorities",
+    "principal_epoch",
     "exp",
     "iat",
     "iss",
@@ -196,8 +197,21 @@ class GatewayAssertionIdentityResolver:
             raise IdentityResolutionError("gateway identity assertion is invalid")
 
         actor = _required_text(claims.get("actor"), "actor")
-        if _required_text(claims.get("sub"), "sub") != actor:
+        subject = _required_text(claims.get("sub"), "sub")
+        if subject != actor:
             raise IdentityResolutionError("gateway identity actor and subject disagree")
+        # The claim that makes ownership survivable. `iat` is per *request* on a
+        # 30-second assertion, so nothing else in this claim set can distinguish
+        # a reissued actor from the original -- and federation ownership is a
+        # comparison against a stored principal id with no transfer operation.
+        # An epoch that increments on reissue makes a reissued actor a different
+        # principal by construction. Vuoro Cloud mints and persists it per
+        # subject; this side only refuses an assertion without one.
+        epoch = claims.get("principal_epoch")
+        if isinstance(epoch, bool) or not isinstance(epoch, int) or epoch < 0:
+            raise IdentityResolutionError(
+                "gateway identity assertion has invalid principal_epoch"
+            )
         workspace_id = _required_text(claims.get("workspace_id"), "workspace_id")
         if not _ULID.fullmatch(workspace_id) or workspace_id != self._expected_workspace_id:
             raise IdentityResolutionError("gateway identity assertion has invalid workspace_id")
@@ -242,4 +256,5 @@ class GatewayAssertionIdentityResolver:
             authorities=frozenset(authorities),
             repo_ids=frozenset(repo_ids),
             workspace_id=workspace_id,
+            principal_id=f"{self._issuer}:{subject}:{epoch}",
         )

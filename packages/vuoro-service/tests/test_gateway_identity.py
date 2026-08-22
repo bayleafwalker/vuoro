@@ -42,6 +42,7 @@ def _claims(**overrides: object) -> dict:
         "sub": "github:123",
         "workspace_id": WORKSPACE_ID,
         "actor": "github:123",
+        "principal_epoch": 0,
         "authorities": ["work:read", "work:write"],
         "repo_ids": ["repo-a"],
         "request_id": REQUEST_ID,
@@ -315,3 +316,53 @@ def test_gateway_assertion_resolver_handles_key_symlinks_fail_closed(
             allowed_repo_ids=frozenset({"repo-a"}),
             trusted_root=root,
         )
+
+
+def test_the_assertion_must_carry_a_principal_epoch(tmp_path: Path) -> None:
+    """The claim that makes federation ownership survivable.
+
+    `iat` is per request on a 30-second assertion, so nothing else in the claim
+    set distinguishes a reissued actor from the original -- and ownership is a
+    comparison against a stored principal id with no transfer operation. An
+    assertion without an epoch is refused rather than defaulted, because every
+    available default is the actor string, which is the failure being prevented.
+    """
+    path, private = _key_file(tmp_path)
+    resolver = _resolver(path)
+    claims = _claims()
+    del claims["principal_epoch"]
+    private_pem = private.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    )
+    token = jwt.encode(claims, private_pem, algorithm="EdDSA",
+                       headers={"typ": "JWT", "kid": "gateway-2026-01"})
+    with pytest.raises(IdentityResolutionError):
+        resolver(_request(token))
+
+    for invalid in ("0", -1, 1.5, True):
+        with pytest.raises(IdentityResolutionError, match="principal_epoch"):
+            resolver(_request(_token(private, principal_epoch=invalid)))
+    # A null claim is a missing claim to PyJWT's require check, so it fails one
+    # step earlier -- still refused, just not by the epoch check itself.
+    with pytest.raises(IdentityResolutionError, match="assertion is invalid"):
+        resolver(_request(_token(private, principal_epoch=None)))
+
+
+def test_a_reissued_actor_is_a_different_principal(tmp_path: Path) -> None:
+    """The whole point of the epoch, stated as the property it buys.
+
+    Same actor string, incremented epoch: a different principal_id, so the
+    ownership comparison against a resource created by the first holder cannot
+    succeed for the second. No transfer operation is needed because no transfer
+    happens.
+    """
+    path, private = _key_file(tmp_path)
+    resolver = _resolver(path)
+    first = resolver(_request(_token(private, principal_epoch=0)))
+    reissued = resolver(_request(_token(private, principal_epoch=1)))
+    assert first.actor == reissued.actor
+    assert first.principal_id != reissued.principal_id
+    assert first.principal_id == f"{CLOUD_ISSUER}:github:123:0"
+    assert reissued.principal_id == f"{CLOUD_ISSUER}:github:123:1"

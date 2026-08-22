@@ -3,6 +3,7 @@
   "identities": {
     "replace-with-a-unique-local-development-token": {
       "actor": "local-evaluation",
+      "principal_id": "vuoro-static:local-evaluation:0",
       "environment": "vuoro-compose",
       "authorities": ["work:read", "execution:read", "knowledge:read", "audit:read"],
       "repo_ids": ["replace-with-the-bound-repository-id"]
