@@ -16,10 +16,20 @@ resolved -- so a revision change is not a cache miss, it is a fleet-wide
 cutover. A migration that rebinds the same adapters must therefore be invisible
 on the wire, and this script is where that stops being an argument.
 
-Run it where the pinned owner wheels are installed; it opens no database.
+Run it where the pinned owner wheels are installed; it opens no database, and
+that bound is worth stating because it cost a CI failure to learn.
+``build`` is not database-free for every owner -- sprintctl's
+``pg.get_connection`` calls ``psycopg.connect`` eagerly -- so a gate that must
+not require Postgres cannot construct real applications. It therefore injects
+stub applications and calls the real ``register`` for each binding: same
+bindings, same order, same entrypoints resolved, and the served catalog is
+unaffected because the revision digests operation definitions and a handler's
+application is not one. What this proves is the catalog; what it does not prove
+is that every owner constructor accepts what the profile pins, which only a
+deployment with a database can.
+
 ``tests/test_composition_v4.py::test_v3_reference_composition_migrates_losslessly``
-proves the composition path is revision-neutral without them, which is the half
-that can be proven in CI.
+proves the composition path is revision-neutral without the wheels at all.
 """
 
 from __future__ import annotations
@@ -52,10 +62,33 @@ KNOWN_GAPS = {
     "knowledge-adapter records no operation_hashes",
 }
 
-# Deployment supplies these; nothing here connects, so any non-empty value will
-# do. They are named by the profile, which is the point -- this script does not
-# know which owner wants which.
-PLACEHOLDER = "postgresql://validate-only/invalid"
+# Deployment supplies these. Nothing here connects, but a value still has to be
+# *syntactically* what its setting is -- ActionQ rejects a schema name that is
+# not a Postgres identifier before it ever opens a connection. Keyed on the
+# setting name, which is Vuoro's own vocabulary from the profile, not on the
+# owner: this script still does not know which owner wants which.
+PLACEHOLDERS = {
+    "dsn": "postgresql://validate-only/invalid",
+    "schema": "validate_only",
+    "repository_id": "validate-only",
+}
+DEFAULT_PLACEHOLDER = "validate-only"
+
+
+class StubApplication:
+    """Stands in for an owner application while proving the catalog.
+
+    Mirrors what ``scripts/validate_released_catalog_composition.py`` does on the
+    v3 side, for the same reason: registration needs an object, and the catalog
+    does not care which. The two attributes are the ones today's adapters read
+    at registration time.
+    """
+
+    managed_dispatch_policy = None
+
+    @staticmethod
+    def maintenance_resource_schema_available() -> bool:
+        return False
 
 
 def main() -> int:
@@ -70,9 +103,9 @@ def main() -> int:
         return 1
 
     environ = {
-        variable: PLACEHOLDER
+        variable: PLACEHOLDERS.get(setting, DEFAULT_PLACEHOLDER)
         for adapter in profile.adapters
-        for variable in adapter.runtime_settings.values()
+        for setting, variable in adapter.runtime_settings.items()
     }
     composed = compose(
         profile, manifest,
@@ -80,6 +113,7 @@ def main() -> int:
         environment_name="validate",
         environment_class="development",
         registry=CatalogRegistry(),
+        application_factory=lambda adapter, runtime: StubApplication(),
     )
     catalog = composed.registry.catalog().model_dump(mode="json")
 

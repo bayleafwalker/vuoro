@@ -219,6 +219,7 @@ def compose(
     environment_name: str,
     environment_class: str,
     registry: CatalogRegistry | None = None,
+    application_factory: Callable[[Adapter, RuntimeConfiguration], Any] | None = None,
 ) -> ComposedCatalog:
     """Build and register every binding the profile declares.
 
@@ -231,6 +232,16 @@ def compose(
     A binding whose adapter declares no module is a provider Vuoro reaches over
     the network rather than in-process: there is nothing to import and nothing
     to register, and it is skipped rather than treated as an error.
+
+    ``application_factory`` replaces the ``build`` call and nothing else -- same
+    bindings, same order, same ``register``, and ``build`` is still resolved so
+    a missing entrypoint still fails. It exists because ``build`` is not
+    database-free for every owner: sprintctl's ``pg.get_connection`` opens a
+    psycopg connection eagerly, so a gate that must not require Postgres cannot
+    construct real applications. Proving the served catalog does not need them
+    -- the revision is a digest over operation definitions, and a handler's
+    application is not part of it -- so the proof injects stubs and says so,
+    rather than the composer quietly tolerating a half-built application.
     """
     registry = registry if registry is not None else CatalogRegistry()
     composed: list[ComposedCapability] = []
@@ -254,7 +265,10 @@ def compose(
         build = _entrypoint(adapter.module, adapter.build or "", label)
         register = _entrypoint(adapter.module, adapter.register or "", label)
         try:
-            application = build(runtime)
+            application = (
+                build(runtime) if application_factory is None
+                else application_factory(adapter, runtime)
+            )
         except CompositionV4Error:
             raise
         except Exception as error:
