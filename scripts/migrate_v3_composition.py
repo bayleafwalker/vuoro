@@ -52,6 +52,11 @@ ROOT = Path(__file__).resolve().parents[1]
 COMPOSITION = ROOT / "packages/vuoro-service/composition"
 V3_MANIFEST = COMPOSITION / "adapter-pins.json"
 V4_PROFILE = COMPOSITION / "profiles/shared.json"
+# Records with no v3 origin: external providers deployed beside the wheels in
+# the same cluster. Merged rather than hand-copied into the profile so that each
+# half has exactly one source -- the wheels' is adapter-pins.json, the externals'
+# is this file -- and neither can drift into the other.
+OVERLAY = COMPOSITION / "profiles/shared-overlay.json"
 
 # The one Vuoro protocol version the service shell speaks (`vuoro_client.PROTOCOL_VERSION`).
 PROTOCOL_VERSION = "1"
@@ -165,12 +170,19 @@ def migrate(manifest: dict) -> dict:
             "adapter_id": adapter_id,
         })
 
+    overlay = json.loads(OVERLAY.read_text(encoding="utf-8")) if OVERLAY.is_file() else {}
+    if overlay.get("profile", "shared") != "shared":
+        raise SystemExit("the overlay declares a different profile than the one it extends")
+    providers += overlay.get("providers", [])
+    adapters += overlay.get("adapters", [])
+    bindings += overlay.get("bindings", [])
+
     return {
         "schema_version": "vuoro-composition/v4",
         "profile": "shared",
         "providers": sorted(providers, key=lambda item: item["provider_id"]),
         "adapters": sorted(adapters, key=lambda item: item["adapter_id"]),
-        "bindings": sorted(bindings, key=lambda item: item["capability_id"]),
+        "bindings": sorted(bindings, key=lambda item: (item["capability_id"], item.get("scope_instance") or "")),
         "migrated_from": {
             "schema_version": manifest["schema_version"],
             "manifest_sha256": hashlib.sha256(V3_MANIFEST.read_bytes()).hexdigest(),

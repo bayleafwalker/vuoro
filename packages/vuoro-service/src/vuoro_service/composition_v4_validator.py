@@ -530,7 +530,7 @@ def _rule_8_v3_invariants(
 
 def _origin(provider: Provider) -> str:
     artifact = provider.artifact
-    for name in ("image_reference", "artifact_url", "chart"):
+    for name in ("image_reference", "artifact_url", "chart_repository"):
         if name in artifact:
             return artifact[name]
     return provider.source_repository

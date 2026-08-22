@@ -73,12 +73,20 @@ _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 # carries a values digest because mutable values are not a freeze, and `image`
 # is frozen only together with its closure -- which is why the closure is a
 # separate record rather than more fields here.
+#
+# `chart_repository` is here because the first real chart provider exposed its
+# absence: rule 8 requires a stated origin for everything that is not a wheel,
+# and a chart identified only by name, version and digest has none -- the check
+# would have compared a chart *name* against an origin allowlist and passed on
+# a coincidence.
 ARTIFACT_IDENTITY_FIELDS: Mapping[str, frozenset[str]] = {
     "wheel": frozenset(
         {"distribution", "distribution_version", "artifact_sha256", "artifact_url"}
     ),
     "image": frozenset({"image_reference", "image_digest"}),
-    "chart": frozenset({"chart", "chart_version", "chart_digest", "values_digest"}),
+    "chart": frozenset(
+        {"chart_repository", "chart", "chart_version", "chart_digest", "values_digest"}
+    ),
     "binary": frozenset({"artifact_url", "artifact_sha256"}),
 }
 
