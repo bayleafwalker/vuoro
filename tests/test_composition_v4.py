@@ -968,3 +968,37 @@ def test_the_shared_profile_is_the_migration_of_the_v3_manifest() -> None:
         cwd=ROOT, capture_output=True, text=True,
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_every_adapter_module_is_shipped_by_a_provider_the_profile_pins() -> None:
+    """The gap that shipped a profile naming modules its own pins could not provide.
+
+    For one commit the profile named `vuoro_adapter_kit.adapters.*` while pinning
+    vuoro-adapter-kit 0.1.0, which does not contain them -- caught only by a
+    comment in a CI step. The import half is now proven in CI against the
+    fetched wheel; this is the half that can be proven from source: every
+    adapter module's distribution is pinned by the profile, and the module file
+    exists in that distribution's source tree.
+    """
+    _, profile = reference()
+    distributions = {
+        provider.artifact["distribution"].replace("-", "_"): provider
+        for provider in profile.providers
+        if provider.artifact_kind == "wheel"
+    }
+    packages = {path.name: path for path in (ROOT / "packages").iterdir() if path.is_dir()}
+    for adapter in profile.adapters:
+        if adapter.module is None:
+            continue
+        root_package = adapter.module.split(".", 1)[0]
+        assert root_package in distributions, (
+            f"{adapter.adapter_id} names {adapter.module}, whose distribution the "
+            "profile does not pin"
+        )
+        owner = packages.get(root_package.replace("_", "-"))
+        if owner is None:
+            continue  # an owner's own wheel, not built from this repository
+        source = owner / "src" / Path(*adapter.module.split("."))
+        assert source.with_suffix(".py").is_file() or source.is_dir(), (
+            f"{adapter.module} is not in {owner.name}'s source tree"
+        )
