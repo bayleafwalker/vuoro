@@ -175,11 +175,11 @@ def test_checked_in_execution_pin_includes_released_contract_companion() -> None
     assert [(item.lock_id, item.lock_kind, item.distribution, item.distribution_version)
             for item in pin.dependencies] == [
         ("execution-contracts", "owner-dependency", "actionq-contracts", "0.1.1"),
-        ("vuoro-adapter-kit", "shared-dependency", "vuoro-adapter-kit", "0.1.0"),
+        ("vuoro-adapter-kit", "shared-dependency", "vuoro-adapter-kit", "0.1.1"),
         ("vuoro-schema-runtime", "shared-dependency", "vuoro-schema-runtime", "0.1.0"),
     ]
     assert pin.dependencies[0].source_revision == "0e8b21325a7fd3d59a989110e61ce80476c51dea"
-    assert pin.dependencies[1].source_revision == "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c"
+    assert pin.dependencies[1].source_revision == "1b6a51397e693c5e1d37ca71658dd3a5d5d0dd77"
     assert pin.dependencies[2].source_revision == "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c"
 
 
@@ -205,7 +205,7 @@ def test_checked_in_work_pin_is_the_reservation_model_release() -> None:
     assert [
         (item.lock_id, item.lock_kind, item.distribution, item.distribution_version)
         for item in pin.dependencies
-    ] == [("vuoro-adapter-kit", "shared-dependency", "vuoro-adapter-kit", "0.1.0")]
+    ] == [("vuoro-adapter-kit", "shared-dependency", "vuoro-adapter-kit", "0.1.1")]
     assert (pin.adapter_module, pin.register) == (
         "sprintctl.vuoro_adapter",
         "register_work_catalog",
@@ -244,10 +244,10 @@ def test_checked_in_knowledge_pin_is_kctl_013_with_released_shared_dependencies(
             "vuoro-adapter-kit",
             "shared-dependency",
             "vuoro-adapter-kit",
-            "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c",
-            "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.1.0/vuoro_adapter_kit-0.1.0-py3-none-any.whl",
-            "0037898a4c9f01720a42302365b0172ecd203732070326ea2abdf549a44bf0c2",
-            "0.1.0",
+            "1b6a51397e693c5e1d37ca71658dd3a5d5d0dd77",
+            "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.1.1/vuoro_adapter_kit-0.1.1-py3-none-any.whl",
+            "0dac880d790857fbed1085906f0e2ffd151c509ab61d527a351b68f3775ee16f",
+            "0.1.1",
         ),
         (
             "vuoro-schema-runtime",
@@ -293,10 +293,10 @@ def test_checked_in_audit_pin_is_auditctl_012_with_released_shared_dependencies(
             "vuoro-adapter-kit",
             "shared-dependency",
             "vuoro-adapter-kit",
-            "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c",
-            "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.1.0/vuoro_adapter_kit-0.1.0-py3-none-any.whl",
-            "0037898a4c9f01720a42302365b0172ecd203732070326ea2abdf549a44bf0c2",
-            "0.1.0",
+            "1b6a51397e693c5e1d37ca71658dd3a5d5d0dd77",
+            "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.1.1/vuoro_adapter_kit-0.1.1-py3-none-any.whl",
+            "0dac880d790857fbed1085906f0e2ffd151c509ab61d527a351b68f3775ee16f",
+            "0.1.1",
         ),
         (
             "vuoro-schema-runtime",

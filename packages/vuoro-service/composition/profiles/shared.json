@@ -156,17 +156,17 @@
       "artifact_kind": "wheel",
       "role": "shared-dependency",
       "source_repository": "https://github.com/bayleafwalker/vuoro",
-      "source_revision": "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c",
+      "source_revision": "1b6a51397e693c5e1d37ca71658dd3a5d5d0dd77",
       "artifact": {
         "distribution": "vuoro-adapter-kit",
-        "distribution_version": "0.1.0",
-        "artifact_sha256": "0037898a4c9f01720a42302365b0172ecd203732070326ea2abdf549a44bf0c2",
-        "artifact_url": "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.1.0/vuoro_adapter_kit-0.1.0-py3-none-any.whl"
+        "distribution_version": "0.1.1",
+        "artifact_sha256": "0dac880d790857fbed1085906f0e2ffd151c509ab61d527a351b68f3775ee16f",
+        "artifact_url": "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.1.1/vuoro_adapter_kit-0.1.1-py3-none-any.whl"
       },
       "capabilities": [],
       "closure": {
-        "configuration_digest": "3cde8191b7a0c054273dc475f3cc7cfe4329d4b8154cace5642f34f8d03d7504",
-        "attestation": "d05444db67bee87035f51c946be44c7e65f6676f035720291f67defe8a149261"
+        "configuration_digest": "8868d1b3682e217dcb6b7a97bd77d45a2dc7563715ecbcad4fb3aaff8ab41e3e",
+        "attestation": "1c350f4d263dfb4cf681ea14e7dbd013a74fb02bca014194c84c168d04e01f1a"
       }
     },
     {
@@ -312,7 +312,7 @@
   ],
   "migrated_from": {
     "schema_version": "vuoro-composition/v3",
-    "manifest_sha256": "6d2f9739c1ffa1a5fa3a9cfdf8dd22b81ed71d5a93eff211fa1db134ae8902f1",
+    "manifest_sha256": "d256efac3f3aee61717a923be9b1fd6b7447d9a802cf4d9dcb542e83d231ea6e",
     "equivalence_proof": "tests/test_composition_v4.py::test_v3_reference_composition_migrates_losslessly"
   }
 }
