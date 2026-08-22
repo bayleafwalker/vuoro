@@ -58,12 +58,12 @@
       "artifact_kind": "wheel",
       "role": "adapter",
       "source_repository": "https://github.com/bayleafwalker/actionq",
-      "source_revision": "0f13e76f953bcacafbf16c41d29e830ffd84f755",
+      "source_revision": "4fd670a7962edeacc7bd05ee1221b75ee0fc2825",
       "artifact": {
         "distribution": "actionq",
-        "distribution_version": "0.1.26",
-        "artifact_sha256": "c0307882804a5e49fdbf6208cffc113ae17aa6cdb72cfb5880c28d9762a85d43",
-        "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/v0.1.26/actionq-0.1.26-py3-none-any.whl"
+        "distribution_version": "0.1.27",
+        "artifact_sha256": "11bcedf62bf336af8ea0160988be5009aa7b518e927923c54bcb979077dd1aa6",
+        "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/v0.1.27/actionq-0.1.27-py3-none-any.whl"
       },
       "capabilities": [
         "execution/v1"
@@ -74,11 +74,11 @@
         "vuoro-schema-runtime"
       ],
       "closure": {
-        "configuration_digest": "35af932f2b3507cf6214991e67c9badc76b8332d0ea8e414525462484710a22d",
+        "configuration_digest": "05c3520008c846131311cd5d171668aa0889d5f8a13cc1a0bb3a6afe94a947ea",
         "schema_version": "actionq-schema/v12",
         "protocol_version": "1",
         "operation_hashes": "8d434e8b347e804c90e48a6598304be84b12f2a61ebc2dbed00a26053239a778",
-        "attestation": "3d2f06fa9a079587d5756fa3217a47cee2662c5d1519b39b7762b4dc7f9cda12"
+        "attestation": "1ed086dcf9b3b9931974ed4ec09de6004cbdcf085568a23b5ae57e633bcbf570"
       }
     },
     {
@@ -312,7 +312,7 @@
   ],
   "migrated_from": {
     "schema_version": "vuoro-composition/v3",
-    "manifest_sha256": "d256efac3f3aee61717a923be9b1fd6b7447d9a802cf4d9dcb542e83d231ea6e",
+    "manifest_sha256": "c39de5344b7013d4ab4a87cd7ee21fff7c30ed75c2a1aaeb7f1d2fbc055cfdf2",
     "equivalence_proof": "tests/test_composition_v4.py::test_v3_reference_composition_migrates_losslessly"
   }
 }

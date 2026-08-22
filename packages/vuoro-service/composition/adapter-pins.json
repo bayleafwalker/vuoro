@@ -15,11 +15,11 @@
       "lock_id": "execution-adapter",
       "lock_kind": "adapter",
       "source_repository": "https://github.com/bayleafwalker/actionq",
-      "source_revision": "0f13e76f953bcacafbf16c41d29e830ffd84f755",
-      "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/v0.1.26/actionq-0.1.26-py3-none-any.whl",
-      "artifact_sha256": "c0307882804a5e49fdbf6208cffc113ae17aa6cdb72cfb5880c28d9762a85d43",
+      "source_revision": "4fd670a7962edeacc7bd05ee1221b75ee0fc2825",
+      "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/v0.1.27/actionq-0.1.27-py3-none-any.whl",
+      "artifact_sha256": "11bcedf62bf336af8ea0160988be5009aa7b518e927923c54bcb979077dd1aa6",
       "distribution": "actionq",
-      "distribution_version": "0.1.26"
+      "distribution_version": "0.1.27"
     },
     {
       "lock_id": "execution-contracts",
