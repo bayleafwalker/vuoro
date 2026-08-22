@@ -219,7 +219,7 @@ def compose(
     environment_name: str,
     environment_class: str,
     registry: CatalogRegistry | None = None,
-    application_factory: Callable[[Adapter, RuntimeConfiguration], Any] | None = None,
+    application_override: Callable[[Adapter, RuntimeConfiguration], Any | None] | None = None,
 ) -> ComposedCatalog:
     """Build and register every binding the profile declares.
 
@@ -233,15 +233,19 @@ def compose(
     the network rather than in-process: there is nothing to import and nothing
     to register, and it is skipped rather than treated as an error.
 
-    ``application_factory`` replaces the ``build`` call and nothing else -- same
-    bindings, same order, same ``register``, and ``build`` is still resolved so
-    a missing entrypoint still fails. It exists because ``build`` is not
-    database-free for every owner: sprintctl's ``pg.get_connection`` opens a
-    psycopg connection eagerly, so a gate that must not require Postgres cannot
-    construct real applications. Proving the served catalog does not need them
-    -- the revision is a digest over operation definitions, and a handler's
-    application is not part of it -- so the proof injects stubs and says so,
-    rather than the composer quietly tolerating a half-built application.
+    ``application_override`` may replace the ``build`` call for one adapter and
+    nothing else: returning ``None`` falls through to the real ``build``, and
+    everything else -- bindings, order, ``register``, entrypoint resolution --
+    is unchanged, so an adapter whose ``build`` has gone missing still fails.
+
+    It exists because ``build`` is not uniformly free of I/O. Three of today's
+    four owners construct lazily; sprintctl's ``pg.get_connection`` calls
+    ``psycopg.connect`` in the constructor, so a gate with no Postgres cannot
+    construct a work application at all. The served catalog does not depend on
+    one -- the revision digests operation definitions, and a handler's
+    application is not among them -- so a proof about the catalog can override
+    that single construction and say which one it overrode, rather than the
+    composer quietly tolerating half-built applications everywhere.
     """
     registry = registry if registry is not None else CatalogRegistry()
     composed: list[ComposedCapability] = []
@@ -266,9 +270,11 @@ def compose(
         register = _entrypoint(adapter.module, adapter.register or "", label)
         try:
             application = (
-                build(runtime) if application_factory is None
-                else application_factory(adapter, runtime)
+                None if application_override is None
+                else application_override(adapter, runtime)
             )
+            if application is None:
+                application = build(runtime)
         except CompositionV4Error:
             raise
         except Exception as error:

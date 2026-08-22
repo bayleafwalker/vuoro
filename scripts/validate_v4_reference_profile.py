@@ -75,20 +75,30 @@ PLACEHOLDERS = {
 DEFAULT_PLACEHOLDER = "validate-only"
 
 
-class StubApplication:
-    """Stands in for an owner application while proving the catalog.
+class WorkStub:
+    """The one application this gate cannot construct for real.
 
-    Mirrors what ``scripts/validate_released_catalog_composition.py`` does on the
-    v3 side, for the same reason: registration needs an object, and the catalog
-    does not care which. The two attributes are the ones today's adapters read
-    at registration time.
+    Three of the four adapters build lazily and are constructed here exactly as
+    a deployment would. sprintctl's ``pg.get_connection`` calls
+    ``psycopg.connect`` in the constructor, so building a work application needs
+    a live database, which this gate deliberately does not have. The stub is the
+    same one ``scripts/validate_released_catalog_composition.py`` uses on the v3
+    side, and it carries the single attribute the released work adapter reads
+    while registering.
+
+    Naming one owner here is what a per-provider conformance harness is for; the
+    composer and the service package still name none.
     """
-
-    managed_dispatch_policy = None
 
     @staticmethod
     def maintenance_resource_schema_available() -> bool:
         return False
+
+
+#: adapter id -> the application to use instead of ``build``. Keyed on the
+#: profile's own adapter id, and deliberately a listing of exceptions rather
+#: than a blanket stub: everything absent from it is constructed for real.
+OVERRIDDEN = {"work-catalog": WorkStub}
 
 
 def main() -> int:
@@ -113,7 +123,9 @@ def main() -> int:
         environment_name="validate",
         environment_class="development",
         registry=CatalogRegistry(),
-        application_factory=lambda adapter, runtime: StubApplication(),
+        application_override=lambda adapter, runtime: (
+            OVERRIDDEN[adapter.adapter_id]() if adapter.adapter_id in OVERRIDDEN else None
+        ),
     )
     catalog = composed.registry.catalog().model_dump(mode="json")
 
