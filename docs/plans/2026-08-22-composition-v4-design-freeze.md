@@ -353,6 +353,16 @@ The W4 scope review's largest open item moves here unchanged: federation ownersh
 turns on `principal_id` forever and v1 has no ownership transfer. A `federation.principal/v1`
 contract must therefore forbid a reissued actor identity from acquiring a historical principal's
 ownership. This is a contract-level claim and is a prerequisite of any federation provider binding.
+
+**Settled 2026-08-22, and implemented on the issuer side.** `principal_id` is a mint-once
+identifier carried by the identity assertion — `<issuer>:<subject>:<epoch>`, the epoch
+incrementing on any reissue — and is a separate field from the display `actor`, which is chosen
+for humans and expected to change. A reissued actor is therefore a different principal by
+construction and inherits nothing, so v1 needs no ownership-transfer operation to be correct.
+`Identity.principal_id`, the gateway assertion's required `principal_epoch` claim and the static
+registry's required `principal_id` are the issuer half; minting and persisting the per-subject
+epoch is Vuoro Cloud's. Reserved system principals (ActionQ's pinned `federation-backfill/v1`)
+are exempt by name. The rescope that consumes this is actionq #41.
 <!-- claim: v4-reissued-identity-no-ownership -->
 
 ## 8. Sequence and status

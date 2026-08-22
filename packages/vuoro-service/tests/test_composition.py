@@ -787,6 +787,7 @@ def test_identity_registry_is_environment_bound_and_never_accepts_short_tokens(t
                 "identities": {
                     "x" * 32: {
                         "actor": "test:developer",
+                        "principal_id": "vuoro-static:developer:0",
                         "environment": "vuoro-dev",
                         "authorities": ["work.read"],
                     }
@@ -809,6 +810,7 @@ def test_identity_registry_supports_a_production_environment_binding(tmp_path: P
                 "identities": {
                     "y" * 32: {
                         "actor": "test:operator",
+                        "principal_id": "vuoro-static:operator:0",
                         "environment": "vuoro-shared",
                         "authorities": ["work.read"],
                     }
@@ -829,6 +831,7 @@ def test_identity_registry_requires_repo_ids_for_work_authorities(tmp_path: Path
                 "identities": {
                     "z" * 32: {
                         "actor": "test:worker",
+                        "principal_id": "vuoro-static:worker:0",
                         "environment": "vuoro-dev",
                         "authorities": ["work:read"],
                     }
@@ -852,12 +855,14 @@ def test_identity_registry_authorizes_explicit_repos_and_the_wildcard(
                 "identities": {
                     "z" * 32: {
                         "actor": "test:worker",
+                        "principal_id": "vuoro-static:worker:0",
                         "environment": "vuoro-dev",
                         "authorities": ["work:read"],
                         "repo_ids": ["sprintctl", "agentops"],
                     },
                     "y" * 32: {
                         "actor": "test:host",
+                        "principal_id": "vuoro-static:host:0",
                         "environment": "vuoro-dev",
                         "authorities": ["work:read"],
                         "repo_ids": ["*"],
@@ -919,3 +924,64 @@ def test_composition_rejects_environment_record_class_mismatch(tmp_path: Path) -
                 "VUORO_ENVIRONMENT_RECORD_PATH": str(record_path),
             }
         )
+
+
+def test_identity_registry_requires_a_minted_principal_id(tmp_path: Path) -> None:
+    """No fallback to actor, because the fallback is the failure.
+
+    Federation ownership binds principal_id forever and has no transfer
+    operation, so an actor rename with actor-as-principal would hand every
+    resource the first holder owned to whoever holds the name next. A registry
+    entry without a minted id is refused rather than defaulted.
+    """
+    path = tmp_path / "identities.json"
+
+    def registry(**identity) -> dict:
+        return {
+            "schema_version": "vuoro-identities/v1",
+            "identities": {
+                "0" * 40: {
+                    "actor": "test:developer",
+                    "environment": "vuoro-dev",
+                    "authorities": ["execution:read"],
+                    **identity,
+                }
+            },
+        }
+
+    path.write_text(json.dumps(registry()), encoding="utf-8")
+    with pytest.raises(CompositionError, match="unsupported identity fields"):
+        load_identities(path, environment="vuoro-dev")
+
+    path.write_text(json.dumps(registry(principal_id="developer")), encoding="utf-8")
+    with pytest.raises(CompositionError, match="principal_id"):
+        load_identities(path, environment="vuoro-dev")
+
+    path.write_text(
+        json.dumps(registry(principal_id="vuoro-static:developer:0")), encoding="utf-8"
+    )
+    resolver = load_identities(path, environment="vuoro-dev")
+    assert resolver._identities["0" * 40].principal_id == "vuoro-static:developer:0"
+
+
+def test_a_reserved_system_principal_is_exempt_from_minting(tmp_path: Path) -> None:
+    """ActionQ's pinned federation-backfill/v1 is a literal on purpose.
+
+    It is half of what makes machine-written changes distinguishable from a
+    person's in a change ledger with no provenance column, so the minting rule
+    must not be read as requiring every principal id to be issued per subject.
+    """
+    path = tmp_path / "identities.json"
+    path.write_text(json.dumps({
+        "schema_version": "vuoro-identities/v1",
+        "identities": {
+            "1" * 40: {
+                "actor": "backfill",
+                "environment": "vuoro-dev",
+                "authorities": ["federation.backfill"],
+                "principal_id": "federation-backfill/v1",
+            }
+        },
+    }), encoding="utf-8")
+    resolver = load_identities(path, environment="vuoro-dev")
+    assert resolver._identities["1" * 40].principal_id == "federation-backfill/v1"

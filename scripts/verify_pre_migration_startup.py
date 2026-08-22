@@ -255,7 +255,8 @@ class Proof:
         self.identities.write_text(json.dumps({
             "schema_version": "vuoro-identities/v1",
             "identities": {secrets.token_hex(32): {
-                "actor": "proof", "environment": "vuoro-2092-proof",
+                "actor": "proof", "principal_id": "vuoro-static:proof:0",
+                "environment": "vuoro-2092-proof",
                 "authorities": ["work:read"], "repo_ids": ["agentops"]}},
         }), encoding="utf-8")
         self.identities.chmod(0o644)

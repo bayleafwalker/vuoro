@@ -26,7 +26,12 @@ from vuoro_service.gateway_identity import (
     GatewayAssertionConfigurationError,
     GatewayAssertionIdentityResolver,
 )
-from vuoro_service.identity import Identity, InvocationContext, StaticBearerIdentityResolver
+from vuoro_service.identity import (
+    Identity,
+    IdentityResolutionError,
+    InvocationContext,
+    StaticBearerIdentityResolver,
+)
 from vuoro_service.project_binding import (
     ProjectAuthorizationError,
     ProjectBinding,
@@ -595,8 +600,13 @@ def load_identities(path: Path, *, environment: str) -> StaticBearerIdentityReso
     for token, identity in raw["identities"].items():
         if not isinstance(token, str) or len(token) < 32 or not isinstance(identity, dict):
             raise CompositionError("identity registry contains an invalid identity")
-        allowed_fields = {"actor", "environment", "authorities", "repo_ids"}
-        required_fields = {"actor", "environment", "authorities"}
+        allowed_fields = {"actor", "environment", "authorities", "repo_ids", "principal_id"}
+        # principal_id is required, not optional-with-a-fallback. Falling back to
+        # actor is exactly the failure the field exists to prevent: ownership in
+        # the federation authority binds this string forever and has no transfer
+        # operation, so an actor rename would move every resource it owns to
+        # whoever holds the name next.
+        required_fields = {"actor", "environment", "authorities", "principal_id"}
         if not required_fields <= set(identity) <= allowed_fields:
             raise CompositionError("identity registry contains unsupported identity fields")
         actor = identity["actor"]
@@ -617,12 +627,16 @@ def load_identities(path: Path, *, environment: str) -> StaticBearerIdentityReso
             raise CompositionError(
                 "identity registry entries with a work: authority must set repo_ids"
             )
-        identities[token] = Identity(
-            actor=actor,
-            environment=bound_environment,
-            authorities=frozenset(authorities),
-            repo_ids=frozenset(repo_ids),
-        )
+        try:
+            identities[token] = Identity(
+                actor=actor,
+                environment=bound_environment,
+                authorities=frozenset(authorities),
+                repo_ids=frozenset(repo_ids),
+                principal_id=identity["principal_id"],
+            )
+        except IdentityResolutionError as error:
+            raise CompositionError(f"identity registry: {error}") from error
     if not identities:
         raise CompositionError("identity registry must contain at least one identity")
     return StaticBearerIdentityResolver(identities)
