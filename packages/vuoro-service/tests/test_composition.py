@@ -166,11 +166,14 @@ def test_checked_in_adapter_artifact_urls_are_source_named_or_exact_semver_relea
 
 def test_checked_in_execution_pin_includes_released_contract_companion() -> None:
     pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("execution")
+    # W4's release. The schema version is unchanged and deliberately so: 0.1.27
+    # adds a federation serving surface and touches no execution migration, so
+    # a moved actionq-schema here would mean the frozen contract had drifted.
     assert (pin.source_revision, pin.distribution_version, pin.schema_version) == (
-        "0f13e76f953bcacafbf16c41d29e830ffd84f755", "0.1.26", "actionq-schema/v12")
-    assert pin.artifact_url.endswith("/v0.1.26/actionq-0.1.26-py3-none-any.whl")
+        "4fd670a7962edeacc7bd05ee1221b75ee0fc2825", "0.1.27", "actionq-schema/v12")
+    assert pin.artifact_url.endswith("/v0.1.27/actionq-0.1.27-py3-none-any.whl")
     assert pin.artifact_sha256 == (
-        "c0307882804a5e49fdbf6208cffc113ae17aa6cdb72cfb5880c28d9762a85d43"
+        "11bcedf62bf336af8ea0160988be5009aa7b518e927923c54bcb979077dd1aa6"
     )
     assert [(item.lock_id, item.lock_kind, item.distribution, item.distribution_version)
             for item in pin.dependencies] == [
