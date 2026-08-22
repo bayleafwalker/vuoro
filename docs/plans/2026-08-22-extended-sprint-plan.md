@@ -112,3 +112,11 @@ Two results from the W3/W4 rounds worth carrying, because they shape what to tru
   manifest must name a wheel digest that already exists. The two repositories' pull requests are
   ordered, not parallel — and the design order is the reverse of the release order.
 - Backfill completes before any native principal holds `federation.create` in an environment.
+
+## Direction above this sprint
+
+`2026-08-22-long-term-direction.md` is the directional freeze candidate this sprint serves. Its
+§0 reconciles it with the v4 freeze (global revision preserved, `required` flag, ledger objects
+as capability contracts, federation as three contracts). Its §11 places this sprint as
+Priority 0; `WorkRelease` / `EffectGrant` / `EvidenceSet` / `Decision` contracts follow it and
+are not in scope here. Nothing in that document reopens an item this sprint closes.
