@@ -4,6 +4,11 @@ status: assessed-draft
 supersedes: []
 title: Vuoro — market-absorption posture, handoff to implementation planning
 date: 2026-07-29
+note: >
+  2026-08-22 — this draft's planning question ("which parts are worth owning
+  through the transition") is answered by 2026-08-22-long-term-direction.md,
+  §2 ("How the intention arrived here") and §3 (ideological rules). Body
+  retained unchanged for provenance.
 ---
 
 # Purpose

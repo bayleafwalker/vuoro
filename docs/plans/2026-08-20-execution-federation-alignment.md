@@ -8,6 +8,11 @@ supersedes:
 
 # Native-runtime and execution-federation alignment
 
+**Superseded-in-part / see also (2026-08-22):** composition questions here
+are carried forward by `2026-08-22-composition-v4-design-freeze.md`; priority
+and sequencing questions are carried forward by
+`2026-08-22-long-term-direction.md`. This note's decisions are unchanged.
+
 This note aligns Vuoro's future-state plans to three owner decisions that
 postdate the plans they affect:
 

@@ -11,6 +11,12 @@ supersedes: null
 > backlog. [Native-runtime and execution-federation alignment](2026-08-20-execution-federation-alignment.md)
 > replaces its `vuoro-runnerd`, ActionQ daemon/queue/lease/placement, Outctl,
 > and namespaced execution-control-plane assumptions.
+>
+> **Retired 2026-08-22.** The live backlog decomposition of these items is
+> retired; see `2026-08-22-long-term-direction.md` §11. Surviving intents are
+> carried by that document's ledger contracts: CRED-006/007 → `EffectGrant`,
+> POL-001 → `policy.decision/v1` inputs, AUT-005 → `WorkRelease` takeover,
+> CRED-008 → `EvidenceSet`/`Decision`.
 
 **Plan ID:** VUORO-CP-2026-01  
 **Baseline:** 15 August 2026  
