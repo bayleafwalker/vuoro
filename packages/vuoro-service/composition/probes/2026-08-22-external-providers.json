@@ -1,0 +1,27 @@
+{
+  "schema_version": "vuoro-probe-record/v1",
+  "recorded_at": "2026-08-22",
+  "recorded_by": "scripts/probe_external_providers.py",
+  "note": "Probe conformance for external providers is evidence about a deployment, not about a wheel. What is checked here is what can be checked without credentials: that each pinned chart digest is the one the upstream repository index publishes for that version, and that each values digest is the one the cluster's own HelmRelease produces. Reaching the running services to exercise their capabilities needs cluster credentials and is an operator step.",
+  "cluster_source": {
+    "repository": "https://github.com/bayleafwalker/appservice",
+    "revision": "72a145b0",
+    "note": "the commit the values digests were computed from"
+  },
+  "probes": [
+    {
+      "provider_id": "alloy",
+      "capability_id": "telemetry.export/v1",
+      "checked": ["chart_digest matches the grafana helm-charts index for alloy 1.11.1",
+                  "values_digest matches clusters/main/kubernetes/system/alloy/app/helm-release.yaml"],
+      "unchecked": ["live OTLP export to a collector endpoint"]
+    },
+    {
+      "provider_id": "kube-prometheus-stack",
+      "capability_id": "metrics.storage/v1",
+      "checked": ["chart_digest matches the prometheus-community helm-charts index for kube-prometheus-stack 88.5.0",
+                  "values_digest matches clusters/main/kubernetes/system/kube-prometheus-stack/app/helm-release.yaml"],
+      "unchecked": ["live query against the Prometheus HTTP API"]
+    }
+  ]
+}

@@ -155,6 +155,9 @@ def main() -> int:
         "operations": len(catalog["operations"]),
         "revision": composed.revision,
         "composed": [item.capability_id for item in composed.composed],
+        "bound_not_composed": sorted(
+            profile.bound_capabilities - {item.capability_id for item in composed.composed}
+        ),
         "known_gaps": sorted(KNOWN_GAPS),
     }, indent=2))
     return 0

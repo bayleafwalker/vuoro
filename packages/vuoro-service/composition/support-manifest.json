@@ -1,6 +1,9 @@
 {
   "schema_version": "vuoro-support-manifest/v1",
-  "origin_allowlist": [],
+  "origin_allowlist": [
+    "https://grafana.github.io/helm-charts",
+    "https://prometheus-community.github.io/helm-charts"
+  ],
   "contracts": [
     {
       "capability_id": "work-api/v1",

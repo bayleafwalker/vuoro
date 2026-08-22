@@ -170,8 +170,9 @@ def test_support_manifest_rejects_duplicate_and_foreign_schemas() -> None:
 
 @pytest.mark.parametrize("artifact_kind, artifact", [
     ("image", {"image_reference": "registry.example/openbao", "image_digest": "sha256:" + "b" * 64}),
-    ("chart", {"chart": "openbao", "chart_version": "1.2.3",
-               "chart_digest": "c" * 64, "values_digest": "d" * 64}),
+    ("chart", {"chart_repository": "https://charts.example/", "chart": "openbao",
+               "chart_version": "1.2.3", "chart_digest": "c" * 64,
+               "values_digest": "d" * 64}),
     ("binary", {"artifact_url": "https://example.invalid/tool", "artifact_sha256": "e" * 64}),
 ])
 def test_a_provider_is_identified_by_artifact_not_by_distribution(
@@ -188,7 +189,8 @@ def test_a_chart_without_a_values_digest_is_not_an_identity() -> None:
     """Mutable values are not a freeze, so the digest is part of the identity."""
     with pytest.raises(CompositionV4Error, match="chart artifact is identified by"):
         Provider.from_dict(_provider(artifact_kind="chart", artifact={
-            "chart": "openbao", "chart_version": "1.2.3", "chart_digest": "c" * 64,
+            "chart_repository": "https://charts.example/", "chart": "openbao",
+            "chart_version": "1.2.3", "chart_digest": "c" * 64,
         }))
 
 
@@ -433,6 +435,15 @@ COMPOSITION = ROOT / "packages/vuoro-service/composition"
 SUPPORT_MANIFEST = COMPOSITION / "support-manifest.json"
 SHARED_PROFILE = COMPOSITION / "profiles/shared.json"
 V3_MANIFEST = COMPOSITION / "adapter-pins.json"
+
+#: What the migrated profile still cannot carry: v3 pins a catalog-metadata
+#: digest for work and execution and none for knowledge or audit.
+KNOWN_SHARED_GAPS = (
+    "rule 3: audit/v1 declares operation-hashes conformance and audit-adapter "
+    "records no operation_hashes",
+    "rule 3: knowledge/v1 declares operation-hashes conformance and "
+    "knowledge-adapter records no operation_hashes",
+)
 
 OBJECT_SCHEMA = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -821,9 +832,15 @@ def test_v3_reference_composition_migrates_losslessly() -> None:
     v3 = CompositionManifest.load(V3_MANIFEST)
     raw = json.loads(V3_MANIFEST.read_text(encoding="utf-8"))
 
-    # Pins, digests and provenance, lock by lock.
+    # Pins, digests and provenance, lock by lock. Compared against the wheel
+    # half of the profile: the external providers deployed beside them have no
+    # v3 records to be equal to, and come from the overlay.
     by_id = {provider.provider_id: provider for provider in profile.providers}
-    assert set(by_id) == {lock.lock_id for lock in v3.release_locks}
+    wheels = {
+        provider_id for provider_id, provider in by_id.items()
+        if provider.artifact_kind == "wheel"
+    }
+    assert wheels == {lock.lock_id for lock in v3.release_locks}
     for lock in v3.release_locks:
         provider = by_id[lock.lock_id]
         assert provider.artifact["distribution"] == lock.distribution
@@ -877,6 +894,9 @@ def test_v3_reference_composition_migrates_losslessly() -> None:
     composed = compose(profile, manifest, environ=environ, environment_name="devbox",
                        environment_class="development")
     assert composed.revision == v3_registry.revision
+    # The external providers are bound and validated but compose nothing: they
+    # are reached over the network, so they cannot move the served catalog --
+    # which is why binding them did not have to wait for the equivalence proof.
     assert len(composed.composed) == len(raw["runtime_descriptors"])
 
 
@@ -934,12 +954,7 @@ def test_the_migrated_reference_profile_states_exactly_what_it_still_lacks() -> 
     """
     manifest, profile = reference()
     found = violations(profile, manifest, root=ROOT, check_entrypoints=False)
-    assert set(found) == {
-        "rule 3: audit/v1 declares operation-hashes conformance and audit-adapter "
-        "records no operation_hashes",
-        "rule 3: knowledge/v1 declares operation-hashes conformance and "
-        "knowledge-adapter records no operation_hashes",
-    }
+    assert set(found) == set(KNOWN_SHARED_GAPS)
 
 
 def test_the_rule_7_allowlists_are_the_v3_code_and_the_conformance_harnesses() -> None:
@@ -970,6 +985,90 @@ def test_the_shared_profile_is_the_migration_of_the_v3_manifest() -> None:
     assert completed.returncode == 0, completed.stdout + completed.stderr
 
 
+# --- the freeze's external proof cases, against real pins --------------------
+
+
+def test_the_shared_profile_binds_external_providers_with_stated_origins() -> None:
+    """Freeze §6's non-authoritative case, grounded rather than illustrated.
+
+    The chart digests are the ones the upstream repository indexes publish for
+    these versions and the values digests are computed from the cluster's own
+    HelmReleases, because a proof case with invented pins would be the exact
+    failure the closure rules exist to prevent. What is not here is the OpenBao
+    `secret.lease/v1` case: OpenBao is not deployed, so its identity would have
+    to be fabricated.
+    """
+    manifest, profile = reference()
+    external = {
+        provider.provider_id: provider
+        for provider in profile.providers
+        if provider.artifact_kind != "wheel"
+    }
+    assert set(external) == {"alloy", "kube-prometheus-stack"}
+    for provider in external.values():
+        assert provider.role == "external"
+        assert provider.artifact["chart_repository"] in manifest.origin_allowlist
+        assert provider.closure.probe_evidence
+        assert provider.closure.attestation == closure_digest(provider)
+        assert (ROOT / "packages/vuoro-service" / provider.closure.probe_evidence).is_file()
+
+
+def test_a_multi_capability_and_an_exclusive_one_share_a_scope_instance() -> None:
+    """Both halves of the case in one profile: several sinks, one store.
+
+    telemetry.export/v1 is multi and metrics.storage/v1 is exclusive, bound at
+    the same environment instance. The validator must accept the pair -- and the
+    exclusive one must still be rejected if it gains a second binding there,
+    which is what makes accepting the multi one meaningful rather than lax.
+    """
+    manifest, profile = reference()
+    assert manifest.contract("telemetry.export/v1").cardinality == "multi"
+    assert manifest.contract("metrics.storage/v1").cardinality == "exclusive"
+    export = profile.bindings_for("telemetry.export/v1")
+    storage = profile.bindings_for("metrics.storage/v1")
+    assert [binding.scope for binding in export] == [("environment", "production")]
+    assert [binding.scope for binding in storage] == [("environment", "production")]
+    assert violations(profile, manifest, check_entrypoints=False) == KNOWN_SHARED_GAPS
+
+    doubled = json.loads(SHARED_PROFILE.read_text(encoding="utf-8"))
+    doubled["bindings"].append(dict(
+        doubled["bindings"][[binding["capability_id"] for binding in doubled["bindings"]]
+                            .index("metrics.storage/v1")],
+        provider_id="alloy", adapter_id="alloy-export",
+    ))
+    found = violations(CompositionProfile.from_dict(doubled), manifest, check_entrypoints=False)
+    assert any("exclusive and has two bindings" in item for item in found)
+
+    # And a second exporter is legal at the same scope, which is the difference
+    # cardinality is supposed to make.
+    two_sinks = json.loads(SHARED_PROFILE.read_text(encoding="utf-8"))
+    two_sinks["bindings"].append(dict(
+        two_sinks["bindings"][[binding["capability_id"] for binding in two_sinks["bindings"]]
+                              .index("telemetry.export/v1")],
+        provider_id="kube-prometheus-stack", adapter_id="prometheus-storage",
+    ))
+    assert violations(CompositionProfile.from_dict(two_sinks), manifest,
+                      check_entrypoints=False) == KNOWN_SHARED_GAPS
+
+
+def test_the_overlay_is_the_only_source_of_the_external_records() -> None:
+    """Two halves, two sources, and the generator is what keeps them apart.
+
+    The wheels come from adapter-pins.json and the externals from the overlay.
+    A record that appears in the generated profile but in neither source would
+    mean someone hand-edited a generated file, which --check already fails on;
+    this pins the division itself so the overlay cannot quietly acquire a wheel.
+    """
+    overlay = json.loads(
+        (COMPOSITION / "profiles/shared-overlay.json").read_text(encoding="utf-8")
+    )
+    assert overlay["profile"] == "shared"
+    assert all(provider["artifact_kind"] != "wheel" for provider in overlay["providers"])
+    _, profile = reference()
+    assert {provider["provider_id"] for provider in overlay["providers"]} == {
+        provider.provider_id for provider in profile.providers
+        if provider.artifact_kind != "wheel"
+    }
 def test_every_adapter_module_is_shipped_by_a_provider_the_profile_pins() -> None:
     """The gap that shipped a profile naming modules its own pins could not provide.
 
