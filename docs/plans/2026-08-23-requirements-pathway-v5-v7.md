@@ -140,23 +140,29 @@ to each source backlog item so the two cannot drift unnoticed.
 
 ## 3. Key decisions register
 
+**Decided 2026-08-23 by the owner:** D-1 own federation principals; D-4 `vuoro-dev` only for
+the first state change — it may be fully broken during tests; `vuoro-shared` then runs the same
+change as a migration exercise; clients are updated only after `vuoro-shared`; D-6 ratified
+(v4 freeze Amendment 2); D-7 all three drops, executed as **one big drop** after the regular
+v5 implementation passes, not interleaved with it. D-3 stands as a soft preference.
+
 Decisions the owner must make or ratify. "Analysis" says what a further session would need
 to do before the decision is safe; "Default" is what proceeds if the owner says nothing.
 
 | D | Decision | Blocks | Default / recommendation | Analysis needed |
 |---|---|---|---|---|
-| D-1 | Federation gets its own migration + runtime principals (not execution's) | R1.2.2 | **Own principals** — freeze §217–275 and the `vuoro-*-db` secret-pair convention both say so | none; settled by text |
+| D-1 | Federation gets its own migration + runtime principals (not execution's) | R1.2.2 | **DECIDED** — **Own principals** — freeze §217–275 and the `vuoro-*-db` secret-pair convention both say so | none; settled by text |
 | D-2 | `principal_epoch` scope key and subject spelling: global-per-subject vs per-workspace; forbid colons vs re-spell `sub` as `users.id`/connector ULID; relax `sub == actor` on vuoro side | R1.1.1, R1.1.2 | **Global per subject; re-spell `sub` to the opaque id, keep `actor` as display; vuoro resolver checks `sub` against a new `subject` claim, not `actor`** `[C-1]` | vuoro-cloud session: write the migration + issuer change + conformance test proving composed id matches `MINTED_PRINCIPAL_ID` |
 | D-3 | What is a reissue: does token rotation bump the epoch? | R1.1.1, G2.5 | **No** (owner's *soft* preference, 2026-08-23) — bump only on decommission-and-reuse and via an operator-only audited endpoint; never decrement. Rotation preserving actor keeps ownership. Overridable if the 5.0 session finds a materially better alternative; note it contradicts rescope §3 ("increments on any reissue"), which gets amended | same session as D-2 |
-| D-4 | Which vuoro-service deployment is in scope for v5 | R1.2.2, 5.6 | **`vuoro-dev` only**; `vuoro-shared` and `agent-cockpit` follow in v5.1 after rollback rehearsal | appservice read: confirm which DB each deployment's DSN points at |
+| D-4 | Which vuoro-service deployment is in scope for v5 | R1.2.2, 5.6 | **DECIDED** — **`vuoro-dev` only**; `vuoro-shared` and `agent-cockpit` follow in v5.1 after rollback rehearsal | appservice read: confirm which DB each deployment's DSN points at |
 | D-5 | Canonical store per ledger object | G2.1 | sprintctl → WorkRelease, RecipeRevision; actionq federation → EffectGrant; auditctl → EvidenceSet, Decision; AgentProfileRevision → agentops repo (git-native) | ledger design session (direction §15) — **the v6 planning session** |
-| D-6 | Rule 8 refinement ratified as v4 freeze Amendment | R1.3.1 | **Accept**: compare filename→digest, reject only conflicting digests | none; frozen-rule amendment recorded in the freeze's amendments section |
-| D-7 | `[C-1]` Drop `execution/v1` from the served catalog in v5 instead of "later"; drop W6 compatibility facades; retire the epoch-less static-registry path once 5.0 lands | v5 scope, W6 | **Yes to all three**, as separately validated revisions (each still causes a global revision change and rediscovery proof) | none |
+| D-6 | Rule 8 refinement ratified as v4 freeze Amendment | R1.3.1 | **DECIDED** — **Accept**: compare filename→digest, reject only conflicting digests | none; frozen-rule amendment recorded in the freeze's amendments section |
+| D-7 | `[C-1]` Drop `execution/v1` from the served catalog in v5 instead of "later"; drop W6 compatibility facades; retire the epoch-less static-registry path once 5.0 lands | v5 scope, W6 | **DECIDED** — **Yes to all three**, as separately validated revisions (each still causes a global revision change and rediscovery proof) | none |
 | D-8 | Qualification rule for cheap-tier action classes (which classes may self-promote to candidate without coordinator review) | R3.1.3 | Start with `mechanical_bulk` and docs-only; promote a class only after N≥5 first-pass green with zero escalation, measured by R4.3 | agentops session: define the classes and the promotion rule in the dispatch manifest |
 | D-9 | First durable-workflow challenger and pilot envelope | G3.4 | Restate on appservice, pilot = one actionq review round reshaped to 4–8 parallel packets (memory: `orchestration-restate-pilot`) | orchestration-planning session; not before v6 |
 | D-10 | W7 destructive retirement `[C-1]` | W7 | Still **not authorized** by this doc — C-1 removes the consumer reason, not the evidence reason; commission a separate short plan after v5's post-fence records pass | — |
 
-D-1, D-6, D-7 need only a yes. D-2/D-3 need the vuoro-cloud session. D-5 and D-9 are the
+D-1, D-4, D-6, D-7 are decided (above). D-2/D-3 need the vuoro-cloud session. D-5 and D-9 are the
 two planning sessions this document hands off to.
 
 ## 4. Delivery points, proving points, utilization points
@@ -168,7 +174,9 @@ two planning sessions this document hands off to.
 | **v6** ledger contracts (Priorities 1–4) | Fresh-context takeover; evidence with validity; grants with lifecycle | G2 entire; D-5 | Falsifier 1: a release settled from a cold session with no transcript; falsifier 11: every contract's events observed in auditctl; EvidenceExpired fired and honored | Owner hands a release to a cold session and it settles; sessions no longer re-derive state from chat history |
 | **v7** episodic supervision + provider pilot (Priorities 5–7) | Full utilization: dumb orchestrator + cheap implementer run gated releases; frontier only at gates | G3 entire; D-8, D-9 | Falsifier 2: frontier turns per release drop ≥ 5× vs v5 scorecard; cheap-tier first-pass ≥ agreed threshold; one challenger passes the outcome suite | Owner returns only on completion or escalation — C-2 realized |
 
-Sub-releases allowed inside each (v5.1 = shared/cockpit deployments, v6.x per ledger object).
+Sub-releases allowed inside each. v5 order per D-4/D-7: v5.0 implementation on `vuoro-dev`
+(breakable) → v5.1 the one big drop (D-7) on `vuoro-dev` → v5.2 `vuoro-shared` as migration
+exercise → v5.3 client update → `agent-cockpit` last. v6.x per ledger object.
 Each sub-release is one orchestrator hand-off unit with its own gate set (§5).
 
 ## 5. Gate set per hand-off unit (what the dumb orchestrator runs)
