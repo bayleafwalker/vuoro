@@ -493,9 +493,9 @@ fails until someone edits the test — and no two claims share a scope.
 Frozen rules change only here. An amendment is **proposed** until the owner ratifies it; a
 proposed amendment authorizes no code change.
 
-### Proposed Amendment 2 — rule 8 filename→digest refinement (pending owner decision D-6)
+### Amendment 2 — rule 8 filename→digest refinement (ratified by the owner 2026-08-23, decision D-6)
 
-Status: **proposed, not ratified** (2026-08-23). Source: requirements pathway
+Status: **ratified** (2026-08-23, owner decision D-6); code change authorized as a v5 packet. Source: requirements pathway
 `2026-08-23-requirements-pathway-v5-v7.md` R1.3.1, obstacle O6, decision D-6 (default: accept).
 Needed by actionq W5 item 5.4 (second ActionQ provider record for `federation.resource/v1`).
 
@@ -515,7 +515,7 @@ and is rejected exactly as today. Everything else in rule 8 (owner-dependency re
 shared-dependency allowlist, no orphan providers, release-URL provenance, registry allowlists) is
 unchanged.
 
-**Where it is enforced (when ratified).**
+**Where it is enforced.**
 
 - `packages/vuoro-service/src/vuoro_service/composition.py`: the manifest-level check at
   `:342-347` builds `{filename: digest}` and raises `CompositionError` only when a filename maps
