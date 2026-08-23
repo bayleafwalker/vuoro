@@ -487,3 +487,56 @@ fails until someone edits the test — and no two claims share a scope.
   revisit.
 - `scope_kind`: `secret.lease/v1` and `metrics.storage/v1` are per `environment` (matching the
   deployable environment classes v3 already enforces); `policy.decision/v1` is `global`.
+
+## 11. Amendments
+
+Frozen rules change only here. An amendment is **proposed** until the owner ratifies it; a
+proposed amendment authorizes no code change.
+
+### Proposed Amendment 2 — rule 8 filename→digest refinement (pending owner decision D-6)
+
+Status: **proposed, not ratified** (2026-08-23). Source: requirements pathway
+`2026-08-23-requirements-pathway-v5-v7.md` R1.3.1, obstacle O6, decision D-6 (default: accept).
+Needed by actionq W5 item 5.4 (second ActionQ provider record for `federation.resource/v1`).
+
+**Problem.** Rule 8 as frozen makes artifact identity the *filename* within the fetch namespace:
+`composition.py:342-347` rejects any two release locks whose release-URL identity yields the same
+wheel filename, and `verify_adapter_artifacts` (`:428-433`) rejects the same at staging. A second
+ActionQ provider record binding `federation.resource/v1` from the same released wheel
+(`actionq-0.1.28-py3-none-any.whl`) as the `execution/v1` provider therefore cannot be declared at
+all, although both records name one identical artifact with one identical digest. That is not a
+collision in the sense rule 8 exists to prevent (two different artifacts overwriting each other in
+one staging directory); it is one artifact referenced twice.
+
+**Refinement.** The collision check compares **filename → digest** within the fetch namespace and
+rejects only *conflicting* digests: two locks naming the same filename with the same sha256 are
+the same artifact and are accepted; the same filename with differing digests remains a collision
+and is rejected exactly as today. Everything else in rule 8 (owner-dependency repository rule,
+shared-dependency allowlist, no orphan providers, release-URL provenance, registry allowlists) is
+unchanged.
+
+**Where it is enforced (when ratified).**
+
+- `packages/vuoro-service/src/vuoro_service/composition.py`: the manifest-level check at
+  `:342-347` builds `{filename: digest}` and raises `CompositionError` only when a filename maps
+  to more than one digest; the staging check in `verify_adapter_artifacts` (`:428-433`) keeps a
+  `{filename: digest}` map instead of a `set[str]`, stages the artifact once, and raises
+  `artifact filename collision` only on a digest conflict. The fetch script's equivalent
+  check (`test_fetcher_rejects_dependency_filename_collisions`,
+  `tests/test_adapter_dependencies.py:71`) follows the same rule.
+- Tests to add, same package: (a) two release locks, identical filename and digest → manifest
+  loads and staging succeeds with one staged file; (b) identical filename, differing digests →
+  still rejected by both the manifest check and `verify_adapter_artifacts`; (c) the existing
+  collision tests keep passing unchanged, since they use differing artifacts.
+- Rule 1 is untouched: the validator must still reject one release unit backing both
+  `exclusive` capabilities in one scope (W5 5.4 restates this as its own gate); this amendment
+  only lets two *provider records* share one *artifact*.
+
+**Why this is an amendment and not a bug fix.** Rule 8 was carried forward from v3 verbatim and
+the filename rule is stated in the frozen text (§4 rule 8, `composition.py:337-342`), so the
+change is a change to a frozen rule and is recorded as such. It does not alter any correctness
+rule (evidence binding, exclusivity, no-sole-attester) and is not loosened by C-1 — it is asked
+for on its own merits.
+
+(Amendment 1 is reserved for the per-contract owner/scope confirmations listed in §10, which the
+W4 rescope took as its input; they are recorded there, not here.)
