@@ -28,6 +28,14 @@ every environment** (verified read-only, actionq #45).
   release completion or when a review escalates. This is dogfooding the §4.2 episodic-supervision
   model while the tooling is still being built, so the workflow itself is under measurement
   from day one (§6).
+- **C-3 Move fast, break things; refactor last (2026-08-23).** For this whole tract (v5–v7)
+  implementation speed beats structural cleanliness: ship the behaviour first, accept broken
+  intermediate states on `vuoro-dev`, and schedule architecture and codebase refactoring as the
+  **final** phase of each release rather than a precondition. Packets are sized for an
+  available workload, not for elegance. What C-3 does *not* relax: the gate set (§5) still runs
+  on every packet and evidence is still captured — they are what makes a broken state
+  recoverable instead of silent. Where a refactor is deferred, the packet records a `debt:` line
+  so the last phase has a list, not a guess.
 
 ## 1. Goal graph
 
@@ -176,7 +184,8 @@ two planning sessions this document hands off to.
 
 Sub-releases allowed inside each. v5 order per D-4/D-7: v5.0 implementation on `vuoro-dev`
 (breakable) → v5.1 the one big drop (D-7) on `vuoro-dev` → v5.2 `vuoro-shared` as migration
-exercise → v5.3 client update → `agent-cockpit` last. v6.x per ledger object.
+exercise → v5.3 client update → `agent-cockpit` last → **v5.9 refactor/architecture pass
+(C-3, from the accumulated `debt:` lines)**. Same shape for v6.x and v7.x.
 Each sub-release is one orchestrator hand-off unit with its own gate set (§5).
 
 ## 5. Gate set per hand-off unit (what the dumb orchestrator runs)
