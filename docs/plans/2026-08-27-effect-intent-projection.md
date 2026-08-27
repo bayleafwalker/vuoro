@@ -52,7 +52,8 @@ No sixth ledger object is added. The existing contract set remains:
 - `Decision` for interpretation, exception, acceptance, and rollback;
 - `ExperimentRecord` for change memory.
 
-Two versioned, non-authoritative structures support the projection.
+A stable value type and one versioned, non-authoritative specification support
+the projection.
 
 ### `ResourceRef` and `ResourceGraphRevision`
 
