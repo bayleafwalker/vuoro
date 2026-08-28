@@ -47,9 +47,9 @@ from vuoro_service.composition_v4_validator import violations
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSITION = ROOT / "packages/vuoro-service/composition"
 
-EXPECTED_TOTAL = 85
-EXPECTED_REVISION = "23cfc276ed1fb4a51b94864a963cfd4b0e70a02a73dc3522e13a96e0c9b33c9a"
-EXPECTED_DOMAIN_COUNTS = {"work": 44, "execution": 26, "knowledge": 10, "audit": 5}
+EXPECTED_TOTAL = 87
+EXPECTED_REVISION = "9a7621e0ab5b3765be162b6ae0fcdbf06c90bc66572873ef02d7ff5f3f14d4fd"
+EXPECTED_DOMAIN_COUNTS = {"work": 46, "execution": 26, "knowledge": 10, "audit": 5}
 
 # The two rule 3 violations the migrated profile is known to carry: v3 pins a
 # catalog-metadata digest for work and execution and none for knowledge or
