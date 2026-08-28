@@ -194,12 +194,12 @@
       "artifact_kind": "wheel",
       "role": "adapter",
       "source_repository": "https://github.com/bayleafwalker/sprintctl",
-      "source_revision": "15afc8762ce99beb3ec0239a5ce4a8713dd6f934",
+      "source_revision": "a2b0cb2991b18a0c364515bd5a69b9721403c2e2",
       "artifact": {
         "distribution": "sprintctl",
-        "distribution_version": "0.3.0",
-        "artifact_sha256": "b2b81526509da84830fe12c646bddfdb99bbba31b2a45625f743c4233d829fe4",
-        "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/v0.3.0/sprintctl-0.3.0-py3-none-any.whl"
+        "distribution_version": "0.3.3",
+        "artifact_sha256": "1368ad62c74f76ac324db9ac0f3978d33572931b7bcfd6c6fda629530d4aeed7",
+        "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/v0.3.3/sprintctl-0.3.3-py3-none-any.whl"
       },
       "capabilities": [
         "work-api/v1"
@@ -208,11 +208,11 @@
         "vuoro-adapter-kit"
       ],
       "closure": {
-        "configuration_digest": "34af0b9116d444436b291bcf0815b7f546ff328d2cd85e221a6e5f838e4eaa80",
+        "configuration_digest": "2fe7bc4a0cf86ccc3822469a381e8d7d3e754822d5452b15c832db66d7421edc",
         "schema_version": "work-schema/v1",
         "protocol_version": "1",
         "operation_hashes": "5988b1117763aa4f517724222f4530b948d9c088463eaca098e6b7c7036b9ff1",
-        "attestation": "9e8316e4c719ceb7daa348bba575b43e4fa4d777db49b47deaf43062d56e07d8"
+        "attestation": "957b98ce8b4e79d450ad09f57c59389598e7b2e6f76e554229302e5fb14cc973"
       }
     }
   ],
@@ -312,7 +312,7 @@
   ],
   "migrated_from": {
     "schema_version": "vuoro-composition/v3",
-    "manifest_sha256": "c39de5344b7013d4ab4a87cd7ee21fff7c30ed75c2a1aaeb7f1d2fbc055cfdf2",
+    "manifest_sha256": "d3cff3f202d4474cd0917ccda76a53afd1789f4fc6545e24300f99fca994842e",
     "equivalence_proof": "tests/test_composition_v4.py::test_v3_reference_composition_migrates_losslessly"
   }
 }
