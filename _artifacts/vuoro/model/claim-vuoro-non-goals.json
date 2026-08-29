@@ -1,0 +1,17 @@
+{
+  "schema_version": "claim/v1",
+  "id": "vuoro-non-goals",
+  "kind": "direction",
+  "scope": "vuoro",
+  "statement": "Binding non-goals: no new execution control plane or takeover runner; no Vuoro ownership of code, intent, evidence or acceptance; no centralized evidence ownership in auditctl (repo shards stay authoritative, auditctl owns the envelope); no federation schema on speculation; no scribedispatch integration; no W7; no hostproto-semantics merge into hostproto; no pre-emptive enablement of repositories without a consumer; no renovation of guidance-only manifests.",
+  "state": "current",
+  "established_by": {
+    "actor": "bayleaf",
+    "actor_type": "human",
+    "at": "2026-08-29T11:14:30Z",
+    "authority_basis": "standing-policy"
+  },
+  "validity": {
+    "effective_from": "2026-08-29T11:14:30Z"
+  }
+}

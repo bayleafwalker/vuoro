@@ -1,0 +1,21 @@
+{
+  "schema_version": "claim/v1",
+  "id": "narrow-boundary",
+  "kind": "direction",
+  "scope": "vuoro",
+  "statement": "Vuoro's surviving boundary is a read-only reconciliation and export adapter (2026-08-20 NARROW adjudication). Market-composed distribution is the v7 horizon, not the next implementation phase. Vuoro projects and reconciles state it does not own; it is not a runner.",
+  "state": "current",
+  "established_by": {
+    "actor": "bayleaf",
+    "actor_type": "human",
+    "at": "2026-08-29T11:14:30Z",
+    "authority_basis": "standing-policy"
+  },
+  "validity": {
+    "effective_from": "2026-08-29T11:14:30Z"
+  },
+  "basis_for": [
+    "v7-horizon",
+    "vuoro-non-goals"
+  ]
+}
