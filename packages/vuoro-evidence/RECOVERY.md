@@ -59,6 +59,8 @@ Three modules were **rewritten from that intent** on 2026-08-29 and pass
 assert properties *of recorded traffic* — that one correlator serves debugpy and
 Delve alike, and that the MCP session loader needs no change for an A2A carrier.
 Synthetic fixtures cannot establish either claim; rewriting them requires
-re-recording with the adapters' `scripts/record-session.mts`, which is not in
-this repo.  Until then, `session_log`'s carrier-agnosticism is asserted by the
-design and unproven by test.
+re-recording with the adapters' `scripts/record-session.mts`.  That script is not
+in this repo but **does survive**, in four sibling repos — `hostproto-dap-debugpy`,
+`hostproto-dap-delve`, `hostproto-mcp-playwright` and `hostproto-a2a-worker` — so
+these two modules are re-recordable.  Until someone re-records,
+`session_log`'s carrier-agnosticism is asserted by design and unproven by test.
