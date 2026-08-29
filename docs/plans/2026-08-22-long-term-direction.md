@@ -1,6 +1,8 @@
 # Vuoro long-term direction
 
-**Status:** **ratified 2026-08-28** (owner ruling, cross-repo dogfood plan §8). Assessed and reconciled against composition v4 (#51 @ `eea7b98`) on 2026-08-22. The thesis, the narrowed ownership model and the non-goals are approved as written; everything past R0 is authorized gate-by-gate, not by calendar.  
+**Status:** **current** — this document states the operative direction as of 2026-08-28. The thesis, the narrowed ownership model and the non-goals are operative; everything past R0 is authorized gate-by-gate, not by calendar. Established by the owner (`actor_type: human`, `authority_basis: standing-policy`, cross-repo dogfood plan §8). Assessed and reconciled against composition v4 (#51 @ `eea7b98`) on 2026-08-22.
+
+`current` means operative, not approved — see `agentops templates/dispatch/model/README.md`, which supersedes every workflow that had a ratification step. This document does not wait on a sign-off, and nothing downstream should wait on one for it. It changes by being superseded, and it is tested by observations that contradict it.  
 **Date:** 2026-08-22  
 **Audience:** future planner, architect, reviewer, and implementer sessions  
 **Scope:** intended product and architecture direction; not an implementation authorization  
@@ -100,7 +102,7 @@ The durable product promise is:
 
 Vuoro therefore productizes an **operating method for heterogeneous agentic work**, not a proprietary execution stack.
 
-### 1.1 The surviving boundary, from the NARROW adjudication [ratified 2026-08-28]
+### 1.1 The surviving boundary, from the NARROW adjudication [current]
 
 The 2026-08-20 takeover experiment adjudicated **NARROW**
 (`agentops` `_projects/takeover-20260820/results/FINAL-ADJUDICATION.md`). Quoted, because
@@ -122,9 +124,9 @@ Market-composed distribution, as §1 describes it, is the **v7 horizon** and not
 implementation phase. Vuoro survives the narrowing as the thing that projects and
 reconciles state it does not own; it does not survive as a runner.
 
-### 1.2 Non-goals [ratified 2026-08-28]
+### 1.2 Non-goals [current]
 
-Ratified from the cross-repo dogfood plan §7, and binding on every packet until
+Operative, from the cross-repo dogfood plan §7, and binding on every packet until
 superseded by an explicit ruling:
 
 - No new execution control plane, and no takeover runner.
