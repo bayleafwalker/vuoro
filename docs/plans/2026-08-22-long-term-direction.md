@@ -5,6 +5,9 @@
 **Audience:** future planner, architect, reviewer, and implementer sessions  
 **Scope:** intended product and architecture direction; not an implementation authorization  
 **Plan of record for implementation:** `2026-08-22-extended-sprint-plan.md` (composition v4 candidate, four weeks). This document sits above it and after it — see §0.  
+**Subsequent correction:** `2026-08-27-effect-intent-projection.md` rejects a
+cluster-granularity single-writer reading, retains native DevOps fencing, and
+limits new work to an advisory resource-graph projection for imperative effects.  
 **Evidence input:** `docs/evidence/2026-08-22-agentic-eventstorm.html` — a big-picture EventStorming pass over Codex, OpenCode, Claude Code and local-inference session logs on this host and the devbox (1,730 / 239 / 194 sessions sampled, $33.50 hosted spend). Its six ranked hotspots are the first evidence Vuoro has about itself; §0.1 records how they reorder §11.
 
 ## 0. Assessment and reconciliation (2026-08-22)
