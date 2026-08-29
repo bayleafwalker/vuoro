@@ -5,11 +5,11 @@
       "lock_id": "work-adapter",
       "lock_kind": "adapter",
       "source_repository": "https://github.com/bayleafwalker/sprintctl",
-      "source_revision": "4098de1a769ab12a9b4717624f3d60f182754916",
-      "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/v0.3.4/sprintctl-0.3.4-py3-none-any.whl",
-      "artifact_sha256": "d0676e74f6f00db38fad5380e05f42c94fd4cd9b9cfad37c8f328876a410705d",
+      "source_revision": "95e18f5683eff28cac66f9351bb6ec062c5e68c8",
+      "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/v0.3.5/sprintctl-0.3.5-py3-none-any.whl",
+      "artifact_sha256": "51e3cf598f4771bed47d45480c33b27789e707b06e516b9db3f0c88afa0d336f",
       "distribution": "sprintctl",
-      "distribution_version": "0.3.4"
+      "distribution_version": "0.3.5"
     },
     {
       "lock_id": "execution-adapter",
