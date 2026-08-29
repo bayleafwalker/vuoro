@@ -48,12 +48,11 @@ Three modules were **rewritten from that intent** on 2026-08-29 and pass
 - `test_generic_paths.py` — all nine situations, over hand-built items.  No
   ingress edge is imported, so a pass is real evidence that the core expresses
   these generically.
-- `test_ingress.py` — five of the original six.  The lost spool is replaced by
-  synthesized manifests of the same shape, so the test the original named
-  `test_real_capture_prevents_blind_rerun_within_window_and_expires_outside` is
-  renamed without `real`: it exercises the same path but is no longer evidence
-  about real traffic.  `test_session_log_replays_a_recorded_session` is new,
-  covering the function that only existed in bytecode.
+- `test_ingress.py` — the HostProto lane only.  Outctl was retired by owner
+  ruling on 2026-08-29 and the `command-capture` decoder was removed with it, so
+  the original's two capture cases are gone rather than kept passing against dead
+  code; git history retains both.  `test_session_log_replays_a_recorded_session`
+  is new, covering the function that only existed in bytecode.
 
 `test_real_traffic` and `test_binding_agnostic` are **not** rewritten.  Both
 assert properties *of recorded traffic* — that one correlator serves debugpy and

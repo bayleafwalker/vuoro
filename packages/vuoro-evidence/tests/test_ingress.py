@@ -1,18 +1,16 @@
-"""Two ingress lanes into the same reducer — a HostProto object and an outctl
-capture manifest.
+"""The HostProto ingress lane into the reducer.
 
 Rewritten 2026-08-29 from the recovered bytecode's intent (see ../RECOVERY.md).
-The original replayed a real 2026-08-08 outctl spool; that spool is lost, so the
-manifests here are synthesized to the same shape.  The test the original named
-`test_real_capture_...` is therefore named without `real` — it exercises the
-same path, but it is no longer evidence about real traffic.
+The original also covered an outctl capture manifest as a second lane; outctl was
+retired the same day and the `command-capture` decoder was removed with it, so
+those two cases are gone rather than kept passing against dead code.
 
 `test_session_log_replays_a_recorded_session` is new: `session_log` was
 recovered from bytecode and had no other surviving coverage.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from vuoro_evidence import (ClaimType, DecisionKind, EvidenceSet, RerunQuestion, decide_rerun,
                             reduce)
@@ -42,20 +40,15 @@ def _observation(**over):
     return payload
 
 
-def _manifest(**cmd):
-    command = {"started": True, "exit_code": 0, "timed_out": False, "cancelled": False}
-    command.update(cmd)
-    return {"capture_id": "c-1", "command": command, "capture_status": "complete",
-            "streams": {"stdout": {"sha256": "sha256:out", "bytes": 12}}}
-
-
 def _decide(*items, now=T0, inputs=None):
     ledger = reduce(EvidenceSet("set-1", tuple(items)), now, inputs)
     return ledger, decide_rerun(ledger, RerunQuestion("d-1", SUBJECT))
 
 
-def test_two_profiles_registered() -> None:
-    assert registered_profiles() == ("command-capture", "hostproto")
+def test_only_hostproto_is_registered() -> None:
+    # command-capture went with outctl's retirement; a second lane must come back
+    # through `register`, not by resurrecting the removed decoder.
+    assert registered_profiles() == ("hostproto",)
 
 
 def test_hostproto_receipt_is_a_completed_claim_with_freshness() -> None:
@@ -92,25 +85,6 @@ def test_unknown_outcome_then_observation_reconciles() -> None:
     assert ledger.subjects[SUBJECT].reconciled is True
     assert after.kind is DecisionKind.ACCEPT
     assert expected  # the receipt carried a state to reconcile against
-
-
-def test_capture_prevents_blind_rerun_within_window_and_expires_outside() -> None:
-    item = ingest("command-capture", _manifest(), subject=SUBJECT, grant_id=GRANT,
-                  collected_at=T0, valid_until=T0 + timedelta(minutes=10))
-    _, inside = _decide(item, now=T0 + timedelta(minutes=1))
-    assert inside.kind is DecisionKind.ACCEPT, "a valid capture must prevent a blind rerun"
-
-    ledger, outside = _decide(item, now=T0 + timedelta(hours=1))
-    assert ledger.expired[item.item_id].reason == "past_valid_until"
-    assert outside.kind is DecisionKind.REACQUIRE
-
-
-def test_timed_out_capture_is_uncertain() -> None:
-    item = ingest("command-capture", _manifest(exit_code=None, timed_out=True),
-                  subject=SUBJECT, grant_id=GRANT, collected_at=T0)
-    ledger, decision = _decide(item)
-    assert ledger.subjects[SUBJECT].effect is EffectState.UNCERTAIN
-    assert decision.kind is DecisionKind.RECONCILE
 
 
 def test_session_log_replays_a_recorded_session() -> None:
