@@ -65,11 +65,11 @@
       "lock_id": "audit-adapter",
       "lock_kind": "adapter",
       "source_repository": "https://github.com/bayleafwalker/auditctl",
-      "source_revision": "613103644f2749a4d0f9ae5cb6913795fa7647a6",
-      "artifact_url": "https://github.com/bayleafwalker/auditctl/releases/download/auditctl-v0.1.2/auditctl-0.1.2-py3-none-any.whl",
-      "artifact_sha256": "b76d9d7aab727c77a7dcfcdc4e5de423b61a07c8f89369101347a4dc6eaf33d1",
+      "source_revision": "eb982ef52b95c593a742cf36cb1f4c6f69381e42",
+      "artifact_url": "https://github.com/bayleafwalker/auditctl/releases/download/auditctl-v0.1.3/auditctl-0.1.3-py3-none-any.whl",
+      "artifact_sha256": "f3d389ad051e5d3b737e0782a4daa40d78d875e8b1bd3f5d29363b382aada2ee",
       "distribution": "auditctl",
-      "distribution_version": "0.1.2"
+      "distribution_version": "0.1.3"
     }
   ],
   "runtime_descriptors": [

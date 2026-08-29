@@ -31,12 +31,12 @@
       "artifact_kind": "wheel",
       "role": "adapter",
       "source_repository": "https://github.com/bayleafwalker/auditctl",
-      "source_revision": "613103644f2749a4d0f9ae5cb6913795fa7647a6",
+      "source_revision": "eb982ef52b95c593a742cf36cb1f4c6f69381e42",
       "artifact": {
         "distribution": "auditctl",
-        "distribution_version": "0.1.2",
-        "artifact_sha256": "b76d9d7aab727c77a7dcfcdc4e5de423b61a07c8f89369101347a4dc6eaf33d1",
-        "artifact_url": "https://github.com/bayleafwalker/auditctl/releases/download/auditctl-v0.1.2/auditctl-0.1.2-py3-none-any.whl"
+        "distribution_version": "0.1.3",
+        "artifact_sha256": "f3d389ad051e5d3b737e0782a4daa40d78d875e8b1bd3f5d29363b382aada2ee",
+        "artifact_url": "https://github.com/bayleafwalker/auditctl/releases/download/auditctl-v0.1.3/auditctl-0.1.3-py3-none-any.whl"
       },
       "capabilities": [
         "audit/v1"
@@ -46,10 +46,10 @@
         "vuoro-schema-runtime"
       ],
       "closure": {
-        "configuration_digest": "cc8469ddd5562e2b61d94c0d653780fe0dfbba69a47b39d22251537fac322fe4",
+        "configuration_digest": "25f09df4a63cd6d79ee9191c7d110741ae10c2beb70f86956847cf657260c511",
         "schema_version": "audit-schema/v1",
         "protocol_version": "1",
-        "attestation": "97924f59c2e96516503706d80900044c73fe4e0da35d2374744ead297a934278"
+        "attestation": "7286e55cb3b3dca72098d723a957095116647597a19fca63cf4d6df2cb723186"
       }
     },
     {
@@ -312,7 +312,7 @@
   ],
   "migrated_from": {
     "schema_version": "vuoro-composition/v3",
-    "manifest_sha256": "58984f6db16b3f740d227c7dbcc7cf48ef79bdcdcc8b575f8694c87fe971e6e3",
+    "manifest_sha256": "57ea6e7c18f57f33b415b5bd3d0d96cd58b1f2610d952976f830917e37410237",
     "equivalence_proof": "tests/test_composition_v4.py::test_v3_reference_composition_migrates_losslessly"
   }
 }
