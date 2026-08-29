@@ -1,6 +1,6 @@
 # Vuoro long-term direction
 
-**Status:** directional freeze candidate, assessed and reconciled against composition v4 (#51 @ `eea7b98`) on 2026-08-22; awaiting owner ratification  
+**Status:** **ratified 2026-08-28** (owner ruling, cross-repo dogfood plan §8). Assessed and reconciled against composition v4 (#51 @ `eea7b98`) on 2026-08-22. The thesis, the narrowed ownership model and the non-goals are approved as written; everything past R0 is authorized gate-by-gate, not by calendar.  
 **Date:** 2026-08-22  
 **Audience:** future planner, architect, reviewer, and implementer sessions  
 **Scope:** intended product and architecture direction; not an implementation authorization  
@@ -99,6 +99,51 @@ The durable product promise is:
 > Define work once; run it through whichever qualified provider currently fits; preserve intent, authority, evidence, recovery, and decision continuity when providers change.
 
 Vuoro therefore productizes an **operating method for heterogeneous agentic work**, not a proprietary execution stack.
+
+### 1.1 The surviving boundary, from the NARROW adjudication [ratified 2026-08-28]
+
+The 2026-08-20 takeover experiment adjudicated **NARROW**
+(`agentops` `_projects/takeover-20260820/results/FINAL-ADJUDICATION.md`). Quoted, because
+this is the decision evidence and not a restatement of it:
+
+> NARROW the takeover architecture. Use direct Git plus a concise `HANDOFF`, exact
+> receipts, explicit settlement, and acceptance for bounded single-repository
+> continuation. Do not promote the experiment's broader orchestration path as the
+> default.
+
+G0 through G7 passed; G8 passed with two packaging defects — the sealed packets carried
+no substantive pre-interruption inventory and no explicit continuation-eligibility rule —
+which the blind reviewer nevertheless reconstructed from committed launch and handoff
+records. That is a packaging defect, not transcript-only state and not a failure of the
+continuation mechanism.
+
+**The surviving boundary is a read-only reconciliation and export adapter.**
+Market-composed distribution, as §1 describes it, is the **v7 horizon** and not the next
+implementation phase. Vuoro survives the narrowing as the thing that projects and
+reconciles state it does not own; it does not survive as a runner.
+
+### 1.2 Non-goals [ratified 2026-08-28]
+
+Ratified from the cross-repo dogfood plan §7, and binding on every packet until
+superseded by an explicit ruling:
+
+- No new execution control plane, and no takeover runner.
+- No Vuoro ownership of code, intent, evidence or acceptance.
+- No centralized evidence ownership in `auditctl` — **repo shards stay authoritative**;
+  auditctl owns the receipt envelope.
+- No federation schema on speculation.
+- No `scribedispatch` integration.
+- No W7.
+- No `hostproto-semantics` merge into `hostproto`.
+- No pre-emptive enablement of repositories without a consumer.
+- No renovation of guidance-only manifests.
+
+Two of these are load-bearing against work already in flight and are worth stating twice.
+*No pre-emptive enablement without a consumer* is why the four unsound dispatch manifests
+and the six unonboarded `hostproto` successors found on 2026-08-29
+(`agentops docs/assessments/dispatch-manifest-classification-2026-08-29.md`) are recorded
+rather than fixed. *No renovation of guidance-only manifests* is why eleven manifests stay
+as they are.
 
 The architecture must remain valid for a future multi-operator or hosted product, but the next implementation phase must be honest about current scale: one operator, one principal environment, low run counts per task class, and no independent ecosystem consumer. Core contracts and the cockpit are current product work. Provider SDKs, signed distribution machinery, automated statistical promotion, and a general ecosystem release train remain activation-gated topology.
 
