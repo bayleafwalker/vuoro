@@ -25,9 +25,9 @@ surviving `.pyc`.
 style) and `README.md` (from the wheel's long description).  Both reproduce the
 wheel's declared contents; neither is a byte recovery.
 
-## Not recovered
+## Tests: partly rewritten, partly lost
 
-`tests/` is lost.  Its `.pyc` are pytest-assertion-rewritten, and the recorded
+The original `tests/` is lost.  Its `.pyc` are pytest-assertion-rewritten, and the recorded
 traffic the tests replay (a Chromium session, a debugpy session, and a real
 2026-08-08 outctl capture spool) is gone with no other copy in this repo.
 What survived is the intent, read out of the bytecode:
@@ -40,5 +40,25 @@ What survived is the intent, read out of the bytecode:
 | `test_real_traffic` | browser and debugger sessions replayed through HostProto ingress into the same reducer as the command-capture lane |
 | `test_binding_agnostic` | the debugpy correlator is reused verbatim for Delve; the MCP session loader is reused unchanged for an A2A-carried run |
 
-Rewriting these requires re-recording the sessions with the adapters'
-`scripts/record-session.mts`, which is not in this repo.
+Three modules were **rewritten from that intent** on 2026-08-29 and pass
+(18 tests).  They are new source, not recoveries:
+
+- `test_boundary.py` — both original assertions, restored in full.  It needs no
+  fixtures, and it is the guard the package's own docstring promises.
+- `test_generic_paths.py` — all nine situations, over hand-built items.  No
+  ingress edge is imported, so a pass is real evidence that the core expresses
+  these generically.
+- `test_ingress.py` — five of the original six.  The lost spool is replaced by
+  synthesized manifests of the same shape, so the test the original named
+  `test_real_capture_prevents_blind_rerun_within_window_and_expires_outside` is
+  renamed without `real`: it exercises the same path but is no longer evidence
+  about real traffic.  `test_session_log_replays_a_recorded_session` is new,
+  covering the function that only existed in bytecode.
+
+`test_real_traffic` and `test_binding_agnostic` are **not** rewritten.  Both
+assert properties *of recorded traffic* — that one correlator serves debugpy and
+Delve alike, and that the MCP session loader needs no change for an A2A carrier.
+Synthetic fixtures cannot establish either claim; rewriting them requires
+re-recording with the adapters' `scripts/record-session.mts`, which is not in
+this repo.  Until then, `session_log`'s carrier-agnosticism is asserted by the
+design and unproven by test.
