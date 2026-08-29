@@ -20,6 +20,7 @@ from vuoro_service.identity import IdentityResolutionError
 WORKSPACE_ID = "01K11111111111111111111111"
 ENVIRONMENT = "vuoro-cloud-ws-01k111111111"
 REQUEST_ID = "01K33333333333333333333333"
+USER_SUBJECT = "01K44444444444444444444444"
 CLOUD_ISSUER = "vuoro-cloud-control"
 
 
@@ -42,6 +43,7 @@ def _claims(**overrides: object) -> dict:
         "sub": "github:123",
         "workspace_id": WORKSPACE_ID,
         "actor": "github:123",
+        "subject": USER_SUBJECT,
         "principal_epoch": 0,
         "authorities": ["work:read", "work:write"],
         "repo_ids": ["repo-a"],
@@ -364,5 +366,30 @@ def test_a_reissued_actor_is_a_different_principal(tmp_path: Path) -> None:
     reissued = resolver(_request(_token(private, principal_epoch=1)))
     assert first.actor == reissued.actor
     assert first.principal_id != reissued.principal_id
-    assert first.principal_id == f"{CLOUD_ISSUER}:github:123:0"
-    assert reissued.principal_id == f"{CLOUD_ISSUER}:github:123:1"
+    assert first.principal_id == f"{CLOUD_ISSUER}:{USER_SUBJECT}:0"
+    assert reissued.principal_id == f"{CLOUD_ISSUER}:{USER_SUBJECT}:1"
+
+
+def test_the_principal_id_is_composed_from_the_colon_free_subject(tmp_path: Path) -> None:
+    """`prod:github:123:0` is ambiguous between (prod, github:123) and
+    (prod:github, 123). The subject claim is an opaque id with no colon, so the
+    composed id parses from the right exactly once."""
+    path, private = _key_file(tmp_path)
+    resolver = _resolver(path)
+    identity = resolver(_request(_token(private)))
+    issuer, subject, epoch = identity.principal_id.rsplit(":", 2)
+    assert (issuer, subject, epoch) == (CLOUD_ISSUER, USER_SUBJECT, "0")
+    for bad in ("github:123", "", "a b", "prod:x"):
+        with pytest.raises(IdentityResolutionError, match="subject"):
+            resolver(_request(_token(private, subject=bad)))
+    claims = _claims()
+    del claims["subject"]
+    private_pem = private.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    )
+    token = jwt.encode(claims, private_pem, algorithm="EdDSA",
+                       headers={"typ": "JWT", "kid": "gateway-2026-01"})
+    with pytest.raises(IdentityResolutionError):
+        resolver(_request(token))

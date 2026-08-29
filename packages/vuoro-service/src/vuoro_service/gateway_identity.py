@@ -21,11 +21,13 @@ from vuoro_service.identity import Identity, IdentityResolutionError
 
 _ULID = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
 _REPO_ID = re.compile(r"^[A-Za-z0-9._-]+$")
+_PRINCIPAL_SUBJECT = re.compile(r"^[A-Za-z0-9._-]+$")
 _NBF_CLOCK_SKEW_SECONDS = 2
 _REQUIRED_CLAIMS = (
     "actor",
     "authorities",
     "principal_epoch",
+    "subject",
     "exp",
     "iat",
     "iss",
@@ -197,9 +199,16 @@ class GatewayAssertionIdentityResolver:
             raise IdentityResolutionError("gateway identity assertion is invalid")
 
         actor = _required_text(claims.get("actor"), "actor")
-        subject = _required_text(claims.get("sub"), "sub")
-        if subject != actor:
+        sub = _required_text(claims.get("sub"), "sub")
+        if sub != actor:
             raise IdentityResolutionError("gateway identity actor and subject disagree")
+        # The principal id is composed from `subject`, the opaque colon-free id
+        # Vuoro Cloud mints per user/connector -- never from the actor string,
+        # which contains a colon and would make `{iss}:{actor}:{epoch}` ambiguous
+        # when parsed (vuoro-cloud principal_epoch backlog, D-2 / E-8).
+        subject = _required_text(claims.get("subject"), "subject")
+        if not _PRINCIPAL_SUBJECT.fullmatch(subject):
+            raise IdentityResolutionError("gateway identity assertion has invalid subject")
         # The claim that makes ownership survivable. `iat` is per *request* on a
         # 30-second assertion, so nothing else in this claim set can distinguish
         # a reissued actor from the original -- and federation ownership is a
