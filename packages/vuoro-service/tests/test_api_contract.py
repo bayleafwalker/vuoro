@@ -136,7 +136,7 @@ async def test_handshake_and_etag_catalog_contract() -> None:
         assert handshake["client_protocol"] == {"minimum": 1, "maximum": 1}
         assert handshake["service_release"] == {
             "distribution": "vuoro-service",
-            "version": "0.1.54",
+            "version": "0.1.55",
         }
         assert handshake["catalog_revision"] == registry.revision
         assert handshake["compatibility"]["domains"]["work"]["state"] == "compatible"
