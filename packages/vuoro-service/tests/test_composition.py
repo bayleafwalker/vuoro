@@ -186,13 +186,14 @@ def test_checked_in_execution_pin_includes_released_contract_companion() -> None
     assert pin.dependencies[2].source_revision == "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c"
 
 
-def test_checked_in_work_pin_is_the_handoff_repair_release() -> None:
-    # 0.3.4 repairs the handoff surface: work.read.handoff no longer fails for a
-    # sprint holding an active reservation -- the state an interrupted session
-    # leaves behind, and the state in which the bundle is read first -- and the
-    # bundle now carries `last_checkpoint`, so a session's position survives the
-    # process that held it. Update this pin and this assertion in the same
-    # commit, never one without the other.
+def test_checked_in_work_pin_is_the_release_actor_binding_release() -> None:
+    # 0.3.5 closes the one served work operation of 43 that accepted a
+    # caller-supplied actor without validating it. `work.reservation.release`
+    # passed it straight to `release_reservation`, which writes it as the
+    # `reservation.released` event actor -- an authorization hole and durable
+    # attribution forgery. It now rejects `actor-mismatch` the way `reserve`
+    # and `reassign` do, and defaults to the authenticated actor. Update this
+    # pin and this assertion in the same commit, never one without the other.
     pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("work")
     assert (
         pin.source_revision,
@@ -200,16 +201,16 @@ def test_checked_in_work_pin_is_the_handoff_repair_release() -> None:
         pin.api_version,
         pin.schema_version,
     ) == (
-        "4098de1a769ab12a9b4717624f3d60f182754916",
-        "0.3.4",
+        "95e18f5683eff28cac66f9351bb6ec062c5e68c8",
+        "0.3.5",
         "work-api/v1",
         "work-schema/v1",
     )
     assert pin.artifact_url.endswith(
-        "/v0.3.4/sprintctl-0.3.4-py3-none-any.whl"
+        "/v0.3.5/sprintctl-0.3.5-py3-none-any.whl"
     )
     assert pin.artifact_sha256 == (
-        "d0676e74f6f00db38fad5380e05f42c94fd4cd9b9cfad37c8f328876a410705d"
+        "51e3cf598f4771bed47d45480c33b27789e707b06e516b9db3f0c88afa0d336f"
     )
     assert [
         (item.lock_id, item.lock_kind, item.distribution, item.distribution_version)
