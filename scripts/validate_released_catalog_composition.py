@@ -15,7 +15,7 @@ from vuoro_service.catalog import CatalogRegistry
 
 
 EXPECTED_TOTAL = 87
-EXPECTED_REVISION = "9a7621e0ab5b3765be162b6ae0fcdbf06c90bc66572873ef02d7ff5f3f14d4fd"
+EXPECTED_REVISION = "fe7e53b64b16ffb14bb27976698b82433fae85a12ea58bd13eda52e8032dd1ce"
 EXPECTED_DOMAIN_COUNTS = {"work": 46, "execution": 26, "knowledge": 10, "audit": 5}
 EXPECTED_EXECUTION_HASH = "8d434e8b347e804c90e48a6598304be84b12f2a61ebc2dbed00a26053239a778"
 

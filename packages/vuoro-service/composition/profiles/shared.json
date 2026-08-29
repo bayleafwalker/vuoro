@@ -194,12 +194,12 @@
       "artifact_kind": "wheel",
       "role": "adapter",
       "source_repository": "https://github.com/bayleafwalker/sprintctl",
-      "source_revision": "a2b0cb2991b18a0c364515bd5a69b9721403c2e2",
+      "source_revision": "4098de1a769ab12a9b4717624f3d60f182754916",
       "artifact": {
         "distribution": "sprintctl",
-        "distribution_version": "0.3.3",
-        "artifact_sha256": "1368ad62c74f76ac324db9ac0f3978d33572931b7bcfd6c6fda629530d4aeed7",
-        "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/v0.3.3/sprintctl-0.3.3-py3-none-any.whl"
+        "distribution_version": "0.3.4",
+        "artifact_sha256": "d0676e74f6f00db38fad5380e05f42c94fd4cd9b9cfad37c8f328876a410705d",
+        "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/v0.3.4/sprintctl-0.3.4-py3-none-any.whl"
       },
       "capabilities": [
         "work-api/v1"
@@ -208,11 +208,11 @@
         "vuoro-adapter-kit"
       ],
       "closure": {
-        "configuration_digest": "2fe7bc4a0cf86ccc3822469a381e8d7d3e754822d5452b15c832db66d7421edc",
+        "configuration_digest": "ed68e1ac72777cb4c330e5c3119205a818e426745f0d2e6adfd1cebb120965fc",
         "schema_version": "work-schema/v1",
         "protocol_version": "1",
-        "operation_hashes": "5988b1117763aa4f517724222f4530b948d9c088463eaca098e6b7c7036b9ff1",
-        "attestation": "957b98ce8b4e79d450ad09f57c59389598e7b2e6f76e554229302e5fb14cc973"
+        "operation_hashes": "c6759b011ab71b65699126a49db48a69ddd760e11758095ace3f3bc46c9ad713",
+        "attestation": "e2876a0da6cd20417f4246bacfa05efa44c453d78849b4fac0c76ddd169e62e1"
       }
     }
   ],
@@ -312,7 +312,7 @@
   ],
   "migrated_from": {
     "schema_version": "vuoro-composition/v3",
-    "manifest_sha256": "d3cff3f202d4474cd0917ccda76a53afd1789f4fc6545e24300f99fca994842e",
+    "manifest_sha256": "261871dc4447091929f30ef5262efa5423706ec6027550931c17a64e5d99cff4",
     "equivalence_proof": "tests/test_composition_v4.py::test_v3_reference_composition_migrates_losslessly"
   }
 }

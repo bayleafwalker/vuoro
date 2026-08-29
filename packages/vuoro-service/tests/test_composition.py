@@ -186,10 +186,13 @@ def test_checked_in_execution_pin_includes_released_contract_companion() -> None
     assert pin.dependencies[2].source_revision == "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c"
 
 
-def test_checked_in_work_pin_is_the_served_next_work_repair_release() -> None:
-    # 0.3.3 repairs the two result-schema drifts that made served next-work
-    # return adapter-result-invalid in every repo scope. Update this pin and
-    # this assertion in the same commit, never one without the other.
+def test_checked_in_work_pin_is_the_handoff_repair_release() -> None:
+    # 0.3.4 repairs the handoff surface: work.read.handoff no longer fails for a
+    # sprint holding an active reservation -- the state an interrupted session
+    # leaves behind, and the state in which the bundle is read first -- and the
+    # bundle now carries `last_checkpoint`, so a session's position survives the
+    # process that held it. Update this pin and this assertion in the same
+    # commit, never one without the other.
     pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("work")
     assert (
         pin.source_revision,
@@ -197,16 +200,16 @@ def test_checked_in_work_pin_is_the_served_next_work_repair_release() -> None:
         pin.api_version,
         pin.schema_version,
     ) == (
-        "a2b0cb2991b18a0c364515bd5a69b9721403c2e2",
-        "0.3.3",
+        "4098de1a769ab12a9b4717624f3d60f182754916",
+        "0.3.4",
         "work-api/v1",
         "work-schema/v1",
     )
     assert pin.artifact_url.endswith(
-        "/v0.3.3/sprintctl-0.3.3-py3-none-any.whl"
+        "/v0.3.4/sprintctl-0.3.4-py3-none-any.whl"
     )
     assert pin.artifact_sha256 == (
-        "1368ad62c74f76ac324db9ac0f3978d33572931b7bcfd6c6fda629530d4aeed7"
+        "d0676e74f6f00db38fad5380e05f42c94fd4cd9b9cfad37c8f328876a410705d"
     )
     assert [
         (item.lock_id, item.lock_kind, item.distribution, item.distribution_version)

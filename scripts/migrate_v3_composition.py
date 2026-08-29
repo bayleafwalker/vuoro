@@ -42,6 +42,7 @@ versions needs owner-side data that does not exist yet.
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 from pathlib import Path
@@ -49,6 +50,7 @@ import sys
 
 
 ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS = Path(__file__).resolve().parent
 COMPOSITION = ROOT / "packages/vuoro-service/composition"
 V3_MANIFEST = COMPOSITION / "adapter-pins.json"
 V4_PROFILE = COMPOSITION / "profiles/shared.json"
@@ -61,11 +63,44 @@ OVERLAY = COMPOSITION / "profiles/shared-overlay.json"
 # The one Vuoro protocol version the service shell speaks (`vuoro_client.PROTOCOL_VERSION`).
 PROTOCOL_VERSION = "1"
 
-# Pinned catalog-metadata digests, from the released-adapter validators that
-# already assert them. Only two of the four domains have one.
+# Pinned catalog-metadata digests, READ FROM the released-adapter validators that
+# already assert them, rather than copied beside them. Only two of the four domains
+# have one.
+#
+# Read rather than copied because the copy went stale: the work digest was transcribed
+# here on 2026-08-22 (19441c1) from a validator that then asserted the sprintctl 0.3.2
+# value, and the 0.3.3 repin on 2026-08-28 (2ed158b) updated the validator without
+# updating this table. For six days the migrated profile attested an operation-hash that
+# no shipped adapter produced, and nothing failed, because the two values that had to
+# agree were never compared. Deriving one from the other is what makes them agree by
+# construction; a test cannot catch a drift between a constant and its own copy.
+_VALIDATOR_DIGESTS = {
+    "work-api/v1": ("validate_released_work_adapter.py", "_EXPECTED_WORK_METADATA_SHA256"),
+    "execution/v1": ("validate_released_execution_adapter.py", "_EXPECTED_CATALOG_METADATA_SHA256"),
+}
+
+
+def _pinned_digest(script_name: str, constant: str) -> str:
+    """Read one module-level string constant out of a sibling validator.
+
+    Parsed rather than imported: these validators import httpx and the adapter wheels at
+    module scope, and the migration must run from a checkout that has neither.
+    """
+    module = ast.parse((SCRIPTS / script_name).read_text(encoding="utf-8"))
+    for node in module.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if any(isinstance(t, ast.Name) and t.id == constant for t in node.targets):
+            value = ast.literal_eval(node.value)
+            if not isinstance(value, str) or len(value) != 64:
+                raise SystemExit(f"{script_name}:{constant} is not a sha256 digest")
+            return value
+    raise SystemExit(f"{script_name} no longer defines {constant}")
+
+
 OPERATION_HASHES = {
-    "work-api/v1": "5988b1117763aa4f517724222f4530b948d9c088463eaca098e6b7c7036b9ff1",
-    "execution/v1": "8d434e8b347e804c90e48a6598304be84b12f2a61ebc2dbed00a26053239a778",
+    api_version: _pinned_digest(*location)
+    for api_version, location in _VALIDATOR_DIGESTS.items()
 }
 
 # Where each domain's adapter is reached through the uniform construction

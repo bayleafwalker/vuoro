@@ -48,7 +48,7 @@ ROOT = Path(__file__).resolve().parents[1]
 COMPOSITION = ROOT / "packages/vuoro-service/composition"
 
 EXPECTED_TOTAL = 87
-EXPECTED_REVISION = "9a7621e0ab5b3765be162b6ae0fcdbf06c90bc66572873ef02d7ff5f3f14d4fd"
+EXPECTED_REVISION = "fe7e53b64b16ffb14bb27976698b82433fae85a12ea58bd13eda52e8032dd1ce"
 EXPECTED_DOMAIN_COUNTS = {"work": 46, "execution": 26, "knowledge": 10, "audit": 5}
 
 # The two rule 3 violations the migrated profile is known to carry: v3 pins a
