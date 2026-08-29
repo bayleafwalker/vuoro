@@ -271,7 +271,7 @@ def test_checked_in_knowledge_pin_is_kctl_013_with_released_shared_dependencies(
     ]
 
 
-def test_checked_in_audit_pin_is_auditctl_013_with_released_shared_dependencies() -> None:
+def test_checked_in_audit_pin_is_auditctl_015_with_released_shared_dependencies() -> None:
     manifest = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json")
     pin = manifest.pin("audit")
     assert (
@@ -283,11 +283,11 @@ def test_checked_in_audit_pin_is_auditctl_013_with_released_shared_dependencies(
         pin.artifact_sha256,
     ) == (
         "https://github.com/bayleafwalker/auditctl",
-        "eb982ef52b95c593a742cf36cb1f4c6f69381e42",
+        "514936b332a91a7d79787085fbc517df1bb9edc0",
         "auditctl",
-        "0.1.3",
-        "https://github.com/bayleafwalker/auditctl/releases/download/auditctl-v0.1.3/auditctl-0.1.3-py3-none-any.whl",
-        "f3d389ad051e5d3b737e0782a4daa40d78d875e8b1bd3f5d29363b382aada2ee",
+        "0.1.5",
+        "https://github.com/bayleafwalker/auditctl/releases/download/auditctl-v0.1.5/auditctl-0.1.5-py3-none-any.whl",
+        "313c73a9c929e464bf546d6d2cafd7991518e958668e297dce7a6f29ad7f33dd",
     )
     assert (pin.adapter_module, pin.register, pin.api_version, pin.schema_version) == (
         "auditctl.vuoro_adapter",
