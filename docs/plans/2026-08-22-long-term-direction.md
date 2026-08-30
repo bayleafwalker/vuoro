@@ -676,6 +676,16 @@ If ordinary solo work remains neutral or negative and multi-agent bursts do not 
 - Execution remains provider-native and generally user-owned.
 - Market mechanisms are preferred where they meet the required outcome.
 - `WorkRelease`, effect authority, evidence, and decisions are durable core semantics.
+- **Auditctl is the canonical home of `EvidenceSet` and `Decision`.** `[settled 2026-08-30 by the owner]`
+  It already holds the rule these objects need — it records what was observed and never what
+  should be — and it is the only store in the workspace that enforces it. This settles them as
+  *ledger objects auditctl records*, which is not a licence to grow it into the general log or
+  analytics platform §11 rules out: acquisition and provenance stay thin and bounded.
+  The consequence is the reason it was asked. Every artifact that today improvises whether it
+  is a record or a build output — `verification/results/`, acceptance-lab `campaigns/` — is a
+  **derived build output that cites a ledger id**, and the gate guarding each stops having to
+  invent which it is. Falsifier: an evidence artifact that no ledger id resolves to, or a
+  decision reachable only by reading a file in a working tree.
 - Frontier supervisors are episodic; deterministic systems handle polling and waiting.
 - Logical agent profiles, skills, and hooks must exist above individual harnesses.
 - Provider portability is checkpoint-based, not transparent live-session migration.
@@ -688,7 +698,7 @@ If ordinary solo work remains neutral or negative and multi-agent bursts do not 
 - the first market durable-workflow challenger and pilot envelope;
 - which ActionQ and Sprintctl semantics survive the provider-neutral classification;
 - the minimal v4 manifest and migration proof;
-- where each ledger object and versioned specification is canonically stored — which bound provider owns `WorkRelease` (Sprintctl as work authority is the default candidate), `EffectGrant` (ActionQ federation), `EvidenceSet` and `Decision`, and where logical agent profiles and skill artifacts live; `[reconciled]`
+- where each ledger object and versioned specification is canonically stored — which bound provider owns `WorkRelease` (Sprintctl as work authority is the default candidate) and `EffectGrant` (ActionQ federation), and where logical agent profiles and skill artifacts live; `EvidenceSet` and `Decision` are settled below. `[reconciled]` `[narrowed 2026-08-30]`
 - the smallest cockpit that measurably improves takeover and supervision;
 - whether served/cloud demand becomes real enough to justify productization.
 
