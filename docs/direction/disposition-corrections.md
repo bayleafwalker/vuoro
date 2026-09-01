@@ -245,15 +245,15 @@ Executed against the v2 queue. Landed at the canonical remote unless noted.
 | A5–A8 cost repair (15.13×) | done | agentops `63725a7` |
 | A9 vuoro-evidence into CI | done | vuoro `01725a2` |
 | A10 fixture partition at ingestion | done | auditctl `0305f65` |
-| A11 EvidenceSet / Decision | resolved as a contract, not code | auditctl `7772aac` |
-| A12 delete ActionQ execution plane | **blocked** | live callers in core; W2 blocker not locatable |
+| A11 EvidenceSet / Decision | done | contract auditctl `7772aac`; `record_class` relaxed by owner ruling, auditctl `cba8850` |
+| A12 delete ActionQ execution plane | **re-expressed, not executed** | actionq `014e12b`; the repo's own tranche plan supersedes the item's list |
 | A13 drop "placement" from ActionQ scope | **stale** | no live document says it |
 | A14 sprintctl skills + drift guard | done | sprintctl `23f8a68` |
 | A15 bootstrap template commands | done | `8026f6d`, `ea8a33e` |
 | A16 vuoro-outctl-ready instance | repointed; destroy blocked | marker now resolves; tool refuses on binding drift |
-| A17 clean live instance root | partial | `.worktrees` and stray `actionq/` hold real content |
-| A18 delete vuoro-bounded-output-starter | **blocked** | not superseded; holds unique unversioned files |
-| A19 stale outctl dispatch manifests | half done | outctl `e743e16`, local only (diverged branch) |
+| A17 clean live instance root | done (destroy still blocked) | both paths were redundant; real work was in `members/outctl`, rescued as outctl `f1032fd` |
+| A18 delete vuoro-bounded-output-starter | done | supersession total by blob and symbol scan; directory deleted |
+| A19 stale outctl dispatch manifests | done | outctl `e743e16`, pushed; second target removed with the starter |
 | A20 outctl in control-plane work items | **stale** | that plan is already `status: superseded` |
 | A21 hostproto forward framing | done, unpushed | `6bd1ca2`; upstream archived, read-only |
 | A22 `.invalid` extension URI | done | hostproto-a2a-worker `6f978b7` |
@@ -267,3 +267,39 @@ item is a hypothesis about the repository, and the repository gets the last word
 deleted `EVIDENCE_FREQUENCY_COUNT_2026-08-16.md`, the count behind outctl's kill
 decision, untracked and present in no git history anywhere. Now committed to the
 outctl repository. The queue assumed disposable instances hold nothing unique.
+
+## Method correction (2026-09-01)
+
+Two of the four refusals above were themselves premised on the wrong test.
+
+`diff -rq` answers *are these two trees identical*. That is not the disposal
+question. The disposal question is *does this content exist anywhere else*, and
+only object-store membership answers it — `git hash-object` on each file, then
+`git cat-file -e` against the candidate repository. Run that way, the
+vuoro-bounded-output-starter tree reduced from "many differing files and three
+unique paths" to five files, three of them stubs whose every symbol survives in
+their successor.
+
+The same mistake was available on `.worktrees/p31-db2`, where a commit SHA absent
+from the parent repository looked like unmerged work. It was a squash-merge: the
+commit object is gone, its *tree* is byte-identical to one on `origin/main`. Compare
+trees, not commit identities.
+
+Both are the same error in different clothing — comparing containers when the
+question is about contents. It is available on every remaining row, so check
+membership before recording anything as unique.
+
+## Rescues (2026-09-01)
+
+Two files-that-existed-nowhere-else were found while executing this queue, both
+inside directories the queue described as disposable:
+
+1. `EVIDENCE_FREQUENCY_COUNT_2026-08-16.md` — the count behind outctl's own
+   retirement decision, untracked in `_projects/vuoro-outctl-ready`.
+2. A 1110-line observability module with tests, three schemas, docs and examples —
+   uncommitted in `_projects/vuoro-dispatch-ready/members/outctl`.
+
+Both are now committed and pushed to `github.com/bayleafwalker/outctl`, which is
+not archived. The lesson is not "check harder"; it is that a disposable instance is
+disposable only once what it holds is provably not the only copy, and the check
+that establishes that is the membership scan above.

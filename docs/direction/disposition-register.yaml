@@ -1779,3 +1779,59 @@ remediation_log:
     .project/sources/20-portfolio-disposition.md, which the agentops project compiler
     propagates into every full-render member. --check fails when the fragment goes stale,
     so a status changes in one place.
+- date: '2026-09-01'
+  item: vuoro-bounded-output-starter
+  action: Directory deleted. Status stays `retired`; only the working copy is gone.
+  commit: 'no repository commit -- the directory had no git history of its own'
+  detail: >-
+    Deleted after a blob-membership scan over the whole tree (caches, .venv and dist
+    excluded and separately accounted for) returned exactly five files not present in
+    outctl's object store: a trailing-newline variant of the boundaries overlay, a
+    derived SHA256SUMS, and three Phase 1 stubs. All twenty symbols in the starter's
+    pilot.py are present in outctl's, which is 1284 lines to the starter's 475; its
+    cli.py is 36 lines to outctl's 623. Supersession confirmed at symbol level, not
+    only at blob level. 98M reclaimed, ~98M of it caches and builds.
+    METHOD CORRECTION - the earlier refusal used `diff -rq`, which answers "are these
+    trees identical". The disposal question is "does this content exist elsewhere",
+    and only object-store membership answers that. The same wrong test is available on
+    every remaining row.
+  supersedes: >-
+    items[key=vuoro-bounded-output-starter] preconditions (b) and (c) as recorded in
+    disposition-corrections.md. (b) supersession is TOTAL, not false. (c)
+    vuoro-cloud/16-CURRENT-IMPLEMENTATION-ANCHORS.md names this directory zero times;
+    its `## outctl` section cites paths that resolve only against /projects/dev/outctl,
+    so deleting the starter removes an ambiguity rather than breaking a pointer.
+- date: '2026-09-01'
+  item: project-instance-runtime-envelope
+  action: Live instance root cleaned. Destroy remains blocked, correctly.
+  commit: 'outctl f1032fd (preservation); no instance commit -- the root is not a repo'
+  detail: >-
+    Deleted .worktrees (19M) and actionq (72K) from _projects/vuoro-dispatch-ready.
+    Both were fully redundant: the worktrees' only local-only commit d899467 has a tree
+    byte-identical to 041ce31 on sprintctl origin/main, and the loose actionq copies
+    are a stale pre-managed_dispatch snapshot missing ManagedDispatchPolicy that the
+    repository has. `status` no longer raises on non-derived paths; it now returns a
+    member table reporting six unexpected-branch members, outctl as an unexpected
+    member, and three binding-drift lines. That readable diagnostic is the correct end
+    of this item, not a clean status.
+    PRESERVED FIRST - members/outctl held 162 tracked insertions and seven untracked
+    paths, including a 1110-line observability module, its tests, three schemas, docs
+    and examples, none of it a blob anywhere in outctl's history. Committed as f1032fd
+    on the instance branch, which is a real worktree of /projects/dev/outctl, so the
+    ref survives the instance. Second such rescue after
+    EVIDENCE_FREQUENCY_COUNT_2026-08-16.md.
+  supersedes: >-
+    items[key=project-instance-runtime-envelope] - the waking condition stays unmet, but
+    the obstacle is member-branch drift with five expected refs deleted from their parent
+    repos, not root litter. Destroy is additionally blocked because this directory is a
+    live agent session root.
+- date: '2026-09-01'
+  item: outctl
+  action: Both rescues made durable at the canonical remote.
+  commit: outctl a9392a0 and f1032fd
+  detail: >-
+    origin (github.com/bayleafwalker/outctl) is not archived, unlike hostproto's. Pushed
+    release/2026-08-11 and the dispatch-ready instance branch; both rescued commits are
+    now contained by a remote ref. Verified with git ls-remote rather than by the push
+    reporting success. A retired repository still needs its history to be somewhere
+    other than one workstation.
