@@ -7,6 +7,7 @@ members = [
     "vuoro-adapter-kit",
     "vuoro-bootstrap",
     "vuoro-client",
+    "vuoro-evidence",
     "vuoro-schema-runtime",
     "vuoro-service",
     "vuoro-workspace",
@@ -814,6 +815,20 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.10,<3" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" },
 ]
+provides-extras = ["test"]
+
+[[package]]
+name = "vuoro-evidence"
+version = "0.1.0"
+source = { editable = "packages/vuoro-evidence" }
+
+[package.optional-dependencies]
+test = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" }]
 provides-extras = ["test"]
 
 [[package]]
