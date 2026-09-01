@@ -303,3 +303,21 @@ Both are now committed and pushed to `github.com/bayleafwalker/outctl`, which is
 not archived. The lesson is not "check harder"; it is that a disposable instance is
 disposable only once what it holds is provably not the only copy, and the check
 that establishes that is the membership scan above.
+
+## Open follow-up: abandoned workloads (2026-09-01)
+
+Removing `appservice/clusters/main/kubernetes/apps/actionq-server/` did not remove
+the workload. `prune: true` collects what a **live** Kustomization owns; deleting
+the Kustomization removes the owner, and its objects are abandoned rather than
+collected. The Deployment kept serving for 116 days, still labelled
+`kustomize.toolkit.fluxcd.io/name: actionq-server` for a Kustomization that no
+longer existed, and nothing reported it.
+
+That failure mode is not specific to this app. Any directory removed from
+`apps/` the same way has probably left its objects running unowned. The sweep is
+cheap — compare live objects carrying `kustomize.toolkit.fluxcd.io/name` labels
+against the set of Kustomizations that actually exist — and it has not been done.
+
+This is the durable lesson from the whole queue, in its third form: a status that
+describes a thing is not the thing. Git said the app was retired, the plan said the
+gate was a decision, and the pod was up the entire time.
