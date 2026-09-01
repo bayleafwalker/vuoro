@@ -1705,3 +1705,77 @@ open_claims:
   - Any absence-by-identifier-grep argument elsewhere in this register - the technique failed here and should be paired
     with a concept-level check before a high confidence rating is claimed.
   - Nothing in the critical path; the verdict is already recorded and the package is frozen.
+
+# Append-only record of remediation executed against this register. Where an entry
+# says it supersedes a field, that field's text is historical and this entry is
+# current. Kept append-only so the register's own history is reconstructible --
+# which is the property the register exists to assert about everything else.
+remediation_log:
+- date: '2026-09-01'
+  item: auditctl
+  action: Fixture partition implemented at ingestion.
+  commit: auditctl 0305f65
+  detail: >-
+    stream_class (live|fixture) is resolver-derived from AUDITCTL_STREAM_CLASS, so a
+    publisher cannot forge it through a payload. Optional by construction, because the
+    required set is validated all-or-nothing and a sixth required field would have
+    rejected every event already carrying the five-field form. Migration 4 lifts it into
+    its own column. Unset resolves to live; an unrecognised value is refused.
+  supersedes: items[key=auditctl].waking_condition clause (1), now satisfied. Clause (2) still open.
+- date: '2026-09-01'
+  item: evidence-set
+  action: Consolidation gate resolved -- adapter, not supersession.
+  commit: auditctl 7772aac
+  detail: >-
+    The two implementations are not divergent definitions of one object. bindery-core's
+    evidencev1 is an agreement test (did independent accounts of one execution agree);
+    vuoro-evidence's is a sufficiency test (is there enough valid evidence to act without
+    observing again). A bindery evidence set maps onto exactly one vuoro EvidenceItem,
+    its evidence_set_id already being a sha256 content address. The field-by-field
+    mapping is recorded in auditctl docs/contracts/evidence-set-and-decision.md. No
+    supersession applies and no third implementation was added.
+  supersedes: items[key=evidence-set].waking_condition
+- date: '2026-09-01'
+  item: decision
+  action: Gate WITHDRAWN -- Decision must not live in auditctl.
+  commit: auditctl 7772aac
+  detail: >-
+    The 2026-08-30 settlement placed Decision in a store whose validator refuses it.
+    record_class is hard-validated to "observation" (auditctl validation.py:372), and
+    AuditContext.as_record states the rule it enforces - auditctl records conformance, it
+    does not state desired state. A Decision is a judgement about what should follow from
+    evidence, which is desired state. Admitting it means relaxing the one constraint that
+    keeps the store a record of what happened, so it is an owner ruling about the
+    boundary rather than a schema change. Acceptance Lab, which already emits terminal
+    decisions, is the candidate home.
+  supersedes: items[key=decision].waking_condition clause (1)
+- date: '2026-09-01'
+  item: vuoro-core
+  action: Settlement spine wired into CI.
+  commit: vuoro 01725a2
+  detail: >-
+    packages/vuoro-evidence was in neither the uv workspace members nor pytest testpaths,
+    so its 16 tests never ran. Added to both; suite 361 -> 377. Also deleted
+    verification/contexts/maintenance-capability-served.json, which named a 0.2.14 catalog
+    as its source of truth against a 0.3.5 pin, asserted an invariant the pinned adapter
+    contradicts, and was referenced by no plan or test.
+- date: '2026-09-01'
+  item: outctl
+  action: Cluster residue removed.
+  commit: appservice c147022f and 4ef1b38b
+  detail: >-
+    RBAC manifest deleted and unwired from the gatus kustomization; the pilot read-only
+    kubeconfig deleted from disk; outctl and actionq-dispatcher removed from the repo_ids
+    of all three actors in both work-resource observer policies. The first commit staged
+    only the deletion, leaving main briefly referencing a file that no longer existed and
+    failing the gatus Kustomization build; 4ef1b38b repaired it and gatus reconciled
+    green at that revision. The RBAC objects are pruned from the cluster.
+- date: '2026-09-01'
+  item: register
+  action: Guidance is now generated from this file.
+  commit: agentops 3598cb6
+  detail: >-
+    render_disposition_fragment.py renders the constraining statuses and open claims into
+    .project/sources/20-portfolio-disposition.md, which the agentops project compiler
+    propagates into every full-render member. --check fails when the fragment goes stale,
+    so a status changes in one place.

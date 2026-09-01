@@ -233,3 +233,37 @@ Small, verified, immediately executable. Each observed present at the artifact.
 
 - **Target:** `/projects/dev/vuoro/verification/contexts/maintenance-capability-served.json (against packages/vuoro-service/composition/adapter-pins.json and sprintctl vuoro_adapter.py:830)`
 - **Why:** A verification context that has drifted from the composition it constrains will either pass vacuously or fail for the wrong reason.
+
+## Queue outcomes (2026-09-01)
+
+Executed against the v2 queue. Landed at the canonical remote unless noted.
+
+| Item | Outcome | Where |
+| --- | --- | --- |
+| A1–A3 outctl cluster residue | done | appservice `c147022f`, repaired by `4ef1b38b` |
+| A4 host field on cost rows | done | agentops `63725a7` |
+| A5–A8 cost repair (15.13×) | done | agentops `63725a7` |
+| A9 vuoro-evidence into CI | done | vuoro `01725a2` |
+| A10 fixture partition at ingestion | done | auditctl `0305f65` |
+| A11 EvidenceSet / Decision | resolved as a contract, not code | auditctl `7772aac` |
+| A12 delete ActionQ execution plane | **blocked** | live callers in core; W2 blocker not locatable |
+| A13 drop "placement" from ActionQ scope | **stale** | no live document says it |
+| A14 sprintctl skills + drift guard | done | sprintctl `23f8a68` |
+| A15 bootstrap template commands | done | `8026f6d`, `ea8a33e` |
+| A16 vuoro-outctl-ready instance | repointed; destroy blocked | marker now resolves; tool refuses on binding drift |
+| A17 clean live instance root | partial | `.worktrees` and stray `actionq/` hold real content |
+| A18 delete vuoro-bounded-output-starter | **blocked** | not superseded; holds unique unversioned files |
+| A19 stale outctl dispatch manifests | half done | outctl `e743e16`, local only (diverged branch) |
+| A20 outctl in control-plane work items | **stale** | that plan is already `status: superseded` |
+| A21 hostproto forward framing | done, unpushed | `6bd1ca2`; upstream archived, read-only |
+| A22 `.invalid` extension URI | done | hostproto-a2a-worker `6f978b7` |
+| A23 drifted verification context | done | vuoro `01725a2` |
+
+Four items were refused rather than forced, each because the artifact
+contradicted the item's premise. That is the register working as intended: an
+item is a hypothesis about the repository, and the repository gets the last word.
+
+**Rescued in passing:** destroying `_projects/vuoro-outctl-ready` would have
+deleted `EVIDENCE_FREQUENCY_COUNT_2026-08-16.md`, the count behind outctl's kill
+decision, untracked and present in no git history anywhere. Now committed to the
+outctl repository. The queue assumed disposable instances hold nothing unique.
