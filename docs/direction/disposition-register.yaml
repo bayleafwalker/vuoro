@@ -1,0 +1,1707 @@
+version: 2
+purpose: Vuoro keeps heterogeneous agent work resumable across sessions, hosts, repositories and runtimes, and makes
+  the accepted result reconstructible.
+supersedes: docs/plans/2026-08-22-long-term-direction.md
+revision_note: 'v2 (2026-09-01) closes six review gaps, each re-verified at the artifact. Added rows for appservice
+  and gitops-nixos - the two infrastructure repos every artifact check lands in, previously unenumerated - and for
+  the takeover-20260820 experiment. Added verdict_vocabulary and path_conventions. Rewrote all nine overloaded `contradicted`
+  verdicts so `verdict` judges the adjacent claim while `contradicts_record` carries disagreement with the decision
+  record. Demoted bindery-core promote -> hold on its own evidence. Made every source path absolute. Two v1 findings
+  were themselves corrected: the meta-layer identifier-absence claim is false, and the takeover package was executed
+  to an adjudicated verdict rather than left unrun. Prose is compressed relative to v1; all verified facts and citations
+  are retained.'
+path_conventions:
+  absolute_paths_only: Every `source` value is an absolute path or a command, with `~/` abbreviating `/projects/dev/`.
+    A path that is relative to anything else is a defect - v1 carried one on its most consequential citation.
+  two_artifacts_roots: /projects/dev/_artifacts and /projects/dev/agentops/_artifacts are DISTINCT stores and both
+    contain an `agentops/` subtree. Acceptance reports live only under /projects/dev/agentops/_artifacts/agentops/acceptance/;
+    /projects/dev/_artifacts/agentops/ holds audit, audit-retired-2026-08-26, capability, hybrid-dispatch, model and
+    preflight, and has no acceptance directory. Resolving an acceptance citation against the wrong root returns nothing
+    and reads as absent evidence.
+status_vocabulary:
+  active: Running, maintained, carrying live load; evidenced by a green run, a deployed artifact, or commits in the
+    last 14 days. Only the owner may demote.
+  keep-narrow: Retained deliberately at current small scope. An agent may propose narrowing further; only the owner
+    may widen.
+  promote: Evidence supports raising it above its current role, but the raise has not been performed. Only the owner
+    may execute it.
+  hold: Real work exists, paused behind a named checkable gate. An agent may check the gate and report; only the owner
+    may release.
+  frozen: Closed with a verdict already reached. Reopening requires an explicit owner ruling, not new interest.
+  deferred: Decided to be built later. An agent may not start it; the owner may schedule it.
+  spec-only: Prose or schema with zero implementing code. Never upgrade out of spec-only on documentation alone; only
+    a code artifact does that.
+  retired: Deliberately ended. May still ship as a tombstone or be kept read-only as history. Delete residue only
+    where a row says so.
+  unknown: Named by the decision record but not established at the artifact. Confidence low by construction; the next
+    act is to look, not to decide.
+verdict_vocabulary:
+  scope: '`verdict` judges the ADJACENT `claim` and nothing else. It never expresses agreement or disagreement with
+    the decision record - that is what `contradicts_record` is for.'
+  confirmed: The adjacent claim was checked at the artifact and is true.
+  contradicted: The adjacent claim was checked at the artifact and is false. No observation in this register currently
+    carries this value; observations are written as true statements.
+  partially-confirmed: Part of the adjacent claim is true at the artifact and part is false, and the row says which
+    is which.
+  could-not-check: The probe could not run, or ran without authority to answer. This is a statement about the checking,
+    NOT about the claim - could-not-check is never evidence of absence.
+  contradicts_record: Separate flag, ABSENT means false. Present and true when a CONFIRMED claim disagrees with the
+    decision record.
+items:
+- key: vuoro-core
+  name: Vuoro core (kernel, service, client, evidence)
+  repos:
+  - /projects/dev/vuoro
+  role: Python monorepo whose runnable surface is a schema-described HTTP service (handshake/catalog/invoke) plus
+    a thin client and bootstrap CLI, with composition-v4 and an EvidenceSet/EffectGrant/Decision reducer library alongside.
+  status: active
+  intention: Own only the semantics that survive replacement of the market products around it - what was released,
+    what authority was granted, what evidence exists, what was decided.
+  waking_condition: n/a - active.
+  supersession: The 2026-08-27 effect-intent-projection doc amends direction sections 5/11/15; the direction doc records
+    [settled 2026-08-30] that auditctl, not Vuoro, is the canonical home of EvidenceSet and Decision.
+  last_verified:
+    date: '2026-09-01'
+    observations:
+    - claim: Deployed and current - the vuoro-shared pod answers handshake with service_version 0.1.59, matching pyproject
+        and HEAD 5e51ce9.
+      source: kubectl exec -n vuoro-shared ... urlopen /api/meta/v1/handshake
+      verdict: confirmed
+    - claim: Could not enumerate the live catalog against the support manifest - /api/catalog/v1 rejects an unversioned
+        client with HTTP 426. This is a gap in the checking, not evidence that the catalog diverges.
+      source: kubectl exec ... urlopen('/api/catalog/v1')
+      verdict: could-not-check
+    - claim: packages/vuoro-evidence, the settlement-spine implementation, is in neither uv workspace members nor
+        pytest testpaths, so CI never runs it.
+      source: ~/vuoro/pyproject.toml:15-22,24-33; ~/vuoro/.github/workflows/ci.yml:61
+      verdict: confirmed
+    - claim: The docs-only nature of the settlement is current as of HEAD - the newest vuoro commit is 9886130, a
+        docs(direction) commit settling auditctl as the home of EvidenceSet and Decision, dated 2026-08-30, touching
+        documentation only.
+      source: git -C ~/vuoro log -1 --date=iso
+      verdict: confirmed
+  divergence: No resume command and no session-handoff object here. CORRECTION - the resumability OUTCOME is implemented,
+    served and evidenced, but in sprintctl, not Vuoro.
+  confidence: high
+- key: appservice
+  name: appservice (Flux/Talos GitOps cluster repo)
+  repos:
+  - /projects/dev/appservice
+  role: The deployment substrate for the entire served portfolio - Flux-managed Kubernetes manifests under clusters/main/kubernetes/apps
+    for vuoro-dev, vuoro-shared, vuoro-dev-db, vuoro-shared-db, actionq-db, sprintctl-postgres, cred-broker, agent-cockpit
+    and homelab-analytics, plus the cluster kubeconfigs under clusters/.kube.
+  status: active
+  intention: Own deployment and cluster configuration only. It holds no work state and no ledger semantics; it is
+    where every 'verify at the artifact' check in this register actually lands.
+  waking_condition: n/a - active.
+  supersession: none.
+  last_verified:
+    date: '2026-09-01'
+    observations:
+    - claim: By far the most active repo in the portfolio - 262 commits in the 14 days to 2026-09-01, HEAD edf86bda
+        dated 2026-09-01. It is a registered dispatch member at adoption_level dispatchable with six action classes
+        enabled (plan, build, review, verify, reconcile, release-ops).
+      source: git -C ~/appservice log --since=2026-08-17 --oneline | wc -l -> 262; git log -1 --date=iso; ~/appservice/appservice.dispatch.json
+      verdict: confirmed
+    - claim: It is the physical location of the outctl cluster residue this register schedules for removal - outctl-pilot-rbac.yaml
+        is present and included at kustomization.yaml line 5, the pilot kubeconfig is present with 0600 permissions,
+        and all three actors in the vuoro-shared observer policy carry outctl in repo_ids (and actionq-dispatcher,
+        itself a tombstone).
+      source: ~/appservice/clusters/main/kubernetes/apps/gatus/app/outctl-pilot-rbac.yaml; .../gatus/app/kustomization.yaml:5
+      verdict: confirmed
+    - claim: It is the largest real consumer in the cost log - the spend open_claim's 30.2% figure and its ~681-of-1512
+        row share are appservice's, not agentops'.
+      source: recomputation over ~/_artifacts/*/audit/*.ndjson and ~/.claude/session-costs.jsonl
+      verdict: confirmed
+      contradicts_record: true
+  divergence: 'v1 omitted appservice entirely, its most consequential structural defect: the outctl row''s headline
+    remediation (''twelve live bindings survive across four repos and the cluster'') pointed into a repo with no row,
+    no status and no owner. It is not part of the Vuoro capability surface and should not become one - its disposition
+    is ''active infrastructure, owns deployment, owns the residue cleanup''.'
+  confidence: high
+- key: gitops-nixos
+  name: gitops-nixos (host provisioning, workstation + devbox)
+  repos:
+  - /projects/dev/gitops-nixos
+  role: NixOS flake provisioning both hosts - WorkstationLinux and the devbox agent host.
+  status: active
+  intention: Define the second host. It carries no work state and no ledger semantics, but it is the repo that makes
+    'cross-host' a real word in this portfolio rather than an aspiration.
+  waking_condition: n/a - active.
+  supersession: none.
+  last_verified:
+    date: '2026-09-01'
+    observations:
+    - claim: Active - 21 commits in the 14 days to 2026-09-01, HEAD 5f4868e dated 2026-09-01. The hybrid-dispatch
+        module tree, the agentworker user module, the client-tools module and the devbox dispatch runbook are all
+        present.
+      source: git -C ~/gitops-nixos log --since=2026-08-17 --oneline | wc -l -> 21; git log -1 --date=iso; ls ~/gitops-nixos/modules/system/hybrid-dispatch/
+      verdict: confirmed
+    - claim: It is a SECOND WRITER into the cost log the register analyses as if singly-sourced - claude-settings.json
+        line 14 wires the same /projects/dev/agentops/templates/dispatch/hooks/log-session-cost.sh on the devbox.
+      source: grep -rn 'log-session-cost' ~/gitops-nixos -> modules/system/hybrid-dispatch/claude-settings.json:14
+      verdict: confirmed
+      contradicts_record: true
+    - claim: 'The cost log carries no host field, so rows from the two hosts are indistinguishable. Its keys are exactly:
+        ts, project, session, model, in, out, cost_usd, and `grep -c ''"host"''` over 1537 rows returns 0.'
+      source: head -1 ~/.claude/session-costs.jsonl parsed for keys; grep -c '"host"' -> 0; wc -l -> 1537
+      verdict: confirmed
+  divergence: Omitted from v1 while two conclusions leaned on it. (1) open_claim 4 reasons about cross-HOST continuity
+    being 'supplied by NEITHER side' without naming the repo that defines the second host. (2) The cost analysis and
+    its shared-reducer remediation assume one producer; there are two, on different hosts, writing rows that cannot
+    be told apart.
+  confidence: high
+- key: vuoro-cloud
+  name: Vuoro Cloud (hosted control plane, gateway, tenant controller)
+  repos:
+  - /projects/dev/vuoro-cloud
+  role: Multi-tenant hosting product - FastAPI control plane, public gateway minting Ed25519 identity assertions,
+    outbox-driven tenant controller, nine SQL migrations, Terraform/Flux for a Hetzner k3s PoC and a Talos green environment.
+  status: hold
+  intention: Host Vuoro for external users with per-tenant isolation, staged with explicit stop conditions. Owns no
+    work or action authority.
+  waking_condition: Blockers 4 and 5 - (1) vuoro-cloud emits a Sprintctl served_profile (name/endpoint/credential_ref/expected_environment)
+    from the onboarding manifest; today `served_profile` appears nowhere in src/, config/ or examples/.
+  supersession: Downstream of vuoro core's release train (pins vuoro-service digests via config/compatibility.json).
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: Real code surface is one package with three entry points; apps/ holds only Kubernetes manifests, no application
+        source.
+      source: ~/vuoro-cloud/pyproject.toml:22-26; find ~/vuoro-cloud/apps -name '*.go' -o -name package.json
+      verdict: confirmed
+    - claim: Could not verify the Hetzner PoC at the artifact - the only kubeconfig context is admin@main. Health
+        at v0.1.0-poc.27 rests on the repo's own status doc, a report rather than the artifact. This is a gap in the
+        checking.
+      source: kubectl config get-contexts --kubeconfig ~/appservice/clusters/.kube/config
+      verdict: could-not-check
+  divergence: Largest divergence from the narrowed record - nothing here serves resumable agent work or a reconstructible
+    result; it is a tenancy and hosting product with ~20 root design docs against one package.
+  confidence: medium
+- key: agentops
+  name: agentops (project/profile compiler and operating workbench)
+  repos:
+  - /projects/dev/agentops
+  role: The one generic compiler rendering cross-repo agent instructions from a project.toml binding plus .project/sources
+    fragments, materializing multi-repo project folders, plus a Next.js operator cockpit projecting sprintctl/auditctl/actionq
+    state.
+  status: active
+  intention: Own the one generic compiler that makes heterogeneous agent work resumable across hosts and repos; keep
+    authority and observability with sprintctl, auditctl and actionq.
+  waking_condition: n/a - active.
+  supersession: project-binding-spec.md states render_project.py supersedes sync_skills.py's mechanical sync for anything
+    expressible as a project render.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: One generic renderer exists (render_project.py, 1167 lines) and reports green across all 7 members; /projects/dev/AGENTS.md
+        is a real compiler output with source_sha256.
+      source: ~/agentops/render_project.py check (rc=0, run in session); ~/agentops/render_workspace_agents.py --check
+        -> OK
+      verdict: confirmed
+    - claim: 'Instruction fan-out is NOT one mechanism - skills are copied per repo by sync_skills.py and that fan-out
+        is broken: vuoro and sprintctl carry drifted reconcile-project-contracts, and actionq, auditctl and kctl have
+        no .agents/skills at all despite manifest selection.'
+      source: ~/agentops/sync_skills.py check --repo ...; ls ~/actionq/.agents/skills -> No such file
+      verdict: confirmed
+      contradicts_record: true
+    - claim: agentops is NOT the largest consumer of measured effort - correct newest-per-session reduction gives
+        it $818.13 of $6,454.63 (12.7%) against appservice at 30.2%.
+      source: recomputation over ~/_artifacts/*/audit/*.ndjson (866 workflow.session rows)
+      verdict: confirmed
+      contradicts_record: true
+  divergence: Aligned on one-generic-compiler. Four divergences - skill distribution is a second, unenforced, broken
+    copy mechanism; no drift check is triggered automatically; mild authority overreach in apps/web; and the cockpit's
+    rendered cost is 15.1x truth. agentops also hosts the two measurement corpora whose headline numbers both failed
+    re-derivation.
+  confidence: high
+- key: project-instance-runtime-envelope
+  name: Project-instance runtime envelope (/projects/dev/_projects)
+  repos:
+  - /projects/dev/_projects
+  - /projects/dev/agentops
+  role: Host-local generated multi-repo work folders from materialize_project.py (agentops-project-folder/v2) - a
+    marker file, rendered AGENTS.md, project.context.json and members/<repo_id>/ linked worktrees, with advisory leases
+    and setup/sync/status/refresh/destroy/rebuild.
+  status: keep-narrow
+  intention: Give a work window a rebuildable, identified multi-repo checkout so a session can resume on any host
+    from the binding commit and digest, owning no backlog or queue state.
+  waking_condition: Promote only when materialize_project.py status returns clean for EVERY instance AND instance
+    creation/teardown is driven by something other than a hand-typed setup command.
+  supersession: TOOL_ID agentops-project-folder/v2 supersedes a v1 folder format; docs/project/project-folder.md calls
+    the v2 foundation implemented with operating-model hardening outstanding.
+  scope_note: '~/_projects is NOT exclusively an instance directory. It holds three subdirectories: two generated
+    instances (vuoro-dispatch-ready, vuoro-outctl-ready) carrying .agentops-project-folder.json markers, and takeover-20260820,
+    a 702-file hand-authored experiment with no marker, not produced by materialize_project.py, which has its own
+    row. Do not read the marker-based instance count as the directory''s full contents - v1 did, and thereby hid the
+    largest surviving artifact of the retired meta-layer.'
+  last_verified:
+    date: '2026-09-01'
+    observations:
+    - claim: Cross-repository composition is real and running - 7 repos as actual git worktrees (members/vuoro/.git
+        -> vuoro/.git/worktrees/vuoro), each pinned by source_commit and every guidance source by sha256 under one
+        context_bundle_sha256, consumed by typed code in project_binding.py with a test.
+      source: ~/_projects/vuoro-dispatch-ready/project.context.json; git rev-parse --git-dir in members/vuoro
+      verdict: confirmed
+    - claim: Could not check whether any instance was rebuilt from its marker on a second host - no rebuild receipt
+        or cross-host materialization evidence in _artifacts. This is a gap in the checking, not proof no rebuild
+        occurred.
+      source: ls ~/agentops/_artifacts/agentops
+      verdict: could-not-check
+    - claim: 'Re-verified 2026-09-01 - _projects contains exactly three entries and only two carry the marker: takeover-20260820
+        has no .agentops-project-folder.json and contains 702 files.'
+      source: ls -la ~/_projects/; ls ~/_projects/takeover-20260820/.agentops-project-folder.json -> No such file
+      verdict: confirmed
+  divergence: Resumability holds at the metadata level, not operationally. Cross-REPOSITORY continuity is the one
+    capability nothing native supplies - Codex's projects and project_roots tables hold zero rows. But only two instances
+    exist, one has degraded, and one has a dangling provenance link.
+  confidence: high
+- key: takeover-experiment
+  name: Takeover experiment (coordinator + five-worker swarm, 2026-08-20)
+  repos:
+  - /projects/dev/_projects/takeover-20260820
+  role: A 702-file executed experiment testing whether a coordinated multi-session takeover beats a direct Git handoff
+    for continuing interrupted work - 13 design documents including a mermaid topology of one Coordinator over five
+    Sol workers, a Python harness with tests, two sealed launch capsules (B2 takeover, CONTROL1 direct control), three
+    recorded runs, a hash-verified blind review, and a final adjudication.
+  status: frozen
+  intention: Not to build a coordination layer, but to decide whether one is worth building. It reached a verdict
+    and is closed.
+  waking_condition: n/a - adjudicated. Reopening requires an explicit owner ruling against the recorded NARROW verdict,
+    not new interest. Its own stop rules are in 06_ACCEPTANCE_KILL_AND_NARROW_GATES.md and the gate status is machine-readable
+    in results/GATE-STATUS-CURRENT.json.
+  supersession: Supersedes nothing. Its verdict supersedes the ambition of the meta-layer row - it is the empirical
+    basis on which multi-agent coordination should stay unbuilt.
+  last_verified:
+    date: '2026-09-01'
+    observations:
+    - claim: It was EXECUTED, not merely designed - two launch capsules (launches/B2, launches/CONTROL1) each with
+        checkpoint.bundle, HANDOFF.yaml and a launch-context-manifest, three result runs (independent-takeover-001/002,
+        direct-control-001), and a byte-preserved blind review with all six payload hashes and the prompt hash passing.
+      source: ls -R ~/_projects/takeover-20260820/launches, .../results; ~/_projects/takeover-20260820/results/FINAL-ADJUDICATION.md
+      verdict: confirmed
+      contradicts_record: true
+    - claim: 'The verdict is NARROW with machine-readable gates - ACCEPT-G0 through G7 pass, G8 passes with two packaging
+        defects, production_mutations false, and the unblinded review preferred the DIRECT CONTROL path over the takeover
+        path. The recorded decision: use direct Git plus a concise HANDOFF, exact receipts, explicit settlement and
+        acceptance for bounded single-repository continuation.'
+      source: ~/_projects/takeover-20260820/results/GATE-STATUS-CURRENT.json
+      verdict: confirmed
+    - claim: It has no .agentops-project-folder.json marker and is not generated by materialize_project.py, so it
+        is not a project instance despite living under /projects/dev/_projects.
+      source: ls ~/_projects/takeover-20260820/.agentops-project-folder.json -> No such file
+      verdict: confirmed
+  divergence: 'This row exists because v1 tested the meta-layer by identifier spelling and concluded the layer ''was
+    never built''. The correction cuts both ways, and the second direction matters more: a coordinated multi-agent
+    takeover was run against a fair control and LOST, on record, with hashes.'
+  confidence: high
+- key: sprintctl
+  name: Sprintctl
+  repos:
+  - /projects/dev/sprintctl
+  role: Local-first/remote-backed CLI ledger for sprints, items, advisory reservations, events and handoff bundles
+    - the tool that decides and records what a session works on next and how it hands off. Where the narrowed purpose
+    is actually implemented.
+  status: active
+  intention: Current work and readiness authority for the narrowed scope; the ceremony around claiming and closing
+    work is what the decision record wants simplified.
+  waking_condition: n/a - active.
+  supersession: The claim family (claim start/list/list-sprint/handoff/resume, claim_token bearer proof) is superseded
+    by the credential-free reservation group.
+  last_verified:
+    date: '2026-09-01'
+    observations:
+    - claim: There is NO `claims` or `claim` command and no `sprint current`. The surface is reservation (reserve/touch/reassign/release/list/show)
+        plus takeup; agent-protocol prints that reservations are advisory with no ownership proof.
+      source: walk of the constructed Click group; ~/sprintctl/sprintctl/db.py:693-697; ~/sprintctl/sprintctl/pg.py:1479-1525;
+        sprintctl agent-protocol
+      verdict: confirmed
+      contradicts_record: true
+    - claim: The decision record's statement that session resume does not work is FALSE. tests/test_handoff_checkpoint.py
+        defines test_the_resumability_outcome_end_to_end, which drives the served work application (not the CLI path)
+        through interrupt-then-fresh-process with no worktree, no local cache and no git context sent, and recovers
+        session identity, work authority, checkpoint and exact revision.
+      source: ~/sprintctl/tests/test_handoff_checkpoint.py:147 (test_the_resumability_outcome_end_to_end, docstring
+        read in session)
+      verdict: confirmed
+      contradicts_record: true
+    - claim: The acceptance evidence is real and re-read at an ABSOLUTE path - the report records Scenario resume-and-settle@1.0.1,
+        Status PASS, Aggregate score 1.000, with all eight hard gates at 1.000 (forbidden_authority_absence, required_fact_citations
+        4/4, work-authority-recovered, checkpoint-recovered, served-surfaces-only, session-identity-recovered, effect_receipts,
+        revision-is-exact 2/2) plus one soft economics gate at latency 1350.6ms.
+      source: ~/agentops/_artifacts/agentops/acceptance/resume-and-settle/report-2026-08-29-after-deploy-repinned.md:4-28
+      verdict: confirmed
+      contradicts_record: true
+    - claim: HEAD is 95e18f5, a release commit preparing Sprintctl 0.3.5 on 2026-08-29 - so the shipped surface is
+        0.3.5 and the three canonical skills teaching the deleted claim API are drifted against the release they ship
+        beside.
+      source: git -C ~/sprintctl log -1 --date=iso
+      verdict: confirmed
+  divergence: 'Two corrections. (1) The record''s framing of claims is against a deleted surface. (2) The statement
+    that session resume does not work is FALSE - the continuation outcome shipped in 0.3.4 (ea834a7). What survives
+    is a catalog/UX defect: the command whose name matches the promise returns not-yet-served, and an operator assembles
+    the continuation from three or four calls.'
+  confidence: high
+- key: sprintctl-bootstrap-template
+  name: Sprintctl Bootstrap Template
+  repos:
+  - /projects/dev/sprintctl-bootstrap-template
+  role: Docs-and-Makefile-only reference repo showing what a sprintctl+kctl repo looks like from scratch; no code,
+    no tests, Makefile targets only print instructions.
+  status: keep-narrow
+  intention: Demoted from canon to a narrow bootstrap example; canonical workflow guidance lives in agentops/templates/dispatch/.
+  waking_condition: Promote back to canon only if agentops/templates/dispatch stops being the shared source of workflow
+    guidance.
+  supersession: Superseded as canon by agentops/templates/dispatch/ (ea4961f, 2026-07-18, demote to frozen bootstrap
+    reference); its README states this at the top.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: No code - AGENTS.md, CLAUDE.md, README.md, a Makefile of echo statements self-described as reminders
+        not automation, and docs/.
+      source: ls ~/sprintctl-bootstrap-template; head -40 ~/sprintctl-bootstrap-template/Makefile
+      verdict: confirmed
+    - claim: It is still receiving commits despite the frozen demotion - rewritten for the reservation model afterwards
+        (f397d97 and 9c905e0 on 2026-08-15, ae34486 on 2026-08-29), so its reservation guidance is current where sprintctl's
+        own skills are not.
+      source: git -C ~/sprintctl-bootstrap-template log --date=iso
+      verdict: confirmed
+      contradicts_record: true
+  divergence: Still receiving commits despite the frozen demotion, so keep-narrow not frozen.
+  confidence: high
+- key: sprintctl-orchestrator
+  name: Sprintctl Orchestrator
+  repos:
+  - /projects/dev/sprintctl-orchestrator
+  role: A three-file design workspace (ADR-001, README, AGENTS.md; 469 lines) arguing for a separate orchestration
+    layer above sprintctl and kctl.
+  status: retired
+  intention: Retained read-only as design history; its central decision - sprintctl never becomes network-native -
+    was overtaken by shipped code.
+  waking_condition: n/a - formally archived. Reopens only if the outbox/sync model in sprintctl were abandoned AND
+    a separate cross-domain coordination layer were rechosen over agentops. Both are checkable; neither holds.
+  supersession: Superseded by sprintctl's remote PostgreSQL backend and CNPG database, by sprintctl/docs/plans/adr-outbox-sync-model.md,
+    and by agentops which owns cross-repo projection and operator surfaces.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: README carries an archival banner dated 2026-07-14 naming its three successors; the substantive archival
+        commits are 8d24284 and 7b7e6b4 on 2026-07-14.
+      source: ~/sprintctl-orchestrator/README.md:3-11; git -C ~/sprintctl-orchestrator log --date=iso
+      verdict: confirmed
+    - claim: The superseding capability is real - sprintctl ships pg.py, pg_migrations.py, a remote-schema group and
+        a remote-backend/v1 capability at remote-schema-version 12, exactly what ADR-001 said would never happen.
+      source: ~/sprintctl/pyproject.toml capabilities; ~/sprintctl/sprintctl/pg.py
+      verdict: confirmed
+  divergence: Aligned, and stronger than dormant - explicitly self-declaredly archived, naming its own successors.
+  confidence: high
+- key: actionq
+  name: ActionQ
+  repos:
+  - /projects/dev/actionq
+  role: PostgreSQL-backed action queue and authority plane - mints actions, hands out fenced claims with expiring
+    leases and attempt identities, settles terminal outcomes against signed runner proofs, and records an as-yet-unserved
+    federation resource ledger whose acceptances must cite verified evidence.
+  status: active
+  intention: Optional authority for unattended attempts, leases and reconciliation. Placement is REMOVED from the
+    narrowed scope - see the first observation.
+  waking_condition: n/a - active.
+  supersession: Supersedes actionq-dispatcher's dispatcher-once execution plane (removed in 0.1.26). Nothing supersedes
+    actionq.
+  last_verified:
+    date: '2026-09-01'
+    observations:
+    - claim: Placement is not implemented. Re-verified 2026-09-01 - a grep across every actionq Python module returns
+        two hits, both the substring 'replacement' in unrelated deprecation metadata (vuoro.py:278, vuoro_federation.py:169).
+        The nearest thing, execution_groups, is a flat immutable set with max_parallel 1..32 and failure_policy CHECK-constrained
+        to the single value continue-independent.
+      source: grep -rn 'placement\|placem' ~/actionq/actionq/*.py; ~/actionq/migrations/005_execution_groups.sql:7-8
+      verdict: confirmed
+      contradicts_record: true
+    - claim: Could not execute the federation tests - they need a disposable PostgreSQL and conftest fails collection
+        without initdb/pg_ctl; CI runs them against real PostgreSQL but no run could be observed.
+      source: pytest ~/actionq/tests/test_federation_revision_authority.py; ~/actionq/.github/workflows/ci.yml:24-32
+      verdict: could-not-check
+    - claim: The W2 blocker has never fenced a real acceptance - the repo's own read-only cluster verification records
+        that no federation migration job has ever existed in any namespace, so the ledger is uninitialized cluster-wide.
+      source: ~/actionq/docs/plans/2026-08-22-w5-plus-backlog.md:34-40
+      verdict: confirmed
+  divergence: Three divergences. (1) Placement names a capability that does not exist; struck from the intention above
+    rather than restated. (2) The W2 blocker is the best-tested control in the portfolio and has never fenced a real
+    acceptance - declared and selected but not evidenced. (3) The execution plane whose deletion was decided 2026-08-20
+    (application_enqueue, application_claim, application_dispatch, managed_dispatch, runner_auth) is still present
+    and maintained - the clearest instance of manufactured depreciation.
+  confidence: high
+- key: actionq-cas
+  name: ActionQ CAS object store
+  repos:
+  - /projects/dev/actionq-cas
+  role: Not a repository - the on-disk root of ActionQ's server-owned content-addressed artifact store, holding exactly
+    one dispatch-result/v1 object from a real completed attempt.
+  status: keep-narrow
+  intention: Not named as a project in the decision record; the durable side of ActionQ's reconstructible-result half
+    - the bytes a result_ref points at.
+  waking_condition: It needs its own status only if `find /projects/dev/actionq-cas -type f` ever returns anything
+    other than CAS objects under objects/sha256/. Until then it is a data directory owned by actionq.
+  supersession: none.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: No git repo and no source - the entire tree is one file under objects/sha256/0b/, a real terminal result
+        (action_id 26, dispatch-result/v1, terminal_status completed) written 2026-08-15.
+      source: ls -la ~/actionq-cas; find ~/actionq-cas -type f | wc -l -> 1; cat of the object
+      verdict: confirmed
+    - claim: No code references the literal path or an ACTIONQ_CAS env var; cas.py refuses roots under /tmp, /var/tmp,
+        ~/.cache, ~/.local/state/actionq and _artifacts, which is why this dedicated root exists.
+      source: grep -rn 'actionq-cas\|ACTIONQ_CAS' /projects/dev; ~/actionq/actionq/cas.py:1,17,29-50
+      verdict: confirmed
+  divergence: The raw scan's 'no git history' is not an abandonment signal - this was never a repository.
+  confidence: high
+- key: actionq-dispatcher
+  name: ActionQ dispatcher (tombstone)
+  repos:
+  - /projects/dev/actionq-dispatcher
+  role: A deliberate retirement tombstone - a 34-line Click CLI keeping the dispatcher-once script name alive so an
+    upgrade replaces stale shims with a deterministic nonzero failure.
+  status: retired
+  intention: Not a live component; its only job is to make removal of the ActionQ daemon execution plane fail loudly
+    rather than silently for legacy callers.
+  waking_condition: Delete the repo once no scheduled dispatcher-once invocation, service unit, cron entry or host
+    package list references it - i.e. once the consumer inventory in docs/runbook.md is empty and the package is uninstalled
+    everywhere.
+  supersession: Superseded by ActionQ 0.1.26, which removed the daemon/harness/worktree/standalone-server execution
+    plane; historical implementation survives at tag actionq-dispatcher-v0.1.2.
+  last_verified:
+    date: '2026-09-01'
+    observations:
+    - claim: The entire package is one command that deletes its arguments and unconditionally raises a ClickException;
+        only cli.py and __init__.py exist.
+      source: ~/actionq-dispatcher/actionq_dispatcher/cli.py:31-34; ls ~/actionq-dispatcher/actionq_dispatcher
+      verdict: confirmed
+    - claim: The retirement is the most recent commit with a version bump to 0.2.0, so this is the current intended
+        state.
+      source: git -C ~/actionq-dispatcher log -3 -> 510822a; ~/actionq-dispatcher/pyproject.toml:7
+      verdict: confirmed
+    - claim: Live bindings to it survive in the cluster - all three actors in both observer policies list actionq-dispatcher
+        in repo_ids alongside outctl.
+      source: ~/appservice/clusters/main/kubernetes/apps/vuoro-shared/app/work-resource-observers.yaml:9-11
+      verdict: confirmed
+  divergence: 'A live-SHIPPING tombstone, not dead code - the retirement is the feature. It is also the sharpest evidence
+    that the ledger contains false DONE records: work items closed for fan-out machinery that was never in this package.'
+  confidence: high
+- key: auditctl
+  name: auditctl
+  repos:
+  - /projects/dev/auditctl
+  role: Repo-local append-only provenance ledger - a CLI (add/list/render/rebuild) writing each event to a SQLite
+    index and a durable daily NDJSON shard, plus an optional PostgreSQL observation-ingest adapter.
+  status: keep-narrow
+  intention: Minimal durable provenance - the substrate making an accepted result reconstructible. Must stay narrow
+    and must partition fixture/experiment data from real workflow events at ingestion.
+  waking_condition: Move to active when BOTH hold. (1) A realm/stream_class partition (live vs fixture) is validated
+    in validate_event_object, persisted as a SQLite column and NDJSON field, and defaulted on in list/render - one
+    resolver-derived field in RESOLVED_CONTEXT_FIELDS (validation.py:62), populated in AuditContext.as_record() (paths.py:39)
+    from an env var so tests set it and publishers cannot forge it, with a _migration_4 in db.py and pass-through
+    at the two INSERTs (db.py:143,178). (2) EvidenceSet and Decision exist as code here.
+  supersession: Supersedes the ActionQ daemon's session.exit projection - TERMINAL_REASON_CODES is documented as an
+    ActionQ-named vocabulary that outlived the daemon and is now written by the SubagentStop hook as dispatch.exit.
+  last_verified:
+    date: '2026-09-01'
+    observations:
+    - claim: No fixture partition exists at ingestion. The write path is add_cmd -> validate_event_object -> insert_event
+        + append_event; grep for fixture|synthetic|sample|dogfood|is_test|experiment|partition returns zero partition-related
+        hits; add_cmd exposes no namespace/stream/fixture option; no test exercises partitioning.
+      source: grep -rniE over ~/auditctl/auditctl/*.py; ~/auditctl/auditctl/cli.py:60-130; ls ~/auditctl/tests/
+      verdict: confirmed
+      contradicts_record: true
+    - claim: record_class cannot carry the partition - validation raises unless it equals observation, the NDJSON
+        reader rejects anything else, and the Vuoro adapter schema pins it as a const.
+      source: ~/auditctl/auditctl/validation.py:352-353; ndjson.py:50-51; vuoro_adapter.py:81
+      verdict: confirmed
+    - claim: auditctl contains ZERO occurrences of EvidenceSet or a Decision class and has no schemas directory, despite
+        the newest vuoro commit settling it as their home.
+      source: grep -rn 'EvidenceSet\|evidence_set' ~/auditctl; find ~/auditctl -name '*.schema.json'; git -C ~/vuoro
+        log -1 -> 9886130 (2026-08-30, docs only)
+      verdict: confirmed
+      contradicts_record: true
+  divergence: 'The record''s hard precondition - partition fixtures at ingestion - is unmet and the store is already
+    contaminated. The contamination is unmeasurable by design: the only discriminator is a session-id shape someone
+    happened to choose, so the next fixture with a UUID is undetectable. A store that cannot tell test data from real
+    data does not make results reconstructible. Separately, the settlement naming it the home of EvidenceSet and Decision
+    is prose with no code.'
+  confidence: high
+- key: acceptance-lab
+  name: Acceptance Lab
+  repos:
+  - /projects/dev/acceptance-lab
+  role: Deterministic offline settlement evaluator - scores a CandidateOutput against a versioned Scenario using 13
+    pinned pure-function scorers across mechanism, quality, authority and economics, recording runs into a hash-chained
+    SQLite event store.
+  status: hold
+  intention: Deterministic settlement evaluation - turn an observed run into a defensible, reproducible verdict a
+    later reader can interpret.
+  waking_condition: A second real consumer needs all six conditions of the repo's own extraction gate - shared scenario
+    identity/version contract, shared run lifecycle, shared baseline promotion, remote or concurrent writes, common
+    projections, and an explicit arbitration rule for conflicting producers.
+  supersession: none.
+  last_verified:
+    date: '2026-09-01'
+    observations:
+    - claim: Determinism is structural - all 13 scorers are pure functions with no I/O, clock or model call and a
+        static registry; the only nondeterminism in a result is run_id and two timestamps.
+      source: ~/acceptance-lab/src/acceptance_lab/scoring.py:47-320,345-360
+      verdict: confirmed
+    - claim: There is no EvidenceSet type in the repo, so the one-generic-edge claim cannot be confirmed. Re-verified
+        2026-09-01 - the grep returns zero hits.
+      source: grep -rniE 'evidenceset|evidence_set' ~/acceptance-lab/src; adapters.py:56-220; retrieval.py
+      verdict: confirmed
+      contradicts_record: true
+  divergence: Two gaps shrink its claimed role - it consumes through one hardcoded adapter rather than a generic evidence
+    edge, and emits no Decision. Both absences are deliberate and documented.
+  confidence: high
+- key: hostproto-semantics-and-adapters
+  name: HostProto semantics + host adapters (core family)
+  repos:
+  - /projects/dev/hostproto-semantics
+  - /projects/dev/hostproto-dap-core
+  - /projects/dev/hostproto-dap-debugpy
+  - /projects/dev/hostproto-dap-delve
+  - /projects/dev/hostproto-mcp-playwright
+  role: A JSON-Schema vocabulary for host interaction (intent, receipt, observation, evidence-ref, deviation, recovery,
+    handles, precondition, capability-profile, target-ref, error) plus four MCP-server adapters speaking it against
+    real engines - one browser host and a shared DAP host with two thin engine bindings.
+  status: hold
+  intention: Candidate canonical ingress for host-interaction claims and effect receipts inside an EvidenceSet, under
+    a 4-6 week bounded proof with kill/narrow/freeze gates.
+  waking_condition: Promote-grade evidence is restored end to end - the lost test_real_traffic and test_binding_agnostic
+    suites are re-recorded via each adapter's scripts/record-session.mts, committed as fixtures, and replayed green
+    through a consumer reducer - AND a consumer outside these repos needs the envelope.
+  supersession: Supersedes /projects/dev/hostproto (archived on GitHub 2026-08-28).
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: A real effect-receipt schema exists - hostproto.receipt/v1 with independent attempted/accepted/executed/verified
+        booleans; 'verified' requires an observed effect, not a returning call.
+      source: ~/hostproto-semantics/schemas/receipt.schema.json; ~/hostproto-dap-core/src/host.ts:409-418
+      verdict: confirmed
+    - claim: The Delve mutation case that motivated read-back is captured by no fixture and no test - only the happy
+        path is asserted in all three suites, because the fake DAP engine always echoes the written value, leaving
+        the verified=false branch unexercised.
+      source: grep read_back over the three test dirs under ~/hostproto-dap-*; ~/hostproto-dap-core/test/fake-engine.ts:59
+      verdict: confirmed
+      contradicts_record: true
+  divergence: The record calls this a live bounded proof. The proof's own verdict (ADR-0014, promote) was reached
+    2026-08-28 and its load-bearing evidence no longer exists - the consumer package was found with every .py deleted
+    and its tests plus all recorded traffic lost (RECOVERY.md, 2026-08-29). Promotion rests on prose, not a runnable
+    test, so status is hold and any quoted promotion claim is unevidenced. Second divergence - the second ingress
+    lane died with outctl, so host-agnosticism is now much cheaper to satisfy than designed.
+  confidence: high
+- key: hostproto-consumer-vuoro-evidence
+  name: vuoro-evidence (the HostProto consumer and EvidenceSet reducer)
+  repos:
+  - /projects/dev/vuoro/packages/vuoro-evidence
+  role: The consumer the bounded proof turns on - a core reducer/model/decision path over generic claims plus a registered
+    HostProto ingress edge decoding receipts, errors, observations and session logs into EvidenceSet items.
+  status: hold
+  intention: Prove HostProto's promotion criterion structurally - zero checks on profile, adapter or host class in
+    the core reducer and decision path, with profile decoding only at registered ingress edges.
+  waking_condition: Ownership is settled IN CODE (auditctl was ruled the home of EvidenceSet and Decision on 2026-08-30
+    and has none), AND the two lost real-traffic suites are re-recorded and committed.
+  supersession: Being superseded on ownership by vuoro 9886130. It superseded nothing itself; its command-capture
+    lane died with outctl in 9986916.
+  last_verified:
+    date: '2026-09-01'
+    observations:
+    - claim: The reducer is 114 lines and host-agnostic by construction, mechanically enforced - a boundary test greps
+        core/ for 21 forbidden terms (hostproto, mcp, a2a, debugpy, delve, chromium, playwright, receipt, surface,
+        adapter, profile and more) and AST-checks that core never imports ingress.
+      source: ~/vuoro/packages/vuoro-evidence/core/reducer.py; .../tests/test_boundary.py
+      verdict: confirmed
+    - claim: The three promotion observations exist only as prose recorded against named commits - the fixtures and
+        tests they cite are absent from the tree, so the promotion verdict is unevidenced at the artifact.
+      source: ~/hostproto-semantics/docs/EVIDENCESET_VALIDATION.md Step 3 and Step 4 records; find over ~/vuoro/packages/vuoro-evidence
+      verdict: confirmed
+      contradicts_record: true
+    - claim: Still outside CI as of 2026-09-01 - packages/vuoro-evidence appears in neither [tool.uv.workspace] members
+        nor [tool.pytest.ini_options] testpaths.
+      source: ~/vuoro/pyproject.toml:15-22,24-33
+      verdict: confirmed
+  divergence: The record treats HostProto as under a live proof with this package as the oracle. The proof returned
+    promote on 2026-08-28 and the oracle was then destroyed and only partly rebuilt on 2026-08-29 - what survives
+    is the structural criterion, not the real-traffic criterion. The object being reduced was assigned to auditctl
+    on 2026-08-30, after this landed in vuoro, so the settlement spine sits in the repo just ruled not to own it,
+    unguarded by any pipeline.
+  confidence: high
+- key: hostproto-a2a-worker
+  name: hostproto-a2a-worker
+  repos:
+  - /projects/dev/hostproto-a2a-worker
+  role: An HTTP/JSON-RPC A2A 1.0 agent (Express, @a2a-js/sdk 1.1.0, agent card, task store, healthz) wrapping the
+    Playwright HostProto adapter over MCP and projecting runs into A2A tasks, receipts into status updates and evidence
+    into artifacts.
+  status: hold
+  intention: The step-4 carrier-agnosticism probe - show the consumer's session loader needs no change when HostProto
+    records arrive over a different carrier.
+  waking_condition: A named consumer actually needs HostProto delivered over A2A, AND the carrier-agnosticism claim
+    is re-established by a committed test (test_binding_agnostic, currently lost) replaying a re-recorded A2A run
+    through the unchanged session loader.
+  supersession: none.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: A real A2A 1.0 implementation and a carrier over the SAME semantics, not a new protocol - HostProto objects
+        ride verbatim in DataParts, no schema changed for it, and the agent card pins the semantics commit and bundle
+        digests.
+      source: ~/hostproto-a2a-worker/README.md; hostproto-semantics.lock.json; src/a2a.ts, executor.ts, card.ts, domain.ts
+      verdict: confirmed
+    - claim: It has a committed recorder and green CI, but the recorded run is not retained here and the consumer-side
+        test that gave it its purpose is gone.
+      source: ~/hostproto-a2a-worker/scripts/record-session.mts (97a7b7c); gh run list -> success
+      verdict: confirmed
+  divergence: Flagged as possible transport creep - it is a long-running daemon, but it did not expand the semantics,
+    so the creep is in deployment shape rather than vocabulary.
+  confidence: high
+- key: hostproto-rust-spec-repo
+  name: hostproto (original Rust workspace + frozen spec package)
+  repos:
+  - /projects/dev/hostproto
+  role: An engine-neutral browser-host contract as a frozen prose/YAML spec package (~1600 lines) plus a five-crate
+    Cargo workspace skeleton with declared crate boundaries and no implementation.
+  status: retired
+  intention: Was to be the executable engine-neutral browser host, with WebKitGTK/Servo neutrality as a compile-time
+    property and replay as a Wave 1 release gate.
+  waking_condition: n/a - the GitHub repo is archived. Reviving requires un-archiving AND an explicit owner ruling
+    against the standing no-hostproto-semantics-merge non-goal.
+  supersession: Superseded by /projects/dev/hostproto-semantics, canonical per ADR-0013; the vuoro non-goals forbid
+    merging semantics back into it.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: Scaffolding only - 112 lines across 14 .rs files, all module doc-comments; the reducer module is 8 lines
+        of prose ending Unimplemented.
+      source: wc -l ~/hostproto/crates/**/*.rs; crates/hostproto-core/src/state/mod.rs:1-8; Cargo.toml:1-25
+      verdict: confirmed
+    - claim: The upstream repository is archived and private; last code commit 2026-08-22, the only later commit an
+        agentops skills re-sync.
+      source: gh repo view -> isArchived true, isPrivate true; git -C ~/hostproto log
+      verdict: confirmed
+  divergence: Not covered by the record's HostProto framing at all - the record describes a live proof while this
+    is the archived predecessor whose local checkout still advertises an active Wave 1 plan and live sprintctl items.
+  confidence: high
+- key: browser-workbench
+  name: browser-workbench
+  repos:
+  - /projects/dev/browser-workbench
+  role: A Linux-first typed browser observation/action runner - a Python control plane, a deterministic mock backend,
+    a real WebKitGTK 2.52.6 native worker in Rust, a pinned Playwright/WebKit oracle lane, a frozen 12x3 corpus, schema'd
+    evidence manifests and differential gates.
+  status: active
+  intention: An independently chartered browser-diagnosis tool. It is HostProto's SOURCE, not its consumer - the decision
+    record's framing is inverted and the fixture disposition is off the table.
+  waking_condition: n/a - active.
+  supersession: Supersedes hostproto 0.1.0's spec-only 16-scenario denominator, vendored byte-preserved as a rollback
+    point.
+  last_verified:
+    date: '2026-09-01'
+    observations:
+    - claim: There is no HostProto execution path in this repo. Re-verified 2026-09-01 - zero first-party lines import,
+        call or depend on any HostProto repo or protocol.
+      source: grep -rniE hostproto over ~/browser-workbench/{src,scripts,native,oracle,chrome,tests} -> only tests/test_corpus.py:26-27
+        and a manifest constant
+      verdict: confirmed
+      contradicts_record: true
+    - claim: Whether the owner uses these workflows outside the release gate cannot be determined - no usage logs
+        and no run history outside evidence/. This is a gap in the checking, not evidence of disuse.
+      source: git -C ~/browser-workbench log shows 8 commits, all authoring slices
+      verdict: could-not-check
+  divergence: The record's premise is INVERTED. browser-workbench is not HostProto's consumer and is not a HostProto
+    fixture - it is HostProto's source, with zero dependency the other way, and hostproto-semantics/docs/THESIS.md
+    cites its executed runs as prior evidence. Its charter is real and grounded in code and executed evidence, naming
+    two workflows plus a third (resumable browser-state diagnosis, WB-S009/S010, both passing on the real engine).
+    Caveat - every workflow has run only against its own pinned loopback fixture site.
+  confidence: high
+- key: bindery-core
+  name: Bindery Core
+  repos:
+  - /projects/dev/bindery-core
+  role: Two unrelated subsystems merged into one Go module on 2026-08-26 - a Kubernetes operator (9 CRDs, 6 controllers)
+    for a capability-driven game platform, and the external-runtime control plane hosting identity, session, placement,
+    execution, enrollment, capture and evidence reconciliation.
+  status: hold
+  status_change_note: Demoted from `promote` in v1. `promote` requires evidence supporting the raise; this row's own
+    observations supply the opposite - the named gate is pending and never run, the Decision leg is 12-for-12 negative,
+    two golden-path links are absent, and the last commit is 2026-08-26. That is `hold`. The v1 status carried the
+    decision record's aspiration rather than the observed state.
+  intention: The external-runtime half is the EXTERNAL-RUNTIME experiment and the intended primary real consumer for
+    proving the Vuoro golden path end to end. Not to become a multiplayer product.
+  waking_condition: ERH-006 in docs/roadmap/post-ra2-hardening.yaml runs. It is status pending with enabler_landed
+    2026-08-26 and the file's own ordering_rule states 'what remains for ERH-006 is a run, not a build'.
+  supersession: The vendored adapters/bindery-ra2-adapter tree is a stale 2026-08-23 snapshot missing nine source
+    files.
+  last_verified:
+    date: '2026-09-01'
+    observations:
+    - claim: A complete accept/reject/merge dispatch cycle was really executed - 42 audit rows from 2026-08-23 to
+        2026-08-26 covering reviewed, rejected, re-run, accepted, merged and reservation released across ERM-003/004/005,
+        ERM-101..105 and ERM-WIDE, backed by 21 receipt and review-evidence files.
+      source: sqlite3 ~/bindery-core/.auditctl/auditctl.db; ~/bindery-core/docs/orchestration/erm-204-fixture-placement-r2.receipt.json
+      verdict: confirmed
+    - claim: All 12 authority-commands queued to the served Vuoro sprintctl authority were terminally REJECTED, so
+        nothing reached the served authority; knowledge publication was blocked twice, so reusable conclusions never
+        left the repo. Re-verified 2026-09-01 - the directory holds exactly 12 files and all 12 carry outcome rejected.
+      source: ~/bindery-core/.sprintctl/authority-command-outbox.db; ls .sprintctl/authority-terminal-decisions/ |
+        wc -l -> 12
+      verdict: confirmed
+    - claim: The named gate has never run and the repo has been dormant since it landed - ERH-006 is status pending
+        with enabler_landed 2026-08-26, and HEAD is aaae976 dated 2026-08-26. No observation in this row evidences
+        a raise above the current role.
+      source: ~/bindery-core/docs/roadmap/post-ra2-hardening.yaml (ERH-006 status pending; ordering_rule 'what remains
+        for ERH-006 is a run, not a build')
+      verdict: confirmed
+      contradicts_record: true
+  divergence: Three divergences. (1) The accept/reject/merge cycle is real but LOCAL - every served-authority command
+    was rejected and knowledge intake blocked, so the golden path's Decision leg is 100% negative. (2) The repo carries
+    a Kubernetes game-hosting operator orthogonal to the experiment, scoping matchmaking, chat and player inventory
+    - the strongest product-drift signal in the portfolio, though the drift is in stated ambition rather than shipped
+    code. (3) Two golden-path links are missing - no fresh-instance bootstrap and no session resume.
+  confidence: high
+- key: bindery-ra2-adapter
+  name: Bindery RA2/YR Adapter
+  repos:
+  - /projects/dev/bindery-ra2-adapter
+  - /projects/dev/bindery-core/adapters/bindery-ra2-adapter
+  role: A GPL-3.0 .NET 8 Windows adapter, the client-side half of the external-runtime experiment for Red Alert 2
+    / Yuri's Revenge - talks to the bindery-core control plane, renders spawn.ini, drives Syringe/yrpp-spawner as
+    an ISpawnerBoundary without embedding proprietary game code.
+  status: hold
+  intention: The concrete external runtime whose 2026-08-25 two-client run is the single empirical demonstration of
+    the external-runtime thesis, and the runtime ERH-006 must be re-run through to convert narrative provenance into
+    referentially complete evidence.
+  waking_condition: A real Windows appliance environment becomes available and ERH-006 runs - two disposable clones
+    of the ra2-yr-cncnet-v0.2 golden appliance complete a match through the hardened control plane, producing an evidence
+    set that resolves after a broker restart with counts derived by the broker rather than reported by the adapter.
+  supersession: Supersedes its own stale vendored copy inside bindery-core.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: The live two-client run really happened - three consecutive commits on 2026-08-25 wire cloned guests
+        into a real match, correct the harness from log-string verdicts to recorded observations, and add AI houses,
+        spectators and clean exit with a preflight that fails when the two clients report different telemetry counts.
+      source: git -C ~/bindery-ra2-adapter log -3 (3cf7b00, 609745b, a528b15)
+      verdict: confirmed
+    - claim: The live qualification gate is formally NOT passed - golden appliance Blocked, two distinct Windows clients
+        Not run, control-plane session Blocked, cncnet-private placement Blocked, tunnel traffic Not run, telemetry
+        Not run, Kctl intake Open.
+      source: ~/bindery-ra2-adapter/docs/live-gate-attempt-2026-08-24.md Gate result table
+      verdict: confirmed
+  divergence: 'Aligned with the external-runtime framing - no multiplayer-product drift at all. Two divergences from
+    the implied state: dormant since 2026-08-25 while bindery-core moved on to two Linux runtimes, so the primary-consumer
+    role has drifted away from RA2; and it sits entirely outside the Vuoro dispatch machinery, so nothing about the
+    golden path is exercised here.'
+  confidence: high
+- key: outctl
+  name: outctl
+  repos:
+  - /projects/dev/outctl
+  role: Bounded command-output capture tool, formerly a supplemental Vuoro component, now a frozen discovery artifact
+    and explicitly not a project member.
+  status: retired
+  intention: Retired from active Vuoro scope on 2026-08-16; the decision record demands removal of stale bindings,
+    ingress lanes and active-plan references.
+  waking_condition: n/a - retired. Vuoro's own ingress test records that a second evidence lane must come back only
+    if a NEW non-outctl carrier is chosen; that is a condition on a different lane, not on this repo.
+  residue_owner: 'The cluster-side residue is owned by the `appservice` row, not by this one: the gatus kustomization
+    entry, outctl-pilot-rbac.yaml, clusters/.kube/outctl-pilot-readonly.kubeconfig and the outctl repo_ids in both
+    work-resource-observers.yaml files all live in /projects/dev/appservice. An agent acting on this row must go there.'
+  supersession: Superseded within Vuoro by native/host content-addressed evidence handles (/projects/dev/cluster-alignment-mvp/ALIGNMENT.md).
+  last_verified:
+    date: '2026-09-01'
+    observations:
+    - claim: The Vuoro kernel itself is clean - outctl is an explicitly FORBIDDEN token in the core boundary test
+        and no vuoro package source imports it.
+      source: ~/vuoro/packages/vuoro-evidence/tests/test_boundary.py:18; grep over ~/vuoro/packages/**/*.py
+      verdict: confirmed
+    - claim: Retirement is enforced nowhere else. Still live - a dispatch manifest with enabled action classes, a
+        second manifest in the starter repo, a cluster RBAC resource included in the gatus kustomization, a pilot
+        read-only kubeconfig on disk, outctl in the repo_ids of all three work-resource-observer actors in BOTH vuoro-dev
+        and vuoro-shared, an Outctl work item in the control-plane plan, a member repo_id plus a materialized worktree
+        in the dispatch-ready folder, an entire vuoro-outctl-ready instance, and a connector in vuoro-cloud.
+      source: ~/appservice/clusters/main/kubernetes/apps/gatus/app/kustomization.yaml:5 and .../outctl-pilot-rbac.yaml
+        present
+      verdict: confirmed
+      contradicts_record: true
+  divergence: Retirement is DECLARED in prose and ENFORCED in the Vuoro kernel only. Twelve live bindings survive
+    across four repos and the cluster, including a credential and an RBAC object. The cleanest instance of declared-does-not-imply-applied,
+    and a live trap - vuoro-cloud's anchors doc points at src/outctl/ paths that resolve only against ~/outctl, not
+    the starter. v1 scheduled this remediation against a repo it never enumerated; see the appservice row.
+  confidence: high
+- key: vuoro-bounded-output-starter
+  name: vuoro-bounded-output-starter (outctl Phase 1 scaffold)
+  repos:
+  - /projects/dev/vuoro-bounded-output-starter
+  role: A non-versioned handoff scaffold for outctl with five JSON schemas, a Phase 1 implementation brief and a stub
+    CLI whose only subcommand is pilot.
+  status: retired
+  intention: To seed the smallest trustworthy local implementation of bounded, recoverable command output. That intention
+    moved to the real repo.
+  waking_condition: n/a - the work it seeded is live elsewhere. It would wake only if /projects/dev/outctl were abandoned
+    and someone restarted from this brief. No reason to keep it in the register except as a directory to delete.
+  supersession: Superseded by /projects/dev/outctl (HEAD 42ecd95), with 20 source modules and a strict superset of
+    the schema set - the starter's five schemas all reappear there alongside ten more.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: No git history - .git exists but is a completely empty directory, so this is a copied snapshot, never
+        a clone or an init'd repo.
+      source: ls -la ~/vuoro-bounded-output-starter/.git -> only . and ..; git log -> fatal, not a git repository
+      verdict: confirmed
+    - claim: The CLI registers exactly one subcommand; src/outctl holds only cli.py, pilot.py, __init__.py, py.typed
+        - the capture/ package and retrieval.py the vuoro-cloud anchors doc cites are absent here.
+      source: grep add_parser ~/vuoro-bounded-output-starter/src/outctl/cli.py -> single hit
+      verdict: confirmed
+  divergence: Read against this starter, vuoro-cloud's anchors doc is stale; read against /projects/dev/outctl it
+    is correct.
+  confidence: high
+- key: scribectl
+  name: scribectl
+  repos:
+  - /projects/dev/scribectl
+  role: Contract runner for Obsidian-vault writing projects - assembles frozen context packs, derives project state,
+    keeps ledgers; consumes Vuoro-served execution state via sprintctl rather than embedding Vuoro.
+  status: active
+  intention: Genuine independent consumer - an unrelated problem domain that happens to run on Vuoro-served execution
+    state.
+  waking_condition: n/a - active.
+  supersession: none.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: No Python source imports vuoro - the coupling is a served-profile env var, so Vuoro is a substitutable
+        authority behind sprintctl.
+      source: grep -rn 'import vuoro\|from vuoro' --include=*.py ~/scribectl; ~/scribectl/.envrc:1,4 SPRINTCTL_VUORO_PROFILE
+      verdict: confirmed
+    - claim: The domain is its own (vault, contextpack, timeline, essay, gamedev, mining-pack modules and matching
+        tests) and active - last commit 2026-08-29 is domain work.
+      source: ls ~/scribectl/scribectl and ~/scribectl/tests; git log -1 -> 07ae91b
+      verdict: confirmed
+  divergence: Aligned; consumption is not circular.
+  confidence: high
+- key: homelab-analytics
+  name: homelab-analytics
+  repos:
+  - /projects/dev/homelab-analytics
+  role: Self-hosted household operating platform (bronze/silver/gold data boundaries, canonical facts and dimensions,
+    /reports publication contracts) consuming Vuoro-served execution state via sprintctl at the environment level.
+  status: active
+  intention: Genuine independent consumer - the strongest non-circular consumer in the portfolio.
+  waking_condition: n/a - active.
+  supersession: none.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: No Python source imports vuoro; only four files mention Vuoro at all and all four are environment/profile
+        wiring or an audit log.
+      source: grep -rn --include=*.py over ~/homelab-analytics
+      verdict: confirmed
+    - claim: Domain mass is ~100x its Vuoro coupling - 3951 Python files - and it is active (2026-08-29) and a dispatch
+        member in its own right.
+      source: find ~/homelab-analytics -name '*.py' | wc -l; git log -1 -> eb56331
+      verdict: confirmed
+  divergence: Aligned; consumption is emphatically not circular.
+  confidence: high
+- key: cred-broker
+  name: cred-broker
+  repos:
+  - /projects/dev/cred-broker
+  role: Authorization broker - turns authenticated subject/session/host context plus a registered canonical repository
+    into narrowly scoped short-lived provider credentials.
+  status: active
+  intention: Replaceable provider with its own authority boundary - Vuoro may compose its API, but cred-broker keeps
+    ownership of authorization, provider translation, issuance and receipts.
+  waking_condition: n/a - active.
+  supersession: none.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: The authority boundary holds in BOTH directions - no Vuoro package imports cred-broker, and no cred-broker
+        source imports vuoro.
+      source: grep -rn -il 'cred.broker\|cred_broker' ~/vuoro/packages; grep -rn 'import vuoro' ~/cred-broker/src/
+      verdict: confirmed
+    - claim: It owns a real, independently exercised authorization surface (policy, sessions, signing, receipts, provider
+        adapters, registry, enrollment) with matching tests, and is active - last commit 2026-08-30, among the most
+        recent in the portfolio.
+      source: ls ~/cred-broker/src and ~/cred-broker/tests; git log -1 -> 9b8ade8
+      verdict: confirmed
+  divergence: Aligned, and the boundary is stronger than declared - the separation holds both ways.
+  confidence: high
+- key: cred-broker-public
+  name: cred-broker-public
+  repos:
+  - /projects/dev/cred-broker-public
+  role: Public-facing extraction of cred-broker (own Dockerfile, SECURITY.md, CONTRIBUTING.md, LICENSE) presenting
+    the same capability-request API as an independent authority component.
+  status: hold
+  intention: Publishable face of the replaceable cred-broker provider, keeping the authority boundary legible to outside
+    readers. Dormant in practice.
+  waking_condition: Not written down anywhere. Checkable substitute until one is written - a decision to publish or
+    open-source the broker.
+  supersession: Mirrors /projects/dev/cred-broker, which is the live one; this copy is ~19 days behind.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: Last commit 2026-08-11 versus 2026-08-30 for cred-broker - a ~19 day drift. No dispatch manifest, so
+        not an active dispatch member.
+      source: git -C ~/cred-broker-public log -1 -> 9bd9f54; ls ~/*/*.dispatch.json
+      verdict: confirmed
+    - claim: Whether the drift is intentional curation or neglect could not be determined - it needs a file-level
+        diff against cred-broker, which was not run.
+      source: not run
+      verdict: could-not-check
+  divergence: Dormant and drifting relative to its private twin, with no waking condition and no divergence policy
+    recorded. The weakest-documented dormancy in the portfolio.
+  confidence: medium
+- key: kctl
+  name: kctl
+  repos:
+  - /projects/dev/kctl
+  role: Local-first read-only reader and review CLI over sprintctl event streams.
+  status: active
+  intention: Replaceable provider of the knowledge/v1 domain, composed into Vuoro behind a uniform construction protocol
+    rather than embedded in the kernel.
+  waking_condition: n/a - active.
+  supersession: none.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: The boundary is mechanically arranged - Vuoro reaches kctl only through lazy function-local imports inside
+        the composition path, and kctl is plugged in as one interchangeable adapter behind a uniform protocol.
+      source: ~/vuoro/packages/vuoro-service/vuoro_service/composition.py:1085-1086
+      verdict: confirmed
+    - claim: The coupling is genuinely bidirectional at the seam - kctl/vuoro.py takes a module-level dependency on
+        vuoro_adapter_kit, by design, but it is not zero.
+      source: ~/kctl/kctl/vuoro.py:1-6,14-18
+      verdict: confirmed
+  divergence: 'Aligned - the boundary is real. One nuance: kctl''s declared render target (/projects/dev/knowledge-base)
+    has had no commit in nearly six weeks, so the publish path may not be landing.'
+  confidence: high
+- key: knowledge-base
+  name: knowledge-base
+  repos:
+  - /projects/dev/knowledge-base
+  role: A committed prose knowledge store (concepts/, domains/, generated/, knowledge-map.md, candidates.md, contact-log.md)
+    - the publication target kctl renders into, not a program.
+  status: hold
+  intention: Durable output surface for reviewed knowledge; written to, not developed.
+  waking_condition: Not written down. Checkable substitute - it should receive a commit whenever kctl publishes.
+  supersession: none.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: 'Last commit 2026-07-22 ''docs: add repository agent guidance'', and datacluster carries an identically-titled
+        commit on the same date, so it was a portfolio sweep, not real activity.'
+      source: git -C ~/knowledge-base log -1 -> 01c49dc; git -C ~/datacluster log -1 -> 67ac65c
+      verdict: confirmed
+    - claim: Whether this repo is kctl's configured publish destination was not traced into kctl/publish.py or its
+        config. This is a gap in the checking.
+      source: not traced
+      verdict: could-not-check
+  divergence: The generated/ directory implies an automated publication path that has produced no commit in six weeks.
+    Held rather than frozen because the failure may be in the producer.
+  confidence: medium
+- key: flowlab
+  name: flowlab
+  repos:
+  - /projects/dev/flowlab
+  role: A deliberately disposable single-day lab that read existing auditctl NDJSON to measure where agent workflow
+    time goes, ran one pilot, and terminated in adopt/kill decisions.
+  status: frozen
+  intention: Bounded experiment that has already produced its verdict; explicitly not a production coordinator and
+    explicitly removable.
+  waking_condition: Substituted by this register, because the repo records none. ADR-0001 deferred capacity interventions
+    because the corpus was eight sanitized events with no resolved blocker interval and only two measurable orientation
+    sessions. Checkable form adopted here - re-run only when the auditctl corpus holds at least one resolved-blocker
+    interval and more than two measurable orientation sessions IN THE LIVE PARTITION, which depends on the auditctl
+    fixture partition existing.
+  supersession: ADR-0001 splits ownership rather than superseding - Acceptance Lab owns scenario-specific trace-grounded
+    candidate scoring, FlowLab owns aggregate flow metrics.
+  last_verified:
+    date: '2026-09-01'
+    observations:
+    - claim: Closed, not abandoned - ADR-0001 'retain the evaluators; defer capacity interventions', accepted for
+        the lab, no production mutation authorized, 2026-08-20; last activity is the campaign's own closing merge.
+      source: ~/flowlab/decisions/ADR-0001-flow-capacity.md; git -C ~/flowlab log -1 -> 0189b70
+      verdict: confirmed
+    - claim: The repo records no explicit, checkable waking condition.
+      source: grep -rn -i 'dormant\|waking\|wake\|revive' ~/flowlab/*.md
+      verdict: confirmed
+      contradicts_record: true
+  divergence: Confirmed dormant and closed. The waking condition is a deferral, not a trigger, and the register substitutes
+    one above. Hidden dependency worth recording - FlowLab's input corpus is the same auditctl store whose fixture
+    contamination is unmeasurable, so re-running it before the partition exists would measure fixtures.
+  confidence: high
+- key: cluster-alignment-mvp
+  name: cluster-alignment-mvp
+  repos:
+  - /projects/dev/cluster-alignment-mvp
+  role: A read-only executable proof for bounded native-runtime cluster investigation and stateless alignment; the
+    planner emits CONTINUE, REFRAME or STOP only.
+  status: frozen
+  intention: Host-persistent experiment package held until the operator either gives it a canonical Git authority
+    or explicitly retires it.
+  waking_condition: Written down explicitly and checkably in HANDOFF.json - retain on WorkstationLinux until the operator
+    selects a canonical Git authority or explicitly retires the experiment.
+  supersession: Its 2026-08-20 ALIGNMENT.md front-matter already re-mapped it to the future state - native products
+    execute, ActionQ only federates external execution/evidence references, Sprintctl reservations are advisory, evidence
+    uses content-addressed native/host handles.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: Explicit machine-readable waking condition and pending state, plus a pinned basis (sprintctl 75fd4a7,
+        agentops 6b41e6f, actionq 8d42934, vuoro 9dc7efa, cred-broker a8ad3e0) so reviving it is a dated, checkable
+        operation.
+      source: ~/cluster-alignment-mvp/HANDOFF.json retention, durable_refs.status, basis.repo_commits
+      verdict: confirmed
+    - claim: Independently corroborates outctl retirement - 'no Outctl dependency' is a declared package constraint,
+        with content-addressed integrity over 25 payload files.
+      source: ~/cluster-alignment-mvp/manifest.json:11 and inventory
+      verdict: confirmed
+  divergence: Alongside takeover-20260820, the best-documented dormancy in the portfolio - and the only repo whose
+    waking condition is machine-readable and owner-actionable as written.
+  confidence: high
+- key: local-inference
+  name: local-inference
+  repos:
+  - /projects/dev/local-inference
+  role: One stable OpenAI-compatible inference endpoint at 127.0.0.1:8020/v1 on an RTX 3090 workstation, with swappable
+    engines below it and named profiles above it.
+  status: active
+  intention: Replaceable provider to Vuoro - a substitutable model runtime behind a stable endpoint, with its execution
+    boundary documented separately.
+  waking_condition: n/a - active.
+  supersession: Supersedes the prior vllm-devstral.service and vllm-writer.service systemd user units.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: Provider shape is explicit (one endpoint, swappable engines, named profiles).
+      source: ~/local-inference/README.md; docs/10-execution-boundary.md; docs/00-adoption-decision.md
+      verdict: confirmed
+    - claim: Active, last commit 2026-08-25 making the manifest an actual dispatch manifest.
+      source: git -C ~/local-inference log -1 -> 4e6dfff
+      verdict: confirmed
+    - claim: No live probe of the 127.0.0.1:8020/v1 endpoint was run, so 'the endpoint is up' is unestablished.
+      source: not run
+      verdict: could-not-check
+  divergence: Aligned - its swappable-engine design is exactly the replaceable-provider shape the record wants. Confidence
+    is medium only because no live probe of the endpoint was run.
+  confidence: medium
+- key: render-fabric
+  name: render-fabric
+  repos:
+  - /projects/dev/render-fabric
+  role: A local GO-FAKE proof for bounded batch execution - typed requests, SQLite broker, finite pull leases, immutable
+    attempts and receipts, content-addressed local artifact store, deterministic fake worker, renderctl CLI.
+  status: hold
+  intention: Bounded proof of a batch-execution provider shape, deliberately carrying no real execution authority.
+  waking_condition: Not written down.
+  supersession: none.
+  last_verified:
+    date: '2026-09-01'
+    observations:
+    - claim: Explicitly a fake/proof with the excluded authorities enumerated, but with a real runnable surface (init/submit/worker
+        documented).
+      source: ~/render-fabric/README.md
+      verdict: confirmed
+    - claim: Dormant since 2026-08-09 - the oldest repo in the active cluster. No dispatch manifest and no reference
+        to Vuoro anywhere.
+      source: git -C ~/render-fabric log -1 -> f512d8b; ls ~/*/*.dispatch.json; grep -ril vuoro ~/render-fabric
+      verdict: confirmed
+    - claim: It carries the portfolio's only surviving 'metacoordinator' reference outside this register - docs/cross-repo-backlog.md
+        line 5 opens 'This is the metacoordinator view of work spanning `render-fabric` and the ...'.
+      source: grep -in 'metaswarm\|meta-swarm\|meta_coordinator\|MetaCoordinator' ~/render-fabric/docs/cross-repo-backlog.md
+        -> one hit at line 5
+      verdict: confirmed
+      contradicts_record: true
+  divergence: Three weeks stale with no recorded waking condition.
+  confidence: medium
+- key: frontier-weave
+  name: frontier-weave
+  repos:
+  - /projects/dev/frontier-weave
+  role: A co-op ecological settlement adventure game for two players - a game design and production repo.
+  status: active
+  intention: Unrelated creative product consuming the shared dispatch toolchain; not part of the Vuoro capability
+    surface.
+  waking_condition: n/a - active.
+  supersession: none.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: Domain is a game, not infrastructure; active (2026-08-26, CI work); consumes the toolchain via a dispatch
+        manifest and an env-level Vuoro profile only.
+      source: ~/frontier-weave/README.md; git log -1 -> aea3595; frontier-weave.dispatch.json; grep -ril vuoro ->
+        only .envrc
+      verdict: confirmed
+  divergence: Aligned - independent consumer, non-circular by construction.
+  confidence: high
+- key: aligned-equity
+  name: aligned-equity
+  repos:
+  - /projects/dev/aligned-equity
+  role: Finland-first evidence and lens research platform for public-company alignment analysis - a standalone Python/data
+    project with an optional, contract-validated boundary to homelab-analytics.
+  status: active
+  intention: Unrelated domain product and independent consumer.
+  waking_condition: n/a - active.
+  supersession: none.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: Boundary is explicit and contract-validated rather than asserted; early-phase but active (2026-08-29)
+        and a registered dispatch member; Vuoro coupling is env-level only.
+      source: ~/aligned-equity/README.md; git log -1 -> 5895e74; aligned-equity.dispatch.json; grep -ril vuoro ->
+        only .envrc
+      verdict: confirmed
+  divergence: Aligned - and notable as the one repo stating its cross-repo boundary as a validated contract rather
+    than prose. That pattern is the one worth generalizing.
+  confidence: high
+- key: datacluster
+  name: datacluster
+  repos:
+  - /projects/dev/datacluster
+  role: Cost-optimized Apache Spark platform on Hetzner Cloud (Talos, Kubernetes, Terraform, Cilium, FluxCD, Spark
+    Operator) - infrastructure, unrelated to Vuoro.
+  status: hold
+  intention: Unrelated infrastructure project; the private instance from which datacluster-template was sanitized.
+    Dormant.
+  waking_condition: n/a as a portfolio capability.
+  supersession: Superseded in maintenance terms by datacluster-template, 5+ weeks newer and still receiving portfolio
+    contract updates.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: Dormant - last commit 2026-07-22 and a portfolio-sweep commit rather than project work. No dispatch manifest,
+        no Vuoro reference.
+      source: git -C ~/datacluster log -1 -> 67ac65c; ls ~/*/*.dispatch.json; grep -ril vuoro ~/datacluster
+      verdict: confirmed
+  divergence: Dormant while its own sanitized template continues to be maintained.
+  confidence: high
+- key: datacluster-template
+  name: datacluster-template
+  repos:
+  - /projects/dev/datacluster-template
+  role: Public sanitized template fork of datacluster (secrets stripped, placeholders substituted) for deploying one's
+    own Spark-on-Hetzner cluster.
+  status: active
+  intention: Template - unrelated to the Vuoro capability surface, kept current with the portfolio's shared forge
+    and gating contract.
+  waking_condition: n/a - active.
+  supersession: Sanitized derivative of /projects/dev/datacluster; it now outlives its source in maintenance.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: Active and tracking the shared contract in lockstep with homelab-gitops-template - identical commit title
+        on the same date - and its gating stance matches the portfolio default that absence of a declaration means
+        routine.
+      source: git -C ~/datacluster-template log -1 -> 1d00436 2026-08-29
+      verdict: confirmed
+  divergence: Aligned. Maintained on the portfolio-wide contract cadence rather than by domain activity - active here
+    means the contract sweep reaches it, not that anyone is using it.
+  confidence: high
+- key: homelab-gitops-template
+  name: homelab-gitops-template
+  repos:
+  - /projects/dev/homelab-gitops-template
+  role: Lean GitOps starter and reference template for a Talos-based Kubernetes homelab managed by Flux and SOPS/age;
+    meant to be copied, renamed and extended.
+  status: active
+  intention: Template - unrelated to Vuoro's capability surface, kept current with the shared forge and gating contract.
+  waking_condition: n/a - active.
+  supersession: none.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: Active on the same shared-contract commit as datacluster-template.
+      source: git -C ~/homelab-gitops-template log -1 -> f03c886; homelab-gitops-template.dispatch.json
+      verdict: confirmed
+  divergence: Aligned. The only template in this cluster carrying a dispatch manifest. Note it is a TEMPLATE for a
+    homelab GitOps repo and is not the portfolio's live cluster repo - that is appservice, which has its own row.
+  confidence: high
+- key: beads-comparison
+  name: Beads / clean-room substrate comparison
+  repos:
+  - /projects/dev/agentops
+  - /projects/dev/vuoro
+  role: Not a repo or a tool - a completed-then-paused clean-room evaluation of external work-tracking substrates
+    (Beads, Gas Town, Restate, td, Windmill, Temporal) as candidate replacements for sprintctl's claim authority.
+  status: hold
+  intention: Answer which external substrate leaves the smallest, cleanest, most stable residual Vuoro-specific core.
+    The migration-safety gate is closed.
+  waking_condition: Two checkable conditions from the readout. (1) A source-level adaptation/fork analysis of Beads+Restate
+    across adapter, fork and replacement-module variants, measuring residual ownership cost - none has been run.
+  supersession: Nothing is superseded.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: The Beads lanes were genuinely EXECUTED against pinned upstream source, not desk-reviewed - lane 1 pins
+        beads d7b9f4fc and gas_town 649b832b and records the actual go test command and its result.
+      source: ~/agentops/docs/assessments/vuoro-clean-room-comparison/runs/2026-07-23-lane-1-beads-gastown-r2/manifest.yaml
+        and evidence/r2-litmus.md
+      verdict: confirmed
+      contradicts_record: true
+    - claim: BeadHub has ZERO occurrences anywhere under /projects/dev; no bd or beads binary is on PATH and no .beads
+        directory exists. The paired names in the actual work are Beads+Gas Town and Beads+Restate.
+      source: grep -rli beadhub /projects/dev; find /projects/dev -name '.beads'; which bd beads
+      verdict: confirmed
+      contradicts_record: true
+  divergence: CONTRADICTS any framing of Beads as purely prospective. A substantial, evidence-backed comparison is
+    already on disk, executed 2026-07-23/24 with real test runs against pinned upstream source.
+  confidence: high
+- key: meta-layer
+  name: Meta-layer / metaswarm / meta-coordinator
+  repos:
+  - /projects/dev/_orchestration
+  - /projects/dev/actionq-dispatcher
+  - /projects/dev/agentops
+  - /projects/dev/vuoro
+  - /projects/dev/_projects/takeover-20260820
+  - /projects/dev/render-fabric
+  role: A multi-agent coordination layer in which one session dispatches and reconciles explorers, planners and orchestrators.
+  status: retired
+  intention: Decision record marks FROZEN - stop developing the multi-agent coordination layer, keep the AgentProfileRevision
+    spec that describes it.
+  waking_condition: Three conditions, all required. (1) AgentProfileRevision is compiled to content-addressed effective
+    profiles. (2) The Lane 1 five-lane clean-room comparison actually runs; vuoro's text records it ready but not
+    run. (3) The NARROW verdict in ~/_projects/takeover-20260820/results/FINAL-ADJUDICATION.md is overturned by an
+    owner ruling or by a new run beating a fair control.
+  supersession: Superseded in intent by AgentProfileRevision, which vuoro's own text calls the missing meta-layer
+    above native harnesses - the spec was retained precisely because the layer was not built.
+  last_verified:
+    date: '2026-09-01'
+    observations:
+    - claim: 'The backlog records #1357, #1361, #1365 DONE for dispatcher-meta parallel fan-out and polling, #1358/#1362
+        for sequential handoff and #1355 for a HarnessAdapter protocol, and the artifact contains none of it - one
+        34-line module, one function, no classes, one console script, no dispatcher-meta identifier anywhere, no HarnessAdapter.'
+      source: ls and wc -l ~/actionq-dispatcher/actionq_dispatcher/; grep -rn 'dispatcher-meta\|dispatcher_meta' ~/actionq-dispatcher
+      verdict: confirmed
+      contradicts_record: true
+    - claim: CORRECTION TO v1. The identifier-absence claim was overstated. Re-run 2026-09-01 case-insensitively,
+        metaswarm/meta-swarm/meta_coordinator/MetaCoordinator returns three files - this register, its corrections
+        companion, and ~/render-fabric/docs/cross-repo-backlog.md:5 ('This is the metacoordinator view of work spanning
+        render-fabric and the ...').
+      source: grep -ril 'metaswarm\|meta-swarm\|meta_coordinator\|MetaCoordinator' --exclude-dir=node_modules --exclude-dir=.git
+        --exclude-dir=archive /projects/dev
+      verdict: confirmed
+    - claim: CORRECTION TO v1. The concept-level check v1 never ran finds a large artifact. ~/_projects/takeover-20260820
+        is a 702-file executed experiment implementing the described shape under different words - a mermaid topology
+        of one Coordinator over five Sol workers, with the coordinator owning task creation, claims, worktree allocation,
+        cross-lane decisions, merge order, evidence index and gate decisions. v1's 'one prose section' understates
+        it by three orders of magnitude. It has its own row.
+      source: ~/_projects/takeover-20260820/03_SWARM_TOPOLOGY_AND_PROTOCOL.md; find ~/_projects/takeover-20260820
+        -type f | wc -l -> 702
+      verdict: confirmed
+    - claim: Whether more meta-coordinator-assigned items exist in other sprintctl repo scopes was not enumerated
+        - only the _orchestration scope was queried. This is a gap in the checking.
+      source: no cross-repo enumeration attempted
+      verdict: could-not-check
+  divergence: 'Retired, not frozen: no persistent layer was ever built, and the one executable that existed is tombstoned.
+    Two v1 findings are corrected above - the identifier-absence claim was absolute and is false by one file, and
+    takeover-20260820 was invisible because v1 tested spelling rather than shape. The net effect STRENGTHENS retirement:
+    the shape was built as an experiment, run against a fair control, and lost.'
+  confidence: high
+- key: work-release
+  name: WorkRelease
+  repos:
+  - /projects/dev/vuoro
+  role: Named in direction section 5 and listed in section 15 as needing a minimal schema - the object recording what
+    work was released, and the point at which a compiled agent-profile digest and a pinned recipe digest are meant
+    to be stamped.
+  status: spec-only
+  intention: Part of the six-object ledger the direction doc specifies; the object the narrowed purpose leans on for
+    'what was released'.
+  waking_condition: A WorkRelease schema is minted with a content address and a canonical store (direction section
+    15 nominates sprintctl), AND one release is issued carrying both a pinned recipe digest and a compiled agent-profile
+    digest.
+  supersession: Supersedes nothing. Direction section 15 assigns its store to sprintctl and the D-5 row repeats that;
+    neither is a store that exists.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: WorkRelease returns zero occurrences in any .py or .json under vuoro packages/ or tests/, alongside RecipeRevision,
+        AgentProfileRevision, ExperimentRecord, ResourceGraphRevision and EffectIntentProjection.
+      source: grep -rl --include=*.py --include=*.json over ~/vuoro/packages and ~/vuoro/tests - empty for all six
+      verdict: confirmed
+    - claim: Only /projects/dev/vuoro was searched for this object; nothing outside it was checked, so the state is
+        known only as a negative within one repo.
+      source: survey coverage
+      verdict: could-not-check
+  divergence: This row exists because silent omission is the failure mode the register prevents. The decision record
+    leans on 'what work was released' as one of the four semantics Vuoro should own, and the artifact contains no
+    such object.
+  confidence: medium
+- key: recipe-revision
+  name: RecipeRevision
+  repos:
+  - /projects/dev/vuoro
+  role: Prose-only versioned specification for a pinned, task-class-specific execution recipe binding provider selection,
+    agent profile, model policy, context compiler, tools, workflow template, validation and escalation.
+  status: spec-only
+  intention: RETAIN AS SPECIFICATION - keep the written spec, do not build it now. It is the object that makes a mid-work
+    provider change definitionally a new release.
+  waking_condition: A RecipeRevision schema is minted with a content address and a canonical store (section 15 nominates
+    sprintctl) AND a WorkRelease is issued carrying a pinned recipe digest - i.e. the D-5 canonical-store question
+    is answered by a store, not a table row in a plan.
+  supersession: Explicitly supersedes the earlier overlapping ExecutionRecipe and CompositionRelease concepts.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: RecipeRevision appears in exactly two markdown plan files and no source file of any language; the identifier
+        'recipe' in any casing is absent from source across vuoro, agentops, sprintctl, actionq, acceptance-lab and
+        auditctl.
+      source: grep -rn RecipeRevision over source types in /projects/dev
+      verdict: confirmed
+    - claim: The canonical store is still an open planning question - D-5 names sprintctl as owner in a requirements
+        table row, deferred to a ledger design session.
+      source: ~/vuoro/docs/plans/2026-08-23-requirements-pathway-v5-v7.md:166
+      verdict: confirmed
+  divergence: Aligned with RETAIN AS SPECIFICATION, with one caveat - the prose is unimplemented at the identifier
+    level. There is no partial implementation to retain, only text.
+  confidence: high
+- key: agent-profile-revision
+  name: AgentProfileRevision
+  repos:
+  - /projects/dev/vuoro
+  - /projects/dev/agentops
+  role: Prose-only versioned specification for a compiled, flat, content-addressed effective agent profile (role id,
+    task classes, inherited skills and overrides, hook bindings and ordering, context/handoff compiler, required tools,
+    provider preferences, effect ceiling, evidence obligations, completion contract).
+  status: spec-only
+  intention: RETAIN AS SPEC, service deferred - the spec is the durable asset; no profile-compilation service now.
+  waking_condition: An agent profile is compiled to a flat effective document whose digest is recorded at WorkRelease
+    issue time - a profile-compile step emitting a content address, stored git-natively in agentops per the D-5 row.
+  supersession: Supersedes nothing observed.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: AgentProfileRevision appears in three markdown plan files and no source file of any language; agent_profile_revision
+        is absent portfolio-wide. agentops restates rather than implements it, quoting vuoro's text as a block quote.
+      source: grep -rn over source types in /projects/dev; ~/agentops/docs/plans/meta-narrative-plan-2026-08-29.md:531
+      verdict: confirmed
+    - claim: No profile-inheritance compiler exists - the only profile digesting in code is a sha256 of one file's
+        own bytes, and agentops holds only two environment-record profiles, which are dispatch environment records
+        rather than logical agent role definitions.
+      source: ~/vuoro/packages/vuoro-service/.../composition_v4.py:522 and tests/test_composition_v4.py:360
+      verdict: confirmed
+  divergence: Aligned with RETAIN AS SPEC, but 'service deferred' implies a service was scoped; in the artifact there
+    is not even a type. Two repos describe this object and neither builds it.
+  confidence: high
+- key: experiment-record
+  name: ExperimentRecord
+  repos:
+  - /projects/dev/vuoro
+  - /projects/dev/acceptance-lab
+  role: Prose-only ledger object for change and comparison memory (hypothesis, baseline, challenger, task sample,
+    evidence, limitations, rationale, resulting decision).
+  status: spec-only
+  intention: Decision record marks ACTIVE - versioned memory of recipe and provider comparisons, feeding the reconstructible-accepted-result
+    goal.
+  waking_condition: A named ExperimentRecord type or JSON schema exists in code (not prose) AND at least one record
+    is produced by a real comparison run.
+  supersession: Supersedes nothing. Named in direction section 5.1 alongside Decision; the effect-intent-projection
+    plan lists it as change memory, still a plan line.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: ExperimentRecord appears in exactly two files portfolio-wide, both markdown plans; no .py/.ts/.go/.sql/.json/.yaml
+        hit anywhere, and no experiment_record identifier exists.
+      source: grep -rn over source types in /projects/dev; file-level grep -rl -> two markdown plans
+      verdict: confirmed
+      contradicts_record: true
+    - claim: The nearest implemented comparison machinery is acceptance-lab's baseline/candidate compare - real code
+        with tests, carrying no ExperimentRecord identity and no hypothesis or challenger vocabulary at all.
+      source: ~/acceptance-lab/src/acceptance_lab/cli.py:53,142-147 and reporting.py:86,122; grep -rni 'hypothesis\|challenger'
+        -> zero
+      verdict: confirmed
+  divergence: The decision record marks this ACTIVE and the artifact shows spec-only - an overstatement by two levels.
+    Emitted as a correction, not reconciled.
+  confidence: high
+- key: effect-grant
+  name: EffectGrant
+  repos:
+  - /projects/dev/vuoro
+  - /projects/dev/actionq
+  role: Authorisation for consequential effects, existing at three levels at once - implemented as a frozen input
+    dataclass in vuoro-evidence core (explicitly never minted here), declared as a capability id federation.grant/v1
+    in the vuoro composition manifest with actionq as owner, and stated in actionq's source to have no operations
+    yet.
+  status: deferred
+  intention: DEFERRED - the runtime grant lifecycle (requested to granted or denied to adapted to re-requested, with
+    GrantEscalated events and denial history feeding policy inputs) is Priority 4 and not to be built now.
+  waking_condition: actionq's federation.grant/v1 gains actual operations - presently a declared contract with zero
+    operations by its own source comment - so a grant can be minted, denied and re-requested through the federation
+    authority, AND vuoro-evidence's EffectGrant stops being a hand-constructed test fixture and starts arriving over
+    the wire.
+  supersession: Supersedes nothing. Direction section 15 assigns its canonical store to actionq federation and the
+    D-5 row repeats that; neither is a store that exists.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: The CONSUMING shape is implemented and tested - a frozen dataclass with grant_id, principal, effect_class,
+        target_scope, expiry, constraints and policy_decision_ref, plus a GrantUse projection (unused / used / uncertain_use)
+        exercised by named tests.
+      source: ~/vuoro/packages/vuoro-evidence/core/model.py:77,69; .../tests/test_generic_paths.py:39,62,73
+      verdict: confirmed
+    - claim: The PRODUCING side is declared-only - actionq's vuoro_federation.py states in its own module docstring
+        that federation.principal/v1 and federation.grant/v1 are declared contracts with no operations yet, and that
+        grants are today the authority set on the asserted principal.
+      source: ~/actionq/actionq/vuoro_federation.py:19-22
+      verdict: confirmed
+  divergence: Aligned with DEFERRED, but deferred hides a three-layer split that is itself the risk - the consumer
+    is built and tested, the producer is empty, and the manifest already declares an exclusive binding with hash conformance
+    over zero operations.
+  confidence: high
+- key: evidence-set
+  name: EvidenceSet
+  repos:
+  - /projects/dev/vuoro
+  - /projects/dev/bindery-core
+  - /projects/dev/hostproto-semantics
+  - /projects/dev/auditctl
+  role: The correlated set of durable references plus integrity and validity metadata a decision is taken against.
+  status: active
+  intention: Part of the settlement spine, ACTIVE - the object that makes the accepted result reconstructible. Direction
+    section 15 settles auditctl as its canonical home.
+  waking_condition: 'n/a - active, but carried by two divergent implementations, so the checkable consolidation gate
+    is: one named owner holds a single EvidenceSet definition in code, with either an adapter or an explicit supersession
+    recorded for the other, AND that owner is the repo the settlement names (auditctl), which today contains zero
+    occurrences.'
+  supersession: Within hostproto-semantics, ADR-0013 supersedes an earlier scope in which HostProto would have been
+    the wire format of a whole EvidenceSet; it is now a contributor of items only.
+  last_verified:
+    date: '2026-09-01'
+    observations:
+    - claim: vuoro-evidence defines EvidenceSet as set_id + items + grants, each item carrying kind, ref, digest,
+        collector, ValidityWindow, claims and provenance, with basis-typed validity (indefinite, bounded, until_inputs_change).
+      source: ~/vuoro/packages/vuoro-evidence/core/model.py:1,44,58,86; pytest -q tests -> 16 passed; tests/test_generic_paths.py:98,111;
+        tests/test_boundary.py:30
+      verdict: confirmed
+    - claim: bindery-core defines a structurally unrelated EvidenceSet in Go over ObservationSummary values with Method
+        (exact-count, ordered-hash, semantic-equivalence, quorum, domain-specific), Outcome and a required Source
+        folded into content-derived identity.
+      source: ~/bindery-core/pkg/evidencev1/evidence.go:20-80; contracts/externalruntime/v1/openapi.yaml:62-69,328;
+        internal/externalruntime/http.go
+      verdict: confirmed
+      contradicts_record: true
+    - claim: vuoro-evidence was reconstructed from bytecode after deletion - its provenance is recovery, not continuous
+        development.
+      source: git -C ~/vuoro log -- packages/vuoro-evidence -> 2cd4484, 22b08c3
+      verdict: confirmed
+    - claim: The third, canonical home has none of it - auditctl contains zero occurrences of EvidenceSet or evidence_set
+        as of 2026-09-01.
+      source: grep -rn 'EvidenceSet\|evidence_set' ~/auditctl
+      verdict: confirmed
+      contradicts_record: true
+  divergence: MAJOR DRIFT. Two incompatible definitions coexist with no adapter and no supersession between them,
+    a third claimed home has no code at all, and the better-engineered of the two (bindery-core's, with a wire contract
+    and a reopen drill) is the one nobody named canonical. The vuoro implementation - the settlement spine - is a
+    bytecode recovery unguarded by CI. Status stays active because the object is load-bearing and in use, but the
+    consolidation gate above is the highest-value open item in the register.
+  confidence: high
+- key: decision
+  name: Decision
+  repos:
+  - /projects/dev/vuoro
+  - /projects/dev/auditctl
+  role: The terminal judgment over an EvidenceSet - accept / reacquire / reconcile / reject - carrying subject, evidence
+    ids, rationale, a requires_observation flag and EvidenceExpired events.
+  status: active
+  intention: Part of the settlement spine, ACTIVE - the object recording what was accepted and on what basis, and
+    therefore the hinge of 'the accepted result is reconstructible'.
+  waking_condition: 'n/a - active. Two checkable consolidation gates apply: (1) Decision exists as code in auditctl,
+    the repo the 2026-08-30 commit settled as its home; (2) the implemented DecisionKind enum either widens to cover
+    the prose taxonomy (supersession, policy exception, provider selection, rollback) or the prose narrows to the
+    four rerun-control values.'
+  supersession: Supersedes nothing. The terminal object of the settlement spine, and the object ExperimentRecord and
+    the EffectGrant lifecycle both defer to.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: Implemented as a frozen dataclass with a four-value kind enum plus expiry events, with a real 36-line
+        decision path and 114-line reducer, exercised by tests covering the no-evidence, expiry, contradiction and
+        uncertain-effect branches.
+      source: ~/vuoro/packages/vuoro-evidence/core/model.py:99,108; wc -l core/*.py; tests/test_generic_paths.py:73,81,126
+      verdict: confirmed
+    - claim: The prose taxonomy is strictly wider than the implemented enum - direction section 5.1 describes acceptance,
+        rejection, revision, supersession, policy exception, provider selection and rollback, while DecisionKind has
+        four members, so supersession, policy exception and provider selection have no representation in code.
+      source: ~/vuoro/docs/plans/2026-08-22-long-term-direction.md:341 vs ~/vuoro/packages/vuoro-evidence/core/model.py:99
+      verdict: confirmed
+      contradicts_record: true
+  divergence: Implemented and tested, but the canonical-store settlement is prose-only and the implementation sits
+    outside CI in a repo just ruled not to own it. Also worth recording - the one place where Decisions were actually
+    taken against served authority (bindery-core) returned rejected 12 times out of 12, so the decision leg exists
+    and has never produced an acceptance.
+  confidence: high
+- key: effect-receipt
+  name: EffectReceipt
+  repos:
+  - /projects/dev/hostproto-semantics
+  - /projects/dev/acceptance-lab
+  - /projects/dev/vuoro
+  role: The record that a consequential effect was attempted, accepted, executed and verified, with before/after revisions
+    and caused events. No object literally named EffectReceipt exists.
+  status: active
+  intention: Part of the settlement spine - receipts are what an EvidenceSet's effect claims are grounded in, per
+    ADR-0013 scoping HostProto to host-interaction claims and effect-receipt evidence within an EvidenceSet.
+  waking_condition: n/a - active.
+  supersession: ADR-0013 supersedes the earlier proposal that HostProto be the wire format of a whole EvidenceSet;
+    the surviving scope is exactly host-interaction and effect-receipt evidence.
+  last_verified:
+    date: '2026-08-31'
+    observations:
+    - claim: No identifier EffectReceipt or effect_receipt (singular) exists as a type anywhere in the portfolio.
+      source: grep -rn EffectReceipt over all source types and file-level in /projects/dev
+      verdict: confirmed
+      contradicts_record: true
+    - claim: A real receipt JSON Schema exists with the full field set - title HostProto receipt v1, requiring schema_version,
+        receipt_id, action_id, surface, attempted, accepted, executed, verified, outcome, provider, caused_events,
+        effects, revision_before, revision_after, additionalProperties false.
+      source: ~/hostproto-semantics/schemas/receipt.schema.json; ~/hostproto-semantics/tests/test_schemas.py
+      verdict: confirmed
+  divergence: A naming divergence rather than an absence. The name in the decision record is fiction; the thing is
+    real under two other names in three places that do not reference one another as one object.
+  confidence: high
+open_claims:
+- claim: Served next-work works, but the product's first promised capability - session resume - does not.
+  verdict: contradicted
+  finding: True only in its weakest reading (no served operation spelled 'session resume' exists) and false under
+    the decision record's own test, the continuation outcome. Three levels stay distinct. (1) IMPLEMENTED LOCALLY
+    - a real Click command with a contract_version-2 payload and 10 dedicated tests; 21 passed with the checkpoint
+    suite. (2) DELIBERATELY NOT SERVED AS ONE COMMAND - served_routes.py registers it unavailable, cli_runtime.py
+    fails it closed before a store opens, and the ~50-operation catalog has no session-resume aggregate. (3) THE OUTCOME
+    IS SERVED, TESTED AND EVIDENCED - every constituent is a catalog operation, the served path is driven end to end
+    by test_the_resumability_outcome_end_to_end, and acceptance-lab run e7876b67 (resume-and-settle@1.0.1, 2026-08-29,
+    against the deployed backend) passes 1.000 on all eight hard gates where the pre-deploy baseline failed at 0.722
+    on exactly the three gates the claim names. RESIDUAL DEFECT - an operator must assemble the continuation from
+    three or four calls. CAVEATS - the passing run is scored at scenario 1.0.1 while the scenario is now 1.0.2, and
+    no 1.0.2 run exists; and the served cross-host WRITE surface accepts no hostname or instance_id while all five
+    takeup commands are unavailable in served mode.
+  sources:
+  - ~/sprintctl/sprintctl/commands/session.py:652-674
+  - ~/sprintctl/sprintctl/served_routes.py:221
+  - ~/sprintctl/sprintctl/cli_runtime.py:352-369
+  - ~/sprintctl/tests/test_handoff_checkpoint.py:147
+  - ~/agentops/_artifacts/agentops/acceptance/resume-and-settle/report-2026-08-29-after-deploy-repinned.md
+  path_warning: This report exists ONLY under /projects/dev/agentops/_artifacts. It does NOT exist under /projects/dev/_artifacts,
+    which has no acceptance directory. v1 of this register cited it relatively, next to neighbouring citations rooted
+    at /projects/dev/_artifacts - an agent resolving it there finds nothing and would reinstate exactly the claim
+    being retired.
+  blocks:
+  - Any kernel or product work sequenced against 'session resume is missing' - do not schedule it.
+  - Any settlement citing the resume-and-settle PASS - re-run at scenario 1.0.2 first.
+  - The cross-host half of the narrowed purpose, which is a served write-surface parity gap rather than a missing
+    capability.
+- claim: Cost telemetry is overstated by 5.4-5.9x.
+  verdict: partially-confirmed
+  finding: 'Overstatement is real; the figure is not. The 5.4-5.9x range appears nowhere under /projects/dev and no
+    computation over the live log reproduces it. DEFECT 1, snapshot double-counting - the Stop hook writes one CUMULATIVE
+    snapshot per assistant turn, so rows supersede rather than accumulate, and costs.js sums every row. On 1512 rows
+    and 292 sessions: naive $138,258.18 versus newest-per-session $20,291.09 = 6.81x whole-log, and per DAY (the cockpit''s
+    window) the factor swings 1.00x to 12.16x, so no scalar is correct. DEFECT 2, stale price table - the opus arm
+    is exactly 3.0x current published rates, the else-arm bills Sonnet 5 at 1.5x and UNDERSTATES Fable 5 by 3.33x,
+    and unknown/synthetic rows are silently priced as Sonnet; price-only factor 2.21x. Combined, the cockpit renders
+    15.13x truth. The suggested causes are ruled out at the artifact - cache-read has its own coefficient, subagent
+    sums are real spend in the same transcript, and cache read/write are not double-added. No conversion factor can
+    restate history; rows must be re-reduced and re-priced. DEFECT 3, new in v2 - the log is written by TWO HOSTS
+    and carries no host field. gitops-nixos wires the same hook on the devbox, and the row keys are exactly ts, project,
+    session, model, in, out, cost_usd with zero occurrences of "host" across all 1537 rows.'
+  sources:
+  - ~/agentops/apps/web/lib/cockpit/costs.js:43,45
+  - ~/agentops/templates/dispatch/hooks/log-session-cost.sh:176-180
+  - ~/gitops-nixos/modules/system/hybrid-dispatch/claude-settings.json:14
+  - ~/.claude/session-costs.jsonl (1537 rows as of 2026-09-01; 1512 at v1)
+  blocks:
+  - Any figure derived from the cockpit status bar or a raw sum of session-costs.jsonl - recompute, never rescale.
+  - Any PER-HOST cost figure - the log has no host field and two hosts write it. This is unrecoverable for history,
+    not merely uncomputed.
+  - Nothing else; the reduction and price fixes are one function, one test line and one jq table, so they belong in
+    maintenance rather than the critical path.
+  - The controls finding it gates - a shared reducer all three consumers import, plus a test that fails if any consumer
+    sums raw rows.
+- claim: 69% of recorded session events are fixtures, and agentops consumed 31% of measured effort.
+  verdict: partially-confirmed
+  finding: The contamination is real and far worse than 69%; the 31% is unsupported and contradicted by every recomputation.
+    FIXTURES - 420 of 457 agentops workflow.session rows (91.9%) carry non-UUID fixture session ids, concentrated
+    in two shards. The plan's own arithmetic ('318 of 473 rows') does not reproduce against today's files (457 workflow.session
+    in 516 lines), so even the 69% cannot be regenerated from the artifact it cites. Worse, the discriminator is an
+    accident - fixture and real events are byte-structurally identical (same source, actor, record_class, schema_version,
+    origin_stream_id), record_class is hard-validated to one value, resolved_context is closed to five non-provenance
+    fields, and 337 of the 420 fixtures self-declare project agentops, the very repo whose share is in dispute. The
+    next fixture written with a UUID id is undetectable. SPEND - no surviving computation yields 31% for agentops.
+    Correct reduction gives agentops $818.13 of $6,454.63 = 12.7%, appservice 30.2%, dev 16.2%; the naive per-row
+    sum gives agentops 7.6% and appservice 57.0%. Fixtures do NOT explain the spend error - synthetic rows are $0.04
+    of $6,454.67. The spend defect is per-row-versus-per-session aggregation; the fixture defect is a partition never
+    built.
+  sources:
+  - ~/_artifacts/agentops/audit/*.ndjson
+  - ~/auditctl/auditctl/validation.py:62,352-353
+  - ~/agentops/docs/assessments/vuoro-pre-clean-room/03-architecture-tax.md:20
+  blocks:
+  - Any study whose unit is the EVENT - session counts, dispatch rates, gate frequency - until the auditctl partition
+    exists.
+  - Does NOT block the spend recomputation, which can run today on existing data; sequencing them together is a false
+    dependency.
+  - Any narrative built on 'agentops is eating the portfolio' - appservice, not agentops, is the largest real consumer
+    at 30.2%, and appservice now has its own row.
+- claim: Native runtimes increasingly own session resume, subagents, hooks, skills and programmatic execution; MCP
+    Tasks supplies durable asynchronous handles; A2A supplies cross-agent interoperability. Vuoro competing below
+    that boundary would manufacture depreciation.
+  verdict: partially-confirmed
+  finding: 'Two-thirds evidenced, one-third assumed. NATIVE-OWNS is confirmed by running state, not prose - Codex
+    holds 1,740 thread rows, 743 spawn edges, 917 turns and 51,434 items, 18 durable goals with a continuation-deferral
+    table, a queue database, native skills, rules and plugins, and multi_agent true; Claude Code natively writes refs/claude/checkpoint-*
+    (verified live) and .claude/RESUME.md in six repos, with zero writers anywhere in the portfolio. MCP TASKS is
+    CONTRADICTED as a portfolio premise - zero usage anywhere outside build artifacts, so it is an assumption about
+    the market doing load-bearing work it has not earned. A2A is confirmed but narrow and not in Vuoro. ALREADY DUPLICATED,
+    with named files - actionq''s application_enqueue, application_claim, application_dispatch, managed_dispatch and
+    runner_auth (deletion decided 2026-08-20, not performed). Also duplicated: the agentops skill DISTRIBUTION layer
+    against native plugin marketplaces, the custom gate hook and .claude/gates.json against native autoMode.soft_deny,
+    and model-routing.json whose every route is marked qualified false. GENUINELY NOT SUPPLIED - cross-REPOSITORY
+    continuity, implemented and running (7 repos as real worktrees, each pinned by commit and every guidance source
+    by sha256, consumed by typed code with a test), which nothing native does. Cross-HOST continuity is supplied by
+    NEITHER side; v2 names ~/gitops-nixos as the repo defining the second host, yet the cost log written from both
+    hosts has no host field, so cross-host continuity is unmeasured as well as unbuilt.'
+  sources:
+  - ~/gitops-nixos/modules/system/hybrid-dispatch/
+  - ~/_projects/vuoro-dispatch-ready/project.context.json
+  - ~/.claude/session-costs.jsonl
+  blocks:
+  - Any new build below the native boundary - specifically, do not build a Vuoro-side durable async handle; nothing
+    would have to be rewritten if MCP Tasks arrives.
+  - Promotion of cross-HOST continuity to a differentiator - unbuilt on both sides, so it is R&D rather than an asserted
+    advantage.
+  - The next unit of settlement work, which is implementing EvidenceSet and Decision in auditctl rather than designing
+    more of it.
+  - The ActionQ execution-plane deletion, decided 2026-08-20 and still outstanding - sequence it ahead of any new
+    build.
+- claim: The multi-agent coordination layer should be frozen (stop developing it).
+  verdict: partially-confirmed
+  finding: 'The conclusion is right and v1''s reasoning was wrong twice. v1 argued the layer ''was never built'' from
+    an identifier grep. That grep is not quite true (render-fabric/docs/cross-repo-backlog.md:5 carries a metacoordinator
+    framing) and, far more importantly, it tested spelling rather than shape. The concept-level artifact is /projects/dev/_projects/takeover-20260820:
+    702 files, a coordinator-over-five-workers mermaid topology, a Python harness with tests, two sealed launch capsules,
+    three recorded runs, a hash-verified blind review, and FINAL-ADJUDICATION.md returning NARROW with the DIRECT
+    CONTROL path preferred on unblinding and production_mutations false. A coordinated multi-agent takeover was built
+    as an experiment, run against a fair control, and lost. That is stronger grounds for keeping it retired than any
+    absence argument - an absence can be overturned by someone writing code.'
+  sources:
+  - ~/_projects/takeover-20260820/results/FINAL-ADJUDICATION.md
+  - ~/_projects/takeover-20260820/results/GATE-STATUS-CURRENT.json
+  - ~/_projects/takeover-20260820/results/FINAL-STATUS.json
+  - ~/_projects/takeover-20260820/03_SWARM_TOPOLOGY_AND_PROTOCOL.md
+  - ~/render-fabric/docs/cross-repo-backlog.md:5
+  blocks:
+  - Any proposal to build a multi-agent coordination layer - it must first answer FINAL-ADJUDICATION.md, not merely
+    observe that no such layer exists.
+  - Any absence-by-identifier-grep argument elsewhere in this register - the technique failed here and should be paired
+    with a concept-level check before a high confidence rating is claimed.
+  - Nothing in the critical path; the verdict is already recorded and the package is frozen.
