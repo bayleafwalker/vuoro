@@ -754,6 +754,110 @@ def test_artifact_verification_fails_closed_on_mismatch(tmp_path: Path) -> None:
         verify_adapter_artifacts(manifest, tmp_path)
 
 
+def test_load_and_verify_accept_a_shared_filename_with_an_identical_digest(tmp_path: Path) -> None:
+    """Amendment 2 / D-6: two release locks may stage the same wheel filename
+    as long as their digests agree -- covering both CompositionManifest.load's
+    filename-collision block and verify_adapter_artifacts, per the design
+    freeze's prescribed test (a)."""
+    from vuoro_service.composition import ReleaseLock
+
+    source = ROOT / "composition" / "adapter-pins.json"
+    raw = json.loads(source.read_text(encoding="utf-8"))
+    artifact = tmp_path / "sprintctl-0.3.5-py3-none-any.whl"
+    artifact.write_bytes(b"same-filename-same-digest")
+    digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    work_lock = next(lock for lock in raw["release_locks"] if lock["lock_id"] == "work-adapter")
+    work_lock["artifact_sha256"] = digest
+    duplicate = dict(work_lock, lock_id="work-adapter-dup", lock_kind="owner-dependency",
+                      distribution="sprintctl-dup")
+    raw["release_locks"].append(duplicate)
+    for descriptor in raw["runtime_descriptors"]:
+        if descriptor["domain"] == "work":
+            descriptor["dependency_lock_ids"].append("work-adapter-dup")
+    path = tmp_path / "manifest.json"
+    path.write_text(json.dumps(raw), encoding="utf-8")
+
+    manifest = CompositionManifest.load(path)
+    filenames = {lock.artifact_url.rsplit("/", 1)[-1] for lock in manifest.release_locks
+                 if lock.lock_id in ("work-adapter", "work-adapter-dup")}
+    assert filenames == {"sprintctl-0.3.5-py3-none-any.whl"}
+
+    # verify_adapter_artifacts checks every lock in the manifest, so isolate
+    # the two colliding locks (rather than staging real wheels for the whole
+    # composition) to prove they are individually accepted on a matching
+    # digest.
+    colliding = tuple(ReleaseLock.from_dict(lock) for lock in raw["release_locks"]
+                       if lock["lock_id"] in ("work-adapter", "work-adapter-dup"))
+    verify_adapter_artifacts(SimpleNamespace(release_locks=colliding), tmp_path)
+
+
+def test_load_and_verify_reject_a_shared_filename_with_a_differing_digest(tmp_path: Path) -> None:
+    """The negative half of the same falsifier (design freeze test (b)): a
+    shared filename with a DIFFERING digest must still be rejected, by both
+    CompositionManifest.load and verify_adapter_artifacts."""
+    from vuoro_service.composition import ReleaseLock
+
+    source = ROOT / "composition" / "adapter-pins.json"
+    raw = json.loads(source.read_text(encoding="utf-8"))
+    artifact = tmp_path / "sprintctl-0.3.5-py3-none-any.whl"
+    artifact.write_bytes(b"same-filename-differing-digest")
+    digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    work_lock = next(lock for lock in raw["release_locks"] if lock["lock_id"] == "work-adapter")
+    work_lock["artifact_sha256"] = digest
+    duplicate = dict(work_lock, lock_id="work-adapter-dup", lock_kind="owner-dependency",
+                      distribution="sprintctl-dup", artifact_sha256="f" * 64)
+    raw["release_locks"].append(duplicate)
+    for descriptor in raw["runtime_descriptors"]:
+        if descriptor["domain"] == "work":
+            descriptor["dependency_lock_ids"].append("work-adapter-dup")
+    path = tmp_path / "manifest.json"
+    path.write_text(json.dumps(raw), encoding="utf-8")
+
+    with pytest.raises(CompositionError, match="differing digests"):
+        CompositionManifest.load(path)
+
+    # verify_adapter_artifacts enforces the same guard independently of
+    # load(): isolate just the two colliding locks (load() would have
+    # already rejected the full manifest) and confirm the digest mismatch is
+    # still caught -- the first lock's real wheel/digest verifies cleanly,
+    # then the second lock's differing digest is rejected on the filename it
+    # shares with the first, before any second file read is attempted.
+    colliding = tuple(ReleaseLock.from_dict(lock) for lock in raw["release_locks"]
+                       if lock["lock_id"] in ("work-adapter", "work-adapter-dup"))
+    with pytest.raises(CompositionError, match="differing digests"):
+        verify_adapter_artifacts(SimpleNamespace(release_locks=colliding), tmp_path)
+
+
+def test_attester_accepts_a_shared_filename_with_an_identical_digest_and_rejects_a_differing_one() -> None:
+    """The deploy-time attestation script (scripts/attest_installed_composition.py)
+    is a fifth, independent rule-8 enforcer -- shipped into the image and
+    consulted by composition_v4_validator.py's rule-7 allowlist -- so the
+    Amendment 2 / D-6 filename->digest refinement must hold there too, not
+    only in CompositionManifest.load, verify_adapter_artifacts, and
+    fetch_pinned_adapters.artifact_pins."""
+    spec = importlib.util.spec_from_file_location(
+        "attest_composition", ROOT.parents[1] / "scripts" / "attest_installed_composition.py"
+    )
+    assert spec and spec.loader
+    attester = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(attester)
+
+    raw = json.loads((ROOT / "composition" / "adapter-pins.json").read_text(encoding="utf-8"))
+    work_lock = next(lock for lock in raw["release_locks"] if lock["lock_id"] == "work-adapter")
+    same_digest = dict(work_lock, lock_id="work-adapter-dup", lock_kind="owner-dependency",
+                        distribution="sprintctl-dup")
+    raw["release_locks"].append(same_digest)
+    for descriptor in raw["runtime_descriptors"]:
+        if descriptor["domain"] == "work":
+            descriptor["dependency_lock_ids"].append("work-adapter-dup")
+    pinned = attester._pinned(raw)
+    assert [entry["lock_id"] for entry in pinned].count("work-adapter-dup") == 1
+
+    raw["release_locks"][-1]["artifact_sha256"] = "f" * 64
+    with pytest.raises(SystemExit, match="staged with differing digests"):
+        attester._pinned(raw)
+
+
 def test_installed_attestation_binds_each_runtime_import_to_the_release_lock(tmp_path: Path, monkeypatch) -> None:
     manifest_path = ROOT / "composition" / "adapter-pins.json"
     manifest = CompositionManifest.load(manifest_path)

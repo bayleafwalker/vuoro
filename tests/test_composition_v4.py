@@ -16,8 +16,13 @@ honest arrangement: they are one deliverable landing in two increments.
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
+import os
+import re
+import tokenize
+import io
 from pathlib import Path
 
 import pytest
@@ -1047,6 +1052,34 @@ def test_federation_principal_owner_is_settled_and_scope_is_global() -> None:
     assert principal.ownership == "non-transferable"
 
 
+def _strip_comments_and_strings(source: str) -> str:
+    """Return `source` with comments and string/docstring bodies blanked out,
+    so a vocabulary scan (e.g. for a stray "project" token) cannot be tripped
+    by prose. Non-string, non-comment tokens are left in place verbatim."""
+    out: list[str] = []
+    try:
+        tokens = tokenize.generate_tokens(io.StringIO(source).readline)
+        last_end = (1, 0)
+        for tok in tokens:
+            tok_type, tok_string, start, end, _line = tok
+            if start > last_end:
+                out.append(source[_offset(source, last_end):_offset(source, start)])
+            if tok_type in (tokenize.COMMENT, tokenize.STRING):
+                out.append(" " * len(tok_string))
+            else:
+                out.append(tok_string)
+            last_end = end
+    except tokenize.TokenizeError:
+        return source
+    return "".join(out)
+
+
+def _offset(source: str, pos: tuple[int, int]) -> int:
+    row, col = pos
+    lines = source.splitlines(keepends=True)
+    return sum(len(line) for line in lines[: row - 1]) + col
+
+
 def test_grant_scope_matches_actionqs_flat_authority_gate() -> None:
     """Falsifies a disagreement between the served grant scope and the implementation.
 
@@ -1059,10 +1092,21 @@ def test_grant_scope_matches_actionqs_flat_authority_gate() -> None:
     never project-scoped.
 
     Half (a) reads the manifest Vuoro actually serves. Half (b) independently
-    reads the actionq sibling checkout and asserts its authority check is
-    still flat frozenset membership with no project dimension anywhere in the
-    federation schema -- so this fails if either artifact drifts from the
-    other, not merely if someone mistypes the manifest.
+    reads the actionq sibling checkout (path overridable with
+    VUORO_ACTIONQ_ROOT, so a CI job that checks out actionq elsewhere can
+    still run this half) and asserts, at the AST level rather than by
+    substring, that: FederationPrincipal carries exactly one authority-bearing
+    field (`authorities`); `_require_authority` still takes only
+    `(self, principal, authority)` and its body is exactly
+    `if authority not in principal.authorities: raise ...`; and at least the
+    seven known call sites still gate on that method with literal authority
+    strings. This is deliberately stronger than a text match: a compat shim
+    that keeps the old field/line while routing real checks through a new
+    project-keyed map, or a deleted call site, both fail it. It also asserts
+    no federation table or column carries a `project` token, scanning with
+    comments and strings stripped so this cannot be tripped by prose (e.g. a
+    comment mentioning "projection"). So this fails if either artifact
+    drifts from the other, not merely if someone mistypes the manifest.
 
     actionq's declared scope text (verbatim): the federation authority
     vocabulary is a flat set checked by string membership, and no federation
@@ -1072,18 +1116,100 @@ def test_grant_scope_matches_actionqs_flat_authority_gate() -> None:
     grant = manifest.contract("federation.grant/v1")
     assert grant.scope_kind == "environment"
 
-    actionq_root = ROOT.parent / "actionq"
+    actionq_root = Path(os.environ["VUORO_ACTIONQ_ROOT"]) if os.environ.get("VUORO_ACTIONQ_ROOT") else ROOT.parent / "actionq"
     if not actionq_root.is_dir():
         pytest.skip(f"sibling checkout not present: {actionq_root}")
 
-    federation_py = (actionq_root / "actionq" / "federation.py").read_text(encoding="utf-8")
-    federation_schema_py = (actionq_root / "actionq" / "federation_schema.py").read_text(encoding="utf-8")
+    federation_py_path = actionq_root / "actionq" / "federation.py"
+    schema_py_path = actionq_root / "actionq" / "federation_schema.py"
+    missing = [path for path in (federation_py_path, schema_py_path) if not path.is_file()]
+    if missing:
+        raise AssertionError(
+            f"actionq checkout present at {actionq_root} but the federation "
+            f"sources this falsifier reads are gone: {[path.name for path in missing]} "
+            "-- federation.grant/v1's environment scope can no longer be checked "
+            "against the implementation"
+        )
 
-    assert "authorities: frozenset[str]" in federation_py
-    assert "authority not in principal.authorities" in federation_py
+    federation_py = federation_py_path.read_text(encoding="utf-8")
+    federation_schema_py = schema_py_path.read_text(encoding="utf-8")
 
-    for source in (federation_py, federation_schema_py):
-        assert "project" not in source.lower()
+    tree = ast.parse(federation_py, filename=str(federation_py_path))
+
+    principal_cls = next(
+        (node for node in ast.walk(tree) if isinstance(node, ast.ClassDef) and node.name == "FederationPrincipal"),
+        None,
+    )
+    assert principal_cls is not None, "actionq no longer declares a FederationPrincipal class"
+    field_names = [node.target.id for node in principal_cls.body if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)]
+    authority_fields = [name for name in field_names if "authorit" in name]
+    assert authority_fields == ["authorities"], (
+        f"FederationPrincipal's authority-bearing fields are {authority_fields!r}, expected exactly "
+        "['authorities'] -- a second authority-shaped field (e.g. a scoped/project-keyed map) would "
+        "let the gate be silently bypassed while this string is still present"
+    )
+
+    require_authority = next(
+        (node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == "_require_authority"),
+        None,
+    )
+    assert require_authority is not None, "actionq no longer declares _require_authority"
+    arg_names = [arg.arg for arg in require_authority.args.args]
+    assert arg_names == ["self", "principal", "authority"], (
+        f"_require_authority's signature is {arg_names!r}, expected exactly "
+        "['self', 'principal', 'authority'] -- an added scope/project parameter would mean the "
+        "gate is no longer flat authority membership"
+    )
+    body = [node for node in require_authority.body if not (isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant))]
+    assert len(body) == 1 and isinstance(body[0], ast.If), "_require_authority's body is no longer a single guard clause"
+    test = body[0].test
+    is_flat_membership_check = (
+        isinstance(test, ast.Compare)
+        and isinstance(test.left, ast.Name) and test.left.id == "authority"
+        and len(test.ops) == 1 and isinstance(test.ops[0], ast.NotIn)
+        and len(test.comparators) == 1
+        and isinstance(test.comparators[0], ast.Attribute)
+        and test.comparators[0].attr == "authorities"
+        and isinstance(test.comparators[0].value, ast.Name) and test.comparators[0].value.id == "principal"
+    )
+    assert is_flat_membership_check, (
+        "_require_authority no longer guards with `authority not in principal.authorities` -- "
+        "the flat frozenset membership gate the environment-scoped grant depends on has changed shape"
+    )
+
+    call_sites = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute) and node.func.attr == "_require_authority"
+        and isinstance(node.func.value, ast.Name) and node.func.value.id == "self"
+    ]
+    _KNOWN_AUTHORITIES = {
+        "federation.create", "federation.relate", "federation.evidence.ingest",
+        "federation.acceptance.decide", "federation.settlement.record", "federation.supersede",
+    }
+    call_authorities = set()
+    for call in call_sites:
+        if len(call.args) >= 2 and isinstance(call.args[1], ast.Constant) and isinstance(call.args[1].value, str):
+            call_authorities.add(call.args[1].value)
+    assert len(call_sites) >= 7, (
+        f"only {len(call_sites)} call sites gate on self._require_authority(...), expected at least the "
+        "7 present when this falsifier was written -- a removed call site ungates a federation operation "
+        "while the frozenset field and the helper's body stay untouched"
+    )
+    assert call_authorities >= _KNOWN_AUTHORITIES, (
+        f"self._require_authority(...) call sites no longer gate on the known authority literals "
+        f"(missing {_KNOWN_AUTHORITIES - call_authorities!r}) -- a call site surviving with its "
+        "authority string changed or removed would ungate that operation"
+    )
+
+    for name, source in (("federation.py", federation_py), ("federation_schema.py", federation_schema_py)):
+        stripped = _strip_comments_and_strings(source)
+        hit = re.search(r"\bproject(_id|_ref|_key|s)?\b", stripped, re.IGNORECASE)
+        assert hit is None, (
+            f"{name} grew a project token at offset {hit.start() if hit else -1}: "
+            f"{hit.group() if hit else ''!r} -- federation.grant/v1 is environment-scoped in the "
+            "manifest with no v2 project-scoped contract"
+        )
 
 
 def test_the_migrated_reference_profile_states_exactly_what_it_still_lacks() -> None:

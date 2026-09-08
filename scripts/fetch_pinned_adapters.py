@@ -82,7 +82,7 @@ def artifact_pins(manifest: object) -> list[tuple[str, dict[str, str]]]:
             raise SystemExit(f"duplicate distribution: {distribution}")
         existing_digest = seen_filename_digests.get(filename)
         if existing_digest is not None and existing_digest != pin["artifact_sha256"]:
-            raise SystemExit(f"artifact filename collision: {filename}")
+            raise SystemExit(f"artifact filename {filename} staged with differing digests")
         lock_id = pin["lock_id"]
         if lock_id in by_id:
             raise SystemExit(f"duplicate lock identifier: {lock_id}")

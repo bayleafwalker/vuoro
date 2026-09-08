@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
@@ -78,18 +79,25 @@ def test_fetcher_rejects_dependency_filename_collisions() -> None:
         "distribution": "companion",
         "artifact_sha256": "c" * 64,
     }
-    with pytest.raises(SystemExit, match="filename collision"):
+    with pytest.raises(SystemExit, match="staged with differing digests"):
         module.artifact_pins(_v3_manifest(
             _release_lock("owner", _adapter()), _release_lock("companion", dependency)
         ))
-    same_digest = _dependency() | {"artifact_url": _adapter()["artifact_url"], "distribution": "companion"}
-    with pytest.raises(SystemExit, match="duplicate runtime domains"):
-        # No filename collision when the digest matches (Amendment 2 / D-6); the
-        # error below is unrelated -- this manifest has no runtime descriptors,
-        # which is what this helper call hits next.
-        module.artifact_pins(_v3_manifest(
-            _release_lock("owner", _adapter()), _release_lock("companion", same_digest)
-        ))
+    # Positive case, against a fully valid v3 manifest (four runtime
+    # descriptors) so the assertion is on the returned pins themselves, not
+    # on an unrelated downstream error whose identity is coupled to
+    # artifact_pins' internal validation order.
+    raw = json.loads((ROOT / "packages" / "vuoro-service" / "composition" / "adapter-pins.json").read_text(encoding="utf-8"))
+    work_lock = next(lock for lock in raw["release_locks"] if lock["lock_id"] == "work-adapter")
+    duplicate = dict(work_lock, lock_id="work-adapter-dup", lock_kind="owner-dependency",
+                      distribution="sprintctl-dup")
+    raw["release_locks"].append(duplicate)
+    for descriptor in raw["runtime_descriptors"]:
+        if descriptor["domain"] == "work":
+            descriptor["dependency_lock_ids"].append("work-adapter-dup")
+    pins = module.artifact_pins(raw)
+    assert [lock_id for lock_id, _ in pins].count("work-adapter-dup") == 1
+    assert [lock_id for lock_id, _ in pins].count("work-adapter") == 1
 
 
 @pytest.mark.parametrize(

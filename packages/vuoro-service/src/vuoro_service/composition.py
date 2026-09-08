@@ -434,7 +434,7 @@ def verify_adapter_artifacts(manifest: CompositionManifest, wheel_dir: Path) -> 
         filename = pin.artifact_url.rsplit("/", 1)[-1]
         existing = seen.get(filename)
         if existing is not None and existing != pin.artifact_sha256:
-            raise CompositionError(f"artifact filename collision: {filename}")
+            raise CompositionError(f"artifact filename {filename} staged with differing digests")
         seen[filename] = pin.artifact_sha256
         artifact = wheel_dir / filename
         try:

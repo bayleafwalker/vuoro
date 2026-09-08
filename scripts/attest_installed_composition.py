@@ -61,7 +61,7 @@ def _pinned(manifest: dict) -> list[dict]:
         raise SystemExit("release locks must be an array")
     seen_ids: set[str] = set()
     seen_distributions: set[str] = set()
-    seen_filenames: set[str] = set()
+    seen_filename_digests: dict[str, str] = {}
     by_id: dict[str, dict] = {}
     for lock in locks:
         if not isinstance(lock, dict):
@@ -76,13 +76,14 @@ def _pinned(manifest: dict) -> list[dict]:
         if lock["lock_kind"] not in _LOCK_KINDS:
             raise SystemExit("invalid release lock kind")
         filename = _filename(lock)
-        if filename in seen_filenames:
-            raise SystemExit(f"artifact filename collision: {filename}")
+        existing_digest = seen_filename_digests.get(filename)
+        if existing_digest is not None and existing_digest != lock["artifact_sha256"]:
+            raise SystemExit(f"artifact filename {filename} staged with differing digests")
         if lock["lock_id"] in seen_ids or lock["distribution"] in seen_distributions:
             raise SystemExit("duplicate release lock identifier or distribution")
         seen_ids.add(lock["lock_id"])
         seen_distributions.add(lock["distribution"])
-        seen_filenames.add(filename)
+        seen_filename_digests[filename] = lock["artifact_sha256"]
         by_id[lock["lock_id"]] = lock
         entries.append(
             {
