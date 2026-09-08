@@ -64,7 +64,7 @@ def artifact_pins(manifest: object) -> list[tuple[str, dict[str, str]]]:
     pins: list[tuple[str, dict[str, str]]] = []
     by_id: dict[str, dict[str, str]] = {}
     seen_distributions: set[str] = set()
-    seen_filenames: set[str] = set()
+    seen_filename_digests: dict[str, str] = {}
     for pin in locks:
         if not isinstance(pin, dict) or set(pin) != _ARTIFACT_FIELDS | {"lock_id", "lock_kind"}:
             raise SystemExit("release lock fields do not match the v3 contract")
@@ -80,13 +80,14 @@ def artifact_pins(manifest: object) -> list[tuple[str, dict[str, str]]]:
         filename = _release_wheel_filename(pin["source_repository"], pin["artifact_url"])
         if distribution in seen_distributions:
             raise SystemExit(f"duplicate distribution: {distribution}")
-        if filename in seen_filenames:
+        existing_digest = seen_filename_digests.get(filename)
+        if existing_digest is not None and existing_digest != pin["artifact_sha256"]:
             raise SystemExit(f"artifact filename collision: {filename}")
         lock_id = pin["lock_id"]
         if lock_id in by_id:
             raise SystemExit(f"duplicate lock identifier: {lock_id}")
         seen_distributions.add(distribution)
-        seen_filenames.add(filename)
+        seen_filename_digests[filename] = pin["artifact_sha256"]
         by_id[lock_id] = pin
         pins.append((lock_id, pin))
 

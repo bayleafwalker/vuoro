@@ -339,12 +339,16 @@ class CompositionManifest:
             raise CompositionError("composition contains duplicate lock identifiers")
         if len(distributions) != len(set(distributions)):
             raise CompositionError("composition contains duplicate distributions")
-        filenames = [
-            _release_wheel_identity(lock.source_repository, lock.artifact_url)[1]
-            for lock in locks
-        ]
-        if len(filenames) != len(set(filenames)):
-            raise CompositionError("composition contains colliding artifact filenames")
+        filename_digests: dict[str, str] = {}
+        for lock in locks:
+            filename = _release_wheel_identity(lock.source_repository, lock.artifact_url)[1]
+            existing = filename_digests.get(filename)
+            if existing is not None and existing != lock.artifact_sha256:
+                raise CompositionError(
+                    f"composition contains colliding artifact filenames: {filename!r} "
+                    "with differing digests"
+                )
+            filename_digests[filename] = lock.artifact_sha256
         if {descriptor.domain for descriptor in descriptors} != _REQUIRED_DOMAINS:
             raise CompositionError("composition must pin exactly work, execution, knowledge, and audit")
         if len(descriptors) != len(_REQUIRED_DOMAINS):
@@ -425,12 +429,13 @@ class CompositionManifest:
 def verify_adapter_artifacts(manifest: CompositionManifest, wheel_dir: Path) -> None:
     """Verify bundled release wheels before importing their adapter modules."""
 
-    seen: set[str] = set()
+    seen: dict[str, str] = {}
     for pin in manifest.release_locks:
         filename = pin.artifact_url.rsplit("/", 1)[-1]
-        if filename in seen:
+        existing = seen.get(filename)
+        if existing is not None and existing != pin.artifact_sha256:
             raise CompositionError(f"artifact filename collision: {filename}")
-        seen.add(filename)
+        seen[filename] = pin.artifact_sha256
         artifact = wheel_dir / filename
         try:
             digest = hashlib.sha256(artifact.read_bytes()).hexdigest()

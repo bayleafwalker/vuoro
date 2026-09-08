@@ -73,10 +73,22 @@ def test_fetcher_rejects_dependency_filename_collisions() -> None:
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    dependency = _dependency() | {"artifact_url": _adapter()["artifact_url"], "distribution": "companion"}
+    dependency = _dependency() | {
+        "artifact_url": _adapter()["artifact_url"],
+        "distribution": "companion",
+        "artifact_sha256": "c" * 64,
+    }
     with pytest.raises(SystemExit, match="filename collision"):
         module.artifact_pins(_v3_manifest(
             _release_lock("owner", _adapter()), _release_lock("companion", dependency)
+        ))
+    same_digest = _dependency() | {"artifact_url": _adapter()["artifact_url"], "distribution": "companion"}
+    with pytest.raises(SystemExit, match="duplicate runtime domains"):
+        # No filename collision when the digest matches (Amendment 2 / D-6); the
+        # error below is unrelated -- this manifest has no runtime descriptors,
+        # which is what this helper call hits next.
+        module.artifact_pins(_v3_manifest(
+            _release_lock("owner", _adapter()), _release_lock("companion", same_digest)
         ))
 
 
