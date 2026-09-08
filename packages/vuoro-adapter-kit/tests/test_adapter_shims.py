@@ -24,7 +24,7 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 
-from vuoro_adapter_kit.adapters import audit, execution, knowledge, work
+from vuoro_adapter_kit.adapters import audit, execution, federation, knowledge, work
 
 
 @dataclass(frozen=True)
@@ -56,7 +56,7 @@ def _module(name: str, **attributes) -> ModuleType:
 @pytest.fixture(autouse=True)
 def _clean_owner_modules():
     injected = [
-        "actionq", "actionq.application", "actionq.vuoro",
+        "actionq", "actionq.application", "actionq.vuoro", "actionq.vuoro_federation",
         "sprintctl", "sprintctl.pg", "sprintctl.application", "sprintctl.vuoro_adapter",
         "kctl", "kctl.application", "kctl.vuoro",
         "auditctl", "auditctl.vuoro_adapter",
@@ -69,7 +69,7 @@ def _clean_owner_modules():
 
 def test_every_shim_exposes_exactly_build_and_register() -> None:
     """No third entrypoint, and no state: the record type has nowhere to put one."""
-    for module in (work, execution, knowledge, audit):
+    for module in (work, execution, knowledge, audit, federation):
         public = {name for name in vars(module) if not name.startswith("_")}
         assert public <= {"build", "register", "annotations", "Any"}
         assert callable(module.build) and callable(module.register)
@@ -102,6 +102,42 @@ def test_execution_registers_through_the_owner_function() -> None:
     )
     registry, application = object(), object()
     execution.register(registry, application)
+    assert seen == {"registry": registry, "application": application}
+
+
+def test_federation_delegates_build_to_the_owner_function() -> None:
+    """The iterative sibling of ``execution``: a straight delegation, nothing constructed here.
+
+    ``federation.resource/v1`` is a separate release unit from frozen
+    ``execution/v1`` (the freeze's rule 7), so this shim has its own module
+    even though both eventually import from ``actionq``.
+    """
+    captured = {}
+
+    def _build(runtime):
+        captured["runtime"] = runtime
+        return "federation-authority"
+
+    _module("actionq")
+    _module("actionq.vuoro_federation", build=_build, register=lambda registry, application: None)
+    runtime = FakeRuntime({"dsn": "postgres:///x", "schema": "actionq"})
+    result = federation.build(runtime)
+    assert result == "federation-authority"
+    assert captured["runtime"] is runtime
+
+
+def test_federation_registers_through_the_owner_function() -> None:
+    seen = {}
+    _module("actionq")
+    _module(
+        "actionq.vuoro_federation",
+        build=lambda runtime: None,
+        register=lambda registry, application: seen.update(
+            registry=registry, application=application
+        ),
+    )
+    registry, application = object(), object()
+    federation.register(registry, application)
     assert seen == {"registry": registry, "application": application}
 
 
