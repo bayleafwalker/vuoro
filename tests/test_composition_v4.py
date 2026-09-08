@@ -942,6 +942,61 @@ def test_reissued_identity_owns_nothing_historical() -> None:
     assert any("ownership_evidence" in item for item in found)
 
 
+def test_federation_principal_owner_is_settled_and_scope_is_global() -> None:
+    """Re-nulling the owner or widening the scope must regress this test visibly.
+
+    federation.principal/v1 is owned by Vuoro's identity plane (vuoro-cloud),
+    frozen, non-transferable, and scoped globally -- backlog item 5.5 and
+    rescope §2.1 settle this; composition_v4.py deliberately still allows a
+    null owner (it must not force one), so the settlement lives in the
+    manifest, and this test pins it there.
+    """
+    manifest, _ = reference()
+    principal = manifest.contract("federation.principal/v1")
+    assert principal.owner == "vuoro-cloud"
+    assert principal.scope_kind == "global"
+    assert principal.ownership == "non-transferable"
+
+
+def test_grant_scope_matches_actionqs_flat_authority_gate() -> None:
+    """Falsifies a disagreement between the served grant scope and the implementation.
+
+    Backlog §5.8 rules that Vuoro's authorizer gets NO repository check for
+    federation operations: authority-gating is the model, and the boundary
+    that contains its honest cost (a principal holding federation.create can
+    create resources anywhere in its environment) is the grant, not a
+    narrower repo-scoped shape copied from `_execution_authorizer`. The grant
+    is therefore environment-scoped (rescope §2.3, restated by backlog §5.8),
+    never project-scoped.
+
+    Half (a) reads the manifest Vuoro actually serves. Half (b) independently
+    reads the actionq sibling checkout and asserts its authority check is
+    still flat frozenset membership with no project dimension anywhere in the
+    federation schema -- so this fails if either artifact drifts from the
+    other, not merely if someone mistypes the manifest.
+
+    actionq's declared scope text (verbatim): the federation authority
+    vocabulary is a flat set checked by string membership, and no federation
+    table carries a project column.
+    """
+    manifest, _ = reference()
+    grant = manifest.contract("federation.grant/v1")
+    assert grant.scope_kind == "environment"
+
+    actionq_root = ROOT.parent / "actionq"
+    if not actionq_root.is_dir():
+        pytest.skip(f"sibling checkout not present: {actionq_root}")
+
+    federation_py = (actionq_root / "actionq" / "federation.py").read_text(encoding="utf-8")
+    federation_schema_py = (actionq_root / "actionq" / "federation_schema.py").read_text(encoding="utf-8")
+
+    assert "authorities: frozenset[str]" in federation_py
+    assert "authority not in principal.authorities" in federation_py
+
+    for source in (federation_py, federation_schema_py):
+        assert "project" not in source.lower()
+
+
 def test_the_migrated_reference_profile_states_exactly_what_it_still_lacks() -> None:
     """Not a falsifier: a pin on the honest gaps, so closing one is a visible edit.
 

@@ -49,14 +49,14 @@
       "scope_kind": "global",
       "frozen": true,
       "conformance": "operation-hashes",
-      "owner": null,
+      "owner": "vuoro-cloud",
       "ownership": "non-transferable"
     },
     {
       "capability_id": "federation.grant/v1",
       "cardinality": "exclusive",
       "required": false,
-      "scope_kind": "project",
+      "scope_kind": "environment",
       "frozen": false,
       "conformance": "operation-hashes",
       "owner": "actionq"
