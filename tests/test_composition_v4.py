@@ -637,6 +637,95 @@ def test_frozen_and_iterative_capabilities_need_separate_release_units() -> None
     assert not any("frozen and an iterative" in item for item in found)
 
 
+def test_same_filename_same_digest_across_release_units_is_not_a_rule_8_collision() -> None:
+    """Amendment 2 / D-6: a shared filename is a collision only when content differs.
+
+    Scope: two provider records in distinct release units naming the same
+    wheel filename, with the same artifact_sha256, is content-identical
+    staging -- not the rule 8 collision the frozen check exists to catch.
+    """
+    manifest = SupportManifest.from_dict(_support(contracts=[
+        _contract(capability_id="execution/v1", frozen=True, operation_hashes="e" * 64),
+        _contract(capability_id="federation.resource/v1", frozen=False, required=False),
+    ]))
+    profile = _profile(
+        providers=[
+            _provider(),
+            _provider(provider_id="actionq-federation", release_unit="actionq-federation",
+                      capabilities=["federation.resource/v1"],
+                      artifact={"distribution": "actionq-federation",
+                                "distribution_version": "0.1.26",
+                                "artifact_sha256": "a" * 64,
+                                "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/v0.1.26/actionq-0.1.26-py3-none-any.whl"}),
+        ],
+        adapters=[_adapter(), _adapter(adapter_id="federation-catalog",
+                                       provider_id="actionq-federation")],
+        bindings=[
+            _binding(capability_id="execution/v1"),
+            _binding(capability_id="federation.resource/v1", provider_id="actionq-federation",
+                     adapter_id="federation-catalog"),
+        ],
+    )
+    found = violations(CompositionProfile.from_dict(profile), manifest, check_entrypoints=False)
+    assert not any("stage the same" in item for item in found)
+
+
+def test_same_filename_differing_digest_across_release_units_is_still_a_rule_8_collision() -> None:
+    """The D-6 refinement narrows rule 8; it does not delete it.
+
+    Scope: two provider records naming the same wheel filename with
+    DIFFERING artifact_sha256 values stay rejected -- otherwise a tampered
+    second wheel would pass under the same name as the first.
+    """
+    manifest = SupportManifest.from_dict(_support(contracts=[
+        _contract(capability_id="execution/v1", frozen=True, operation_hashes="e" * 64),
+        _contract(capability_id="federation.resource/v1", frozen=False, required=False),
+    ]))
+    profile = _profile(
+        providers=[
+            _provider(),
+            _provider(provider_id="actionq-federation", release_unit="actionq-federation",
+                      capabilities=["federation.resource/v1"],
+                      artifact={"distribution": "actionq-federation",
+                                "distribution_version": "0.1.26",
+                                "artifact_sha256": "b" * 64,
+                                "artifact_url": "https://github.com/bayleafwalker/actionq/releases/download/v0.1.26/actionq-0.1.26-py3-none-any.whl"}),
+        ],
+        adapters=[_adapter(), _adapter(adapter_id="federation-catalog",
+                                       provider_id="actionq-federation")],
+        bindings=[
+            _binding(capability_id="execution/v1"),
+            _binding(capability_id="federation.resource/v1", provider_id="actionq-federation",
+                     adapter_id="federation-catalog"),
+        ],
+    )
+    found = violations(CompositionProfile.from_dict(profile), manifest, check_entrypoints=False)
+    assert any("stage the same" in item and "digest" in item for item in found)
+
+
+def test_one_release_unit_bound_to_execution_and_federation_resource_still_fails_rule_7() -> None:
+    """The rule 8 loosening must not leak into rule 7's frozen/iterative split.
+
+    Scope: a SINGLE provider record (one release unit) bound to both frozen
+    execution/v1 and iterative federation.resource/v1 stays rejected by rule
+    7, proving D-6's filename/digest refinement did not weaken the separate
+    frozen-vs-iterative release-unit check.
+    """
+    manifest = SupportManifest.from_dict(_support(contracts=[
+        _contract(capability_id="execution/v1", frozen=True, operation_hashes="e" * 64),
+        _contract(capability_id="federation.resource/v1", frozen=False, required=False),
+    ]))
+    profile = _profile(
+        providers=[_provider(capabilities=["execution/v1", "federation.resource/v1"])],
+        bindings=[
+            _binding(capability_id="execution/v1"),
+            _binding(capability_id="federation.resource/v1"),
+        ],
+    )
+    found = violations(CompositionProfile.from_dict(profile), manifest, check_entrypoints=False)
+    assert any("frozen and an iterative" in item for item in found)
+
+
 def test_adapter_records_cannot_declare_canonical_state() -> None:
     """An adapter with state of its own is a provider.
 

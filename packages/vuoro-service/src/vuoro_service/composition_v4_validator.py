@@ -459,7 +459,7 @@ def _rule_8_v3_invariants(
     found: list[str] = []
     by_id = {provider.provider_id: provider for provider in profile.providers}
 
-    filenames: dict[str, str] = {}
+    filenames: dict[str, tuple[str, str]] = {}
     for provider in profile.providers:
         if provider.artifact_kind == "wheel":
             url = provider.artifact["artifact_url"]
@@ -468,12 +468,17 @@ def _rule_8_v3_invariants(
             except CompositionError as error:
                 found.append(f"rule 8: {provider.provider_id}: {error}")
                 continue
+            digest = provider.artifact["artifact_sha256"]
             if filename in filenames:
-                found.append(
-                    f"rule 8: {provider.provider_id} and {filenames[filename]} stage the "
-                    f"same artifact filename {filename!r}"
-                )
-            filenames[filename] = provider.provider_id
+                other_id, other_digest = filenames[filename]
+                if other_digest != digest:
+                    found.append(
+                        f"rule 8: {provider.provider_id} and {other_id} stage the same "
+                        f"artifact filename {filename!r} with differing digests "
+                        f"({digest!r} != {other_digest!r})"
+                    )
+            else:
+                filenames[filename] = (provider.provider_id, digest)
             if provider.source_revision is None or not _GIT_SHA.fullmatch(provider.source_revision):
                 found.append(
                     f"rule 8: {provider.provider_id} wheel has no full-Git-SHA source_revision"
