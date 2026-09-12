@@ -8,6 +8,10 @@ at the plan describing it, then revised against an adversarial completeness pass
 minor. All six were re-verified at the artifact and all six were real; the revision closed them and
 corrected two v1 findings that were themselves wrong.
 
+The estate's shape as of 2026-09-12, and the doc-vs-disk deltas open against it, are recorded in
+[`docs/architecture/agentic-estate.md`](../architecture/agentic-estate.md); status remains this
+register's to decide.
+
 ## Revision record
 
 ## What changed

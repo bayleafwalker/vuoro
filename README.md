@@ -64,7 +64,11 @@ The domain tools retain their state machines. Machine-local worktrees and
 filesystem effects stay on the executing machine even when shared coordination
 is served remotely. See the
 [system shape and end-to-end walkthrough](https://github.com/bayleafwalker/agentops/blob/main/docs/architecture/vuoro-system-shape.md)
-for the ownership map, failure rejection, and recovery path.
+for the ownership map, failure rejection, and recovery path. The ratified
+record of the surrounding estate — control plane, authority owners, execution
+hosts and identities, trust boundary, evidence stores, and the ownership table
+that supersedes the historical one — is
+[The agentic estate](docs/architecture/agentic-estate.md).
 
 Commands may eventually return references to domain-owned observable
 resources. Vuoro standardizes reference, snapshot, change, and delivery
