@@ -194,12 +194,12 @@
       "artifact_kind": "wheel",
       "role": "adapter",
       "source_repository": "https://github.com/bayleafwalker/sprintctl",
-      "source_revision": "95e18f5683eff28cac66f9351bb6ec062c5e68c8",
+      "source_revision": "2fe8ea1d02d8f7d02c9907ca09ade4d5520ec1ea",
       "artifact": {
         "distribution": "sprintctl",
-        "distribution_version": "0.3.5",
-        "artifact_sha256": "51e3cf598f4771bed47d45480c33b27789e707b06e516b9db3f0c88afa0d336f",
-        "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/v0.3.5/sprintctl-0.3.5-py3-none-any.whl"
+        "distribution_version": "0.3.6",
+        "artifact_sha256": "0edfab85f686baa5fa073424c3e22b171407a0ddeaee45c8912583cf94a2842e",
+        "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/v0.3.6/sprintctl-0.3.6-py3-none-any.whl"
       },
       "capabilities": [
         "work-api/v1"
