@@ -121,7 +121,10 @@ G0  Vuoro is the governed distribution and control projection for a changing pro
     ├── R4.3 per-release scorecard: frontier turns, cheap-tier first-pass rate,
     │        escalations, rework, cost; compared release over release.  A: agentops
     └── E4.4 OTel/Alloy deferred until a dashboard consumer exists (direction: no
-             generic audit ingestion without a consumer).
+             generic audit ingestion without a consumer). Note (2026-09-14): the
+             harness-evidence backend is now Langfuse (G1, accepted); Langfuse as
+             the E4.4 consumer is proposed (G2, pending) — see agentops
+             `docs/plans/agentops/native-runtime-federation-realignment-2026-08-20.md`.
 ```
 
 ### Obstacles (and the leaf that resolves each)
