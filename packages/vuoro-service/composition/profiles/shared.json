@@ -211,8 +211,8 @@
         "configuration_digest": "89b03ef9f35395b4231226af1ca7cc0d3e97f14fc5bd443d44b5732517836ffa",
         "schema_version": "work-schema/v1",
         "protocol_version": "1",
-        "operation_hashes": "c6759b011ab71b65699126a49db48a69ddd760e11758095ace3f3bc46c9ad713",
-        "attestation": "290a8a809d86651dc0c9bc6fb0257810fad655b6b1e40362f240d7375ab72cc4"
+        "operation_hashes": "26a9d58287ae120a738d512aa21aa8f9da5032c8110d1d18d59898a1fbc62bfa",
+        "attestation": "6a54a3c5559b6d9824764d73d950b846bdf2d362b3704f3786a7313cd6138768"
       }
     }
   ],
