@@ -53,7 +53,8 @@ items:
   repos:
   - /projects/dev/vuoro
   role: Python monorepo whose runnable surface is a schema-described HTTP service (handshake/catalog/invoke) plus
-    a thin client and bootstrap CLI, with composition-v4 and an EvidenceSet/EffectGrant/Decision reducer library alongside.
+    a thin client and bootstrap CLI, with an EvidenceSet/EffectGrant/Decision reducer library alongside. Composition-v4
+    was deleted unwired in S2 change 1 (decision D4, branch chore/s2-delete-composition-v4).
   status: active
   intention: Own only the semantics that survive replacement of the market products around it - what was released,
     what authority was granted, what evidence exists, what was decided.
