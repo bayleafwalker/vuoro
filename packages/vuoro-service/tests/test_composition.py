@@ -830,8 +830,7 @@ def test_load_and_verify_reject_a_shared_filename_with_a_differing_digest(tmp_pa
 
 def test_attester_accepts_a_shared_filename_with_an_identical_digest_and_rejects_a_differing_one() -> None:
     """The deploy-time attestation script (scripts/attest_installed_composition.py)
-    is a fifth, independent rule-8 enforcer -- shipped into the image and
-    consulted by composition_v4_validator.py's rule-7 allowlist -- so the
+    is an independent rule-8 enforcer -- shipped into the image -- so the
     Amendment 2 / D-6 filename->digest refinement must hold there too, not
     only in CompositionManifest.load, verify_adapter_artifacts, and
     fetch_pinned_adapters.artifact_pins."""

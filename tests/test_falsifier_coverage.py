@@ -58,18 +58,22 @@ REQUIRED_FIELDS = {"id", "claim", "scope"}
 ABSOLUTE_FLOOR = 0.0
 
 
-def _documents() -> list[tuple[Path, str]]:
+def _documents(roots: tuple[Path, ...] = DOC_ROOTS) -> list[tuple[Path, str]]:
     """Documents that opt in, discovered by *either* signal.
 
     Keying discovery on the falsifiers block alone would make a document that
     carries claim markers and no block invisible to every check below -- the one
     shape that most needs catching, since it is what a half-finished opt-in
     looks like.
+
+    No opted-in document is a legitimate state: the composition v4 freeze was
+    the only one, and it was deleted with v4 (S2 change 1, decision D4). A
+    missing scan root is not -- it would make every check below pass vacuously
+    because the tree moved, not because no document makes claims -- so it fails.
     """
     found: list[tuple[Path, str]] = []
-    for root in DOC_ROOTS:
-        if not root.is_dir():
-            continue
+    for root in roots:
+        assert root.is_dir(), f"falsifier scan root {root} does not exist"
         for path in sorted(root.rglob("*.md")):
             text = path.read_text(encoding="utf-8")
             if FALSIFIER_BLOCK.search(text) or CLAIM_MARKER.search(text):
@@ -135,10 +139,32 @@ def _flow(value: str) -> str:
     return " ".join(value.split())
 
 
-def test_at_least_one_document_opts_in() -> None:
-    """The checker is worthless if nothing is registered; fail rather than pass
-    vacuously when every document has dropped its falsifiers block."""
-    assert _documents(), "no plan document carries a falsifiers block"
+def test_the_docs_tree_is_scanned() -> None:
+    """The scan roots exist, so an empty discovery means no document opts in."""
+    assert DOC_ROOTS, "no falsifier scan roots configured"
+    for root in DOC_ROOTS:
+        assert root.is_dir(), f"falsifier scan root {root} does not exist"
+    _documents()
+
+
+def test_a_missing_docs_tree_fails(tmp_path: Path) -> None:
+    """A moved or deleted docs/ tree must not read as 'nothing opted in'."""
+    with pytest.raises(AssertionError, match="does not exist"):
+        _documents((tmp_path / "docs",))
+
+
+def test_no_opted_in_document_passes_and_an_opted_in_one_is_found(tmp_path: Path) -> None:
+    """Zero opted-in documents is a pass; discovery still sees either signal."""
+    docs = tmp_path / "docs"
+    (docs / "plans").mkdir(parents=True)
+    (docs / "plans" / "plain.md").write_text("# No claims here\n", encoding="utf-8")
+    assert _documents((docs,)) == []
+
+    marked = docs / "plans" / "marked.md"
+    marked.write_text("A claim. <!-- claim: some-claim -->\n", encoding="utf-8")
+    blocked = docs / "blocked.md"
+    blocked.write_text("```falsifiers\n{}\n```\n", encoding="utf-8")
+    assert sorted(path for path, _ in _documents((docs,))) == sorted([marked, blocked])
 
 
 def test_every_marked_claim_is_accounted_for_and_every_falsifier_is_marked() -> None:

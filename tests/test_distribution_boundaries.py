@@ -14,8 +14,9 @@ SHARED_PACKAGES = {
 }
 SHARED_PACKAGE_VERSIONS = {
     "vuoro-schema-runtime": "0.1.0",
-    # 0.1.1 adds vuoro_adapter_kit.adapters: the uniform construction shims the
-    # v4 profile names. The pinned 0.1.0 wheel does not contain them.
+    # 0.1.1 adds vuoro_adapter_kit.adapters, the uniform construction shims that
+    # composition v4 named. v4 was deleted in S2 change 1 (D4); the shims remain
+    # in the released 0.1.1 wheel and nothing in this repository loads them.
     "vuoro-adapter-kit": "0.1.1",
 }
 FORBIDDEN_CLIENT_TERMS = {
