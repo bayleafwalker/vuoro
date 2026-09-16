@@ -5,7 +5,7 @@
 [Explore the Vuoro overview.](https://bayleafwalker.github.io/vuoro/)
 
 Vuoro is a reusable governed-work substrate. It keeps machine-local effects on
-the machine while serving shared work, execution, knowledge, and audit
+the machine while serving shared work and audit
 capabilities through one versioned runtime.
 
 ## Project status
@@ -52,7 +52,7 @@ agent or cockpit
                                       pinned owner adapters
                                                     │
                                       remote mode   ▼
-                                  sprintctl · actionq · kctl · auditctl
+                                        sprintctl · auditctl
                                       shared PostgreSQL authorities
 ```
 

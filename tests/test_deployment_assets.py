@@ -21,10 +21,10 @@ def test_base_keeps_runtime_and_migration_credentials_separate() -> None:
     assert "vuoro-runtime-dsns" in deployment
     assert "vuoro-migration-dsns" not in deployment
     assert "vuoro-migration-dsns" in jobs
-    assert jobs.count("suspend: true") == 4
-    assert "ACTIONQ_RUNTIME_ROLE" in jobs
-    assert "--environment-name" in jobs
-    assert "--environment-class" in jobs
+    assert jobs.count("suspend: true") == 2
+    # S2 item 4: the execution (ActionQ) and knowledge (kctl) domains are unbound.
+    assert "ACTIONQ_" not in jobs and "kctl" not in jobs
+    assert "VUORO_EXECUTION_" not in deployment and "VUORO_KNOWLEDGE_" not in deployment
 
 
 def test_base_requires_an_immutable_image_replacement() -> None:

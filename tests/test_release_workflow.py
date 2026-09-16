@@ -90,16 +90,9 @@ def test_service_image_installs_both_locked_shared_dependencies() -> None:
     assert "python -m pip install --no-cache-dir --no-deps" in dockerfile
     assert "/opt/vuoro/adapters/vuoro_adapter_kit-*.whl" in dockerfile
     assert "/opt/vuoro/adapters/vuoro_schema_runtime-*.whl" in dockerfile
-    assert "/opt/vuoro/adapters/kctl-*.whl" in dockerfile
-
-
-def test_ci_exercises_the_released_knowledge_composition() -> None:
-    workflow = CI_WORKFLOW.read_text(encoding="utf-8")
-    assert "name: Exercise pinned released knowledge adapter" in workflow
-    assert "dist/adapters/kctl-*.whl" in workflow
-    assert "dist/adapters/vuoro_adapter_kit-*.whl" in workflow
-    assert "dist/adapters/vuoro_schema_runtime-*.whl" in workflow
-    assert "scripts/validate_released_knowledge_adapter.py" in workflow
+    # S2 item 4 unbound the execution (ActionQ) and knowledge (kctl) domains.
+    for retired in ("actionq-", "actionq_contracts-", "kctl-"):
+        assert f"/opt/vuoro/adapters/{retired}" not in dockerfile
 
 
 def test_ci_exercises_the_released_audit_composition() -> None:
@@ -111,25 +104,16 @@ def test_ci_exercises_the_released_audit_composition() -> None:
     assert "scripts/validate_released_audit_adapter.py" in workflow
 
 
-def test_ci_exercises_the_released_execution_composition_with_shared_lock() -> None:
+def test_ci_exercises_the_complete_released_two_domain_catalog() -> None:
     workflow = CI_WORKFLOW.read_text(encoding="utf-8")
-    assert "name: Exercise pinned released execution adapter" in workflow
-    assert "dist/adapters/actionq_contracts-*.whl" in workflow
-    assert "dist/adapters/actionq-*.whl" in workflow
-    assert "--no-deps" in workflow
-    assert "dist/adapters/vuoro_adapter_kit-*.whl" in workflow
-    assert "dist/adapters/vuoro_schema_runtime-*.whl" in workflow
-    assert "uv pip check --python" in workflow
-    assert "scripts/validate_released_execution_adapter.py" in workflow
-    execution_gate = workflow.split("name: Exercise pinned released execution adapter", 1)[1].split(
-        "name: Exercise pinned released knowledge adapter", 1
-    )[0]
-    assert "'psycopg[binary]>=3.2,<4'" in execution_gate
-
-
-def test_ci_exercises_the_complete_released_four_domain_catalog() -> None:
-    workflow = CI_WORKFLOW.read_text(encoding="utf-8")
-    assert "name: Exercise complete released four-domain catalog" in workflow
+    assert "name: Exercise complete released two-domain catalog" in workflow
+    for retired in (
+        "validate_released_execution_adapter.py",
+        "validate_released_knowledge_adapter.py",
+        "dist/adapters/actionq",
+        "dist/adapters/kctl-",
+    ):
+        assert retired not in workflow
     assert "scripts/validate_released_catalog_composition.py" in workflow
     assert "dist/adapters/auditctl-*.whl" in workflow
     assert "dist/adapters/vuoro_schema_runtime-*.whl" in workflow

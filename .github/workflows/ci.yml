@@ -74,46 +74,6 @@ jobs:
             scripts/validate_released_work_adapter.py \
             packages/vuoro-service/composition/adapter-pins.json \
             dist/adapters
-      - name: Exercise pinned released execution adapter
-        shell: bash
-        run: |
-          uv venv --python 3.12 /tmp/vuoro-released-execution-wheel
-          uv pip install --python /tmp/vuoro-released-execution-wheel/bin/python \
-            dist/vuoro-service/*.whl \
-            'httpx>=0.27,<1' 'psycopg[binary]>=3.2,<4'
-          # Install the owner wheels before the shared dependency.  ActionQ's
-          # metadata names the same immutable shared URLs; keeping this step
-          # explicit prevents resolver drift while preserving pip check.
-          uv pip install --python /tmp/vuoro-released-execution-wheel/bin/python \
-            --no-deps \
-            dist/adapters/actionq_contracts-*.whl \
-            dist/adapters/actionq-*.whl
-          uv pip install --python /tmp/vuoro-released-execution-wheel/bin/python \
-            --no-deps \
-            dist/adapters/vuoro_adapter_kit-*.whl \
-            dist/adapters/vuoro_schema_runtime-*.whl
-          uv pip check --python /tmp/vuoro-released-execution-wheel/bin/python
-          /tmp/vuoro-released-execution-wheel/bin/python \
-            scripts/validate_released_execution_adapter.py \
-            packages/vuoro-service/composition/adapter-pins.json \
-            dist/adapters
-      - name: Exercise pinned released knowledge adapter
-        shell: bash
-        run: |
-          uv venv --python 3.12 /tmp/vuoro-released-knowledge-wheel
-          uv pip install --python /tmp/vuoro-released-knowledge-wheel/bin/python \
-            dist/vuoro-service/*.whl \
-            'httpx>=0.27,<1'
-          uv pip install --python /tmp/vuoro-released-knowledge-wheel/bin/python \
-            --no-deps \
-            dist/adapters/vuoro_adapter_kit-*.whl \
-            dist/adapters/vuoro_schema_runtime-*.whl \
-            dist/adapters/kctl-*.whl
-          uv pip check --python /tmp/vuoro-released-knowledge-wheel/bin/python
-          /tmp/vuoro-released-knowledge-wheel/bin/python \
-            scripts/validate_released_knowledge_adapter.py \
-            packages/vuoro-service/composition/adapter-pins.json \
-            dist/adapters
       - name: Exercise pinned released audit adapter
         shell: bash
         run: |
@@ -131,23 +91,20 @@ jobs:
             scripts/validate_released_audit_adapter.py \
             packages/vuoro-service/composition/adapter-pins.json \
             dist/adapters
-      - name: Exercise complete released four-domain catalog
+      - name: Exercise complete released two-domain catalog
         shell: bash
         run: |
-          uv venv --python 3.12 /tmp/vuoro-released-four-domain-wheel
-          uv pip install --python /tmp/vuoro-released-four-domain-wheel/bin/python \
+          uv venv --python 3.12 /tmp/vuoro-released-two-domain-wheel
+          uv pip install --python /tmp/vuoro-released-two-domain-wheel/bin/python \
             dist/vuoro-service/*.whl \
-            'httpx>=0.27,<1' 'click>=8.1' 'psycopg[binary]>=3.2,<4'
-          uv pip install --python /tmp/vuoro-released-four-domain-wheel/bin/python \
+            'httpx>=0.27,<1' 'click>=8.1'
+          uv pip install --python /tmp/vuoro-released-two-domain-wheel/bin/python \
             --no-deps \
-            dist/adapters/actionq_contracts-*.whl \
-            dist/adapters/actionq-*.whl \
             dist/adapters/vuoro_adapter_kit-*.whl \
             dist/adapters/vuoro_schema_runtime-*.whl \
             dist/adapters/sprintctl-*.whl \
-            dist/adapters/kctl-*.whl \
             dist/adapters/auditctl-*.whl
-          uv pip check --python /tmp/vuoro-released-four-domain-wheel/bin/python
-          /tmp/vuoro-released-four-domain-wheel/bin/python \
+          uv pip check --python /tmp/vuoro-released-two-domain-wheel/bin/python
+          /tmp/vuoro-released-two-domain-wheel/bin/python \
             scripts/validate_released_catalog_composition.py
       - run: python -m json.tool vuoro.dispatch.json >/dev/null

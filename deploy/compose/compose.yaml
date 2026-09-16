@@ -26,10 +26,6 @@ services:
       VUORO_IDENTITIES_FILE: /run/vuoro/identities.json
       VUORO_WORK_REPOSITORY_ID: local-evaluation
       VUORO_WORK_RUNTIME_DSN: postgresql://work_runtime:local-evaluation-only@postgres:5432/vuoro
-      VUORO_EXECUTION_RUNTIME_DSN: postgresql://execution_runtime:local-evaluation-only@postgres:5432/vuoro
-      VUORO_EXECUTION_SCHEMA: execution
-      VUORO_KNOWLEDGE_RUNTIME_DSN: postgresql://knowledge_runtime:local-evaluation-only@postgres:5432/vuoro
-      VUORO_KNOWLEDGE_SCHEMA: knowledge
       VUORO_AUDIT_RUNTIME_DSN: postgresql://audit_runtime:local-evaluation-only@postgres:5432/vuoro
       VUORO_AUDIT_SCHEMA: audit
     ports:

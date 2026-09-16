@@ -39,16 +39,6 @@ spec:
                 secretKeyRef:
                   name: vuoro-runtime-dsns
                   key: work
-            - name: VUORO_EXECUTION_RUNTIME_DSN
-              valueFrom:
-                secretKeyRef:
-                  name: vuoro-runtime-dsns
-                  key: execution
-            - name: VUORO_KNOWLEDGE_RUNTIME_DSN
-              valueFrom:
-                secretKeyRef:
-                  name: vuoro-runtime-dsns
-                  key: knowledge
             - name: VUORO_AUDIT_RUNTIME_DSN
               valueFrom:
                 secretKeyRef:
