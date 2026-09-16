@@ -15,8 +15,6 @@ from vuoro_service.composition import (
     load_identities,
     verify_adapter_artifacts,
     verify_installed_composition,
-    _execution_authorizer,
-    _execution_completion_connection_factories,
     _bind_work_resource_visibility,
     _load_work_resource_observation_authorizer,
     _load_project_binding_for_composition,
@@ -32,13 +30,16 @@ from vuoro_service.project_binding import load_project_bindings
 ROOT = Path(__file__).parents[1]
 
 
-def test_checked_in_manifest_pins_all_four_domains() -> None:
+def test_checked_in_manifest_pins_only_work_and_audit() -> None:
     manifest = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json")
-    assert {pin.domain for pin in manifest.adapters} == {"work", "execution", "knowledge", "audit"}
+    # S2 item 4 unbound the execution (ActionQ) and knowledge (kctl) domains.
+    assert {pin.domain for pin in manifest.adapters} == {"work", "audit"}
+    assert not {"actionq", "actionq-contracts", "kctl"} & {
+        lock.distribution for lock in manifest.release_locks
+    }
     assert all(len(pin.source_revision) == 40 for pin in manifest.adapters)
     assert all(len(pin.artifact_sha256) == 64 for pin in manifest.adapters)
     assert all(pin.lock_kind == "adapter" for pin in manifest.adapters)
-    assert manifest.pin("execution").dependencies[0].lock_kind == "owner-dependency"
     assert all("migration_entrypoint" not in descriptor.__dict__ for descriptor in manifest.runtime_descriptors)
 
 
@@ -57,7 +58,7 @@ def test_shared_dependency_is_reusable_and_fetched_and_attested_once(tmp_path: P
     assert sum(
         "vuoro-schema-runtime" in descriptor.dependency_lock_ids
         for descriptor in manifest.runtime_descriptors
-    ) == 3
+    ) == 1
 
     fetch_spec = importlib.util.spec_from_file_location(
         "fetch_pins", ROOT.parents[1] / "scripts" / "fetch_pinned_adapters.py"
@@ -98,11 +99,33 @@ def test_runtime_and_fetcher_share_v3_dependency_policy(tmp_path: Path) -> None:
         fetcher.artifact_pins(raw)
 
 
+def _with_foreign_owner_dependency(raw: dict) -> None:
+    # The checked-in manifest no longer carries an owner-dependency lock (the
+    # ActionQ contracts companion left with the execution domain), so graft a
+    # synthetic one from a different repository onto the audit descriptor.
+    raw["release_locks"].append({
+        "lock_id": "audit-contracts",
+        "lock_kind": "owner-dependency",
+        "source_repository": "https://github.com/example/auditctl",
+        "source_revision": "0" * 40,
+        "artifact_url": "https://github.com/example/auditctl/releases/download/v0.1.0/auditctl_contracts-0.1.0-py3-none-any.whl",
+        "artifact_sha256": "1" * 64,
+        "distribution": "auditctl-contracts",
+        "distribution_version": "0.1.0",
+    })
+    audit = next(item for item in raw["runtime_descriptors"] if item["domain"] == "audit")
+    audit["dependency_lock_ids"].insert(0, "audit-contracts")
+
+
+def _lock(raw: dict, lock_id: str) -> dict:
+    return next(lock for lock in raw["release_locks"] if lock["lock_id"] == lock_id)
+
+
 @pytest.mark.parametrize("mutation, message", [
-    (lambda raw: raw["release_locks"][0].update(lock_kind="shared-dependency"), "primary"),
-    (lambda raw: raw["release_locks"][2].update(lock_kind="adapter"), "adapter"),
-    (lambda raw: raw["release_locks"][2].update(source_repository="https://github.com/example/actionq", artifact_url="https://github.com/example/actionq/releases/download/vuoro-adapter-v1-0e8b213/actionq_contracts-0.1.1-py3-none-any.whl"), "same owner"),
-    (lambda raw: raw["release_locks"][0].update(artifact_sha256="x" * 64), "artifact"),
+    (lambda raw: _lock(raw, "work-adapter").update(lock_kind="shared-dependency"), "primary"),
+    (lambda raw: _lock(raw, "vuoro-schema-runtime").update(lock_kind="adapter"), "adapter"),
+    (_with_foreign_owner_dependency, "same owner"),
+    (lambda raw: _lock(raw, "work-adapter").update(artifact_sha256="x" * 64), "artifact"),
 ])
 def test_attester_rejects_the_same_v3_policy_mutations_as_runtime(
     mutation, message: str,
@@ -136,9 +159,11 @@ def test_v3_composition_fails_closed_on_duplicate_and_orphan_release_locks(
         CompositionManifest.load(path)
 
     raw = json.loads(source.read_text(encoding="utf-8"))
-    raw["runtime_descriptors"][1]["dependency_lock_ids"] = []
+    next(item for item in raw["runtime_descriptors"] if item["domain"] == "audit")[
+        "dependency_lock_ids"
+    ] = []
     path.write_text(json.dumps(raw), encoding="utf-8")
-    with pytest.raises(CompositionError, match="owner dependency|orphan"):
+    with pytest.raises(CompositionError, match="must be referenced|orphan"):
         CompositionManifest.load(path)
 
 
@@ -162,28 +187,6 @@ def test_checked_in_adapter_artifact_urls_are_source_named_or_exact_semver_relea
             }
         )
         assert pin.source_revision[:7] in tag or exact_owner_semver
-
-
-def test_checked_in_execution_pin_includes_released_contract_companion() -> None:
-    pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("execution")
-    # W4's release. The schema version is unchanged and deliberately so: 0.1.27
-    # adds a federation serving surface and touches no execution migration, so
-    # a moved actionq-schema here would mean the frozen contract had drifted.
-    assert (pin.source_revision, pin.distribution_version, pin.schema_version) == (
-        "4fd670a7962edeacc7bd05ee1221b75ee0fc2825", "0.1.27", "actionq-schema/v12")
-    assert pin.artifact_url.endswith("/v0.1.27/actionq-0.1.27-py3-none-any.whl")
-    assert pin.artifact_sha256 == (
-        "11bcedf62bf336af8ea0160988be5009aa7b518e927923c54bcb979077dd1aa6"
-    )
-    assert [(item.lock_id, item.lock_kind, item.distribution, item.distribution_version)
-            for item in pin.dependencies] == [
-        ("execution-contracts", "owner-dependency", "actionq-contracts", "0.1.1"),
-        ("vuoro-adapter-kit", "shared-dependency", "vuoro-adapter-kit", "0.1.1"),
-        ("vuoro-schema-runtime", "shared-dependency", "vuoro-schema-runtime", "0.1.0"),
-    ]
-    assert pin.dependencies[0].source_revision == "0e8b21325a7fd3d59a989110e61ce80476c51dea"
-    assert pin.dependencies[1].source_revision == "1b6a51397e693c5e1d37ca71658dd3a5d5d0dd77"
-    assert pin.dependencies[2].source_revision == "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c"
 
 
 def test_checked_in_work_pin_is_the_release_actor_binding_release() -> None:
@@ -220,55 +223,6 @@ def test_checked_in_work_pin_is_the_release_actor_binding_release() -> None:
         "sprintctl.vuoro_adapter",
         "register_work_catalog",
     )
-
-
-def test_checked_in_knowledge_pin_is_kctl_013_with_released_shared_dependencies() -> None:
-    manifest = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json")
-    pin = manifest.pin("knowledge")
-    assert (
-        pin.source_repository,
-        pin.source_revision,
-        pin.distribution,
-        pin.distribution_version,
-        pin.artifact_url,
-        pin.artifact_sha256,
-    ) == (
-        "https://github.com/bayleafwalker/kctl",
-        "f5c5483b0825219ad90488276b56d143b64f01ad",
-        "kctl",
-        "0.1.3",
-        "https://github.com/bayleafwalker/kctl/releases/download/kctl-v0.1.3/kctl-0.1.3-py3-none-any.whl",
-        "789b5aadfc4c31171d574c76b79af9999b08b5cf212969cefc8504eb2e99e43d",
-    )
-    assert (pin.adapter_module, pin.register, pin.api_version, pin.schema_version) == (
-        "kctl.vuoro",
-        "register_operations",
-        "knowledge/v1",
-        "knowledge-schema/v1",
-    )
-    assert [(dependency.lock_id, dependency.lock_kind, dependency.distribution,
-             dependency.source_revision, dependency.artifact_url,
-             dependency.artifact_sha256, dependency.distribution_version)
-            for dependency in pin.dependencies] == [
-        (
-            "vuoro-adapter-kit",
-            "shared-dependency",
-            "vuoro-adapter-kit",
-            "1b6a51397e693c5e1d37ca71658dd3a5d5d0dd77",
-            "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.1.1/vuoro_adapter_kit-0.1.1-py3-none-any.whl",
-            "0dac880d790857fbed1085906f0e2ffd151c509ab61d527a351b68f3775ee16f",
-            "0.1.1",
-        ),
-        (
-            "vuoro-schema-runtime",
-            "shared-dependency",
-            "vuoro-schema-runtime",
-            "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c",
-            "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-schema-runtime-v0.1.0/vuoro_schema_runtime-0.1.0-py3-none-any.whl",
-            "b66c9357c99aa9e1a7353991ce54105a8621958ecfac47f8c121d80b90b77912",
-            "0.1.0",
-        ),
-    ]
 
 
 def test_checked_in_audit_pin_is_auditctl_016_with_released_shared_dependencies() -> None:
@@ -318,85 +272,6 @@ def test_checked_in_audit_pin_is_auditctl_016_with_released_shared_dependencies(
             "0.1.0",
         ),
     ]
-
-
-def test_execution_authorizer_is_exact_and_repository_scoped() -> None:
-    scoped = SimpleNamespace(authorized_repositories=("agentops", "vuoro"))
-    wildcard = SimpleNamespace(authorized_repositories=("*",))
-    for pair in (("execution.candidate-action.create", "create"),
-                 ("execution.group.manage", "create"),
-                 ("execution.group.manage", "update")):
-        assert _execution_authorizer(scoped, *pair)
-    assert _execution_authorizer(scoped, "execution.dispatch.repo:agentops", "enqueue")
-    assert _execution_authorizer(scoped, "execution.dispatch.repo:vuoro", "read")
-    assert _execution_authorizer(wildcard, "execution.dispatch.repo:any", "enqueue")
-    assert not _execution_authorizer(scoped, "execution.dispatch.repo:kctl", "enqueue")
-    assert not _execution_authorizer(scoped, "execution.group.manage", "delete")
-    assert not _execution_authorizer(scoped, "execution.candidate-action.create", "update")
-    assert not _execution_authorizer(scoped, "execution.anything", "create")
-
-
-def test_schema_v11_requires_explicit_distinct_completion_dsns(monkeypatch) -> None:
-    execution_pin = CompositionManifest.load(
-        ROOT / "composition" / "adapter-pins.json"
-    ).pin("execution")
-    with pytest.raises(CompositionError, match="VUORO_EXECUTION_COMPLETION_INGEST_DSN"):
-        _execution_completion_connection_factories(
-            execution_pin=execution_pin,
-            execution_runtime_dsn="postgresql://runtime/db",
-            environ={},
-        )
-    with pytest.raises(CompositionError, match="distinct from the execution runtime"):
-        _execution_completion_connection_factories(
-            execution_pin=execution_pin,
-            execution_runtime_dsn="postgresql://runtime/db",
-            environ={
-                "VUORO_EXECUTION_COMPLETION_INGEST_DSN": "postgresql://runtime/db",
-                "VUORO_EXECUTION_COMPLETION_READ_DSN": "postgresql://read/db",
-            },
-        )
-    with pytest.raises(CompositionError, match="ingest and read DSNs must be distinct"):
-        _execution_completion_connection_factories(
-            execution_pin=execution_pin,
-            execution_runtime_dsn="postgresql://runtime/db",
-            environ={
-                "VUORO_EXECUTION_COMPLETION_INGEST_DSN": "postgresql://completion/db",
-                "VUORO_EXECUTION_COMPLETION_READ_DSN": "postgresql://completion/db",
-            },
-        )
-    seen: list[str] = []
-    monkeypatch.setattr(
-        "vuoro_service.composition._pg_connection_factory",
-        lambda dsn: seen.append(dsn) or (lambda: None),
-    )
-    factories = _execution_completion_connection_factories(
-        execution_pin=execution_pin,
-        execution_runtime_dsn="postgresql://runtime/db",
-        environ={
-            "VUORO_EXECUTION_COMPLETION_INGEST_DSN": "postgresql://ingest/db",
-            "VUORO_EXECUTION_COMPLETION_READ_DSN": "postgresql://read/db",
-        },
-    )
-    assert factories is not None and len(factories) == 2
-    assert seen == ["postgresql://ingest/db", "postgresql://read/db"]
-
-
-def test_schema_v12_retains_completion_role_separation(monkeypatch) -> None:
-    seen: list[str] = []
-    monkeypatch.setattr(
-        "vuoro_service.composition._pg_connection_factory",
-        lambda dsn: seen.append(dsn) or (lambda: None),
-    )
-    factories = _execution_completion_connection_factories(
-        execution_pin=SimpleNamespace(schema_version="actionq-schema/v12"),
-        execution_runtime_dsn="postgresql://runtime/db",
-        environ={
-            "VUORO_EXECUTION_COMPLETION_INGEST_DSN": "postgresql://ingest/db",
-            "VUORO_EXECUTION_COMPLETION_READ_DSN": "postgresql://read/db",
-        },
-    )
-    assert factories is not None
-    assert seen == ["postgresql://ingest/db", "postgresql://read/db"]
 
 
 def test_work_resource_visibility_requires_a_separate_injected_policy() -> None:

@@ -18,7 +18,7 @@ import re
 from urllib.parse import urlsplit
 
 _LOCK_KINDS = {"adapter", "owner-dependency", "shared-dependency"}
-_DOMAINS = {"work", "execution", "knowledge", "audit"}
+_DOMAINS = {"work", "audit"}
 _SHARED_SOURCE = "https://github.com/bayleafwalker/vuoro"
 _SHARED_DISTRIBUTIONS = {"vuoro-schema-runtime", "vuoro-adapter-kit"}
 _LOCK_FIELDS = {"lock_id", "lock_kind", "source_repository", "source_revision", "artifact_url", "artifact_sha256", "distribution", "distribution_version"}
@@ -99,11 +99,11 @@ def _pinned(manifest: dict) -> list[dict]:
         )
     descriptors = manifest.get("runtime_descriptors")
     if not isinstance(descriptors, list) or len(descriptors) != len(_DOMAINS):
-        raise SystemExit("composition must contain exactly four runtime descriptors")
+        raise SystemExit("composition must contain exactly two runtime descriptors")
     if any(not isinstance(item, dict) or set(item) != _DESCRIPTOR_FIELDS for item in descriptors):
         raise SystemExit("runtime descriptor fields do not match the v3 contract")
     if {item["domain"] for item in descriptors} != _DOMAINS:
-        raise SystemExit("composition must pin exactly work, execution, knowledge, and audit")
+        raise SystemExit("composition must pin exactly work and audit")
     referenced: list[str] = []
     primary_counts: dict[str, int] = {}
     dependency_counts: dict[str, int] = {}

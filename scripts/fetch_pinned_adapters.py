@@ -18,7 +18,7 @@ _ARTIFACT_FIELDS = {
 _LOCK_KINDS = {"adapter", "owner-dependency", "shared-dependency"}
 _CANONICAL_VUORO_SOURCE_REPOSITORY = "https://github.com/bayleafwalker/vuoro"
 _SHARED_DEPENDENCY_DISTRIBUTIONS = {"vuoro-schema-runtime", "vuoro-adapter-kit"}
-_REQUIRED_DOMAINS = {"work", "execution", "knowledge", "audit"}
+_REQUIRED_DOMAINS = {"work", "audit"}
 _DESCRIPTOR_FIELDS = {
     "domain", "lock_id", "dependency_lock_ids", "adapter_module", "register",
     "api_version", "schema_version",
@@ -104,7 +104,7 @@ def artifact_pins(manifest: object) -> list[tuple[str, dict[str, str]]]:
     ):
         raise SystemExit("runtime descriptor fields do not match the v3 contract")
     if {descriptor["domain"] for descriptor in descriptors} != _REQUIRED_DOMAINS:
-        raise SystemExit("composition must pin exactly work, execution, knowledge, and audit")
+        raise SystemExit("composition must pin exactly work and audit")
     referenced: list[str] = []
     primary_references: dict[str, int] = {}
     dependency_references: dict[str, int] = {}

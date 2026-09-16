@@ -1,4 +1,4 @@
-"""Pinned four-domain Vuoro service composition.
+"""Pinned two-domain (work, audit) Vuoro service composition.
 
 The service accepts domain adapters only through the checked-in composition
 manifest. Deployment supplies runtime DSNs and an environment-bound identity
@@ -41,7 +41,7 @@ from vuoro_service.project_binding import (
 )
 
 
-_REQUIRED_DOMAINS = frozenset({"work", "execution", "knowledge", "audit"})
+_REQUIRED_DOMAINS = frozenset({"work", "audit"})
 _DEPLOYABLE_ENVIRONMENT_CLASSES = frozenset({"development", "production"})
 _DEFAULT_PROJECT_BINDINGS_PATH = Path("/opt/vuoro/composition/project-bindings.json")
 _CLOUD_PROJECT_BINDINGS_PATH = Path("/etc/vuoro/bindings/bindings.json")
@@ -350,7 +350,7 @@ class CompositionManifest:
                 )
             filename_digests[filename] = lock.artifact_sha256
         if {descriptor.domain for descriptor in descriptors} != _REQUIRED_DOMAINS:
-            raise CompositionError("composition must pin exactly work, execution, knowledge, and audit")
+            raise CompositionError("composition must pin exactly work and audit")
         if len(descriptors) != len(_REQUIRED_DOMAINS):
             raise CompositionError("composition contains duplicate runtime domains")
         by_id = {lock.lock_id: lock for lock in locks}
@@ -504,21 +504,6 @@ def verify_installed_composition(manifest: CompositionManifest, manifest_path: P
             raise CompositionError(f"{distribution_name}: pinned distribution is not installed") from error
         if record.get("installed_files_sha256") != digest or record.get("installed_files_count") != count:
             raise CompositionError(f"{distribution_name}: installed files do not match build attestation")
-
-
-def _execution_authorizer(provenance: Any, resource: str, verb: str) -> bool:
-    if (resource, verb) in {
-        ("execution.candidate-action.create", "create"),
-        ("execution.group.manage", "create"),
-        ("execution.group.manage", "update"),
-    }:
-        return True
-    prefix = "execution.dispatch.repo:"
-    if verb not in {"enqueue", "read"} or not resource.startswith(prefix):
-        return False
-    repo_id = resource[len(prefix):]
-    repositories = tuple(provenance.authorized_repositories)
-    return bool(repo_id) and ("*" in repositories or repo_id in repositories)
 
 
 WorkResourceObservationAuthorizer = Callable[[InvocationContext, str], bool]
@@ -771,41 +756,6 @@ def _pg_connection_factory(dsn: str) -> Callable[[], Any]:
     return lambda: psycopg.connect(dsn, row_factory=dict_row)
 
 
-def _execution_completion_connection_factories(
-    *, execution_pin: AdapterPin, execution_runtime_dsn: str, environ: Mapping[str, str]
-) -> tuple[Callable[[], Any], Callable[[], Any]] | None:
-    """Require capability-specific DSNs for ActionQ schema-v11/v12 completion APIs.
-
-    ActionQ's application intentionally falls back to its queue runtime
-    connection when completion factories are absent. Vuoro cannot permit that
-    fallback for a composed schema-v11/v12 service: completion ingest/read roles
-    are separate database principals with separate credentials.
-    """
-
-    if execution_pin.schema_version not in {"actionq-schema/v11", "actionq-schema/v12"}:
-        return None
-    ingest_dsn = _runtime_env(
-        "VUORO_EXECUTION_COMPLETION_INGEST_DSN", environ
-    )
-    read_dsn = _runtime_env("VUORO_EXECUTION_COMPLETION_READ_DSN", environ)
-    values = {
-        "VUORO_EXECUTION_RUNTIME_DSN": execution_runtime_dsn,
-        "VUORO_EXECUTION_COMPLETION_INGEST_DSN": ingest_dsn,
-        "VUORO_EXECUTION_COMPLETION_READ_DSN": read_dsn,
-    }
-    if any(not isinstance(value, str) or not value.strip() for value in values.values()):
-        raise CompositionError("execution runtime and completion DSNs must be non-empty")
-    if ingest_dsn == execution_runtime_dsn or read_dsn == execution_runtime_dsn:
-        raise CompositionError(
-            "execution completion DSNs must be distinct from the execution runtime DSN"
-        )
-    if ingest_dsn == read_dsn:
-        raise CompositionError(
-            "execution completion ingest and read DSNs must be distinct"
-        )
-    return _pg_connection_factory(ingest_dsn), _pg_connection_factory(read_dsn)
-
-
 def _compatibility(domain: str, record: Mapping[str, Any], pin: AdapterPin) -> DomainCompatibility:
     compatible = record.get("compatible")
     if compatible is None:
@@ -1046,65 +996,6 @@ def create_composed_app(
     )
     work_state = _compatibility("work", work_migrations.compatibility_handshake(work_store), work_pin)
 
-    execution_pin = manifest.pin("execution")
-    from actionq.application import ActionQApplication
-    from actionq import vuoro as execution_adapter
-    from actionq.managed_dispatch import (
-        ManagedDispatchRejected,
-        load_managed_dispatch_policy,
-    )
-
-    execution_runtime_dsn = _runtime_env(
-        "VUORO_EXECUTION_RUNTIME_DSN",
-        environ,
-        aliases=("VUORO_EXECUTION_DSN",),
-    )
-    completion_factories = _execution_completion_connection_factories(
-        execution_pin=execution_pin,
-        execution_runtime_dsn=execution_runtime_dsn,
-        environ=environ,
-    )
-    managed_dispatch_policy = None
-    policy_path = environ.get("VUORO_MANAGED_DISPATCH_POLICY_PATH", "").strip()
-    if policy_path:
-        try:
-            managed_dispatch_policy = load_managed_dispatch_policy(policy_path)
-        except ManagedDispatchRejected as exc:
-            raise CompositionError("managed dispatch policy is invalid") from exc
-    execution_application = ActionQApplication(
-        schema=_runtime_env("VUORO_EXECUTION_SCHEMA", environ),
-        connection_factory=_pg_connection_factory(execution_runtime_dsn),
-        completion_ingest_connection_factory=(
-            completion_factories[0] if completion_factories else None
-        ),
-        completion_read_connection_factory=(
-            completion_factories[1] if completion_factories else None
-        ),
-        authorizer=_execution_authorizer,
-        managed_dispatch_policy=managed_dispatch_policy,
-    )
-    _load_function(execution_pin)(registry, application=execution_application)
-    execution_state = _compatibility("execution", execution_adapter.compatibility_record(execution_application), execution_pin)
-
-    knowledge_pin = manifest.pin("knowledge")
-    from kctl.application import CentralKnowledgeApplication
-    from kctl import vuoro as knowledge_adapter
-
-    knowledge_application = CentralKnowledgeApplication(
-        schema=_runtime_env("VUORO_KNOWLEDGE_SCHEMA", environ),
-        connection_factory=_pg_connection_factory(
-            _runtime_env(
-                "VUORO_KNOWLEDGE_RUNTIME_DSN",
-                environ,
-                aliases=("VUORO_KNOWLEDGE_DSN",),
-            )
-        ),
-        expected_environment_name=environment_name,
-        expected_environment_class=environment_class,
-    )
-    _load_function(knowledge_pin)(registry, application=knowledge_application)
-    knowledge_state = _compatibility("knowledge", knowledge_adapter.compatibility_record(knowledge_application), knowledge_pin)
-
     audit_pin = manifest.pin("audit")
     from auditctl.vuoro_adapter import VuoroAuditAdapter
 
@@ -1127,8 +1018,6 @@ def create_composed_app(
 
     domains = {
         "work": work_state,
-        "execution": execution_state,
-        "knowledge": knowledge_state,
         "audit": audit_state,
     }
     incompatible = [name for name, state in domains.items() if state.state != "compatible"]

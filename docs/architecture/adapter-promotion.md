@@ -5,6 +5,12 @@ This document governs a source-only update to
 an image release, deployment change, schema migration, data backfill, or
 runtime validation.
 
+> **S2 item 4 (2026-09):** the execution (ActionQ) and knowledge (kctl) domains
+> are unbound. The composition pins only work (Sprintctl) and audit (Auditctl),
+> the served catalog is 51 operations, and the execution/knowledge release
+> gates and their validator scripts are deleted. Sections below that describe
+> ActionQ or kctl pins are historical.
+
 ## Release-lock and runtime-descriptor update
 
 Composition v3 deliberately separates immutable release identity from

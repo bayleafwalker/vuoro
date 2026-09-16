@@ -83,7 +83,7 @@ def test_fetcher_rejects_dependency_filename_collisions() -> None:
         module.artifact_pins(_v3_manifest(
             _release_lock("owner", _adapter()), _release_lock("companion", dependency)
         ))
-    # Positive case, against a fully valid v3 manifest (four runtime
+    # Positive case, against a fully valid v3 manifest (two runtime
     # descriptors) so the assertion is on the returned pins themselves, not
     # on an unrelated downstream error whose identity is coupled to
     # artifact_pins' internal validation order.
