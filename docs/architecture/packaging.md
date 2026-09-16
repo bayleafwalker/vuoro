@@ -17,17 +17,10 @@ deployment. Installing the client can never grant DDL capability.
 
 The client also validates the shared `vuoro-discovery/v1` and
 `vuoro-bootstrap-manifest/v1` documents. Validation remains transport-only;
-filesystem changes and package installation belong to the separate
-`vuoro-bootstrap` distribution.
-
-## `vuoro-bootstrap`
-
-`vuoro-bootstrap` is an independently released, filesystem-owning companion.
-It consumes the Cloud device-session API, refuses an unreleased compatibility
-manifest, renders `.vuoro/project.json`, `.sprintctl/backend.json`, and a
-complete client profile, and writes bearer credentials only with mode `0600`.
-It does not own account, workspace, tenant, database, or device-authorization
-state. Print-only mode must remain side-effect free.
+filesystem changes and package installation are not performed by this
+repository; the `vuoro-bootstrap` companion distribution was deleted in the S2
+consolidation, and the manifest's `vuoro-bootstrap` version key is retained
+only as wire vocabulary.
 
 Tag publication synchronizes and tests the complete locked workspace, builds
 each distribution once, and runs release and served-conformance gates against

@@ -28,9 +28,6 @@ This repository deliberately publishes five distributions:
 - `vuoro-service` is the deployable FastAPI/uvicorn runtime. It owns service
   composition, compatibility checks, migration entrypoints, and explicitly
   authorized administration commands.
-- `vuoro-bootstrap` is the release-gated filesystem boundary for public
-  onboarding. It consumes Cloud's device flow but does not own account,
-  workspace, tenant, or domain state.
 - `vuoro-schema-runtime` is the stdlib-only shared central-schema runtime. It
   supplies migration metadata and fail-closed compatibility checks without
   selecting a database driver or owning domain migrations.
@@ -97,7 +94,6 @@ Python 3.12 and `uv` are required.
 ```bash
 uv sync --all-packages --all-extras
 uv build --package vuoro-client --wheel --out-dir dist/vuoro-client
-uv build --package vuoro-bootstrap --wheel --out-dir dist/vuoro-bootstrap
 uv build --package vuoro-service --wheel --out-dir dist/vuoro-service
 uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime
 uv build --package vuoro-adapter-kit --wheel --out-dir dist/vuoro-adapter-kit
@@ -108,7 +104,6 @@ The client and service can also be tested independently:
 
 ```bash
 uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests
-uv run --package vuoro-bootstrap --extra test pytest packages/vuoro-bootstrap/tests
 uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests
 ```
 

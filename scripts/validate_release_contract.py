@@ -10,11 +10,11 @@ import zipfile
 
 
 PACKAGE_NAMES = {
-    "vuoro-client", "vuoro-bootstrap", "vuoro-service",
+    "vuoro-client", "vuoro-service",
     "vuoro-schema-runtime", "vuoro-adapter-kit",
 }
 TAG = re.compile(
-    r"^(vuoro-client|vuoro-bootstrap|vuoro-service|vuoro-schema-runtime|vuoro-adapter-kit)-v(.+)$"
+    r"^(vuoro-client|vuoro-service|vuoro-schema-runtime|vuoro-adapter-kit)-v(.+)$"
 )
 IMMUTABLE_VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[a-z]+[0-9]+)?$")
 

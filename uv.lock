@@ -5,7 +5,6 @@ requires-python = ">=3.12"
 [manifest]
 members = [
     "vuoro-adapter-kit",
-    "vuoro-bootstrap",
     "vuoro-client",
     "vuoro-evidence",
     "vuoro-schema-runtime",
@@ -769,28 +768,6 @@ test = [
 
 [package.metadata]
 requires-dist = [{ name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" }]
-provides-extras = ["test"]
-
-[[package]]
-name = "vuoro-bootstrap"
-version = "0.1.0"
-source = { editable = "packages/vuoro-bootstrap" }
-dependencies = [
-    { name = "httpx" },
-    { name = "vuoro-client" },
-]
-
-[package.optional-dependencies]
-test = [
-    { name = "pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "httpx", specifier = ">=0.27,<1" },
-    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" },
-    { name = "vuoro-client", editable = "packages/vuoro-client" },
-]
 provides-extras = ["test"]
 
 [[package]]
