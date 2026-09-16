@@ -2,8 +2,9 @@
 
 Status: release-contract candidate. The public control API and device
 authorization remain owned by `vuoro-cloud`; this repository owns the shared
-payload vocabulary, transport validation, and the separate `vuoro-bootstrap`
-filesystem boundary.
+payload vocabulary and transport validation. The separate `vuoro-bootstrap`
+filesystem distribution was deleted in the S2 consolidation; the manifest keeps
+its `vuoro-bootstrap` version key as v1 wire vocabulary.
 
 ## Contract boundary
 
@@ -19,10 +20,8 @@ consumable only when:
 - the service protocol range includes v1.
 
 The client validates these documents without adding filesystem or package
-manager behavior. `vuoro-bootstrap` performs the device-session HTTP calls and
-renders local changes. It refuses conflicting existing files and writes the
-credential with mode `0600`. A print-only plan is pure and does not mutate the
-repository.
+manager behavior. No distribution in this repository performs the
+device-session HTTP calls or renders local changes.
 
 The session response must return the discovery document's normalized
 activation URI and positive integer expiry and polling intervals. Exchange is

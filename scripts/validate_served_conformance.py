@@ -21,7 +21,6 @@ from vuoro_client import (
     Profile,
     __version__ as client_version,
 )
-from vuoro_bootstrap import BootstrapApi, __version__ as bootstrap_version
 from vuoro_service import __version__ as service_version
 from vuoro_service.app import ServiceSettings, create_app
 from vuoro_service.catalog import CatalogRegistry, DEFAULT_SCHEMA_FEATURES
@@ -118,8 +117,6 @@ def _app() -> tuple[object, CatalogRegistry]:
 async def run() -> None:
     assert installed_version("vuoro-client") == client_version
     assert installed_version("vuoro-service") == service_version
-    assert installed_version("vuoro-bootstrap") == bootstrap_version
-    assert BootstrapApi is not None
     app, registry = _app()
     profile = Profile("served-test", "http://served.test", "token:read", "served-test")
     asgi_transport = httpx.ASGITransport(app=app)
