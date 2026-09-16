@@ -1868,3 +1868,16 @@ remediation_log:
     Sweep for other abandoned workloads. Any app directory removed from
     appservice/clusters/main/kubernetes/apps/ the same way has likely left its objects
     running unowned, and nothing reports it. Not yet done.
+- date: '2026-09-16'
+  item: vuoro-core
+  action: Managed-capsule shadow pilot retired; CI no longer checks out agentops.
+  commit: vuoro branch s2/item1-drop-agentops-checkout (S2 item 1 part b)
+  detail: >-
+    packages/vuoro-service/src/vuoro_service/managed_capsule_shadow.py was a dead shadow
+    pilot - imported only by its own test, with no package export, entry point or doc
+    reference. That test was the sole consumer of VUORO_AGENTOPS_ROOT, loading agentops
+    templates/dispatch/scripts/render_managed_capsule.py from a pinned checkout
+    (67b9ec3). Module and test deleted; the agentops checkout step and the env var are
+    removed from ci.yml and publish-python-packages.yaml. Vuoro CI no longer depends on
+    the agentops dispatch tree.
+  supersedes: The pinned agentops checkout in .github/workflows/ci.yml and publish-python-packages.yaml.
