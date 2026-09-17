@@ -26,8 +26,7 @@
       "reconcile-project-contracts"
     ],
     "overlays": [
-      ".agents/overlays/vuoro.boundaries.md",
-      ".agents/overlays/vuoro.hybrid-worker.md"
+      ".agents/overlays/vuoro.boundaries.md"
     ]
   },
   "instruction_set": {
