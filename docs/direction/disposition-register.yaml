@@ -2,6 +2,7 @@ version: 2
 purpose: Vuoro keeps heterogeneous agent work resumable across sessions, hosts, repositories and runtimes, and makes
   the accepted result reconstructible.
 supersedes: docs/plans/2026-08-22-long-term-direction.md
+superseded_in_part_by: 'Owner decision D1 (2026-09-14) and /projects/dev/agentops/docs/plans/2026-09-17-target-state.md. Entries that decide deployment, deprecation or retirement of agent tooling yield to the target state where they conflict, pending a v3 reconciliation pass. Retirement is decided on goal state, not on current usage.'
 revision_note: 'v2 (2026-09-01) closes six review gaps, each re-verified at the artifact. Added rows for appservice
   and gitops-nixos - the two infrastructure repos every artifact check lands in, previously unenumerated - and for
   the takeover-20260820 experiment. Added verdict_vocabulary and path_conventions. Rewrote all nine overloaded `contradicted`
