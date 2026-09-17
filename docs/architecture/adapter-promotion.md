@@ -174,7 +174,7 @@ uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests
 uv build --package vuoro-client --wheel --out-dir dist/vuoro-client
 uv build --package vuoro-service --wheel --out-dir dist/vuoro-service
 uv run pytest
-python /projects/dev/agentops/templates/dispatch/scripts/validate_verification_artifacts.py --root .
+python /projects/dev/agentops/scripts/validate_verification_artifacts.py --root .
 ```
 
 For a changed work adapter, also run the owner repository's focused catalog,
