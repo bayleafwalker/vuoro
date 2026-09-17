@@ -2158,7 +2158,9 @@ items:
     basis:
     - TS-5
     - dossier §4 Decision
-    note: 'New row: decided today.'
+    note: 'Retires at S3: the forward migration removes the capability-receipt record types, maps the 4 drafted rows
+      (sprintctl sprints 379 and 404-406) to legacy evidence, and checks the authority journal for capability-receipt.accept
+      records first (TS-5).'
 - key: auditctl-workspace-pool
   name: Workspace-pooled audit store (/projects/dev/.auditctl)
   repos:
@@ -2316,7 +2318,8 @@ items:
     v3_status: retiring
     basis:
     - dossier §5 Deletes
-    note: 'New row: previously unenumerated.'
+    note: 'Retires in S2 item 7: dump digest, test restore and scale-to-zero evidence, then drop vuoro-dev-db, and remove
+      the vuoro-dev namespace and vuoro-postgres once nothing binds them.'
 - key: session-mechanization
   name: Session mechanization contracts and validators
   repos:
@@ -2343,7 +2346,8 @@ items:
     basis:
     - dossier §11 S4
     - TS-8
-    note: 'New row: previously unenumerated.'
+    note: 'Retires at S4: session capsules and notes become evidence kinds; validate_session_mechanization_artifacts
+      and actionq''s CI use of it go with it (TS-13, dossier §11 S4).'
 - key: handoff-v1
   name: handoff/v1 files and the handoff skill
   repos:
