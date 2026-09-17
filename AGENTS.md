@@ -72,8 +72,6 @@ worker from changing contracts, composition, deployment, or repository
 policy. A frozen packet may name transport-only client implementation paths
 only when schemas, interfaces, fixtures, and acceptance are already fixed;
 the coordinator must review the boundary and compatibility evidence.
-`.agents/overlays/vuoro.hybrid-worker.md` carries the same boundaries and stop
-conditions into the worker's context.
 
 Gate every packet with a registered command from `hybrid.commands`
 (`vuoro.client.tests`, `vuoro.service.tests`, `vuoro.boundaries`,
