@@ -15,7 +15,10 @@ revision_note: 'v3 (2026-09-17) reconciles every row to owner decision D1 (2026-
   agentops-dispatch-templates, hybrid-dispatch, agent-tooling-interim-instruments, capability-receipts, auditctl-workspace-pool,
   operator-projection, agent-cockpit, composition-v4, vuoro-bootstrap, vuoro-dev, session-mechanization, handoff-v1, metanarrative-model.
   Replaces the v2 superseded_in_part_by marker. v1 and v2 observations are kept verbatim; where D1 made one historical,
-  the goal_state note says so.'
+  the goal_state note says so. 2026-09-17 addendum: the seven open questions are decided under delegation (D1, target
+  state), not queued - actionq residue retiring; sprintctl-bootstrap-template retired; acceptance-lab keep-narrow until
+  S8; hostproto-semantics-and-adapters and hostproto-a2a-worker retired from Vuoro scope; knowledge-base retiring; render-fabric
+  retired from Vuoro scope; metanarrative-model retiring (TS-13). Each row''s goal_state.decided names the step.'
 revision_history:
 - 'v2 (2026-09-01) closes six review gaps, each re-verified at the artifact. Added rows for appservice and gitops-nixos
   - the two infrastructure repos every artifact check lands in, previously unenumerated - and for the takeover-20260820
@@ -456,10 +459,9 @@ items:
   - /projects/dev/sprintctl-bootstrap-template
   role: Docs-and-Makefile-only reference repo showing what a sprintctl+kctl repo looks like from scratch; no code,
     no tests, Makefile targets only print instructions.
-  status: open
+  status: retired
   intention: Demoted from canon to a narrow bootstrap example; canonical workflow guidance lives in agentops/templates/dispatch/.
-  waking_condition: Promote back to canon only if agentops/templates/dispatch stops being the shared source of workflow
-    guidance.
+  waking_condition: n/a - retired. Reopens only if served repo register is removed and no rendered guidance replaces it.
   supersession: Superseded as canon by agentops/templates/dispatch/ (ea4961f, 2026-07-18, demote to frozen bootstrap
     reference); its README states this at the top.
   last_verified:
@@ -480,16 +482,19 @@ items:
   goal_state:
     reviewed: '2026-09-17'
     v2_status: keep-narrow
-    v3_status: open
+    v3_status: retired
     basis:
+    - decided 2026-09-17 under delegation (D1, target state)
     - dossier §6.3 Maintainers
     - dossier §8 Administration
     - TS-11
     note: 'The v2 waking condition (''only if agentops/templates/dispatch stops being the shared source of workflow guidance'')
       has literally fired: templates/dispatch is deleted (agentops #165). The target does not name this repo.'
-    open_question: With the dispatch templates deleted, does a bootstrap template have a place in the target?
-    recommendation: Retire. Repository onboarding is served repo register (dossier §8 Administration), guidance is rendered
-      from agentops skills/ and render_project.py, and the walk's footprint is 2 tool repos (dossier §6.3).
+    decided:
+      date: '2026-09-17'
+      question: With the dispatch templates deleted, does a bootstrap template have a place in the target?
+      step: Archive the GitHub repo now. Onboarding is served repo register (dossier §8 Administration); guidance is rendered
+        from agentops skills/ and render_project.py.
 - key: sprintctl-orchestrator
   name: Sprintctl Orchestrator
   repos:
@@ -565,6 +570,7 @@ items:
     v2_status: active
     v3_status: retiring
     basis:
+    - decided 2026-09-17 under delegation (D1, target state)
     - D1
     - TS-1
     - TS-2
@@ -575,11 +581,12 @@ items:
       in S2 item 4 (vuoro #71, catalog 51). actionq-db and actionq-db-proxy drop in S2 item 7 once the dump, test restore
       and scale-to-zero evidence holds. The immutable freeze and grant-conflict refusal are absorbed into Release at S3;
       ActionQ''s 17 actions are archived, not imported.'
-    open_question: 'Residue the walk does not name: the action-resource ownership work still landing (actionq #50-#52, the
-      frozen #2027 verification bundle) and the 2026-08-27 effect-intent projection pilot. Does any of it survive?'
-    recommendation: No as a repo. Harvest the freeze and conflict-refusal invariants as S3 Release tests in sprintctl; treat
-      the resource-graph projection as a derived query (dossier §4 'derived, never stored') if S3 needs it; archive the
-      repo after S3.
+    decided:
+      date: '2026-09-17'
+      question: 'Residue the walk does not name: the action-resource ownership work still landing (actionq #50-#52, the
+        frozen #2027 verification bundle) and the 2026-08-27 effect-intent projection pilot. Does any of it survive?'
+      step: Harvest the freeze and conflict-refusal invariants into S3 Release tests in sprintctl, make any resource projection
+        (action-resource ownership, the 2026-08-27 effect-intent pilot) a derived query, and archive the repo after S3.
 - key: actionq-cas
   name: ActionQ CAS object store
   repos:
@@ -710,12 +717,10 @@ items:
   role: Deterministic offline settlement evaluator - scores a CandidateOutput against a versioned Scenario using 13
     pinned pure-function scorers across mechanism, quality, authority and economics, recording runs into a hash-chained
     SQLite event store.
-  status: open
+  status: keep-narrow
   intention: Deterministic settlement evaluation - turn an observed run into a defensible, reproducible verdict a
     later reader can interpret.
-  waking_condition: A second real consumer needs all six conditions of the repo's own extraction gate - shared scenario
-    identity/version contract, shared run lifecycle, shared baseline promotion, remote or concurrent writes, common
-    projections, and an explicit arbitration rule for conflicting producers.
+  waking_condition: 'S8 rehearsal (TS-9) is scheduled: decide fold-or-retire then.'
   supersession: none.
   last_verified:
     date: '2026-09-01'
@@ -735,17 +740,20 @@ items:
   goal_state:
     reviewed: '2026-09-17'
     v2_status: hold
-    v3_status: open
+    v3_status: keep-narrow
     basis:
+    - decided 2026-09-17 under delegation (D1, target state)
     - TS-9
     - TS-12
     - dossier §15 trigger 7
     note: The v2 hold gate is a second-consumer condition, which is a usage criterion, not a goal-state one. The target
       is silent on acceptance-lab by name; TS-9 needs a rehearsal at S8, not necessarily this evaluator.
-    open_question: Is a separate scenario evaluator part of the target, or does S8's rehearsal carry the resume-and-settle
-      check itself?
-    recommendation: 'keep-narrow until S8: it scores the pre-registered retrospective runs (S0-style) and holds the resume-and-settle
-      scenario. At S8 move the scenario into the rehearsal if that is cheaper, then apply trigger 7.'
+    decided:
+      date: '2026-09-17'
+      question: Is a separate scenario evaluator part of the target, or does S8's rehearsal carry the resume-and-settle
+        check itself?
+      step: Keep narrow until S8. At S8, fold the resume-and-settle scenario into the rehearsal or retire the evaluator,
+        per dossier §15 trigger 7.
 - key: hostproto-semantics-and-adapters
   name: HostProto semantics + host adapters (core family)
   repos:
@@ -757,12 +765,11 @@ items:
   role: A JSON-Schema vocabulary for host interaction (intent, receipt, observation, evidence-ref, deviation, recovery,
     handles, precondition, capability-profile, target-ref, error) plus four MCP-server adapters speaking it against
     real engines - one browser host and a shared DAP host with two thin engine bindings.
-  status: open
+  status: retired
   intention: Candidate canonical ingress for host-interaction claims and effect receipts inside an EvidenceSet, under
     a 4-6 week bounded proof with kill/narrow/freeze gates.
-  waking_condition: Promote-grade evidence is restored end to end - the lost test_real_traffic and test_binding_agnostic
-    suites are re-recorded via each adapter's scripts/record-session.mts, committed as fixtures, and replayed green
-    through a consumer reducer - AND a consumer outside these repos needs the envelope.
+  waking_condition: A Decision adds a host or live-infrastructure evidence kind to the closed evidence record_class set
+    (dossier §4).
   supersession: Supersedes /projects/dev/hostproto (archived on GitHub 2026-08-28).
   last_verified:
     date: '2026-08-31'
@@ -786,15 +793,17 @@ items:
   goal_state:
     reviewed: '2026-09-17'
     v2_status: hold
-    v3_status: open
+    v3_status: retired
     basis:
+    - decided 2026-09-17 under delegation (D1, target state)
     - dossier §4 Evidence kinds
     - dossier §9 (Flux-applied observation not built)
     note: D1 closes the evidence record_class kinds to claim, commit, session-binding, grant, handoff checkpoint and lesson.
       There is no host-interaction or effect-receipt kind, and the target does not name HostProto.
-    open_question: Is host-interaction evidence part of the target evidence kinds?
-    recommendation: Retire from Vuoro scope. Revisit only if an evidence kind for host or live-infrastructure effects is
-      added by a Decision; browser-workbench stays HostProto's source independently.
+    decided:
+      date: '2026-09-17'
+      question: Is host-interaction evidence part of the target evidence kinds?
+      step: Retired from Vuoro scope. The repos themselves are not deleted; browser-workbench stays HostProto's source independently.
 - key: hostproto-consumer-vuoro-evidence
   name: vuoro-evidence (the HostProto consumer and EvidenceSet reducer)
   repos:
@@ -847,12 +856,11 @@ items:
   role: An HTTP/JSON-RPC A2A 1.0 agent (Express, @a2a-js/sdk 1.1.0, agent card, task store, healthz) wrapping the
     Playwright HostProto adapter over MCP and projecting runs into A2A tasks, receipts into status updates and evidence
     into artifacts.
-  status: open
+  status: retired
   intention: The step-4 carrier-agnosticism probe - show the consumer's session loader needs no change when HostProto
     records arrive over a different carrier.
-  waking_condition: A named consumer actually needs HostProto delivered over A2A, AND the carrier-agnosticism claim
-    is re-established by a committed test (test_binding_agnostic, currently lost) replaying a re-recorded A2A run
-    through the unchanged session loader.
+  waking_condition: A Decision adds a host or live-infrastructure evidence kind to the closed evidence record_class set
+    (dossier §4).
   supersession: none.
   last_verified:
     date: '2026-08-31'
@@ -872,12 +880,15 @@ items:
   goal_state:
     reviewed: '2026-09-17'
     v2_status: hold
-    v3_status: open
+    v3_status: retired
     basis:
+    - decided 2026-09-17 under delegation (D1, target state)
     - dossier §4 Evidence kinds
     note: Depends on hostproto-semantics-and-adapters.
-    open_question: Same as hostproto-semantics-and-adapters.
-    recommendation: Retire with it.
+    decided:
+      date: '2026-09-17'
+      question: Same as hostproto-semantics-and-adapters.
+      step: Retired from Vuoro scope with hostproto-semantics-and-adapters. The repo itself is not deleted.
 - key: hostproto-rust-spec-repo
   name: hostproto (original Rust workspace + frozen spec package)
   repos:
@@ -1276,9 +1287,9 @@ items:
   - /projects/dev/knowledge-base
   role: A committed prose knowledge store (concepts/, domains/, generated/, knowledge-map.md, candidates.md, contact-log.md)
     - the publication target kctl renders into, not a program.
-  status: open
+  status: retiring
   intention: Durable output surface for reviewed knowledge; written to, not developed.
-  waking_condition: Not written down. Checkable substitute - it should receive a commit whenever kctl publishes.
+  waking_condition: n/a - retiring at S4.
   supersession: none.
   last_verified:
     date: '2026-08-31'
@@ -1297,13 +1308,15 @@ items:
   goal_state:
     reviewed: '2026-09-17'
     v2_status: hold
-    v3_status: open
+    v3_status: retiring
     basis:
+    - decided 2026-09-17 under delegation (D1, target state)
     - dossier §5 Absorbs (kctl data as lesson evidence)
     note: The target names kctl data but not the rendered prose store.
-    open_question: Does the rendered prose store survive kctl's retirement?
-    recommendation: Freeze it when kctl retires at S4, after its concepts are imported as lesson evidence; keep it read-only
-      as history.
+    decided:
+      date: '2026-09-17'
+      question: Does the rendered prose store survive kctl's retirement?
+      step: Freeze at kctl's S4 retirement, after its concepts are imported as lesson evidence; keep read-only as history.
 - key: flowlab
   name: flowlab
   repos:
@@ -1414,9 +1427,9 @@ items:
   - /projects/dev/render-fabric
   role: A local GO-FAKE proof for bounded batch execution - typed requests, SQLite broker, finite pull leases, immutable
     attempts and receipts, content-addressed local artifact store, deterministic fake worker, renderctl CLI.
-  status: open
+  status: retired
   intention: Bounded proof of a batch-execution provider shape, deliberately carrying no real execution authority.
-  waking_condition: Not written down.
+  waking_condition: n/a - retired from Vuoro scope.
   supersession: none.
   last_verified:
     date: '2026-09-01'
@@ -1440,15 +1453,18 @@ items:
   goal_state:
     reviewed: '2026-09-17'
     v2_status: hold
-    v3_status: open
+    v3_status: retired
     basis:
+    - decided 2026-09-17 under delegation (D1, target state)
     - 'dossier §9 (Running agents, queues: DELIBERATE_EXCLUSION, permanent)'
     - TS-2
     note: A batch-execution provider proof. The target permanently excludes running agents and queues from Vuoro but does
       not name this repo.
-    open_question: Is render-fabric a Vuoro provider candidate or an unrelated product?
-    recommendation: Remove it from Vuoro scope (retired as a Vuoro provider); if it continues, it is an unrelated product
-      like frontier-weave.
+    decided:
+      date: '2026-09-17'
+      question: Is render-fabric a Vuoro provider candidate or an unrelated product?
+      step: 'Retired from Vuoro scope (dossier §9: running agents and queues are a permanent exclusion). If it continues,
+        it is an unrelated product.'
 - key: frontier-weave
   name: frontier-weave
   repos:
@@ -2381,10 +2397,10 @@ items:
   - /projects/dev/agentops
   role: 'agentops metanarrative: tenet, direction, practice and decision claims with observations, published to kctl,
     with events in auditctl.'
-  status: open
+  status: retiring
   intention: 'TS-13 (proposed): claims and observations become claim and lesson evidence plus Decisions at S4, when kctl
     retires.'
-  waking_condition: n/a - open.
+  waking_condition: n/a - retiring at S4.
   supersession: Superseded capability-receipt/v2 as the claim shape (agentops model/README.md).
   last_verified:
     date: '2026-09-17'
@@ -2397,13 +2413,16 @@ items:
   goal_state:
     reviewed: '2026-09-17'
     v2_status: absent
-    v3_status: open
+    v3_status: retiring
     basis:
+    - decided 2026-09-17 under delegation (D1, target state)
     - TS-13 (proposed)
     note: New row.
-    open_question: Does the metanarrative model survive S4 as its own store, or become evidence kinds?
-    recommendation: 'Become evidence kinds (TS-13): its stores both retire at S4, and a parallel claims store would be
-      a second meaning of decision.'
+    decided:
+      date: '2026-09-17'
+      question: Does the metanarrative model survive S4 as its own store, or become evidence kinds?
+      step: At S4, claims and observations become claim and lesson evidence kinds plus Decisions (TS-13), when kctl and
+        the auditctl central store retire.
 open_claims:
 - claim: Served next-work works, but the product's first promised capability - session resume - does not.
   verdict: contradicted
