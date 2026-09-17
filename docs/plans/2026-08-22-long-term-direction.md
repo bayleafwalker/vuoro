@@ -1,8 +1,10 @@
 # Vuoro long-term direction
 
+> **Superseded in part (2026-09-17).** Owner decision D1 (2026-09-14) overrides §1, §1.1, §1.2 and §14 of this document: Vuoro owns the semantics of agent-performed work (release, evidence, decision) inside sprintctl's served authority. For agent tooling (what is implemented, rolled out, deprecated and retired), the target state is `/projects/dev/agentops/docs/plans/2026-09-17-target-state.md`; where this document conflicts with it, the target state wins.
+
 **Status:** **current** — this document states the operative direction as of 2026-08-28. The thesis, the narrowed ownership model and the non-goals are operative; everything past R0 is authorized gate-by-gate, not by calendar. Established by the owner (`actor_type: human`, `authority_basis: standing-policy`, cross-repo dogfood plan §8). Assessed and reconciled against composition v4 (#51 @ `eea7b98`) on 2026-08-22.
 
-`current` means operative, not approved — see `agentops templates/dispatch/model/README.md`, which supersedes every workflow that had a ratification step. This document does not wait on a sign-off, and nothing downstream should wait on one for it. It changes by being superseded, and it is tested by observations that contradict it.  
+`current` means operative, not approved — see `agentops/model/README.md`, which supersedes every workflow that had a ratification step. This document does not wait on a sign-off, and nothing downstream should wait on one for it. It changes by being superseded, and it is tested by observations that contradict it.  
 **Date:** 2026-08-22  
 **Audience:** future planner, architect, reviewer, and implementer sessions  
 **Scope:** intended product and architecture direction; not an implementation authorization  
