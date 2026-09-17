@@ -461,7 +461,7 @@ items:
     no tests, Makefile targets only print instructions.
   status: retired
   intention: Demoted from canon to a narrow bootstrap example; canonical workflow guidance lives in agentops/templates/dispatch/.
-  waking_condition: n/a - retired. Reopens only if served repo register is removed and no rendered guidance replaces it.
+  waking_condition: n/a - retired. Reopens only if the sprintctl project-integration guide and rendered agentops guidance stop covering repository onboarding.
   supersession: Superseded as canon by agentops/templates/dispatch/ (ea4961f, 2026-07-18, demote to frozen bootstrap
     reference); its README states this at the top.
   last_verified:
@@ -493,8 +493,10 @@ items:
     decided:
       date: '2026-09-17'
       question: With the dispatch templates deleted, does a bootstrap template have a place in the target?
-      step: Archive the GitHub repo now. Onboarding is served repo register (dossier §8 Administration); guidance is rendered
-        from agentops skills/ and render_project.py.
+      step: 'Done 2026-09-17: GitHub repo archived after operative references were removed (sprintctl #57, scribectl #8,
+        gitops-nixos #4). Correction: sprintctl has no served `repo register` command (0.3.6 has only repo list/delete);
+        served rows carry the repo_id from the repository marker, so onboarding is the sprintctl project-integration guide
+        plus guidance rendered from agentops skills/ and render_project.py.'
 - key: sprintctl-orchestrator
   name: Sprintctl Orchestrator
   repos:
