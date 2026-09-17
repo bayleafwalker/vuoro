@@ -219,7 +219,7 @@ unresolved, evidence, sprintctl_bundle_ref, next_action, successor`; optional `o
 `origin_path`; `successor.harness` is `claude-code | codex`. State digest v1 is `sha256(git diff
 HEAD ‖ git status --porcelain)`; v2 adds, per untracked file, `NUL path NUL sha256(contents)`,
 and `state.digest_version` declares which. CLI `agentops handoff
-create|validate|prompt|ack|render` over `templates/dispatch/scripts/handoff.py`; the Codex path
+create|validate|prompt|ack|render` over `scripts/handoff.py`; the Codex path
 `handoff_codex.py` drives `codex app-server --stdio` as newline-delimited JSON-RPC 2.0 with no
 daemon, and because `thread/read` over turns is unsupported on codex 0.153.4, `read` parses the
 rollout file. Canonical store `agentops/docs/dispatch/handoffs/<date>-<slug>.v<N>.json`, `.md`
