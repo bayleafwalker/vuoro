@@ -580,8 +580,9 @@ items:
     - dossier §8 Migration
     - dossier §13
     note: 'Decided by the goal state, not by current usage. Execution (27 operations) was unbound from the served catalog
-      in S2 item 4 (vuoro #71, catalog 51). actionq-db and actionq-db-proxy drop in S2 item 7 once the dump, test restore
-      and scale-to-zero evidence holds. The immutable freeze and grant-conflict refusal are absorbed into Release at S3;
+      in S2 item 4 (vuoro #71, catalog 51). actionq-db and actionq-db-proxy dropped in S2 item 7 (appservice #1676,
+      #1678, 2026-09-18) after the dump, test restore and scale-to-zero evidence. The actionq-pg LoadBalancer
+      (vuoro-shared, devbox-only direct DSN to vuoro-postgres) is a legacy direct-DSN route and retires at S5 under TS-10. The immutable freeze and grant-conflict refusal are absorbed into Release at S3;
       ActionQ''s 17 actions are archived, not imported.'
     decided:
       date: '2026-09-17'
