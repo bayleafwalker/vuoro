@@ -1,0 +1,134 @@
+[
+ {
+  "claim": "SoL-Pi reduces recorded token traffic by 44.7\u201349.0% and API cost by about one third compared to Pi on EdgeBench.",
+  "kind": "result",
+  "quote": "On the 51-task EdgeBench evaluation, SoL-Pi achieves performance comparable to Pi across GPT-5.6 Sol and Opus 5 while reducing recorded token traffic by 44.7\u201349.0% and API cost by about one third.",
+  "offset": 0
+ },
+ {
+  "claim": "SoL-Pi reduces API cost by 50.0% relative to Codex on GPT-5.6 Sol and by 54.3% relative to Claude Code on Opus 5.",
+  "kind": "result",
+  "quote": "SoL-Pi reduces API cost by 50.0% relative to Codex on GPT-5.6 Sol and by 54.3% relative to Claude Code on Opus 5.",
+  "offset": 0
+ },
+ {
+  "claim": "The search yielded four specific mechanisms: Action Fusion, Online Context Compact, ObservationPack, and Evidence-Preserving Reducer.",
+  "kind": "mechanism",
+  "quote": "The search yields four reusable mechanisms that pass capability-constrained selection: Action Fusion, Online Context Compact, ObservationPack, and Evidence-Preserving Reducer.",
+  "offset": 0
+ },
+ {
+  "claim": "Action Fusion combines a mutation and its follow-up command into one request, reducing API calls from three to two.",
+  "kind": "mechanism",
+  "quote": "Action Fusion combines a mutation and its follow-up command into one request, reducing API calls from three to two.",
+  "offset": 0
+ },
+ {
+  "claim": "Online Context Compact applies compaction only when projected savings exceed the rewrite cost.",
+  "kind": "mechanism",
+  "quote": "Online Context Compact evaluates compaction at subtask completion and applies it only when projected savings exceed the rewrite cost.",
+  "offset": 0
+ },
+ {
+  "claim": "ObservationPack replaces large results with a stable handle and a 1 KB excerpt after the first two provider requests.",
+  "kind": "mechanism",
+  "quote": "ObservationPack sends large results in full for the first two provider requests, then replaces them with a stable handle and a 1 KB excerpt.",
+  "offset": 0
+ },
+ {
+  "claim": "Evidence-Preserving Reducer uses a low-cost model to compact results with deterministic verification and fallback to the original on failure.",
+  "kind": "mechanism",
+  "quote": "Evidence-Preserving Reducer uses a low-cost model to compact results, with deterministic verification and fallback to the original on failure.",
+  "offset": 0
+ },
+ {
+  "claim": "Held-out results never feed back into the search loop to prevent validation failures from being patched into task-specific solutions.",
+  "kind": "method",
+  "quote": "Held-out results never feed back into the Auto-Research Loops: a failed validation rejects the candidate without triggering further optimization.",
+  "offset": 0
+ },
+ {
+  "claim": "The search set comprises 535 executable environments, including 495 repository tasks and 40 synthetic tasks.",
+  "kind": "method",
+  "quote": "The search set comprises 535 executable environments: 495 repository tasks derived from GitHub issue\u2013pull request pairs and 40 synthetic tasks with executable success verifiers.",
+  "offset": 0
+ },
+ {
+  "claim": "SoL-Pi [Efficiency] uses 1.10 B tokens, which is 49.0% fewer than Pi, while retaining 93.7% of Pi\u2019s average score.",
+  "kind": "result",
+  "quote": "The Efficiency point uses a total of 1.10 B tokens, 49.0% fewer than Pi, while retaining 93.7% of Pi\u2019s average score (42.0 vs. 44.8).",
+  "offset": 0
+ },
+ {
+  "claim": "SoL-Pi developed with GPT-5.6 Sol retains 94.3% of Pi\u2019s average score on Opus 5 without further search or adaptation.",
+  "kind": "result",
+  "quote": "On Opus 5, it retains 94.3% of Pi\u2019s average score while reducing token traffic by 44.7% and API cost by 33.5%, relative to Pi\u2019s point estimates.",
+  "offset": 0
+ },
+ {
+  "claim": "SoL-Pi reduces total model cost by 26.3% compared to Pi on Terminal-Bench 4.",
+  "kind": "result",
+  "quote": "Compared with Pi, SoL-Pi reduces total model cost by 26.3% ($211.12 vs. $286.45) and cost per solved task by 11.6% ($14.07 vs. $15.91).",
+  "offset": 24000
+ },
+ {
+  "claim": "SoL-Pi achieves the lowest cost per passed problem on IMO 2026.",
+  "kind": "result",
+  "quote": "SoL-Pi passes three of six problems at a total model cost of $62.69, achieving the lowest cost per passed problem ($20.90), compared with $22.89 for Codex and $25.32 for Pi.",
+  "offset": 24000
+ },
+ {
+  "claim": "The SoL-Pi swarm reduces API cost by 26.8% relative to the Pi baseline swarm under the same execution budget.",
+  "kind": "result",
+  "quote": "Under the same execution budget, the SoL-Pi swarm reduces API cost by 26.8% relative to the Pi baseline swarm, while the single agent remains least expensive.",
+  "offset": 24000
+ },
+ {
+  "claim": "The complete SoL-Pi stack reduces token traffic by 44.7\u201349.0% on EdgeBench.",
+  "kind": "result",
+  "quote": "On EdgeBench, the best-performing candidates improve model performance by 5.3\u201312.8% and token efficiency by 9.8\u201318.2%, while the complete stack reduces token traffic by 44.7\u201349.0% and token cost by about one third at comparable performance.",
+  "offset": 24000
+ },
+ {
+  "claim": "Mechanism activation varies across backends, with lower trigger rates under Opus 5.",
+  "kind": "mechanism",
+  "quote": "Figure 6 shows that mechanism activation varies across backends. Trigger rate is the fraction of tasks on which a mechanism activates, while trigger intensity is the mean number of activations per triggered task. Both are lower under Opus 5, which may reflect the harness being optimized exclusively on GPT-5.6 Sol trajectories.",
+  "offset": 24000
+ },
+ {
+  "claim": "ObservationPack becomes more selective in the full stack due to overlap with Evidence-Preserving Reducer.",
+  "kind": "mechanism",
+  "quote": "ObservationPack becomes more selective in the full stack, potentially due to overlap with Evidence-Preserving Reducer on observation-heavy trajectories.",
+  "offset": 24000
+ },
+ {
+  "claim": "Shortening context can reduce prompt-cache reuse when it changes a previously cached prefix.",
+  "kind": "mechanism",
+  "quote": "Shortening context can reduce prompt-cache reuse when it changes a previously cached prefix [39].",
+  "offset": 24000
+ },
+ {
+  "claim": "GPU-dependent Terminal-Bench 4 tasks were excluded due to infrastructure limits.",
+  "kind": "limitation",
+  "quote": "Note. GPU-dependent Terminal-Bench 4 tasks were excluded due to infrastructure limits.",
+  "offset": 24000
+ },
+ {
+  "claim": "Comparisons on each configuration\u2019s own triggered-task subset do not isolate interaction effects.",
+  "kind": "limitation",
+  "quote": "This pattern is consistent with complementarity in the evaluated stack, although comparisons on each configuration\u2019s own triggered-task subset do not isolate interaction effects.",
+  "offset": 24000
+ },
+ {
+  "claim": "Running complete auto-research loops is computationally expensive, making controlled comparisons challenging.",
+  "kind": "limitation",
+  "quote": "Running complete auto-research loops in our environment is computationally expensive, making controlled comparisons of search breadth and depth under a fixed budget particularly challenging.",
+  "offset": 24000
+ },
+ {
+  "claim": "The single agent and coordinators use GPT-5.6 Sol at xhigh, while all workers use GPT-5.6 Luna at xhigh.",
+  "kind": "method",
+  "quote": "The single agent and coordinators use GPT-5.6 Sol at xhigh; all workers use GPT-5.6 Luna at xhigh.",
+  "offset": 24000
+ }
+]

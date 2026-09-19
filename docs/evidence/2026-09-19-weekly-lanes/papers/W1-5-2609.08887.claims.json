@@ -1,0 +1,110 @@
+[
+ {
+  "claim": "Retaining a third of the corpus selected by reciprocal rank fusion preserves the full-corpus model ranking while raising absolute Recall@1000 only by 3\u20137 points.",
+  "kind": "result",
+  "quote": "Retaining a third of the corpus, selected by reciprocal rank fusion over pooled retriever runs, preserves the full-corpus model ranking under the combined judgments while raising absolute Recall@1000 only by 3\u20137 points.",
+  "offset": 0
+ },
+ {
+  "claim": "Retrieval effectiveness decreases by about 20% on average when using reformulated queries compared to original human queries.",
+  "kind": "result",
+  "quote": "Even reformulations that preserve the intent reduce the nDCG@10 of retrieval pipelines by about 20% on average (Penha et al., 2022).",
+  "offset": 0
+ },
+ {
+  "claim": "On MS MARCO, 70% of manually inspected top-retrieved but unlabeled passages were in fact relevant, indicating high false negative rates in sparse labels.",
+  "kind": "result",
+  "quote": "Such false negatives are common under sparse labels: on MS MARCO, 70% of manually inspected top-retrieved but unlabeled passages were in fact relevant (Qu et al., 2021)",
+  "offset": 0
+ },
+ {
+  "claim": "The weakest retriever by Recall@1000 contributes the largest set of relevant documents that no other retriever recovers.",
+  "kind": "result",
+  "quote": "the weakest retriever by Recall@1000 contributes by far the largest set of relevant documents that no other retriever recovers, so retriever family matters independently of scale.",
+  "offset": 0
+ },
+ {
+  "claim": "All tested neural retrievers have lower recall on supporting queries than on primary queries.",
+  "kind": "result",
+  "quote": "All tested neural retrievers have lower recall on supporting queries than on primary queries, while BM25 has slightly higher recall on supporting queries (Figure 8).",
+  "offset": 0
+ },
+ {
+  "claim": "BM25 has the lowest Recall@1000 overall but recovers the largest set of relevant documents that no other tested retriever recovers.",
+  "kind": "result",
+  "quote": "BM25 also has the lowest Recall@1000 overall, yet recovers the largest set of relevant documents that no other tested retriever recovers (Section 5.1).",
+  "offset": 0
+ },
+ {
+  "claim": "The benchmark uses three judgment sets derived from agent citations, production rankings, and LLM judgments to reduce false negatives and bias.",
+  "kind": "mechanism",
+  "quote": "To limit false negatives without inheriting the bias of any single label source, we construct three judgment sets, derived from agent citations, production rankings, and LLM judgments of previously unjudged candidates.",
+  "offset": 0
+ },
+ {
+  "claim": "Subcorpus sampling is performed by retaining a third of the corpus selected by reciprocal rank fusion over pooled retriever runs to approximate full-corpus evaluation.",
+  "kind": "mechanism",
+  "quote": "We find that retaining a third of the corpus, selected by reciprocal rank fusion (RRF) score over pooled retriever runs, preserves the full-corpus ranking of systems and approximates the absolute scores.",
+  "offset": 0
+ },
+ {
+  "claim": "The corpus is constructed from top-ranked retrieval results rather than a random sample, creating a high concentration of plausible distractors.",
+  "kind": "mechanism",
+  "quote": "The corpus is constructed from top-ranked retrieval results rather than a random sample of web documents. Consequently, it contains documents that a production retrieval system considered plausible matches for at least one dataset query.",
+  "offset": 0
+ },
+ {
+  "claim": "Existing benchmarks often provide shallow relevance supervision, assigning labels to only one clicked document per query, which leads to false negatives.",
+  "kind": "limitation",
+  "quote": "MS MARCO Web Search, for instance, assigns a relevance label to only one clicked document per query, leaving potentially relevant but unclicked documents unlabeled.",
+  "offset": 0
+ },
+ {
+  "claim": "Public benchmarks risk validity erosion because models trained on them obtain inflated scores due to contamination.",
+  "kind": "limitation",
+  "quote": "We argue that publicly releasing Q2D-Web would erode its validity over time. Public benchmarks often end up in training data, intentionally or unintentionally through derivative datasets, and models trained on them obtain inflated scores",
+  "offset": 0
+ },
+ {
+  "claim": "The Combined+LLM-Judged relevance set is constructed by merging rankings from multiple retrievers using reciprocal rank fusion and selecting the top 500 previously unjudged documents.",
+  "kind": "mechanism",
+  "quote": "We merge these rankings with reciprocal rank fusion, select the top 500 previously unjudged documents, and ask deepseek-ai/DeepSeek-V4-Flash to assign each query\u2013document pair a binary relevance label (Figure 5).",
+  "offset": 24000
+ },
+ {
+  "claim": "LLM-as-a-judge systems have documented preferences, such as favoring fluent and long-form text, which introduces source-specific annotation bias.",
+  "kind": "limitation",
+  "quote": "An LLM-as-a-judge (Gu et al., 2025) has documented preferences of its own, for example, favoring fluent and long-form text.",
+  "offset": 24000
+ },
+ {
+  "claim": "A single full-corpus pass with pplx-embed-v1-4b takes 4,608 H200 GPU-hours, making repeated community-scale evaluation impractical.",
+  "kind": "limitation",
+  "quote": "A single full-corpus pass with pplx-embed-v1-4b takes 4,608 H200 GPU-hours. Even the smallest retriever we evaluate, EmbeddingGemma-300M (Vera et al., 2025) at 300M parameters, requires almost 200 H200 GPU-hours. Repeated, community-scale evaluation at this corpus size is therefore impractical rather than merely expensive (Scells et al., 2022).",
+  "offset": 24000
+ },
+ {
+  "claim": "Omitting challenging distractors (documents ranked above relevant ones by at least one retriever) can inflate evaluation scores and change the relative ranking of systems.",
+  "kind": "limitation",
+  "quote": "We argue that omitting such distractors can inflate evaluation scores and change the relative ranking of systems (Dinzinger et al., 2026).",
+  "offset": 24000
+ },
+ {
+  "claim": "The relevance-judging prompt enforces strict constraint matching, requiring exact entity, time/date, quantity, and aspect, answering NO if any constraint is missing or only approximately met.",
+  "kind": "mechanism",
+  "quote": "You are an EXTREMELY STRICT search-relevance judge. Answer YES only if this document satisfies EVERY specific constraint in the query \u2014 the exact entity, the exact time/date, the exact quantity, and the exact aspect being asked about \u2014 and contains the precise information the user wants. Answer NO if any constraint is missing, mismatched, or only approximately met (e.g. a similar-but-different entity, a different date, a near but not equal value, or only part of the question). When in doubt, answer NO.",
+  "offset": 24000
+ },
+ {
+  "claim": "All retrievers encode the first 512 tokens of each document, a truncation forced by cost, which means most of the corpus body is never seen by any system.",
+  "kind": "limitation",
+  "quote": "All retrievers encode the first 512 tokens of each document, a truncation forced by the cost of encoding a 190M-document corpus; since the mean document is roughly 3.3k tokens, most of the corpus body is never seen by any system.",
+  "offset": 24000
+ },
+ {
+  "claim": "The winner on Recall@1000 is identical between full and subsampled evaluations for each judgment set, with subsampling raising every Recall@1000 score by 3\u20137 points but leaving the winner unchanged.",
+  "kind": "result",
+  "quote": "On the primary metric Recall@1000, the winner in each of the three judgment sets is identical between the full and subsampled evaluations: Nemotron-3-Embed-8B wins Citation, and pplx-embed-v1-4b wins Web Ranking and Comb.; subsampling raises every Recall@1000 score by 3\u20137 points but leaves the winner on each set unchanged.",
+  "offset": 24000
+ }
+]

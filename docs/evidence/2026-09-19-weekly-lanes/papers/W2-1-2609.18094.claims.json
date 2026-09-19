@@ -1,0 +1,134 @@
+[
+ {
+  "claim": "The system was tested in a sustained run of nearly 12 days involving 13 language-model workers with no assigned tasks or central planner.",
+  "kind": "result",
+  "quote": "We describe the system and report its first sustained use: a run of nearly 12 days in which 13 language-model workers, with no assigned tasks and no central planner, worked on a weight-transfer problem.",
+  "offset": 0
+ },
+ {
+  "claim": "The agents improved the evaluator score from 3.39 to 1.899 bits per byte, closing 62% of the gap to a trained GPT-2 124M.",
+  "kind": "result",
+  "quote": "They published 1,703 contributions and drove the evaluator from 3.39 to 1.899 bits per byte, closing 62% of the gap to a trained GPT-2 124M.",
+  "offset": 0
+ },
+ {
+  "claim": "The winning solution involved compressing donor next-token statistics into the target\u2019s embedding and output head, then adding a short-range context signal through sparse edits.",
+  "kind": "mechanism",
+  "quote": "The winning recipe compresses donor next-token statistics into the target\u2019s embedding and output head, then adds a short-range context signal through sparse edits to attention, feed-forward, and state-space blocks.",
+  "offset": 0
+ },
+ {
+  "claim": "The winning solution's ancestry spanned 15 accounts and received 165 independent reproductions, none of which failed.",
+  "kind": "result",
+  "quote": "Its 145-commit ancestry spans 15 accounts, and 165 independent reproductions were posted, none of which failed.",
+  "offset": 0
+ },
+ {
+  "claim": "A single mid-run human intervention was required to pull the community out of a monoculture.",
+  "kind": "limitation",
+  "quote": "We describe the single mid-run human intervention that pulled the community out of a monoculture, what the trace does and does not establish, and the controlled comparison that would settle whether shared research state improves discovery per unit of compute.",
+  "offset": 0
+ },
+ {
+  "claim": "The authors state that the trace does not establish whether shared research state improves discovery per unit of compute, noting this requires a controlled comparison.",
+  "kind": "limitation",
+  "quote": "We describe the single mid-run human intervention that pulled the community out of a monoculture, what the trace does and does not establish, and the controlled comparison that would settle whether shared research state improves discovery per unit of compute.",
+  "offset": 0
+ },
+ {
+  "claim": "The system uses an append-only directed acyclic graph (DAG) stored in Git where every claim is a commit anyone can check out and rerun.",
+  "kind": "mechanism",
+  "quote": "Agora is a shared memory for such agents: research is recorded as an append-only directed acyclic graph (DAG) stored in Git, so that every claim is a commit anyone can check out and rerun.",
+  "offset": 0
+ },
+ {
+  "claim": "A diversity-aware selection rule is used to keep the community from collapsing onto one leader.",
+  "kind": "mechanism",
+  "quote": "a derived index exposes the frontier, the neglected branches, and the verification status of each claim, and a diversity-aware selection rule keeps the community from collapsing onto one leader.",
+  "offset": 0
+ },
+ {
+  "claim": "The system does not try to decide what is true, but makes claims, dependencies, verification status, and untried alternatives visible.",
+  "kind": "mechanism",
+  "quote": "The system does not try to decide what is true. It makes claims, dependencies, verification status, and untried alternatives visible enough that a mixed community of humans and agents can coordinate around them.",
+  "offset": 0
+ },
+ {
+  "claim": "The system does not assign work via a central planner; workers read and write the Git history, and nothing else passes between them.",
+  "kind": "mechanism",
+  "quote": "The Git history is the only state: workers read and write it, and nothing else passes between them.",
+  "offset": 0
+ },
+ {
+  "claim": "The run involved 13 coding-agent sessions working on initializing a frozen hybrid language model from a zoo of 141 pretrained donors with no training data.",
+  "kind": "result",
+  "quote": "We put this to the test with a 12-day run in which 13 coding-agent sessions, given only a two-page brief, an evaluator, and the shared graph, worked on initializing a frozen hybrid language model from a zoo of pretrained donors with no training data.",
+  "offset": 0
+ },
+ {
+  "claim": "The agents reproduced one another\u2019s results 165 times during the run.",
+  "kind": "result",
+  "quote": "They reached 1.899 bpb from a random baseline of 3.39, reproduced one another\u2019s results 165 times, and, after a single human intervention that showed them a map of their own concentration, left a five-day monoculture within a day.",
+  "offset": 0
+ },
+ {
+  "claim": "The system processed 1,703 contributions which comprised 1,124 scored results, 284 insights, 203 hypotheses, 165 verifications, and one report.",
+  "kind": "result",
+  "quote": ",703 contributions comprise 1,124 scored results, 284 insights, 203 hypotheses, 165 verifications, and one report, with tag overlaps;",
+  "offset": 24000
+ },
+ {
+  "claim": "233 of the scored results set a new best.",
+  "kind": "result",
+  "quote": "233 of the scored results set a new best.",
+  "offset": 24000
+ },
+ {
+  "claim": "The winning recipe's best contribution at the analysis cutoff is a chain of 83 Python modules.",
+  "kind": "mechanism",
+  "quote": "That commit is a chain of 83 Python modules, each importing its parent and applying one change;",
+  "offset": 24000
+ },
+ {
+  "claim": "Stage A uses six donors sharing the GPT-2 vocabulary, including GPT-2 small and large and Cerebras-GPT 111M to 1.3B.",
+  "kind": "mechanism",
+  "quote": "Six donors sharing the GPT-2 vocabulary, GPT-2 small and large (Radford et al., 2019) and Cerebras-GPT 111M to 1.3B (Dey et al., 2023), are queried on every vocabulary token vv under 28 single-token contexts pp",
+  "offset": 24000
+ },
+ {
+  "claim": "Stage B re-enables sublayers with sparse deterministic edits on 96-dimensional bands of the hidden state.",
+  "kind": "mechanism",
+  "quote": "Stage B re-enables sublayers with sparse deterministic edits on 96-dimensional bands of the hidden state, Bk=[1+96k, 97+96k)",
+  "offset": 24000
+ },
+ {
+  "claim": "The first scored attempt scored 4.68, which was worse than random.",
+  "kind": "result",
+  "quote": "The first scored attempt copied parameter slices from GPT-2 and Mamba into matching shapes and scored 4.68, worse than random;",
+  "offset": 24000
+ },
+ {
+  "claim": "The first 18 scored contributions account for about 98% of the total reduction in loss.",
+  "kind": "result",
+  "quote": "Those 18 scored contributions account for about 98% of the total reduction.",
+  "offset": 24000
+ },
+ {
+  "claim": "The evaluation method was not a controlled ablation because each row was selected on the same development evaluator.",
+  "kind": "limitation",
+  "quote": "Each row was selected on the same development evaluator, so adjacent rows are stages of a search, not a controlled ablation.",
+  "offset": 24000
+ },
+ {
+  "claim": "The community's best transfer() initializes the frozen 119.6M hybrid to 1.899044 bpb, closing 62% of the gap to a trained GPT-2 124M.",
+  "kind": "result",
+  "quote": "Without training data or a single gradient update on the target, the community\u2019s best transfer() initializes the frozen 119.6M hybrid to 1.899044 bpb, against 3.3923 for random initialization and about 1.0 for a trained GPT-2 124M, closing 62% of that gap.",
+  "offset": 24000
+ },
+ {
+  "claim": "The study did not run the same models without Agora or with a plain leaderboard, so it does not settle causal claims about the coordination layer.",
+  "kind": "limitation",
+  "quote": "What the run does not settle is causal: we did not run the same models and compute without Agora or with a plain leaderboard",
+  "offset": 24000
+ }
+]

@@ -1,0 +1,218 @@
+[
+ {
+  "claim": "WorldBench comprises 1,600 tasks across seven languages and eight cultures.",
+  "kind": "result",
+  "quote": "WorldBench comprises 1,600 tasks across seven languages and eight cultures, filtered and refined through feedback from human annotators with language- and culture-specific expertise.",
+  "offset": 0
+ },
+ {
+  "claim": "Frontier models reach only 49.2% Constrained Task Success (CTS).",
+  "kind": "result",
+  "quote": "Our experiments show that frontier models reach only 49.2% CTS, with all models demonstrating large gaps between correctness and environment preservation.",
+  "offset": 0
+ },
+ {
+  "claim": "All models demonstrated large gaps between correctness and environment preservation.",
+  "kind": "result",
+  "quote": "Our experiments show that frontier models reach only 49.2% CTS, with all models demonstrating large gaps between correctness and environment preservation.",
+  "offset": 0
+ },
+ {
+  "claim": "Current agents remain brittle in multilingual, agentic scenarios, especially for long-horizon tasks and under state-preservation constraints.",
+  "kind": "limitation",
+  "quote": "We thereby show that current agents remain brittle in multilingual, agentic scenarios, especially for long-horizon tasks and under state-preservation constraints",
+  "offset": 0
+ },
+ {
+  "claim": "Constrained Task Success (CTS) combines natural language instructions and testbeds to score task completion, minimal modification, and other complementary metrics through deterministic and LLM-as-a-Judge evaluations.",
+  "kind": "mechanism",
+  "quote": "For evaluation, we extend metrics from previous works and introduce Constrained Task Success (CTS), which combines natural language instructions and testbeds to score task completion, minimal modification, and other complementary metrics through deterministic and LLM-as-a-Judge evaluations.",
+  "offset": 0
+ },
+ {
+  "claim": "Each WorldBench setting is constructed and audited directly within its target language and cultural context, unlike benchmarks derived from a shared translated task pool.",
+  "kind": "method",
+  "quote": "Unlike multilingual benchmarks derived from a shared translated task pool, each WorldBench setting is constructed and audited directly within its target language and cultural context.",
+  "offset": 0
+ },
+ {
+  "claim": "Generated tasks are filtered and revised through feedback from human annotators with language- and culture-specific expertise.",
+  "kind": "method",
+  "quote": "To improve benchmark quality, generated tasks are filtered and revised through feedback from human annotators with language- and culture-specific expertise.",
+  "offset": 0
+ },
+ {
+  "claim": "Constrained Task Success (CTS) is a task-level final-state metric where a task receives CTS only when every task-specific evaluation function passes and the preservation constraint holds.",
+  "kind": "mechanism",
+  "quote": "Hence, we introduce Constrained Task Success (CTS), a task-level final-state metric where a task receives CTS only when every task-specific evaluation function passes and the preservation constraint holds.",
+  "offset": 0
+ },
+ {
+  "claim": "WorldBench studies multilingual robustness across seven different languages: English (US and UK), Italian, Portuguese, Spanish, French, German, and Chinese.",
+  "kind": "method",
+  "quote": "WorldBench studies multilingual robustness across seven different languages: English (US and UK), Italian, Portuguese, Spanish, French, German, and Chinese.",
+  "offset": 0
+ },
+ {
+  "claim": "The strongest model reaches 49.2% CTS, while the weakest achieves 10.8%.",
+  "kind": "result",
+  "quote": "We evaluate nine frontier LLM agents on WorldBench. The strongest model reaches 49.2% CTS, while the weakest achieves 10.8%.",
+  "offset": 0
+ },
+ {
+  "claim": "Across models, pass rate is higher than CTS, indicating that many apparently correct trajectories modify files outside the target.",
+  "kind": "result",
+  "quote": "Across models, pass rate is higher than CTS, indicating that many apparently correct trajectories modify files outside the target.",
+  "offset": 0
+ },
+ {
+  "claim": "We find a stable language gradient, with English settings leading and Chinese trailing across every model.",
+  "kind": "result",
+  "quote": "We also find a stable language gradient, with English settings leading and Chinese trailing across every model.",
+  "offset": 0
+ },
+ {
+  "claim": "Nine LLM-based agents were evaluated using identical prompts, action schemas, environments, and configurations.",
+  "kind": "method",
+  "quote": "We evaluate nine LLM-based agents: Gemini-3.1-Pro, Gemini-3.5-Flash, GPT-5, GPT-4o, Qwen-3-32B, Qwen-3-4B, Llama-3.3-70B, Llama-3.1-8B, and EuroLLM-9B. All agents use the same prompts, action schema, environment, and configurations.",
+  "offset": 24000
+ },
+ {
+  "claim": "Each task was executed exactly once per model under a fixed decoding configuration.",
+  "kind": "method",
+  "quote": "Each task is run once per model, using the protocol in Appendix B.",
+  "offset": 24000
+ },
+ {
+  "claim": "The best-performing model achieved a Clean Termination Score (CTS) of 49.2%, failing to surpass 50%.",
+  "kind": "result",
+  "quote": "Gemini-3.1-Pro, GPT-5, and Qwen-3-32B lead the pack at 49.2%, 48.8%, and 48.0% CTS respectively.",
+  "offset": 24000
+ },
+ {
+  "claim": "All evaluated models exhibited a preservation gap where pass rate exceeded CTS, indicating collateral edits.",
+  "kind": "result",
+  "quote": "Table 3 displays that for every model, pass rate exceeds CTS by a broad margin.",
+  "offset": 24000
+ },
+ {
+  "claim": "The preservation gap ranged from 10.1 for Gemini-3.1-Pro to 16.8 for Llama-3.3-70B.",
+  "kind": "result",
+  "quote": "The gap ranges from 10.1 for Gemini-3.1-Pro to 16.8 for Llama-3.3-70B and increases as overall capability decreases.",
+  "offset": 24000
+ },
+ {
+  "claim": "English generally yielded the highest CTS scores, while Chinese was among the most difficult settings for most models.",
+  "kind": "result",
+  "quote": "Table 4 and Figure 4 show that English generally yield the highest CTS, while Chinese is among the most difficult settings for most models.",
+  "offset": 24000
+ },
+ {
+  "claim": "Qwen-3-32B achieved the highest CTS score specifically in the Chinese language setting.",
+  "kind": "result",
+  "quote": "The Qwen models are the main exception: their decline on Chinese is smaller, and Qwen-3-32B gets the highest Chinese.",
+  "offset": 24000
+ },
+ {
+  "claim": "Calendar and document tasks achieved higher CTS scores compared to messaging and shell tasks.",
+  "kind": "result",
+  "quote": "Calendar and document tasks achieve higher scores, while messaging and shell tasks show lower CTS and larger preservation gaps.",
+  "offset": 24000
+ },
+ {
+  "claim": "Deterministic evaluation functions achieved higher pass rates than open-ended evaluators like email and note checks.",
+  "kind": "result",
+  "quote": "Figure 6 shows that deterministic functions, including file-existence and spreadsheet-cell checks, achieve higher pass rates than the email and note evaluators.",
+  "offset": 24000
+ },
+ {
+  "claim": "Wrong output was the largest failure category for stronger models, while collateral edits remained substantial across all agents.",
+  "kind": "result",
+  "quote": "Figure 8 reports the share of failed tasks assigned to each category for every model, showing that wrong output is the largest category for stronger models, with collateral edits remaining substantial across all agents.",
+  "offset": 24000
+ },
+ {
+  "claim": "Iteration-cap hits accounted for up to 43% of failures for the EuroLLM-9B model.",
+  "kind": "result",
+  "quote": "Iteration-cap hits increase as performance decreases and form the largest category for the smallest models, accounting for up to 43% of failures in the case of EuroLLM-9B.",
+  "offset": 24000
+ },
+ {
+  "claim": "The benchmark excludes visual desktop control and live web interaction to maximize reproducibility.",
+  "kind": "limitation",
+  "quote": "WorldBench evaluates structured, file-based workflows via a fixed action interface. This supports reproducible experiments on documents, spreadsheets, calendars, and filesystem operations, but excludes visual desktop control and live web interaction, which have not been included in this version to maximise reproducibility, but are intended to be incorporated in future development versions.",
+  "offset": 24000
+ },
+ {
+  "claim": "The final benchmark contains 1,600 tasks and 400 personas across eight language-locale settings.",
+  "kind": "result",
+  "quote": "The final benchmark therefore contains 1,600 tasks and 400 personas, with an average of four retained tasks per persona.",
+  "offset": 48000
+ },
+ {
+  "claim": "Annotators were compensated at a rate of 12 GBP per hour.",
+  "kind": "method",
+  "quote": "Annotators were compensated at 12(GBP/h).",
+  "offset": 48000
+ },
+ {
+  "claim": "25% of the candidate tasks received double annotation to ensure quality control.",
+  "kind": "method",
+  "quote": "Each candidate task received one annotation, and 25% of the pool was double-annotated.",
+  "offset": 48000
+ },
+ {
+  "claim": "Performance increases between 10 and 30 steps, with gains ranging from 0.3 to 1.9 CTS.",
+  "kind": "result",
+  "quote": "Performance increases between 10 and 30 steps, and between 30 and 50 steps; gains range from 0.3 to 1.9 CTS across the evaluated subset.",
+  "offset": 48000
+ },
+ {
+  "claim": "Weaker models benefit slightly more from a larger iteration budget than stronger models.",
+  "kind": "result",
+  "quote": "The weaker models benefit slightly more from a larger budget, which is consistent with their higher iteration-cap hit rate in Table 3, and even for them the extra budget converts into fewer than two additional points.",
+  "offset": 48000
+ },
+ {
+  "claim": "CTS generally decreases as trajectory length increases, particularly beyond successful trajectory lengths.",
+  "kind": "result",
+  "quote": "Across models, CTS generally decreases as trajectories become longer.",
+  "offset": 48000
+ },
+ {
+  "claim": "The three LLM judges agree with one another on 94.1% of items.",
+  "kind": "result",
+  "quote": "The three judges agree with one another on 94.1% of items, so the choice of judge shifts the reported pass rate by at most 2.4 points on either function.",
+  "offset": 48000
+ },
+ {
+  "claim": "Cohen\u2019s kappa for judge agreement with human reference ranges between 0.76 and 0.81.",
+  "kind": "result",
+  "quote": "Agreement with the human reference is substantial throughout, with Cohen\u2019s kappa between 0.76 and 0.81, and a majority vote raises it to 0.84.",
+  "offset": 48000
+ },
+ {
+  "claim": "Distractor capture and shell over-reach together account for 42.4% of failures.",
+  "kind": "result",
+  "quote": "First, distractor capture and shell over-reach together account for 42.4% of failures, and both are preservation failures by construction, which explains the width of the gap between pass rate and CTS.",
+  "offset": 48000
+ },
+ {
+  "claim": "Locale mismatch is the principal mechanism underlying the language gradient in performance.",
+  "kind": "mechanism",
+  "quote": "This pattern is therefore the principal mechanism underlying the language gradient in \u00a75, and it is a grounding failure, since the agents parse the instruction correctly and then emit values under the conventions of the wrong locale.",
+  "offset": 48000
+ },
+ {
+  "claim": "Locale mismatch rises from 6.8% in English settings to 21.4% in non-English settings.",
+  "kind": "result",
+  "quote": "locale mismatch is the only pattern whose share varies substantially by language, rising from 6.8% in English settings to 21.4% in non-English settings and peaking at 26.9% in Chinese.",
+  "offset": 48000
+ },
+ {
+  "claim": "The task sets are independently constructed without translations or item-level counterparts.",
+  "kind": "method",
+  "quote": "The task sets are independently constructed within each setting, without translations or item-level counterparts of tasks in the other settings.",
+  "offset": 48000
+ }
+]
