@@ -139,7 +139,7 @@ spec:
     title: check_trajectory_flags.py, gate-file weakening and rework-round trajectory flag
     purpose: Raise a local advisory flag at the verify stage from the gate log and the branch diff; one extra Sonnet review-synthesis pass on the flagged unit, never a reject.
     ownerRepo: agentops
-    hostItem: null
+    hostItem: '#2440'
     filing: after WL-D1 (#2434) has landed
     priority: P1
     size: S
@@ -159,7 +159,7 @@ spec:
     title: Producer count for evidence_obligations (W1-4 trigger check)
     purpose: Measure before declaring (TS-12); count sprint-559 items with ingested evidence refs against live sprintctl state and record the number as a Decision.
     ownerRepo: sprintctl
-    hostItem: null
+    hostItem: '#2439'
     filing: next refine tick; a live-state read, no code
     priority: P1
     size: S
@@ -218,7 +218,7 @@ spec:
     title: evidence_obligations key on acceptance_contract plus unmet_obligations() report
     purpose: Let a Release declare the evidence it owes and report, never block, on Decisions that accepted without it.
     ownerRepo: sprintctl
-    hostItem: null
+    hostItem: '#2446'
     filing: only when WL-A2a records five or more producers
     priority: P2
     size: S-M
@@ -268,7 +268,7 @@ spec:
     title: Watchlist recheck 2026-10-31 (Agora matched comparison, independent SoL-Pi re-run)
     purpose: Both source papers were two to three days old on 2026-09-19, so absence of a follow-up was not informative; one dated recheck replaces a standing trigger.
     ownerRepo: vuoro
-    hostItem: null
+    hostItem: '#2441'
     filing: as a dated note, not a sprint item, unless the lane loop prefers one
     priority: P2
     size: S
