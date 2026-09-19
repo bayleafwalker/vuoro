@@ -1,0 +1,212 @@
+[
+ {
+  "claim": "In the original WebArena study, the strongest reported GPT-4 agent completed 14.41% of tasks, compared with 78.24% for humans.",
+  "kind": "result",
+  "quote": "In the original WebArena study, the strongest reported GPT-4 agent completed 14.41% of tasks, compared with 78.24% for humans",
+  "offset": 0
+ },
+ {
+  "claim": "In the original OSWorld study, performance was below 12.2% for its best configuration and 72.4% for humans.",
+  "kind": "result",
+  "quote": "the original OSWorld study reported performance below 12.2% for its best configuration and 72.4% for humans",
+  "offset": 0
+ },
+ {
+  "claim": "Multi-agent debate can drift away from the original problem over longer interactions.",
+  "kind": "result",
+  "quote": "Multi-agent debate can drift away from the original problem over longer interactions",
+  "offset": 0
+ },
+ {
+  "claim": "Equal-compute comparisons question whether some reported multi-agent gains arise from organization rather than additional inference budget.",
+  "kind": "result",
+  "quote": "equal-compute comparisons question whether some reported multi-agent gains arise from organization rather than additional inference budget",
+  "offset": 0
+ },
+ {
+  "claim": "ReAct interleaved reasoning traces with actions and environmental observations.",
+  "kind": "mechanism",
+  "quote": "ReAct interleaved reasoning traces with actions and environmental observations",
+  "offset": 0
+ },
+ {
+  "claim": "Toolformer studied learned decisions about when and how to call application programming interfaces (APIs).",
+  "kind": "mechanism",
+  "quote": "Toolformer studied learned decisions about when and how to call application programming interfaces (APIs)",
+  "offset": 0
+ },
+ {
+  "claim": "Reflexion used linguistic feedback to revise subsequent behaviour.",
+  "kind": "mechanism",
+  "quote": "Reflexion used linguistic feedback to revise subsequent behaviour",
+  "offset": 0
+ },
+ {
+  "claim": "The SWE-agent study reported a 12.5% pass@1 rate on SWE-bench and argued that interface choices materially shape behaviour.",
+  "kind": "result",
+  "quote": "the original NeurIPS study reported a 12.5% pass@1 rate on SWE-bench and argued that interface choices materially shape behaviour",
+  "offset": 0
+ },
+ {
+  "claim": "This review is a critical review, not a systematic review or a quantitative meta-analysis.",
+  "kind": "limitation",
+  "quote": "This is a critical review, not a systematic review or a quantitative meta-analysis",
+  "offset": 0
+ },
+ {
+  "claim": "The design does not support statements about the proportion of all agent papers with a given feature.",
+  "kind": "limitation",
+  "quote": "This design does not support statements about the proportion of all agent papers with a given feature",
+  "offset": 0
+ },
+ {
+  "claim": "The design does not yield a formal meta-analytic effect size.",
+  "kind": "limitation",
+  "quote": "nor does it yield a formal meta-analytic effect size",
+  "offset": 0
+ },
+ {
+  "claim": "A GPT-4 baseline achieved 14.41% end-to-end success on WebArena compared to 78.24% for humans.",
+  "kind": "result",
+  "quote": "Its best reported GPT-4 baseline achieved 14.41% end-to-end success against 78.24% for humans [56].",
+  "offset": 24000
+ },
+ {
+  "claim": "The best evaluated agent achieved less than 12.2% success on OSWorld compared to 72.4% for humans in a study of 369 tasks.",
+  "kind": "result",
+  "quote": "The original study contained 369 tasks and reported less than 12.2% success for the best evaluated agent compared with 72.4% for humans [50].",
+  "offset": 24000
+ },
+ {
+  "claim": "OpenAI\u2019s Computer-Using Agent reported 38.1% success on OSWorld and 58.1% on WebArena.",
+  "kind": "result",
+  "quote": "OpenAI\u2019s Computer-Using Agent (CUA) research preview reported 38.1% on OSWorld and 58.1% on WebArena with a screen\u2013mouse\u2013keyboard action space [29].",
+  "offset": 24000
+ },
+ {
+  "claim": "A study of 303 bounties found that 32.7% were attributed to API-key or MCP channels.",
+  "kind": "result",
+  "quote": "A February 2026 preprint measured 303 bounties on the same marketplace and attributed 99 (32.7%) to API-key or MCP channels.",
+  "offset": 24000
+ },
+ {
+  "claim": "A 2026 preprint found that single-agent systems matched or outperformed several multi-agent organizations when reasoning-token budgets were held constant.",
+  "kind": "result",
+  "quote": "A 2026 preprint found that single-agent systems matched or outperformed several multi-agent organizations on multi-hop reasoning when reasoning-token budgets were held constant, while identifying API and benchmark artifacts that can inflate apparent gains [45].",
+  "offset": 24000
+ },
+ {
+  "claim": "V-JEPA 2 post-trains an action-conditioned model with fewer than 62 hours of unlabelled robot video.",
+  "kind": "result",
+  "quote": "V-JEPA 2 learns predictive representations from more than one million hours of video and then post-trains an action-conditioned model with fewer than 62 hours of unlabelled robot video; the report demonstrates zero-shot image-goal planning on Franka arms in two laboratories [6].",
+  "offset": 24000
+ },
+ {
+  "claim": "The authors state that first-party evaluation and deployment reports do not replace independent tests under stable harnesses.",
+  "kind": "limitation",
+  "quote": "Because the evaluation and deployment reports are first-party, they do not replace independent tests under stable harnesses.",
+  "offset": 24000
+ },
+ {
+  "claim": "The authors state that the RentAHuman study does not establish causal effects or ecosystem-wide prevalence.",
+  "kind": "limitation",
+  "quote": "The study is a single-platform, single-snapshot preprint and its retrospective screening experiment does not establish causal effects or ecosystem-wide prevalence.",
+  "offset": 24000
+ },
+ {
+  "claim": "The authors state that the 2026 preprint on multi-agent systems is limited to the tested models and reasoning tasks.",
+  "kind": "limitation",
+  "quote": "The result is limited to the tested models and reasoning tasks, yet it establishes a necessary evaluation principle: compare equal computation and report coordination overhead.",
+  "offset": 24000
+ },
+ {
+  "claim": "The authors state that the V-JEPA 2 results remain preprint evidence and do not test long-lived objectives or open human environments.",
+  "kind": "limitation",
+  "quote": "They remain preprint evidence, and the demonstrated manipulation tasks do not test long-lived objectives, heterogeneous hardware, or open human environments.",
+  "offset": 24000
+ },
+ {
+  "claim": "The authors state that Project Eden was a company research preview, not a peer-reviewed paper or independently reproduced benchmark.",
+  "kind": "limitation",
+  "quote": "At the cutoff it was a company research preview, not a peer-reviewed paper, an open model, or an independently reproduced agent benchmark.",
+  "offset": 24000
+ },
+ {
+  "claim": "The authors state that the distinction between APIs and graphical control is a trade between explicit semantics and interface coverage.",
+  "kind": "mechanism",
+  "quote": "The difference between APIs and graphical control is therefore not a choice between \u201climited\u201d and \u201cgeneral\u201d agency. It is a trade between explicit semantics and interface coverage.",
+  "offset": 24000
+ },
+ {
+  "claim": "RT-2 reported 6,000 evaluation trials and improved generalization to novel objects and instructions.",
+  "kind": "result",
+  "quote": "Its peer-reviewed study reported 6,000 evaluation trials and improved generalization to novel objects and instructions, including rudimentary semantic reasoning [57].",
+  "offset": 48000
+ },
+ {
+  "claim": "OpenVLA was trained on 970,000 robot episodes.",
+  "kind": "result",
+  "quote": "OpenVLA trained a 7-billion-parameter open VLA model on 970,000 robot episodes and evaluated it across multiple robot embodiments and manipulation suites [14].",
+  "offset": 48000
+ },
+ {
+  "claim": "Coscientist evaluated six tasks, including optimization of palladium-catalysed cross-coupling reactions.",
+  "kind": "result",
+  "quote": "Its Nature paper evaluated six tasks, including optimization of palladium-catalysed cross-coupling reactions, and characterized the system as supporting semi-autonomous experimental design and execution [8].",
+  "offset": 48000
+ },
+ {
+  "claim": "A 2025 Nature Communications study evaluated single- and multi-agent workflows across experimental design, operation, and analysis.",
+  "kind": "result",
+  "quote": "The 2025 Nature Communications study evaluated single- and multi-agent workflows across experimental design, operation, and analysis, finding that domain question-answering performance did not reliably translate into laboratory competence.",
+  "offset": 48000
+ },
+ {
+  "claim": "The study reported sensitivity to prompt formatting and instruction deviations termed 'sleepwalking,' despite multi-agent gains in the evaluated setting.",
+  "kind": "result",
+  "quote": "It also reported sensitivity to prompt formatting and instruction deviations termed \u201csleepwalking,\u201d despite multi-agent gains in the evaluated setting [19].",
+  "offset": 48000
+ },
+ {
+  "claim": "A January 2026 author correction revised claims about material novelty and synthesis outcomes for A-Lab.",
+  "kind": "result",
+  "quote": "A January 2026 author correction revised claims about material novelty and synthesis outcomes; we therefore use A-Lab here as evidence of system integration, not as an unqualified count of novel materials [44].",
+  "offset": 48000
+ },
+ {
+  "claim": "The MHS announcement presents proof-of-concept work spanning microscopes, liquid handlers, robotic arms, qPCR monitoring, assay optimization, and laser alignment.",
+  "kind": "result",
+  "quote": "The announcement presents proof-of-concept work spanning microscopes, liquid handlers, robotic arms, qPCR monitoring, assay optimization, and laser alignment.",
+  "offset": 48000
+ },
+ {
+  "claim": "At the cutoff, MHS access was limited and demonstrations were supplied by Anthropic and participating laboratories rather than an independent conformance program.",
+  "kind": "limitation",
+  "quote": "At the cutoff, access was limited, the announcement preceded a promised open-source release, and the reported demonstrations were supplied by Anthropic and participating laboratories rather than an independent conformance program.",
+  "offset": 48000
+ },
+ {
+  "claim": "Partner accounts for MHS identify failures that still required expert physical insight.",
+  "kind": "limitation",
+  "quote": "The source itself describes further work on safety evaluations and best practices, and partner accounts identify failures that still required expert physical insight.",
+  "offset": 48000
+ },
+ {
+  "claim": "A common driver cannot infer accurate limits, guarantee that tags are complete, or make a model understand fluid dynamics and collision risk.",
+  "kind": "limitation",
+  "quote": "A common driver can reduce integration effort and expose safety metadata; it cannot infer accurate limits, guarantee that tags are complete, or make a model understand fluid dynamics and collision risk.",
+  "offset": 48000
+ },
+ {
+  "claim": "A small number of demonstrations cannot estimate rare hazards in autonomous laboratory settings.",
+  "kind": "limitation",
+  "quote": "The research goal and available tools are prescribed; chemical access and execution are constrained; a small number of demonstrations cannot estimate rare hazards; and expert judgment remains essential for interpreting whether a procedure is scientifically meaningful.",
+  "offset": 48000
+ },
+ {
+  "claim": "An LM-emulated environment cannot reproduce every external side effect.",
+  "kind": "limitation",
+  "quote": "Attack strings, tool schemas, model endpoints, and defense prompts change, and an LM-emulated environment cannot reproduce every external side effect.",
+  "offset": 48000
+ }
+]

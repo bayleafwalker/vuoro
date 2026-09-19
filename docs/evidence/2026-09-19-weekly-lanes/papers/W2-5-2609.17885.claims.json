@@ -1,0 +1,140 @@
+[
+ {
+  "claim": "Evaluating six closed and open-source agents, we demonstrate that strong general GUI performance does not transfer to enterprise reliability.",
+  "kind": "result",
+  "quote": "Evaluating six closed and open-source agents, we demonstrate that strong general GUI performance does not transfer to enterprise reliability.",
+  "offset": 0
+ },
+ {
+  "claim": "Some agents save in up to 85% of runs but write the correct value in as few as 3%.",
+  "kind": "result",
+  "quote": "Even when an agent reaches the right form and saves it, the stored record is often wrong: some agents save in up to 85% of runs but write the correct value in as few as 3%.",
+  "offset": 0
+ },
+ {
+  "claim": "The benchmark evaluates agents on a live, self-hosted instance of ERPNext, an open-source ERP.",
+  "kind": "method",
+  "quote": "ERPBench is built on a live, self-hosted instance of ERPNext [11], an open-source ERP spanning finance, procurement, inventory, and customer management.",
+  "offset": 0
+ },
+ {
+  "claim": "Agents operate from screenshots alone, while each task is graded against ground-truth database fields.",
+  "kind": "method",
+  "quote": "Agents operate from screenshots alone, while each task is graded against ground-truth database fields, extending execution-based state verification [7, 5] to persistent business records.",
+  "offset": 0
+ },
+ {
+  "claim": "The production-grade harness gates every agent action behind human approval for safe enterprise use.",
+  "kind": "mechanism",
+  "quote": "In deployment, it gates every agent action behind human approval for safe enterprise use [2].",
+  "offset": 0
+ },
+ {
+  "claim": "For benchmarking, the same harness runs autonomously, with an auto-approver in place of the human reviewer.",
+  "kind": "mechanism",
+  "quote": "For benchmarking, the same harness runs autonomously, with an auto-approver in place of the human reviewer.",
+  "offset": 0
+ },
+ {
+  "claim": "The database grader reads target field values from ERPNext through the Frappe REST API after the run.",
+  "kind": "mechanism",
+  "quote": "The database grader reads the target field values from ERPNext through the Frappe REST API after the run.",
+  "offset": 0
+ },
+ {
+  "claim": "The stage grader awards partial credit over ordered stages: Navigation, Interaction, Commit, and Database.",
+  "kind": "mechanism",
+  "quote": "The stage grader awards partial credit over ordered stages, agent actions followed by a verification of persistent state: Navigation (the target record or field is reached), Interaction (the required GUI manipulation is completed), Commit (a save or submit is invoked), and Database (the target fields match ground truth).",
+  "offset": 0
+ },
+ {
+  "claim": "Existing enterprise benchmarks rely on proprietary platforms or on simulated approximations of such software.",
+  "kind": "limitation",
+  "quote": "Existing enterprise benchmarks rely on proprietary platforms or on simulated approximations of such software.",
+  "offset": 0
+ },
+ {
+  "claim": "Prior benchmarks do not model the persistent, domain-specific business state characteristic of enterprise applications.",
+  "kind": "limitation",
+  "quote": "Collectively, these benchmarks establish interaction and execution success as the dominant evaluation paradigm for general-purpose GUI agents, but do not model the persistent, domain-specific business state characteristic of enterprise applications.",
+  "offset": 0
+ },
+ {
+  "claim": "UI-CUBE evaluates agents on simulated web applications and exposes DOM information alongside screenshots.",
+  "kind": "limitation",
+  "quote": "However, UI-CUBE evaluates agents on simulated web applications, exposes DOM information alongside screenshots, and verifies outcomes against application-state snapshots.",
+  "offset": 0
+ },
+ {
+  "claim": "Claude reaches 94%, 100%, and 100% success across the three tiers, approaching the human reference; however, its token requirements scale heavily, from 231K tokens per run on T1 to roughly 2.0M on T3.",
+  "kind": "result",
+  "quote": "Claude reaches 94%, 100%, and 100% success across the three tiers, approaching the human reference; however, its token requirements scale heavily, from 231K tokens per run on T1 to roughly 2.0M on T3.",
+  "offset": 24000
+ },
+ {
+  "claim": "The strongest open models, Holo3-35B-A3B and Qwen3-VL-32B, reach only 34% and 32% on T1 and fall to 0\u20133% on T2 and T3, while OpenCUA-7B fails every task.",
+  "kind": "result",
+  "quote": "By contrast, the strongest open models, Holo3-35B-A3B and Qwen3-VL-32B, reach only 34% and 32% on T1 and fall to 0\u20133% on T2 and T3, while OpenCUA-7B fails every task (Table\u00a02).",
+  "offset": 24000
+ },
+ {
+  "claim": "UI-TARS and OpenCUA-32B report 42.5 and 34.8 on OSWorld-Verified, yet reach only 9% and 23% on T1, showing a gap between general GUI performance and enterprise execution.",
+  "kind": "result",
+  "quote": "The gap is starkest for models with strong general scores: UI-TARS and OpenCUA-32B report 42.5 and 34.8 on OSWorld-Verified, yet reach only 9% and 23% on T1.",
+  "offset": 24000
+ },
+ {
+  "claim": "Open models successfully navigate to target records in 90\u201395% of T1 runs, but fail at interaction and database persistence, with interaction rates falling to 0\u201353% and database-correct rates to 0\u201334%.",
+  "kind": "result",
+  "quote": "Open models successfully navigate to target records in 90\u201395% of T1 runs, but fail at interaction and database persistence. Their interaction rate falls to 0\u201353% and their database-correct rate to 0\u201334%: they arrive at the right screen yet cannot reliably enter and persist the intended value.",
+  "offset": 24000
+ },
+ {
+  "claim": "UI-TARS reaches the target in 95% of runs and fires a save in 68%, yet only 9% leave the correct value in the database, indicating nearly every save it commits is wrong.",
+  "kind": "result",
+  "quote": "UI-TARS is the clearest case: it reaches the target in 95% of runs and fires a save in 68%, yet only 9% leave the correct value in the database, so nearly every save it commits is wrong.",
+  "offset": 24000
+ },
+ {
+  "claim": "Claude stays near ceiling across every stage on T1, with navigate 99%, interact 97%, commit 98%, and database 94% success rates.",
+  "kind": "result",
+  "quote": "Claude, by contrast, stays near ceiling across every stage (T1 navigate 99%, interact 97%, commit 98%, database 94%).",
+  "offset": 24000
+ },
+ {
+  "claim": "Claude completes all six T3 chained workflows (30/30), matching the human annotator, but at 36 actions and 323 s per run versus 12 actions and 89 s on T1.",
+  "kind": "result",
+  "quote": "Claude completes all six T3 chained workflows (30/30), matching the human annotator, but at 36 actions and 323 s per run versus 12 actions and 89 s on T1.",
+  "offset": 24000
+ },
+ {
+  "claim": "Open models stay cheap only because they stop early, with OpenCUA-7B averaging 1.6 actions on T1 and Qwen3-VL 4.9, reflecting premature loop termination rather than task efficiency.",
+  "kind": "result",
+  "quote": "The open models stay cheap only because they stop early: OpenCUA-7B averages 1.6 actions on T1 and Qwen3-VL 4.9, reflecting premature loop termination rather than task efficiency.",
+  "offset": 24000
+ },
+ {
+  "claim": "Claude\u2019s turn counts and output tokens grow with tier depth, from 13.8 turns and 2.3K output tokens in T1 to 38.2 turns and 6.5K output tokens in T3.",
+  "kind": "result",
+  "quote": "Claude\u2019s turn counts and output tokens grow with tier depth (13.8 turns in T1 to 38.2 turns in T3, 2.3K output tokens in T1 to 6.5K output tokens in T3) while its per-turn thinking time grows more modestly, from about 4 s on T1\u2013T2 to 6 s on T3.",
+  "offset": 24000
+ },
+ {
+  "claim": "Open models perform worse on exact free-text field entry (22\u201347%) than on select/toggle choices (31\u201354%), indicating typing an exact value is harder than picking a known option.",
+  "kind": "result",
+  "quote": "With the exception of Holo3, open models perform worse on exact free-text field entry (22\u201347%) than on select/toggle choices (31\u201354%), i.e., typing an exact value is harder than picking a known option.",
+  "offset": 24000
+ },
+ {
+  "claim": "Removing the navigation crutch (starting URL prompts) in T3 causes chain completion depth to drop significantly, for example, OpenCUA-32B drops from 22% warm-start depth to 9% blank-start depth.",
+  "kind": "result",
+  "quote": "In T3, removing the navigation crutch (starting URL prompts) causes chain completion depth to drop significantly. For example, OpenCUA-32B drops from 22% warm-start depth to 9% blank-start depth.",
+  "offset": 24000
+ },
+ {
+  "claim": "The human reference was produced by the authors themselves with no external participants and no sensitive personal data involved.",
+  "kind": "limitation",
+  "quote": "The human reference was produced by the authors themselves; no external participants and no sensitive personal data were involved, and no institutional review board approval was required.",
+  "offset": 24000
+ }
+]

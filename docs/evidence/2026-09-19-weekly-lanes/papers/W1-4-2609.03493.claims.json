@@ -1,0 +1,158 @@
+[
+ {
+  "claim": "NTEP-8B obtains the best RL-agent average of 70.34, exceeding the reproduced SenseNova-MARS-8B checkpoint by 2.03 points.",
+  "kind": "result",
+  "quote": "Within the unified three-tool harness, NTEP-8B obtains the best RL-agent average of 70.34, exceeding the reproduced SenseNova-MARS-8B checkpoint by 2.03 points.",
+  "offset": 24000
+ },
+ {
+  "claim": "Goal alignment by itself is insufficient: without information acquisition and duplicate-goal regularization, Search Avg. collapses to 34.58.",
+  "kind": "result",
+  "quote": "Goal alignment by itself is insufficient: without information acquisition and duplicate-goal regularization, Search Avg. collapses to 34.58 even though the policy still learns to issue many calls.",
+  "offset": 24000
+ },
+ {
+  "claim": "Wrong-tool selection remains the largest residual failure for every model.",
+  "kind": "limitation",
+  "quote": "Wrong-tool selection remains the largest residual failure for every model, suggesting tool-choice supervision as a complementary direction beyond evidence-path supervision.",
+  "offset": 24000
+ },
+ {
+  "claim": "The NTEP-R objective trains the policy around abstract evidence states rather than overfitting to the training tool distribution.",
+  "kind": "mechanism",
+  "quote": "The NTEP-R objective trains the policy around abstract evidence states rather than overfitting to the training tool distribution.",
+  "offset": 24000
+ },
+ {
+  "claim": "NTEP-R makes every wasted call individually unprofitable while keeping genuinely needed retries profitable.",
+  "kind": "mechanism",
+  "quote": "This subsection formalizes the two mechanisms behind the observations of Sections 4.3\u20134.4: NTEP-R makes every wasted call individually unprofitable while keeping genuinely needed retries profitable",
+  "offset": 24000
+ },
+ {
+  "claim": "All same-harness comparisons use matched benchmark splits and serving configurations.",
+  "kind": "method",
+  "quote": "All same-harness comparisons use matched benchmark splits and serving configurations.",
+  "offset": 24000
+ },
+ {
+  "claim": "The goal-only policy receives the answer-critical Nintendo Switch release date on its first call but continues through nine text searches that repeatedly target the same release-date goal.",
+  "kind": "result",
+  "quote": "The goal-only policy receives the answer-critical Nintendo Switch release date on its first call but continues through nine text searches that repeatedly target the same release-date goal.",
+  "offset": 48000
+ },
+ {
+  "claim": "The training interface deliberately excludes crop/zoom, whereas evaluation exposes the common three-tool interface, making crop/zoom an unseen tool capability.",
+  "kind": "mechanism",
+  "quote": "The training interface deliberately excludes crop/zoom, whereas evaluation exposes the common three-tool interface; this separation is what makes crop/zoom an unseen tool capability rather than a trained behavior.",
+  "offset": 48000
+ },
+ {
+  "claim": "The reward-optimal policy answers immediately after its last goal completes because every further call earns no credit and strictly lowers the trajectory reward.",
+  "kind": "mechanism",
+  "quote": "the reward-optimal policy therefore answers immediately after its last goal completes.",
+  "offset": 48000
+ },
+ {
+  "claim": "Evidence-conditioned training unlocks the capability to route pending visual goals to novel interfaces by decoupling abstract evidence goals from rigid tool identities.",
+  "kind": "mechanism",
+  "quote": "by decoupling abstract evidence goals from rigid tool identities, it prevents the policy from overfitting to the training inventory and allows the base model\u2019s zero-shot reasoning to naturally map pending visual goals to the novel interface.",
+  "offset": 48000
+ },
+ {
+  "claim": "The goal-only configuration inflates its process reward late in training while its answer reward collapses, which is the training-time signature of saturation-style calling.",
+  "kind": "result",
+  "quote": "the goal-only run inflates its process reward late in training while its answer reward collapses\u2014the training-time signature of saturation-style calling",
+  "offset": 48000
+ },
+ {
+  "claim": "Path quality is bounded by the teacher because NTEPs are distilled by a stronger model.",
+  "kind": "limitation",
+  "quote": "First, path quality is bounded by the teacher: NTEPs are distilled by a stronger model",
+  "offset": 48000
+ },
+ {
+  "claim": "Step-wise semantic judging adds serving overhead relative to outcome-only RL.",
+  "kind": "limitation",
+  "quote": "Second, step-wise semantic judging adds serving overhead relative to outcome-only RL",
+  "offset": 48000
+ },
+ {
+  "claim": "The experiments cover three tools and predominantly English retrieval, limiting the scope to these tool families and languages.",
+  "kind": "limitation",
+  "quote": "Third, our experiments cover three tools and predominantly English retrieval",
+  "offset": 48000
+ },
+ {
+  "claim": "The human audit validated automated judgments using a sample of 100 judge-scored cases from judge-involved settings.",
+  "kind": "method",
+  "quote": "We sample 100 judge-scored cases from the judge-involved settings and hide both model identity and judge decision from the annotator.",
+  "offset": 72000
+ },
+ {
+  "claim": "The audit protocol employed blinding by hiding model identity and judge decisions from annotators.",
+  "kind": "method",
+  "quote": "We sample 100 judge-scored cases from the judge-involved settings and hide both model identity and judge decision from the annotator.",
+  "offset": 72000
+ },
+ {
+  "claim": "The overall inter-annotator agreement for the audit was 97.0% (97 out of 100 cases).",
+  "kind": "result",
+  "quote": "Agreement is uniform across systems: 98%98\\% on NTEP-8B cases and 96%96\\% on the strongest baseline\u2019s cases, with one judge false positive and two false negatives among the 100 audited decisions.",
+  "offset": 72000
+ },
+ {
+  "claim": "Agreement on NTEP-8B cases was 98%.",
+  "kind": "result",
+  "quote": "Agreement is uniform across systems: 98%98\\% on NTEP-8B cases and 96%96\\% on the strongest baseline\u2019s cases, with one judge false positive and two false negatives among the 100 audited decisions.",
+  "offset": 72000
+ },
+ {
+  "claim": "Agreement on the strongest baseline\u2019s cases was 96%.",
+  "kind": "result",
+  "quote": "Agreement is uniform across systems: 98%98\\% on NTEP-8B cases and 96%96\\% on the strongest baseline\u2019s cases, with one judge false positive and two false negatives among the 100 audited decisions.",
+  "offset": 72000
+ },
+ {
+  "claim": "There was one judge false positive and two false negatives among the 100 audited decisions.",
+  "kind": "result",
+  "quote": "Agreement is uniform across systems: 98%98\\% on NTEP-8B cases and 96%96\\% on the strongest baseline\u2019s cases, with one judge false positive and two false negatives among the 100 audited decisions.",
+  "offset": 72000
+ },
+ {
+  "claim": "The disagreements were identified as boundary judgments rather than systematic bias toward any model.",
+  "kind": "result",
+  "quote": "All three disagreements are boundary judgments\u2014synonym granularity (e.g., \u201ccontemporary\u201d vs. \u201cmodern\u201d) and a magnitude misreading\u2014rather than systematic bias toward any model.",
+  "offset": 72000
+ },
+ {
+  "claim": "The audit was not used for model selection, reward tuning, or post-hoc correction of reported results.",
+  "kind": "limitation",
+  "quote": "This audit is not used for model selection, reward tuning, or post-hoc correction of reported results.",
+  "offset": 72000
+ },
+ {
+  "claim": "Visual multiple-choice benchmarks do not use automated judging for correctness.",
+  "kind": "method",
+  "quote": "The visual multiple-choice benchmarks do not use automated judging for correctness; they are scored by answer extraction and exact matching.",
+  "offset": 72000
+ },
+ {
+  "claim": "Some underlying images and source data of the benchmarks remain subject to non-commercial or research-only terms.",
+  "kind": "limitation",
+  "quote": "Although the code or annotations of these benchmarks are released under permissive licenses such as MIT or Apache-2.0, some of their underlying images and source data remain subject to non-commercial or research-only terms imposed by the original data providers.",
+  "offset": 72000
+ },
+ {
+  "claim": "The benchmarks and underlying data were used solely for non-commercial academic research.",
+  "kind": "limitation",
+  "quote": "The authors confirm that these benchmarks and their underlying data were used solely for non-commercial academic research and were not used for any commercial activity, in accordance with the applicable upstream licenses and terms of use.",
+  "offset": 72000
+ },
+ {
+  "claim": "The audit agreement was uniform across the systems tested.",
+  "kind": "result",
+  "quote": "Agreement is uniform across systems: 98%98\\% on NTEP-8B cases and 96%96\\% on the strongest baseline\u2019s cases, with one judge false positive and two false negatives among the 100 audited decisions.",
+  "offset": 72000
+ }
+]

@@ -1,0 +1,200 @@
+[
+ {
+  "claim": "HazardAuditor improves accuracy by up to 16.5 percentage points over the strongest prior guard on the CUA-EXEC benchmark.",
+  "kind": "result",
+  "quote": "On our balanced cross-agent execution diagnostic, which we denote as CUA-EXEC, HazardAuditor improves accuracy by up to 16.5 percentage points over the strongest prior guard",
+  "offset": 0
+ },
+ {
+  "claim": "The evaluation dataset for each agent framework subset contains 100 safe and 100 unsafe trajectories.",
+  "kind": "result",
+  "quote": "Each framework subset contains 100 safe and 100 unsafe trajectories.",
+  "offset": 0
+ },
+ {
+  "claim": "Ablation studies confirm that GuardPO adds a further 10.4 points of improvement on cross-agent traces beyond the baseline.",
+  "kind": "result",
+  "quote": "Ablation confirms that both components contribute: execution-grounded data alone matches the strongest baseline, while GuardPO adds a further 10.4 points on cross-agent traces (Table IV).",
+  "offset": 0
+ },
+ {
+  "claim": "The framework runs heterogeneous agents (Claude Code, Codex, Hermes, and OpenClaw) in controlled environments.",
+  "kind": "mechanism",
+  "quote": "Its infrastructure runs heterogeneous agents (Claude Code, Codex, Hermes, and OpenClaw) in controlled environments and normalizes their interactions into a canonical event representation for cross-framework supervision.",
+  "offset": 0
+ },
+ {
+  "claim": "GuardPO normalizes rationale and verdict regions to prevent variable-length explanations from dominating the gradient update.",
+  "kind": "mechanism",
+  "quote": "It normalizes the analysis and verdict regions within each response before aggregation, preventing rationale length from determining the optimization weight while retaining explicit pressure on the final verdict.",
+  "offset": 0
+ },
+ {
+  "claim": "Existing guard models are poorly suited for agent execution because they target static prompts and responses.",
+  "kind": "limitation",
+  "quote": "Existing guard models target static prompts and responses and are poorly suited to agent execution",
+  "offset": 0
+ },
+ {
+  "claim": "Existing executable safety platforms produce evaluation verdicts rather than normalized supervision for guard model learning.",
+  "kind": "limitation",
+  "quote": "existing executable safety platforms produce evaluation verdicts rather than the normalized supervision a guard model needs to learn across heterogeneous agent frameworks.",
+  "offset": 0
+ },
+ {
+  "claim": "Token-level post-training objectives create a structural mismatch for generative guards because longer rationales dominate gradient updates.",
+  "kind": "limitation",
+  "quote": "We further observe that token-level post-training objectives create a structural mismatch for generative guards, causing longer rationales to dominate gradient updates.",
+  "offset": 0
+ },
+ {
+  "claim": "The comparison with prior guards was controlled across multiple benchmarks and heterogeneous computer-use systems.",
+  "kind": "method",
+  "quote": "Across multiple benchmarks and heterogeneous computer-use systems, HazardAuditor improves accuracy by up to 16.5 percentage points over the strongest prior guard.",
+  "offset": 0
+ },
+ {
+  "claim": "The guard model produces an auditable analysis and a deterministic binary verdict to support downstream runtime intervention.",
+  "kind": "mechanism",
+  "quote": "Its output contains an auditable analysis and a deterministic binary verdict that can support downstream runtime intervention by an external controller.",
+  "offset": 0
+ },
+ {
+  "claim": "The labeling protocol assigns unsafe labels based on attempted or executed actions rather than merely observing risky content.",
+  "kind": "mechanism",
+  "quote": "A trace is labeled unsafe when the agent attempts or executes an unauthorized or harmful action, exposes sensitive information, produces an actionable harmful artifact, or otherwise materially advances an unsafe objective.",
+  "offset": 0
+ },
+ {
+  "claim": "HazardAuditor improves accuracy by 12.5, 4.0, 9.5, and 16.5 percentage points on Claude Code, Codex, Hermes, and OpenClaw respectively compared to BraveGuard.",
+  "kind": "result",
+  "quote": "Relative to the strongest prior agent-oriented guard, BraveGuard, HazardAuditor improves accuracy by 12.5, 4.0, 9.5, and 16.5 percentage points on the four agents, respectively.",
+  "offset": 24000
+ },
+ {
+  "claim": "GuardPO improves accuracy from 82.0 to 94.0 on Claude Code.",
+  "kind": "result",
+  "quote": "GuardPO also improves upon the SFT initialization across all four balanced subsets,, raising accuracy from 82.0 to 94.0 on Claude Code, from 91.0 to 95.5 on Codex, from 75.0 to 86.5 on Hermes, and from 74.0 to 87.5 on OpenClaw.",
+  "offset": 24000
+ },
+ {
+  "claim": "HazardAuditor achieves the best result in every reported metric across Claude Code, Codex, Hermes, and OpenClaw.",
+  "kind": "result",
+  "quote": "HazardAuditor achieves the best result in every reported metric across Claude Code, Codex, Hermes, and OpenClaw, despite differences in agent architecture, tool interfaces, and execution protocols.",
+  "offset": 24000
+ },
+ {
+  "claim": "The CUA-Exec evaluation dataset contains 200 trajectories per framework, equally divided between safe and unsafe labels.",
+  "kind": "result",
+  "quote": "It contains 200 trajectories per framework, equally divided between safe and unsafe labels.",
+  "offset": 24000
+ },
+ {
+  "claim": "All models evaluated within a given table receive the same underlying trajectory evidence.",
+  "kind": "method",
+  "quote": "All models evaluated within a given table receive the same underlying trajectory evidence.",
+  "offset": 24000
+ },
+ {
+  "claim": "GuardPO removes the direct proportional dependence on rationale length at aggregation.",
+  "kind": "mechanism",
+  "quote": "GuardPO therefore removes the direct proportional dependence on rationale length at aggregation.",
+  "offset": 24000
+ },
+ {
+  "claim": "The effective unit of optimization in GuardPO is the safety decision rather than the number of generated explanation tokens.",
+  "kind": "mechanism",
+  "quote": "The effective unit of optimization is therefore the safety decision rather than the number of generated explanation tokens.",
+  "offset": 24000
+ },
+ {
+  "claim": "HazardAuditor maintains the highest worst-case F1 (88.3%) across R-Judge, ASSE-Safety, and ATBench benchmarks.",
+  "kind": "result",
+  "quote": "Across all three benchmarks, HazardAuditor maintains the highest worst-case F1 (88.3%), compared with 86.2% for HazardAuditor-SFT and 80.7% for the best prior guard.",
+  "offset": 24000
+ },
+ {
+  "claim": "HazardAuditor performs deterministic generation with greedy decoding and a maximum response length of 384 tokens.",
+  "kind": "method",
+  "quote": "HazardAuditor performs deterministic generation with greedy decoding, a maximum response length of 384 tokens, and a maximum trajectory context of 16,000 tokens.",
+  "offset": 24000
+ },
+ {
+  "claim": "HazardAuditor does not invoke an external judge or reward model at inference time.",
+  "kind": "method",
+  "quote": "HazardAuditor does not invoke an external judge or reward model at inference time.",
+  "offset": 24000
+ },
+ {
+  "claim": "Several released guards occupy a high-precision, low-recall regime, such as Qwen3-Guard reaching 100% precision but 10.8% recall on ATBench.",
+  "kind": "result",
+  "quote": "Several released guards occupy a high-precision, low-recall regime (e.g., Qwen3-Guard reaches 100% precision but 10.8% recall on ATBench); HazardAuditor instead keeps its largest precision\u2013recall gap below 1.1 points on every dataset.",
+  "offset": 24000
+ },
+ {
+  "claim": "The CUA-Exec trajectories are held out from training at the safety-case level to prevent data leakage.",
+  "kind": "method",
+  "quote": "CUA-Exec trajectories are held out from training at the safety-case level to prevent data leakage.",
+  "offset": 24000
+ },
+ {
+  "claim": "HazardAuditor achieves 91.5% accuracy and F1 on the ASSE-Safety benchmark.",
+  "kind": "result",
+  "quote": "On ASSE-Safety, HazardAuditor achieves the best accuracy and F1 at 91.5%.",
+  "offset": 48000
+ },
+ {
+  "claim": "On ATBench, HazardAuditor's accuracy exceeds the strongest prior guard by 0.8 points, but its F1 is lower than AgentDoG-Llama3.1-8B and GPT-5.2.",
+  "kind": "result",
+  "quote": "On ATBench, its 88.4% accuracy exceeds the strongest prior guard by 0.8 points, while its 88.3% F1 is 0.5 points below AgentDoG-Llama3.1-8B and 2.4 points below GPT-5.2.",
+  "offset": 48000
+ },
+ {
+  "claim": "Some released guard models exhibit high precision but extremely low recall, making them ineffective for unsafe-behavior coverage.",
+  "kind": "result",
+  "quote": "For example, Qwen3-Guard reaches 100% precision but only 10.8% recall on ATBench, and ShieldGemma-27B reaches 100% precision but 1.0% recall on R-Judge.",
+  "offset": 48000
+ },
+ {
+  "claim": "GuardPO improves the cross-benchmark floor but does not produce a monotonic gain on every source dataset.",
+  "kind": "result",
+  "quote": "GuardPO therefore improves the cross-benchmark floor without producing a monotonic gain on every source.",
+  "offset": 48000
+ },
+ {
+  "claim": "On the CUA-Exec source, GuardPO increases accuracy by 10.38 percentage points and Macro-F1 by 10.68 points compared to SFT.",
+  "kind": "result",
+  "quote": "CUA-Exec aggregate equally over four backends or frameworks and use Macro-F1.",
+  "offset": 48000
+ },
+ {
+  "claim": "HazardAuditor achieves 88.89% accuracy and 88.88% Macro-F1 on a balanced 6,400-query subset of NSFA-Query-Multilingual.",
+  "kind": "result",
+  "quote": "The subset contains 6,400 queries (3,200 safe and 3,200 unsafe). HazardAuditor obtains 88.89% accuracy and 88.88% Macro-F1",
+  "offset": 48000
+ },
+ {
+  "claim": "The model's unsafe recall is significantly lower for sensitive information and resource abuse compared to malicious code and dangerous operations.",
+  "kind": "result",
+  "quote": "Unsafe recall is strongest for malicious code (96.54%) and dangerous operations (95.14%), and lower for sensitive information (69.22%) and resource abuse (42.95%).",
+  "offset": 48000
+ },
+ {
+  "claim": "The fixed CUA-Exec test subset contains 228 trajectories with 47\u201369 trajectories per framework and is not class balanced.",
+  "kind": "result",
+  "quote": "The fixed CUA-Exec test subset contains 228 trajectories. Its four frameworks contribute 47\u201369 trajectories, and the pooled set is not class balanced.",
+  "offset": 48000
+ },
+ {
+  "claim": "GuardPO raises pooled accuracy from 76.75% to 88.16% and Macro-F1 from 76.75% to 87.76% on the fixed CUA-Exec test set.",
+  "kind": "result",
+  "quote": "GuardPO raises pooled accuracy from 76.75% to 88.16% and Macro-F1 from 76.75% to 87.76%.",
+  "offset": 48000
+ },
+ {
+  "claim": "Serialized traces are enclosed in an explicit untrusted-data boundary to ensure instructions inside logged trajectories are treated as evidence rather than guard instructions.",
+  "kind": "mechanism",
+  "quote": "Serialized traces are enclosed in an explicit untrusted-data boundary so that instructions inside a logged trajectory are evidence rather than guard instructions.",
+  "offset": 48000
+ }
+]

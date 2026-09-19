@@ -1,0 +1,212 @@
+[
+ {
+  "claim": "Across 720 runs covering six frameworks, five foundation models, six carriers, and four attacker objectives, attacks complete in approximately 1% of runs but are attempted in 12.8%.",
+  "kind": "result",
+  "quote": "Across 720 runs covering six frameworks, five foundation models, six carriers, and four attacker objectives, attacks complete in approximately 1% of runs but are attempted in 12.8%",
+  "offset": 0
+ },
+ {
+  "claim": "The gap between attack attempts and completions is closed almost entirely at the planning step, where the model reads the injected instruction and declines to act on it.",
+  "kind": "result",
+  "quote": "the gap is closed almost entirely at the planning step, where the model reads the injected instruction and declines to act on it",
+  "offset": 0
+ },
+ {
+  "claim": "The choice of foundation model matters more than the framework for whether an instruction is acted upon.",
+  "kind": "result",
+  "quote": "The model matters far more than the framework for whether an instruction is acted on",
+  "offset": 0
+ },
+ {
+  "claim": "One specific model never attempted an attack and recognized the injection in 59.7% of runs.",
+  "kind": "result",
+  "quote": "One model never attempts an attack and recognizes the injection in 59.7% of runs",
+  "offset": 0
+ },
+ {
+  "claim": "Two other models attempted attacks in 23.6% of runs.",
+  "kind": "result",
+  "quote": "while two others attempt in 23.6%",
+  "offset": 0
+ },
+ {
+  "claim": "Only two of the five foundation models ingest audio input.",
+  "kind": "result",
+  "quote": "Only two of the five models ingest audio",
+  "offset": 0
+ },
+ {
+  "claim": "Only three of the six agentic frameworks deliver audio to the model.",
+  "kind": "result",
+  "quote": "and only three of the six frameworks deliver it",
+  "offset": 0
+ },
+ {
+  "claim": "Where the audio signal arrives, the attack completes in 49% of cells.",
+  "kind": "result",
+  "quote": "but where the signal arrives the attack completes in 49% of cells",
+  "offset": 0
+ },
+ {
+  "claim": "For one specific model, the audio attack completion rate is 75%.",
+  "kind": "result",
+  "quote": "and in 75% for one model",
+  "offset": 0
+ },
+ {
+  "claim": "Reporting only attack completion rates understates the actual exposure to prompt injection.",
+  "kind": "result",
+  "quote": "Reporting completion alone therefore understates exposure",
+  "offset": 0
+ },
+ {
+  "claim": "Perceptual channels beyond vision are narrower in availability but much less defended than vision.",
+  "kind": "result",
+  "quote": "and perceptual channels beyond vision are narrower but much less defended",
+  "offset": 0
+ },
+ {
+  "claim": "The study measures attack surface rather than mitigations, leaving the evaluation of defenses to future work.",
+  "kind": "limitation",
+  "quote": "This study measures attack surface rather than mitigations; evaluating defenses is left to future work",
+  "offset": 0
+ },
+ {
+  "claim": "The evaluation matrix consisted of 720 total runs.",
+  "kind": "result",
+  "quote": "The full evaluation crosses 24 attacks, 5 models, and 6 frameworks for a total of 720 runs at temperature zero.",
+  "offset": 24000
+ },
+ {
+  "claim": "Only 8 out of 720 runs resulted in a completed attack under the deterministic judge.",
+  "kind": "result",
+  "quote": "Only 8 of the 720 runs (1.11%, 95% interval 0.6\u20132.2%) reach a completed attack under the deterministic judge",
+  "offset": 24000
+ },
+ {
+  "claim": "The panel judge labeled 92 out of 720 runs as attempted.",
+  "kind": "result",
+  "quote": "The panel judge labels 92 of 720 runs (12.8%, 95% interval 10.5\u201315.4%) as attempted",
+  "offset": 24000
+ },
+ {
+  "claim": "CrewAI had 4 completed attacks out of 120 runs, while other frameworks had 1 each.",
+  "kind": "result",
+  "quote": "Completed attacks per framework are 1 of 120 for LangGraph, AutoGen, OpenAI Agents SDK, Semantic Kernel, and LlamaIndex, and 4 of 120 for CrewAI.",
+  "offset": 24000
+ },
+ {
+  "claim": "Claude Opus 4.8 never attempted an attack in any of its 144 runs.",
+  "kind": "result",
+  "quote": "Claude Opus 4.8 never attempts an attack in any of its 144 runs",
+  "offset": 24000
+ },
+ {
+  "claim": "OCR text was the most effective carrier, attempted in 27.5% of runs.",
+  "kind": "result",
+  "quote": "Rendered OCR text is the most effective carrier, attempted in 27.5% of runs",
+  "offset": 24000
+ },
+ {
+  "claim": "Inter-agent propagation was attempted in 23.3% of runs.",
+  "kind": "result",
+  "quote": "Inter-agent propagation (O4) is attempted in 23.3% of runs",
+  "offset": 24000
+ },
+ {
+  "claim": "303 runs reached the planning stage, representing 42.1% of the total.",
+  "kind": "result",
+  "quote": "The 303 runs that reach planning are the core of the resistance.",
+  "offset": 24000
+ },
+ {
+  "claim": "Runs are not bit-reproducible because no explicit sampling seed is passed.",
+  "kind": "limitation",
+  "quote": "We do not pass an explicit sampling seed, so runs are not bit-reproducible",
+  "offset": 24000
+ },
+ {
+  "claim": "CrewAI's higher completion rate is confounded by re-execution and differing prompt configuration.",
+  "kind": "limitation",
+  "quote": "The CrewAI signal is confounded by how it was run, not cleanly attributable to how it orchestrates.",
+  "offset": 24000
+ },
+ {
+  "command": "result",
+  "claim": "Audio attacks completed in 35 of 72 cells (49%).",
+  "quote": "The attack completes in 35 of 72 (49%, 95% interval 37\u201360%).",
+  "offset": 24000
+ },
+ {
+  "claim": "The audio channel completion rate is 49% when the model is willing, compared to 1% under a reluctant model.",
+  "kind": "result",
+  "quote": "The same pipeline that yields 1% completion under a reluctant model yields 49% when the model is willing.",
+  "offset": 48000
+ },
+ {
+  "claim": "In the image channel, the framework had no clear effect on attack success across 720 runs, while model choice varied behavior substantially.",
+  "kind": "result",
+  "quote": "Across the 720 image runs we found no clear framework effect on attack success, while the choice of model changed behavior substantially, from a model that never attempted an attack to models that attempted in roughly a quarter of runs.",
+  "offset": 48000
+ },
+ {
+  "claim": "Three of the six frameworks in the audio channel never delivered the audio to the model, preventing the attack from being presented.",
+  "kind": "result",
+  "quote": "Three of the six frameworks never delivered the audio to the model at all, so the attack was never presented and the model never had the opportunity to fail.",
+  "offset": 48000
+ },
+ {
+  "claim": "Claude Opus 4.8 never attempts an attack and explicitly recognizes the injection in a majority of runs.",
+  "kind": "result",
+  "quote": "Claude Opus 4.8 never attempts an attack and explicitly recognizes the injection in a majority of runs, while Llama 4 Maverick attempts often and recognizes least, meaning it tends to overlook the payload rather than refuse it.",
+  "offset": 48000
+ },
+ {
+  "claim": "GPT-audio rarely misses the payload and carries it out in three quarters of audio cells.",
+  "kind": "result",
+  "quote": "Gemini 3.1 Pro names the injection as suspicious in half of its cells, while gpt-audio rarely misses the payload and instead carries it out in three quarters of them.",
+  "offset": 48000
+ },
+ {
+  "claim": "The comparison within the audio channel was controlled, with two models facing identical payloads, framings, and tools.",
+  "kind": "method",
+  "quote": "The comparison that is controlled is the one within the audio channel, where two models faced identical payloads, framings, and tools, and completed 75% and 22% of cells respectively.",
+  "offset": 48000
+ },
+ {
+  "claim": "Individual cell outcomes are less reliable than aggregate rates because a small number of borderline cells change outcome between executions.",
+  "kind": "limitation",
+  "quote": "The protocol runs one trial per cell at temperature zero, no sampling seed is fixed, and we observed that a small number of borderline cells change outcome between executions, so individual cell outcomes are less reliable than the aggregate rates.",
+  "offset": 48000
+ },
+ {
+  "claim": "The per-framework comparison in Table II carries two confounds that cannot be separated due to uneven re-execution coverage.",
+  "kind": "limitation",
+  "quote": "Coverage is also uneven: 159 cells were re-executed and all of them belong to two of the six frameworks, and the framework whose configuration differs from the shared system prompt is the same one that was re-executed, so the per-framework comparison in Table II carries two confounds we cannot separate.",
+  "offset": 48000
+ },
+ {
+  "claim": "The audio study is much smaller than the image study, covering only two models, three frameworks, and twelve payloads.",
+  "kind": "limitation",
+  "quote": "The audio study is much smaller than the image study, covering two models, three frameworks, and twelve payloads, because only two frontier models accept audio and only three frameworks deliver it.",
+  "offset": 48000
+ },
+ {
+  "claim": "The tool environment is a sandbox of mock tools, so a completed attack means the agent issued the harmful call, not that a real system was damaged.",
+  "kind": "limitation",
+  "quote": "The tool environment is a sandbox of mock tools, so a completed attack means the agent issued the harmful call, not that a real system was damaged; this measures agent behavior rather than end-to-end impact.",
+  "offset": 48000
+ },
+ {
+  "claim": "The panel judge is composed of language models, and smaller judge models conflate describing an injected instruction with obeying it.",
+  "kind": "limitation",
+  "quote": "The panel judge is itself composed of language models, and while a cross-vendor majority reduces individual bias, we found during development that smaller judge models conflate describing an injected instruction with obeying it, which is why the reported labels use frontier judges.",
+  "offset": 48000
+ },
+ {
+  "claim": "The paper evaluates attack surface and does not evaluate defenses, leaving mitigation measurement to future work.",
+  "kind": "limitation",
+  "quote": "We evaluate attack surface and do not evaluate defenses; measuring which mitigations reduce the attempted rate is left to future work.",
+  "offset": 48000
+ }
+]

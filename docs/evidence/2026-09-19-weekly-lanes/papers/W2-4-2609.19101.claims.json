@@ -1,0 +1,50 @@
+[
+ {
+  "claim": "Without steering, the model takes the honeypot only 1 out of the 194 times.",
+  "kind": "result",
+  "quote": "Normally, without any steering, the model takes the honeypot only 1 out of the 194 times.",
+  "offset": 24000
+ },
+ {
+  "claim": "After steering, the model takes the honeypot nearly a quarter of the time.",
+  "kind": "result",
+  "quote": "However, after steering (from x1 to x8 strengths), the model takes the honeypot nearly a quarter of the time, or contemplates the honeypot (in code comments) nearly half of the time.",
+  "offset": 24000
+ },
+ {
+  "claim": "Probes catch 3.0 percentage points more hacks on DeepSWE than the monitor at matched FPR.",
+  "kind": "result",
+  "quote": "For Kimi K3, at matched FPR to the monitor, probes catch 3.0 and 33.1 percentage points more hacks on DeepSWE and ImpossibleBench respectively, and miss only 6.6 points more on SWEBench.",
+  "offset": 24000
+ },
+ {
+  "claim": "Probes catch 33.1 percentage points more hacks on ImpossibleBench than the monitor at matched FPR.",
+  "kind": "result",
+  "quote": "For Kimi K3, at matched FPR to the monitor, probes catch 3.0 and 33.1 percentage points more hacks on DeepSWE and ImpossibleBench respectively, and miss only 6.6 points more on SWEBench.",
+  "offset": 24000
+ },
+ {
+  "claim": "Adding the probe to the monitor increases TPR from 41.1% to 80.2% on DeepSWE for Kimi K3 with a 1% absolute increase in FPR.",
+  "kind": "result",
+  "quote": "For example, with only a 1% absolute increase in FPR, adding the probe to the monitor increases TPR from 41.1% to 80.2% on DeepSWE for Kimi K3.",
+  "offset": 24000
+ },
+ {
+  "claim": "Replacing the DeepSWE monitor with the probe improved reward hacks recalled in 2/3 settings.",
+  "kind": "result",
+  "quote": "At matched FPR with the LLM monitor, we can replace the DeepSWE monitor for the probe and see an improvement in reward hacks recalled in 2/3 settings: 0.41 to 0.44 in Kimi K3, 0.33 to 0.39 in Qwen 3.8 Max, and 0.41 to 0.33 in GLM 5.2.",
+  "offset": 24000
+ },
+ {
+  "claim": "Precision at a fixed false positive rate around 1% drops when replacing LLM monitor calls with probe calls.",
+  "kind": "result",
+  "quote": "Precision at a fixed false positive rate around 1% takes the biggest hit of a few percentage points.",
+  "offset": 24000
+ },
+ {
+  "claim": "Around half of the false-positives flagged by the probe consists of deliberations of taking a shortcut.",
+  "kind": "result",
+  "quote": "Figure 11 shows our results: around half of the false-positives flagged by our probe consists of deliberations of taking a shortcut.",
+  "offset": 24000
+ }
+]
