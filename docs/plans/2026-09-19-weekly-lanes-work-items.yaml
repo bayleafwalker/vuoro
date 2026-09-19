@@ -1,0 +1,281 @@
+# Backlog projection of docs/plans/2026-09-19-agent-systems-weekly-lanes.md (Revision 2,
+# 2026-09-19 12:30 UTC synthesis). Shape follows
+# docs/plans/2026-08-15-vuoro-control-plane-work-items.yaml.
+#
+# Items with a hostItem already exist in sprintctl sprint 559 (filed by
+# agentops/docs/assessments/lane-loop/refine-2026-09-19T1056Z.md §3). The 2026-09-20
+# 06:00 UTC implementation run records Decisions on those ids and files nothing new for
+# them. Items with hostItem null are filed by the next refine tick when their `filing`
+# condition holds. `current` means operative, not approved (agentops/model/README.md).
+#
+# Vuoro owns none of the code below. Every item lands in its ownerRepo as a derived
+# projection or a narrow extension of an existing object (Release, Decision, the
+# per-session gate log); none adds a queue, worker supervisor, model router or execution
+# control plane (direction §11 "Explicitly deferred", target state TS-1/TS-2).
+apiVersion: planner.vuoro.cloud/v1alpha1
+kind: ImplementationPlan
+metadata:
+  name: weekly-lanes-2026-09
+  planId: WEEKLY-LANES-2026-09
+  baselineDate: '2026-09-19'
+  revision: 2
+  status: current
+  source: docs/plans/2026-09-19-agent-systems-weekly-lanes.md
+spec:
+  assumptions:
+  - sprintctl S3 Release and Decision are landed (ca3fa92, a3e02db, 22f7afb); Decision is the sole terminal writer (TS-5).
+  - Hybrid dispatch and templates/dispatch are deleted (0baa680) and stay deleted (TS-2).
+  - outctl is retired; only its context-economy instrument relocates (disposition-register outctl row).
+  - local-inference is workstation-only; appservice, local-inference, vuoro-evidence and outctl were not available to the cloud runs, so citations into them are re-verified by the implementer.
+  repositoryOwnership:
+  - area: sprintctl
+    owner: work.read.unbound categories, Release acceptance_contract and declared scope, Decision evidence digests, live sprint state.
+  - area: agentops
+    owner: Claude Code hooks (guard hooks, gate-log, log-session-cost), scripts/context_economy, _projects ExperimentRecords.
+  - area: local-inference
+    owner: benchmark scoring scripts and results JSONL.
+  - area: appservice
+    owner: Delivery unit F (off-cluster collector, expiring receipt, assessor).
+  - area: vuoro
+    owner: This plan, its evidence directory, EvidenceSet/ExperimentRecord export projections; computes and adjudicates nothing.
+  workstreams:
+  - id: A
+    name: Evidence and Decision lifecycle hardening (sprintctl)
+  - id: B
+    name: Change memory for reconstruction (sprintctl, rides WL-C2)
+  - id: C
+    name: Outcome class and state-grounded acceptance (local-inference, sprintctl, appservice)
+  - id: D
+    name: Harness denial and trajectory-signal recording (agentops hooks)
+  - id: S
+    name: Context-economy quote verification (agentops)
+  - id: R
+    name: Evidence rechecks (vuoro)
+  workItems:
+  - id: WL-A1
+    workstream: A
+    lane: W1-6
+    title: accepted_without_evidence finding kind in work.read.unbound
+    purpose: Report accepts that carry no evidence digest, split by alias path versus explicit decide, without blocking anything.
+    ownerRepo: sprintctl
+    hostItem: '#2432'
+    priority: P0
+    size: S
+    dependsOn: []
+    outputs:
+    - Fourth CATEGORIES entry in sprintctl/sprintctl/unbound.py with a pure derivation function
+    - Report field surfaced wherever unbound is served or printed, no new flag
+    - Decision on #2432 with the live-state finding count as rationale
+    acceptance:
+    - A finding is produced for an item whose latest terminal Decision is kind accept with empty evidence_digests on a Release whose acceptance_contract carries the default review_required key
+    - The finding is split by rationale == "" (alias path) versus non-empty rationale (explicit item decide without --evidence), and a fixture with both paths yields one finding of each
+    - The existing three categories return unchanged on the existing fixtures
+    - Tests pass in tests/test_releases.py, tests/test_decisions.py, tests/pg/test_releases.py and tests/test_served_decisions.py
+    - Before merge the derivation is run against live sprint state; zero findings across every open and recently closed sprint retires the kind instead of shipping it
+  - id: WL-D1
+    workstream: D
+    lane: W1-2
+    title: Guard-hook decision rows plus rework_rounds kind filter
+    purpose: Record every PreToolUse deny or ask as a local advisory row in the per-session gate log that log-session-cost.sh already drains, without corrupting rework_rounds.
+    ownerRepo: agentops
+    hostItem: '#2434'
+    priority: P0
+    size: S
+    dependsOn: []
+    outputs:
+    - Shared shell helper (hooks/lib/emit-decision.sh or equivalent) sourced by the four existing guard hooks
+    - kind != "decision" filter in hooks/log-session-cost.sh before rework_rounds, in the same commit
+    - hooks/tests/test-decision-row.sh and a rework_rounds regression case
+    acceptance:
+    - bounded-read-guard.sh, nfs-workspace-guard.sh, forge-sandbox-guard.sh and gate-check.sh each append {kind:"decision", ts, hook, rule_id, tool, policy_decision} to gates-$SESSION.jsonl on deny and on ask, in addition to the unchanged stdout hookSpecificOutput
+    - secret-read-guard.sh is not created or referenced; the item touches exactly four hooks
+    - On a replay fixture with failed-then-retried gate commands interleaved with decision rows, rework_rounds equals its pre-change value
+    - The gates metadata key published to auditctl is either documented as a mixed array or split into a sibling decisions key; the commit says which
+    - No OTel GenAI schema version is pinned
+  - id: WL-S1
+    workstream: S
+    lane: W2-3
+    title: Context-economy gate measurement, instrument relocation and verify_quotes.py
+    purpose: Measure the Phase 1/2 shares before any gate exists and build the mechanical quote checker that arm (b) depends on.
+    ownerRepo: agentops
+    hostItem: '#2435'
+    priority: P0
+    size: S-M
+    dependsOn: []
+    outputs:
+    - agentops/scripts/context_economy/{measure,classes,waste}.py relocated unchanged from outctl/studies/context-economy/
+    - A recorded Bash-share and file-read-share measurement of the current stack
+    - agentops/scripts/verify_quotes.py with a fixture corpus of verbatim and mismatched quotes
+    acceptance:
+    - The three relocated scripts run against the current transcript format from their new location
+    - A real Bash-share and file-read-share number is recorded as a Decision on #2435; the 28 % and 45 % thresholds are not asserted as gates before that number exists
+    - verify_quotes.py checks each {claim, quote, ref} verbatim after whitespace normalisation against path:Lstart-Lend or a spool file plus sha256, reports failures as UNVERIFIED, never drops them, and exits non-zero when any quote is UNVERIFIED
+    - The fixture includes at least one known-mismatched quote that is reported UNVERIFIED
+    - Precondition confirmed on devbox before relocation: outctl checkout at 94840d7
+  - id: WL-C1
+    workstream: C
+    lane: W1-3
+    title: Local-inference outcome-class rescore on escalation-probe data (first experiment)
+    purpose: Split accepted into completed, completed_with_collateral_change and incomplete from existing booleans and surface the two known tampered-and-accepted rows; ExperimentRecord exp-2026-09-local-inference-outcome-collateral.
+    ownerRepo: local-inference
+    hostItem: '#2436'
+    priority: P0
+    size: S
+    dependsOn: []
+    outputs:
+    - outcome beside accepted in exp-tier-effect.py; per-outcome counts in analyse-tier-effect.py; outcome column in results-to-scorecard.py with the TAMPER note kept
+    - task_id and arm on probe-escalation.sh rows, backfilled for the two escalation rows
+    - Rescore of all results JSONL and a Decision on #2436 carrying the ExperimentRecord as change memory
+    acceptance:
+    - Both rows of 2026-08-19T120204-escalation.jsonl surface as completed_with_collateral_change with task_id and arm attached, or are reported unattributable with the reason
+    - Rows without violated_constraint get outcome null and unavailable_reason no_violated_constraint_field (181 rows in Revision 1)
+    - Malformed JSONL lines are counted per file and reported (88 in Revision 1)
+    - Per-arm rankings are compared against the TAMPER free-text convention; the falsifier (zero collateral rows, or unchanged rankings with nothing previously invisible) retires the field and the enum before WL-C2 starts
+    - accepted and the TAMPER note are unchanged; the new scorecard is written beside the old one
+    - The implementer re-verifies exp-tier-effect.py:158, results-to-scorecard.py:28-29 and probe-escalation.sh before editing, since no 2026-09-19 cloud run had the repository
+  - id: WL-D2
+    workstream: D
+    lane: W2-4
+    title: check_trajectory_flags.py, gate-file weakening and rework-round trajectory flag
+    purpose: Raise a local advisory flag at the verify stage from the gate log and the branch diff; one extra Sonnet review-synthesis pass on the flagged unit, never a reject.
+    ownerRepo: agentops
+    hostItem: null
+    filing: after WL-D1 (#2434) has landed
+    priority: P1
+    size: S
+    dependsOn:
+    - WL-D1
+    outputs:
+    - agentops script check_trajectory_flags.py reading gates-$SESSION.jsonl and git diff base..head
+    - Verify-stage wiring that triggers one review-synthesis pass on a flag
+    acceptance:
+    - Flags test or gate-file weakening from git diff base..head on a fixture that weakens an assertion, and does not flag a fixture that adds a test
+    - Flags rework_rounds >= 3 or gate-command churn using WL-D1's kind-filtered computation, not a second implementation
+    - Runs locally at the verify stage only; no CI job, no Opus escalation, no sprintctl write
+    - A flag results in exactly one additional Sonnet review-synthesis pass on the flagged unit and never in a reject
+  - id: WL-A2a
+    workstream: A
+    lane: W1-4
+    title: Producer count for evidence_obligations (W1-4 trigger check)
+    purpose: Measure before declaring (TS-12); count sprint-559 items with ingested evidence refs against live sprintctl state and record the number as a Decision.
+    ownerRepo: sprintctl
+    hostItem: null
+    filing: next refine tick; a live-state read, no code
+    priority: P1
+    size: S
+    dependsOn: []
+    outputs:
+    - One Decision recording the count of sprint-559 items with at least one ingested evidence ref, and the command used
+    acceptance:
+    - The count is read from live sprintctl state (sprintctl sprint show 559 or equivalent), not from either repository's git history
+    - The Decision states the count, the date and whether the W1-4 trigger (five or more) is met
+    - No schema change, no new key and no query code lands in this item regardless of the result
+  - id: WL-C2
+    workstream: C
+    lane: W1-3, W2-1
+    title: Declared write scope on Release with collateral and outcome derivation (plus the W2-1 scope note)
+    purpose: Grade against durable state, not self-report; a Release declares the paths it may touch and the Decision's evidence digest records whether the diff stayed inside them.
+    ownerRepo: sprintctl
+    hostItem: '#2433'
+    priority: P1
+    size: M
+    dependsOn:
+    - WL-C1
+    outputs:
+    - Declared scope field on WorkRelease (path prefixes or globs) with normalisation and digest inclusion in sprintctl/sprintctl/releases.py
+    - Pure function computing collateral and the three-way outcome from a diff digest and the declared scope
+    - One scope-note line on #2433 for the W2-1 change-memory observation rule
+    - Vuoro-side export of outcome and collateral onto EvidenceSet and ExperimentRecord projections, read-only
+    acceptance:
+    - Condition to start is met and recorded, namely one real Release with a declared scope and a diff digest produced through ordinary use, not a synthetic fixture
+    - collateral flags a diff path outside the declared scope and does not flag one inside it, on a unit-test fixture independent of storage; granularity follows AppWorld-style path-level diffing, not a diff-nonzero check
+    - The outcome enum is the one WL-C1 validated; there is no second definition
+    - The declared scope is part of the release digest, and tests in tests/test_releases.py and tests/pg/test_releases.py prove digest stability
+    - The reconstructing session's claim-level supersession, derivation or corroboration gaps are logged as observations with evidence_ref under this item, not a separate code path
+    - Vuoro projects the field and never computes or adjudicates it
+    - If after a trial period no real Release declares a scope narrower than everything, the field is dropped by Decision
+  - id: WL-A3
+    workstream: A
+    lane: W2-2
+    title: decisions_on_expired_evidence read-time expiry join
+    purpose: Join work_decision.evidence_digests to validity computed at read time once evidence has one home; no stored expiry event, no new reason value, no gate.
+    ownerRepo: sprintctl
+    hostItem: null
+    filing: at the S4 evidence-home migration
+    priority: P2
+    size: S
+    dependsOn: []
+    outputs:
+    - Ported expiry_of() semantics from the vuoro-evidence reducer
+    - A pure report query over work_decision.evidence_digests
+    acceptance:
+    - The query reports Decisions whose evidence items are outside their collector-declared validity window at read time
+    - No table, column, event or reason value is added; no lifecycle transition consults the result
+    - Revocation, if it ever fires, is modelled as justification recomputation and emitted as an event, not a boolean flipped in place
+  - id: WL-A2b
+    workstream: A
+    lane: W1-4
+    title: evidence_obligations key on acceptance_contract plus unmet_obligations() report
+    purpose: Let a Release declare the evidence it owes and report, never block, on Decisions that accepted without it.
+    ownerRepo: sprintctl
+    hostItem: null
+    filing: only when WL-A2a records five or more producers
+    priority: P2
+    size: S-M
+    dependsOn:
+    - WL-A2a
+    outputs:
+    - evidence_obligations key accepted by normalize_acceptance_contract
+    - Pure unmet_obligations() report query, not a decision_error block
+    acceptance:
+    - WL-A2a's Decision records at least five sprint-559 items with ingested evidence refs; below five this item is not filed
+    - unmet_obligations() reports and never blocks; no lifecycle transition consults it
+    - Tests in tests/test_releases.py and tests/pg/test_releases.py cover a Release with obligations met, unmet and undeclared
+  - id: WL-C3
+    workstream: C
+    lane: W2-5
+    title: Delivery unit F, off-cluster collector, expiring receipt, assessor
+    purpose: State-grounded acceptance evidence for appservice, specified in appservice's own plan; recorded here only as the dependency of WL-C4.
+    ownerRepo: appservice
+    hostItem: appservice-owned
+    priority: P2
+    size: M
+    dependsOn: []
+    outputs:
+    - Per appservice docs/plans/2026-08-27-repository-assurance-and-operational-evidence.md
+    acceptance:
+    - Per appservice's own plan; nothing in vuoro or agentops builds a collector or assessor for it
+  - id: WL-C4
+    workstream: C
+    lane: W2-5
+    title: _projects ExperimentRecord comparing accept basis with Delivery unit F verdicts
+    purpose: One §8.2 record over F's output after two collection cycles; Vuoro-side involvement in W2-5 ends here.
+    ownerRepo: agentops
+    hostItem: null
+    filing: after Delivery unit F completes two collection cycles
+    priority: P2
+    size: S
+    dependsOn:
+    - WL-C3
+    outputs:
+    - _projects ExperimentRecord with hypothesis, baseline, challenger, task sample, measures, falsifier and rollback
+    acceptance:
+    - The record compares F's verdict with the acceptance record for the same releases over two cycles
+    - The resulting keep, prefer, reject or revisit decision is a Decision, not an automated promotion
+  - id: WL-R1
+    workstream: R
+    lane: W2-1, W2-3
+    title: Watchlist recheck 2026-10-31 (Agora matched comparison, independent SoL-Pi re-run)
+    purpose: Both source papers were two to three days old on 2026-09-19, so absence of a follow-up was not informative; one dated recheck replaces a standing trigger.
+    ownerRepo: vuoro
+    hostItem: null
+    filing: as a dated note, not a sprint item, unless the lane loop prefers one
+    priority: P2
+    size: S
+    dependsOn: []
+    outputs:
+    - A dated note under docs/evidence/2026-09-19-weekly-lanes/ recording what was found
+    acceptance:
+    - Records whether yifanzhang-pro/Agora or a new arXiv version of 2609.18094 carries the matched comparison the paper proposed
+    - Records whether any group outside the authors has re-run SoL-Pi on Terminal-Bench, EdgeBench or another benchmark
+    - A positive finding on either reopens the lane by a new proposal; a negative one closes the recheck with no further date
