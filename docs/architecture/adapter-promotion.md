@@ -128,8 +128,9 @@ and runs no startup or migration code.
 The gate also proves the exact 26-operation owner catalog hash, the four
 completion-operation authorities, schema-11 compatibility, migration-011
 packaging, byte equality of the old 22-operation subset, and stale-catalog
-rejection. The accepted composed service total is 84 operations with revision
-`fc308e37ff1d56eccd9bd1f5372bf782e017936acf44994b22ddba4863e9f196`.
+rejection. The accepted composed service total and revision are pinned by
+`EXPECTED_TOTAL`, `EXPECTED_DOMAIN_COUNTS`, and `EXPECTED_REVISION` in
+`scripts/validate_released_catalog_composition.py`, not restated here.
 
 Completion serving remains deployment-blocked until Appservice supplies
 separate execution-runtime, completion-ingest, and completion-read DSNs and
@@ -155,13 +156,46 @@ their digests, installs the pinned Sprintctl wheel and the one locked shared
 `vuoro-adapter-kit` wheel explicitly with `--no-deps` in an isolated
 environment, runs `pip check`, and then runs
 `scripts/validate_released_work_adapter.py`. The gate proves the installed
-metadata identity, exact 43-operation owner metadata hash, the `work-api/v1`
+metadata identity, the owner metadata hash pinned by
+`_EXPECTED_WORK_METADATA_SHA256` in that script, the `work-api/v1`
 and `work-schema/v1` descriptor, populated and malformed/unauthorized reads,
 project routing across the canonical member binding, the maintenance-resource
-registration and owner result decoder, and the four-domain composed revision
-(`84` operations, `fc308e37ff1d56eccd9bd1f5372bf782e017936acf44994b22ddba4863e9f196`).
+registration and owner result decoder, and the composed catalog totals and
+revision pinned by `EXPECTED_TOTAL`, `EXPECTED_DOMAIN_COUNTS`, and
+`EXPECTED_REVISION` in `scripts/validate_released_catalog_composition.py`.
 It does not import Sprintctl from a neighboring checkout or change the
 schema/runtime contract.
+
+## Repin checklist
+
+A `sprintctl` repin touches more than the composition manifest. Each of the
+following files must be reviewed together; a repin that updates only the
+manifest will fail CI on the second pass.
+
+- `packages/vuoro-service/composition/adapter-pins.json` — the work-adapter
+  release lock's wheel filename and `artifact_sha256`. Both come from the
+  Sprintctl release body: the GitHub release asset URL/filename and the
+  published SHA-256 of that asset, not a locally rebuilt wheel.
+- `packages/vuoro-service/tests/test_composition.py` — every literal that
+  names the pinned Sprintctl version, wheel filename, or distribution
+  version, including the `tmp_path` fixture wheel filenames used by the
+  staged-wheel and colliding-lock tests.
+- `packages/vuoro-service/pyproject.toml` and
+  `packages/vuoro-service/tests/test_api_contract.py` — the served service
+  `version`, which Vuoro bumps alongside a repin.
+- `scripts/validate_released_work_adapter.py` `_EXPECTED_WORK_METADATA_SHA256`
+  (line 32) — recompute as the SHA-256 of
+  `json.dumps(catalog_operation_specs(resource_schema_available=False), sort_keys=True, separators=(",", ":")).encode()`
+  under the newly pinned wheel, exactly as `_assert_owner_metadata` does. The
+  operation-spec diff between the old and new wheel must be reviewed and the
+  PR must state whether it is additive or not.
+- `scripts/validate_released_catalog_composition.py` `EXPECTED_REVISION`
+  (line 11) — measure it, not guess it: build the CI venv the way
+  `.github/workflows/ci.yml` does (install the built `vuoro-service` wheel,
+  then the pinned adapter wheels with `--no-deps`), then run the script and
+  read the assertion failure's actual value. `EXPECTED_TOTAL` and
+  `EXPECTED_DOMAIN_COUNTS` change only when operations are added or removed,
+  not on every repin.
 
 ## Source acceptance commands
 
