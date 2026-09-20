@@ -11,5 +11,6 @@ from .core.reducer import Ledger, reduce
 from .core.decision import RerunQuestion, decide_rerun
 from .core.chain import (ChainBreak, ChainBreakReason, ChainVerification, entry_digest, link,
                          verify_chain)
+from .core.set_builder import EvidenceSetBuilder, verify_evidence_set
 
 __all__ = [n for n in dir() if not n.startswith("_")]

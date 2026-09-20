@@ -1,8 +1,63 @@
 # E0 hardening — status and design for the remaining controls (agentops#2464)
 
-Landed in this pass: **evidence chaining** only (acceptance (a)). This note
-records the design for (b)-(e) so the next pass does not re-derive it.
-Nothing here is implemented yet; it is a plan, not code.
+**Update (second pass):** acceptances (b), (c), (d) and (e) are now
+implemented and tested, and the evidence-chaining gap this note flagged
+(nothing called `link`/`verify_chain`) is closed at the interim scope this
+note recommended. See "Landed in the second pass" below. The original design
+notes for (b)-(e) are left as-is beneath it for the record of what was
+planned before implementation, plus what changed against the plan.
+
+## Landed in the second pass
+
+- **(e) token audience validation** — `gateway_identity.py` already checked
+  `aud` via PyJWT's `audience=` comparison (pre-dating this item); the gap
+  was that "aud" wasn't in `_REQUIRED_CLAIMS`, so a token with *no* audience
+  claim at all relied on PyJWT's implicit default rather than an explicit,
+  documented requirement. Added `"aud"` to `_REQUIRED_CLAIMS` and a test
+  (`test_gateway_assertion_resolver_rejects_assertion_with_no_audience_claim_at_all`)
+  that fails if either the explicit requirement or the value comparison is
+  removed (checked both ways).
+- **(b) lease TTL with heartbeat** — new `vuoro_service/lease.py`,
+  implementing the design below almost exactly: `Lease`, `LeaseStore.claim`/
+  `reclaim`/`heartbeat`/`complete`, all keyed by `subject` with one live
+  lease at a time, using an injectable clock. A completion or heartbeat
+  against a lease id that has been superseded by a reclaim fails with
+  `LeaseNotCurrentError` regardless of whether the caller still has the
+  right holder name -- `lease_id` currency, not holder identity, is what
+  "current" means, which is what makes a stale holder's replayed completion
+  fail. Not wired into an HTTP endpoint yet -- there is still no `claim_work`
+  consumer in vuoro's service layer -- so this lands as a tested primitive
+  the way `chain.py` did in the first pass; the recorded claim-evidence
+  question ("needs a decision" below) is still open.
+- **(c) rate limiting** — new `vuoro_service/rate_limit.py`
+  (`RateLimiter`, token bucket per `(token, ip)` key) wired into
+  `app.py`'s `_dispatch`, evaluated before identity resolution so an
+  abusive caller is rejected before paying for crypto/identity work. `429`
+  with `error_code: "rate-limit-exceeded"`, verified distinct in status and
+  code from the `401 identity-required` case in the same test file. `None`
+  by default (opt-in via `create_app(rate_limiter=...)`), matching the
+  `readiness_check` pattern already used for optional runtime wiring.
+- **(d) endpoint monitoring** — new `vuoro_service/metrics.py`
+  (`RequestMetrics`: request/error counts, bounded rolling latency sample,
+  p50/p95), wired around the same `_dispatch` path and exposed at
+  `GET /health/metrics` (JSON, always mounted -- next to the pre-existing
+  `/health/live` and `/health/ready`, not a new probe surface).
+- **Evidence-chain wiring** — new `vuoro_evidence/core/set_builder.py`:
+  `EvidenceSetBuilder` is the writer (every `add()` runs the item through
+  `chain.link` before storing it, so `chain_seq`/`chain_prev_digest` can
+  never be forgotten or misassigned) and `verify_evidence_set` is the read
+  path (re-derives chain-break diagnostics from a loaded `EvidenceSet`).
+  Scoped by `EvidenceSet.set_id`, exactly the interim this note recommended
+  below, **not** wired into `ingress/hostproto.py` or `vuoro-service`
+  composition -- that wiring still needs the run-scope decision this note
+  raised, which depends on the rebuild's run-tracking object (agentops#2479,
+  not landed). When that lands, `EvidenceSetBuilder`'s `extend`/`build`
+  shape is meant to be reused directly against the new run-scoped key.
+
+## Original notes (before the second pass; kept for the record)
+
+Landed in the first pass: **evidence chaining** only (acceptance (a)). This
+note recorded the design for (b)-(e) so the next pass did not re-derive it.
 
 ## Landed: evidence chaining
 

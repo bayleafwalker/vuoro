@@ -39,6 +39,8 @@ from vuoro_service.identity import (
     InvocationContext,
     deny_all_identities,
 )
+from vuoro_service.metrics import RequestMetrics
+from vuoro_service.rate_limit import RateLimitExceededError, RateLimiter, rate_limit_key
 
 
 LOGGER = logging.getLogger(__name__)
@@ -131,18 +133,29 @@ def _invocation_response(
     return JSONResponse(envelope.model_dump(mode="json"), status_code=http_status)
 
 
+def _dispatch_rate_limit_key(request: Request) -> str:
+    authorization = request.headers.get("authorization", "")
+    _scheme, _sep, token = authorization.partition(" ")
+    client_ip = request.client.host if request.client is not None else None
+    return rate_limit_key(token=token or None, client_ip=client_ip)
+
+
 def create_app(
     *,
     settings: ServiceSettings | None = None,
     registry: CatalogRegistry | None = None,
     identity_resolver: IdentityResolver = deny_all_identities,
     readiness_check: ReadinessCheck | None = None,
+    rate_limiter: RateLimiter | None = None,
+    metrics: RequestMetrics | None = None,
 ) -> FastAPI:
     settings = settings or ServiceSettings()
     registry = registry or CatalogRegistry()
+    metrics = metrics or RequestMetrics()
     app = FastAPI(title="Vuoro service", version=__version__)
     app.state.settings = settings
     app.state.registry = registry
+    app.state.metrics = metrics
 
     @app.exception_handler(RequestValidationError)
     async def invalid_request_envelope(
@@ -202,6 +215,17 @@ def create_app(
             status_code=503,
         )
 
+    @app.get("/health/metrics", include_in_schema=False)
+    async def health_metrics() -> dict[str, object]:
+        snapshot = metrics.snapshot()
+        return {
+            "request_count": snapshot.request_count,
+            "error_count": snapshot.error_count,
+            "error_rate": snapshot.error_rate,
+            "p50_latency_ms": snapshot.p50_latency_ms,
+            "p95_latency_ms": snapshot.p95_latency_ms,
+        }
+
     @app.get("/api/meta/v1/handshake", response_model=HandshakeResponse)
     async def handshake() -> HandshakeResponse:
         return HandshakeResponse(
@@ -252,6 +276,45 @@ def create_app(
         )
 
     async def _dispatch(
+        request: Request,
+        *,
+        operation_name: str,
+        arguments: object,
+        request_id: str,
+        catalog_revision: str | None,
+        basis_revision: str | None,
+        idempotency_key: str | None,
+        repo_id: str | None,
+    ) -> JSONResponse:
+        stop_timer = metrics.start_timer()
+        if rate_limiter is not None:
+            try:
+                rate_limiter.check(_dispatch_rate_limit_key(request))
+            except RateLimitExceededError:
+                stop_timer(False)
+                return _invocation_response(
+                    request_id=request_id,
+                    operation=operation_name,
+                    revision=registry.revision,
+                    status="rejected",
+                    error_code="rate-limit-exceeded",
+                    error_message="rate limit exceeded; slow down and retry later",
+                    http_status=429,
+                )
+        response = await _dispatch_after_rate_limit(
+            request,
+            operation_name=operation_name,
+            arguments=arguments,
+            request_id=request_id,
+            catalog_revision=catalog_revision,
+            basis_revision=basis_revision,
+            idempotency_key=idempotency_key,
+            repo_id=repo_id,
+        )
+        stop_timer(response.status_code >= 500)
+        return response
+
+    async def _dispatch_after_rate_limit(
         request: Request,
         *,
         operation_name: str,
