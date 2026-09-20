@@ -109,3 +109,17 @@ def test_unknown_method_is_rejected(client: httpx.Client):
         headers={"authorization": f"Bearer {TOKEN}"},
     )
     assert response.json()["error"]["code"] == -32601
+
+
+def test_mcp_name_header_disagreement_is_rejected(client: httpx.Client):
+    """The `Mcp-Name` arm of the header/body agreement check. The coordinator
+    silent-pass audit for agentops#2469 found this arm had no test at all:
+    deleting it outright left all 29 tests green, so only the `Mcp-Method`
+    arm was actually load-bearing."""
+    response = client.post(
+        "/mcp",
+        json={"jsonrpc": "2.0", "id": 8, "method": "list_ready_work", "params": {}},
+        headers={"authorization": f"Bearer {TOKEN}", "mcp-name": "claim_work"},
+    )
+    assert response.json()["error"]["code"] == -32020
+    assert "Mcp-Name" in response.json()["error"]["message"]

@@ -111,3 +111,44 @@ def test_build_custom_tools_raises_when_a_tool_is_missing():
 
     with pytest.raises(MCPClientError):
         build_custom_tools(_StubClient())
+
+
+def test_verify_tools_available_false_when_the_server_is_up_but_a_tool_is_missing(live_mcp_client):
+    """The reachable-but-incomplete branch of the preflight, distinct from
+    the unreachable one above. A coordinator silent-pass audit (agentops#2469)
+    found that deleting this branch left the suite green: `verify_tools_available`
+    was only ever exercised with a fully-stocked server or none at all, so a
+    server answering with a partial tool set would have been dispatched
+    against. That is the "only one of two placements" failure class."""
+
+    class _PartialTool:
+        name = "a_tool_the_server_does_not_offer"
+
+        @staticmethod
+        def handler(arguments):  # pragma: no cover - never dispatched
+            raise AssertionError("must not be dispatched")
+
+    poller = Poller(
+        queue_client=FakeQueueClient(),
+        mcp_client=live_mcp_client,
+        custom_tools=(_PartialTool(),),
+    )
+    assert poller.verify_tools_available() is False
+
+
+def test_run_once_reports_error_for_an_unknown_custom_tool(live_mcp_client):
+    """A queued task naming a tool this poller was not built with must be
+    reported back as an error, not silently acked or crashed on. Added by the
+    coordinator audit: disabling the `tool is None` guard left the suite green
+    while turning this case into an AttributeError inside the dispatch."""
+    tools = build_custom_tools(live_mcp_client)
+    queue = FakeQueueClient(
+        [ScheduledTask(task_id="task-9", tool_name="not_a_wrapped_tool", arguments={})]
+    )
+    poller = Poller(queue_client=queue, mcp_client=live_mcp_client, custom_tools=tools)
+    outcome = poller.run_once()
+    assert outcome.status == "error"
+    assert "not_a_wrapped_tool" in (outcome.detail or "")
+    assert queue.submitted[0][0] == "task-9"
+    assert queue.submitted[0][1] is None
+    assert "not_a_wrapped_tool" in queue.submitted[0][2]
