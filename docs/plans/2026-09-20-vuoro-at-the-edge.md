@@ -255,7 +255,11 @@ flowchart LR
 
    **Decided (operator, 2026-09-20):** both. The target state is a narrow public MCP surface for interactive runtimes (Cowork, claude.ai, mobile, Routines, cloud sessions, OpenAI Responses) *and* the Managed Agents self-hosted worker for unattended runs. It costs one more component and that is accepted. The E1 stop condition stands as the falsifier: if a month of E1 passes without the substrate being reached from a hosted runtime, the rest is not built.
 2. **Static bearer or full OAuth?** Static is right for one operator and costs you the ability to distinguish callers. If you ever want per-runtime scopes rather than one shared credential, that is the moment to move.
+
+   **Decided 2026-09-20:** static bearer for E1, with the token schema designed as if OAuth; the scope set is vuoro:work.read / vuoro:work.claim with grant instances bound to lease_id, and there is deliberately no vuoro:effect.apply scope. Recorded as agentops#2470.
 3. **Does the connector immutability rule change the sequencing?** Connector auth settings cannot be edited after adding. If E1 registers with a static header and E2 wants OAuth, that is a remove-and-re-add. Possibly worth deciding the auth mode before E1 rather than after.
+
+   **Decided 2026-09-20:** no change to the sequencing - E1 still ships first with a static bearer; connector-auth immutability is why the mode was decided before E1 registers, and a later move to OAuth is accepted as a remove-and-re-add. Recorded as agentops#2470.
 
 ### Falsifiable bets
 
