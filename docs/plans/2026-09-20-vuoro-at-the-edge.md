@@ -16,7 +16,7 @@ vuoro.cloud is not a hosted product looking for users. It is the substrate's net
 
 That distinction matters because it survives your own position. Pursuing external users adds nothing; reaching external *runtimes* is a different claim entirely, and it is an availability requirement rather than a market one. A Cowork session, a scheduled cloud run or a Codex task today produces no Claim, no RunManifest and no evidence — not because the design excludes them, but because they cannot reach a Postgres on VLAN 20. That is a hole in the record, which makes it a defect against R5 and R8 of the rebuild.
 
-**This reverses the "park vuoro.cloud" verdict recorded in the rebuild's Build-vs-buy ledger** (`docs/plans/2026-09-19-agentic-pipeline-first-principles-rebuild.md`, row "**Revisit**. superseded — see the companion doc Vuoro at the Edge"; its open question "Does vuoro.cloud stay up?" is the same verdict). That verdict was correct given the premise that the hosted variant served nobody. The premise was wrong: it serves every runtime you do not host, which is most of them now.
+**This reverses the "park vuoro.cloud" verdict recorded in the rebuild's §15 Reconciliation table** (`docs/plans/2026-09-19-agentic-pipeline-first-principles-rebuild.md`, row "**Revisit**. superseded — see the companion doc Vuoro at the Edge"; its open question "Does vuoro.cloud stay up?" is the same verdict). That verdict was correct given the premise that the hosted variant served nobody. The premise was wrong: it serves every runtime you do not host, which is most of them now.
 
 ### One finding changes the economics
 
