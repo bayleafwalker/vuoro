@@ -9,6 +9,7 @@ members = [
     "vuoro-evidence",
     "vuoro-schema-runtime",
     "vuoro-service",
+    "vuoro-worker",
     "vuoro-workspace",
 ]
 
@@ -849,6 +850,34 @@ requires-dist = [
     { name = "pyjwt", specifier = ">=2.10,<3" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34,<1" },
+]
+provides-extras = ["test"]
+
+[[package]]
+name = "vuoro-worker"
+version = "0.1.0"
+source = { editable = "packages/vuoro-worker" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "uvicorn", extra = ["standard"] },
+    { name = "vuoro-evidence" },
+    { name = "vuoro-service" },
+]
+
+[package.optional-dependencies]
+test = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.115,<1" },
+    { name = "httpx", specifier = ">=0.27,<1" },
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.34,<1" },
+    { name = "vuoro-evidence", editable = "packages/vuoro-evidence" },
+    { name = "vuoro-service", editable = "packages/vuoro-service" },
 ]
 provides-extras = ["test"]
 

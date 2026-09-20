@@ -1,0 +1,23 @@
+[Unit]
+Description=vuoro Managed Agents poller
+After=network-online.target vuoro-internal-mcp.service
+Wants=network-online.target
+Requires=vuoro-internal-mcp.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/vuoro-worker poll --internal-mcp-url http://127.0.0.1:8765
+EnvironmentFile=/etc/vuoro/poller.env
+Restart=on-failure
+RestartSec=5
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+# This unit only makes outbound connections (to Anthropic's Managed Agents
+# queue, and to vuoro-internal-mcp on loopback). It opens no listening
+# socket of its own.
+
+[Install]
+WantedBy=multi-user.target

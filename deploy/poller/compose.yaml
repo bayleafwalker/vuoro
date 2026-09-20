@@ -1,0 +1,45 @@
+services:
+  internal-mcp:
+    build:
+      context: ../..
+      dockerfile: packages/vuoro-worker/Dockerfile
+    image: vuoro-worker:local
+    command: ["vuoro-worker", "serve-internal-mcp", "--host", "0.0.0.0", "--port", "8765"]
+    environment:
+      VUORO_POLLER_TOKEN: ${VUORO_POLLER_TOKEN:?set VUORO_POLLER_TOKEN, a static bearer this host issues to itself}
+      VUORO_POLLER_ACTOR: vuoro-poller
+      VUORO_POLLER_ENVIRONMENT: homelab
+    # No `ports:` entry, deliberately: this container is reachable only
+    # from the `poller` service over the compose-internal network below,
+    # never from the host's network interfaces (agentops#2469's writable
+    # boundary is "no public endpoint anywhere in this path").
+    networks:
+      - internal-only
+
+  poller:
+    build:
+      context: ../..
+      dockerfile: packages/vuoro-worker/Dockerfile
+    image: vuoro-worker:local
+    command: ["vuoro-worker", "poll", "--internal-mcp-url", "http://internal-mcp:8765"]
+    depends_on:
+      - internal-mcp
+    environment:
+      VUORO_POLLER_TOKEN: ${VUORO_POLLER_TOKEN:?set VUORO_POLLER_TOKEN, matching internal-mcp's}
+      # Registering the Managed Agents agent and provisioning its bearer
+      # credential are operator, vendor-side steps this compose file does
+      # not perform -- see ../../packages/vuoro-worker/README.md.
+      VUORO_MANAGED_AGENTS_BASE_URL: ${VUORO_MANAGED_AGENTS_BASE_URL:?set after registering the agent with Anthropic}
+      VUORO_MANAGED_AGENTS_TOKEN: ${VUORO_MANAGED_AGENTS_TOKEN:?set after registering the agent with Anthropic}
+      VUORO_MANAGED_AGENTS_AGENT_ID: ${VUORO_MANAGED_AGENTS_AGENT_ID:?set after registering the agent with Anthropic}
+    # No `ports:` entry either: the poller's only inbound-initiated network
+    # activity is outbound polling of Anthropic's queue. It never listens.
+    networks:
+      - internal-only
+
+networks:
+  # No `external: true`, no host port publishing on either service above --
+  # this network exists only for internal-mcp<->poller traffic on this
+  # compose project's own bridge, isolated from the host's public
+  # interfaces by Docker's default bridge behavior.
+  internal-only: {}

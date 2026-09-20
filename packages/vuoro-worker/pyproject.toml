@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vuoro-worker"
+version = "0.1.0"
+description = "Self-hosted Managed Agents poller wrapping vuoro's internal MCP server (agentops#2469)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "httpx>=0.27,<1",
+  "uvicorn[standard]>=0.34,<1",
+  "vuoro-evidence",
+  "vuoro-service",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.3,<9",
+]
+
+[project.scripts]
+vuoro-worker = "vuoro_worker.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vuoro_worker"]
+
+[tool.uv.sources]
+vuoro-evidence = { workspace = true }
+vuoro-service = { workspace = true }
