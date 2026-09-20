@@ -10,7 +10,7 @@
 
 Extending vuoro.cloud so the substrate reaches runtimes you do not host — a companion to the first-principles rebuild.
 
-## The reframe
+## 1. The reframe
 
 vuoro.cloud is not a hosted product looking for users. It is the substrate's network-reachable edge, and its justification is that a growing share of your agent sessions now run in places your homelab cannot see.
 
@@ -32,7 +32,7 @@ Three consequences:
 
 Four things, in the order they bind: what each runtime can actually do (§2), where the boundary sits (§3), how the substrate is published (§4–5), and what it costs in threat-model terms (§8). One item — quota portfolio routing — came out materially weaker than it looked, and §6 says why.
 
-## Runtime inventory
+## 2. Runtime inventory
 
 The reachable set is narrower than the enthusiasm suggests. Roughly half the hosted coding-agent market cannot talk to an arbitrary self-hosted MCP server at all.
 
@@ -61,7 +61,7 @@ The reachable set is narrower than the enthusiasm suggests. Roughly half the hos
 
 **Your server may not need to be public at all.** The Managed Agents [self-hosted sandbox](https://platform.claude.com/docs/en/managed-agents/self-hosted-sandboxes) runs a worker on your own Linux host that polls Anthropic's queue and executes tools locally — including wrapping an internal MCP server as custom tools against `http://mcp.internal:8000/mcp`. Orchestration and the model stay on Anthropic's control plane, and tool inputs and outputs still flow to Anthropic, but the endpoint never leaves your network. §8 weighs this against exposure.
 
-## The boundary
+## 3. The boundary
 
 Intent, coordination and evidence cross to the cloud. Effects and credentials do not. That single rule decides every other question in this document, and it is the git→cluster split you already trust, wearing a different coat.
 
@@ -86,7 +86,7 @@ flowchart LR
 
 **One practical consequence.** Every tool on the MCP surface must be classifiable as read, coordinate, record or propose. If a tool cannot be put in one of those four buckets, it belongs on the homelab side of the boundary, not on the published surface. That is a cheap and durable test to apply when the surface grows.
 
-## MCP surface design
+## 4. MCP surface design
 
 The 2026-07-28 spec wants exactly the object model you already have, which is the most useful coincidence in this document. Sessions were removed at every layer; cross-call state is now carried by **server-minted opaque handles passed as ordinary tool arguments** ([SEP-2567](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/seps/2567-sessionless-mcp.md)).
 
@@ -119,7 +119,7 @@ A minimal server in September 2026: one HTTPS POST endpoint, `405` on GET and DE
 
 One reverse-proxy gotcha worth pre-empting: buffering breaks streaming. Send `X-Accel-Buffering: no`, tune read timeouts, and emit SSE keep-alive comments on long-lived listen streams.
 
-## Auth and the grant model
+## 5. Auth and the grant model
 
 Start with a static bearer token, and design the schema as if it were OAuth. That is the honest recommendation: for one operator, standing up an authorization server buys identity you already know, while the token *scoping* — which is where the design content lives — works identically either way.
 
@@ -143,7 +143,7 @@ The shape: a grant class is a scope, and a grant instance is a lease-bound handl
 
 **The property worth stating plainly:** no credential issued to a hosted runtime can name a cluster resource. Scopes cover read, claim, record and propose. There is no `vuoro:effect.apply` scope, because §3 says applying happens on the other side of the boundary. Leaving that scope undefined is a design decision, not an omission — write it down so a future session does not helpfully add it.
 
-## Quota portfolio routing
+## 6. Quota portfolio routing
 
 This came out materially weaker than it looked, and the reason is worth stating up front: **there is no supported programmatic read of individual plan consumption, on either vendor.** Predictive routing — "send this to whichever pool has headroom" — cannot be built on published interfaces today.
 
@@ -170,7 +170,7 @@ What exists, precisely:
 
 **One intake path worth knowing.** Routines expose `POST /v1/claude_code/routines/{id}/fire` with a bearer token and the `experimental-cc-routine-2026-04-01` beta header. That is a clean way to push work from your substrate into a Claude cloud session from outside. Note the payload arrives wrapped in `<routine-fire-payload>` and is explicitly treated as untrusted — which is correct, and which your own EffectIntent handling should mirror.
 
-## Cloud proposes, homelab executes
+## 7. Cloud proposes, homelab executes
 
 An EffectIntent is a described change with a named resource set, queued by a runtime that cannot apply it. A homelab-side reconciler — actionq-dispatcher, already trusted, already holding the credentials — picks it up and executes. The shape is deliberately the same as Flux reconciling a commit.
 
@@ -188,7 +188,7 @@ An EffectIntent is a described change with a named resource set, queued by a run
 
 **A deduplication property falls out.** Because an EffectIntent names its resource set before execution, a second identical intent from a re-run session is visible as a duplicate *before* anything happens. That is the fix for your cost-blind-reruns-of-live-infrastructure-commands friction, and it only works because the intent is declared rather than executed directly.
 
-## Threat model change
+## 8. Threat model change
 
 Exposing vuoro.cloud converts a homelab-internal substrate into an internet-reachable, credential-holding service with one user and no on-call. That is a real change in kind, and Phase 0 of the rebuild stops being optional hygiene.
 
@@ -217,7 +217,7 @@ The trade is coverage. That path reaches Managed Agents and the Messages API. It
 
 **That is the real decision in this document**, and it is not obviously a one-or-the-other. Running both — a narrow public surface for interactive runtimes, a worker for unattended ones — is defensible, and costs one more component to maintain.
 
-## Implementation sequence
+## 9. Implementation sequence
 
 Five phases, folded into the rebuild's own phasing rather than running beside it. Each is independently valuable; the first two are worth doing whether or not the rest happens.
 
@@ -247,7 +247,7 @@ flowchart LR
 
 **One thing deliberately absent.** No phase here adds runtimes for the sake of coverage. Codex cloud and Jules cannot reach an arbitrary server, and building toward them would be building toward a maybe. If that changes, E1's surface works unmodified.
 
-## Open questions and bets
+## 10. Open questions and bets
 
 ### Decisions left open
 

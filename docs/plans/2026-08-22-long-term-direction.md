@@ -126,23 +126,25 @@ Four amendments land inline, each marked `[edge 2026-09-20]` where it lands:
   blocker could not rest on §1.2. The live exclusion is TS-1's — Vuoro "is not a runner, queue,
   model router or worker supervisor". Second the substance: E3 does not cross it. An `EffectIntent`
   is a *record* of a proposed change that one homelab-side consumer polls and executes, the same
-  shape as a commit Flux reconciles. Vuoro stores it and serves it on read; it never assigns an
-  intent to a consumer, never schedules, never retries, never expires one and never supervises the
-  consumer. That is strictly less queue-like than `claim_work`, which TS-1 already permits, since no
+  shape as a commit Flux reconciles. Vuoro stores it and serves it on read; Vuoro never assigns,
+  schedules, retries, supervises or expires an intent — any one of those five verbs voids this
+  resolution. That is strictly less queue-like than `claim_work`, which TS-1 already permits, since no
   lease and no dispatch attach to an intent at all. §11's deferred "Vuoro-owned queue, retry engine,
-  worker supervisor" is deferred on exactly the three verbs E3 does not perform. **So the §0.2
+  worker supervisor" is deferred on exactly the verbs E3 does not perform. **So the §0.2
   constraint is withdrawn: E3 is authorized, bounded.** The bound is the reason, not decoration — if
-  assignment, retry, scheduling or supervision of intents is ever added, TS-1's exclusion bites and
+  assignment, scheduling, retry, supervision or expiry of intents is ever added, TS-1's exclusion bites and
   that behaviour belongs outside Vuoro. The reconciliation is recorded against TS-1 itself in the
   agentops target state so the live document carries it too.
 - **Where a hosted runtime's evidence is authoritative.** §1.2 keeps repo shards authoritative and
   §14 settles auditctl as the canonical home of `EvidenceSet` and `Decision`. A hosted runtime holds
   no merge rights, so it cannot write a shard; `append_evidence` therefore lands in the substrate
   first. Whether the substrate's hash chain is the authoritative capture and the shard a projection
-  of it, or the reverse, is undecided. `agentops docs/plans/2026-09-17-target-state.md` names no MCP
-  surface, no public endpoint and no cloud runtime anywhere: TS-6 ("evidence is append-only and has
-  one home") and TS-9 (resumability and successor export proven by rehearsal) have no story for a run
-  that cannot reach that home. That gap is theirs to close and is not closed here.
+  of it, or the reverse, is undecided. As of this writing, `agentops
+  docs/plans/2026-09-17-target-state.md` named no MCP surface, no public endpoint and no cloud
+  runtime anywhere: TS-6 ("evidence is append-only and has one home") and TS-9 (resumability and
+  successor export proven by rehearsal) had no story for a run that cannot reach that home. That was
+  the gap this realignment closed: TS-16 now names all three, and the substrate-vs-projection
+  question above is what TS-16's own dependency risk paragraph leaves open.
 
 **One correction, pre-emptive.** Quota portfolio routing came out materially weaker than it was
 pitched. There is no supported programmatic read of individual plan consumption on either vendor, so
@@ -230,7 +232,8 @@ as they are.
 The 2026-09-20 edge work touches four of these and is silent on the rest, taken one at a time so
 that none is widened by omission. `[edge 2026-09-20]` *No new execution control plane, and no
 takeover runner* holds for E0 through E2, and for E3 as well: an `EffectIntent` is a record one
-homelab-side consumer polls, not a queue Vuoro assigns, retries or supervises from. That is settled
+homelab-side consumer polls, not a queue Vuoro assigns, schedules, retries, supervises or expires
+from. That is settled
 against the live exclusion — TS-1's "not a runner, queue, model router or worker supervisor" —
 rather than against this section, which D1 overrides; see §0.2. *No Vuoro ownership of code,
 intent, evidence or acceptance* was already overridden by D1 (2026-09-14) and is not further amended by the edge work; what the edge work adds is
@@ -802,9 +805,9 @@ If ordinary solo work remains neutral or negative and multi-agent bursts do not 
   `[settled 2026-09-20]` It was carried as an open decision against §1.2's "no new execution control
   plane"; §1.2 is overridden by D1, and against the live exclusion — TS-1's "not a runner, queue,
   model router or worker supervisor" — E3 does not cross it, because Vuoro stores and serves intents
-  and never assigns, schedules, retries or supervises. Bounded: adding any of those four verbs puts
-  the behaviour outside Vuoro. §0.2 carries the reasoning. Falsifier: an intent Vuoro hands to a
-  named consumer, re-queues after a failure, or expires on its own.
+  and never assigns, schedules, retries, supervises or expires it. Bounded: adding any of those five
+  verbs puts the behaviour outside Vuoro. §0.2 carries the reasoning. Falsifier: an intent Vuoro
+  hands to a named consumer, re-queues after a failure, or expires on its own.
 - **E4 records and parks; it does not route.** `[settled 2026-09-20]` On a rate-limit denial the
   substrate records the `rate_limit_event`, releases the lease, parks the claim and records which
   model family the next attempt used. Choosing that family is the harness's or the dispatcher's act
