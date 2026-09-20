@@ -162,11 +162,11 @@ What exists, precisely:
 
 ### What can actually be built
 
-**Reactive routing, not predictive.** A plan-level limit cannot be escaped by switching model; a model-family limit can. `rate_limit_event` tells you which you hit and when it resets. So: on a family limit, re-dispatch the WorkRelease to another family; on a plan limit, release the lease, park the claim, and let the scheduler refill when the window rolls. That is your "unlogged cost/quota failover" friction fixed — the failover already happens, it just needs to be an event in the evidence chain rather than an afternoon you lost.
+**Reactive, not predictive — and recorded, not routed.** A plan-level limit cannot be escaped by switching model; a model-family limit can. `rate_limit_event` tells you which you hit and when it resets. The substrate's part is the same in both cases: record the event as evidence, release the lease, park the claim, and let the scheduler refill when the window rolls. On a family limit the harness or the dispatcher picks another family and claims the parked WorkRelease again; the substrate records which family the next attempt used and never chooses it. That division is deliberate — model choice is the harness's, and a substrate that re-dispatched across families would be a model router. What it buys is still the whole point: your "unlogged cost/quota failover" friction fixed, because the failover already happens and it just needs to be an event in the evidence chain rather than an afternoon you lost.
 
 **Self-instrumented consumption, as a second-best.** Your MCP server sees every claim and completion from every runtime. It is the one vantage point you control that spans them all. Reconstructing consumption from your own call log will be approximate, but it is the only cross-device, cross-runtime view available — and `/usage` already attributes a share per MCP server, which gives you a periodic calibration point.
 
-**Portfolio value survives, on a weaker footing.** Dispatching the same WorkRelease to a different runtime when one pool is exhausted still works, because the trigger is a denial rather than a forecast. What you lose is the ability to *balance* load across pools before hitting a wall. That is a real loss and it is the reason this item dropped from first to third in the ordering.
+**Portfolio value survives, on a weaker footing.** Re-claiming a parked WorkRelease from a different runtime when one pool is exhausted still works, because the trigger is a denial rather than a forecast — and because the deciding is done by whoever claims, not by the substrate that parked it. What you lose is the ability to *balance* load across pools before hitting a wall. That is a real loss and it is the reason this item dropped from first to third in the ordering.
 
 **One intake path worth knowing.** Routines expose `POST /v1/claude_code/routines/{id}/fire` with a bearer token and the `experimental-cc-routine-2026-04-01` beta header. That is a clean way to push work from your substrate into a Claude cloud session from outside. Note the payload arrives wrapped in `<routine-fire-payload>` and is explicitly treated as untrusted — which is correct, and which your own EffectIntent handling should mirror.
 
@@ -229,7 +229,7 @@ Five phases, folded into the rebuild's own phasing rather than running beside it
 
 **E3 — EffectIntent and the reconciler.** `propose_effect` on the surface, actionq-dispatcher polling and executing on the homelab side. Diff-shaped intents only to begin with. *Depends on: E2.*
 
-**E4 — Reactive quota failover.** Record `rate_limit_event` as evidence, park claims on plan limits, re-dispatch across families on family limits. Last, because it needs RunManifest, leases and a second driver to mean anything. *Depends on: E2, rebuild Phase 3, 6.*
+**E4 — Reactive quota failover, recorded.** Record `rate_limit_event` as evidence; on a denial, release the lease, park the claim, and record which model family the next attempt used. Choosing that family is the harness's or the dispatcher's act, not the substrate's — the substrate records and parks, it does not route. Last, because it needs RunManifest, leases and a second driver to mean anything. *Depends on: E2, rebuild Phase 3, 6.*
 
 ### Sequencing against the rebuild
 
