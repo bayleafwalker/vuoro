@@ -19,6 +19,7 @@ members = [
   "packages/vuoro-schema-runtime",
   "packages/vuoro-adapter-kit",
   "packages/vuoro-evidence",
+  "packages/vuoro-worker",
 ]
 
 [tool.pytest.ini_options]
@@ -29,5 +30,6 @@ testpaths = [
   "packages/vuoro-schema-runtime/tests",
   "packages/vuoro-adapter-kit/tests",
   "packages/vuoro-evidence/tests",
+  "packages/vuoro-worker/tests",
   "tests",
 ]

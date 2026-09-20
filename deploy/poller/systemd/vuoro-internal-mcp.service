@@ -1,0 +1,25 @@
+[Unit]
+Description=vuoro internal MCP server (loopback only, no public endpoint)
+After=network.target
+
+[Service]
+Type=simple
+# 127.0.0.1 deliberately, not 0.0.0.0: this is the same host-local
+# constraint the compose deployment enforces by leaving the port
+# unpublished. If this host ever needs the poller and this server on
+# separate machines, bind to the private/VPN address of an internal
+# network the operator controls -- never a publicly routable one.
+ExecStart=/usr/local/bin/vuoro-worker serve-internal-mcp --host 127.0.0.1 --port 8765
+EnvironmentFile=/etc/vuoro/poller.env
+Restart=on-failure
+RestartSec=5
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+# No socket activation, no IP_FREEBIND, nothing that would let this unit
+# bind a non-loopback address by accident.
+
+[Install]
+WantedBy=multi-user.target
