@@ -9,5 +9,7 @@ from .core.model import (Claim, ClaimType, Decision, DecisionKind, EffectGrant, 
                          EvidenceItem, EvidenceSet, GrantUse, ValidityBasis, ValidityWindow)
 from .core.reducer import Ledger, reduce
 from .core.decision import RerunQuestion, decide_rerun
+from .core.chain import (ChainBreak, ChainBreakReason, ChainVerification, entry_digest, link,
+                         verify_chain)
 
 __all__ = [n for n in dir() if not n.startswith("_")]
