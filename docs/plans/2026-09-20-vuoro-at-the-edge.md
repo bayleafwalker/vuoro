@@ -2,7 +2,7 @@
 
 **Status:** Plan of record for the edge work.
 **Written:** 2026-09-19
-**Landed:** 2026-09-20, from the session that picked up the extended realignment. Previously existed only in `~/Downloads` and in a chat artifact; this landing is the durable record. A companion first-principles rebuild (R1-R8, ADR-02, ADR-05, Phase 0-6, §15) exists only as a chat artifact, not in this repo as of 2026-09-20.
+**Landed:** 2026-09-20, from the session that picked up the extended realignment. Previously existed only in `~/Downloads` and in a chat artifact; this landing is the durable record. A companion first-principles rebuild (R1-R13, ADR-01..08, Phase 0-6) has since landed as `docs/plans/2026-09-19-agentic-pipeline-first-principles-rebuild.md` (merge d47b98cb); its headings are unnumbered, so there is no §15 to cite — the verdict this doc reverses is its build-versus-buy ledger row for vuoro.cloud.
 **Decides:** DECISION 1 (operator, 2026-09-20) — both paths, public E1 first. Recorded below at "Decisions left open" item 1, now marked decided.
 
 
@@ -16,7 +16,7 @@ vuoro.cloud is not a hosted product looking for users. It is the substrate's net
 
 That distinction matters because it survives your own position. Pursuing external users adds nothing; reaching external *runtimes* is a different claim entirely, and it is an availability requirement rather than a market one. A Cowork session, a scheduled cloud run or a Codex task today produces no Claim, no RunManifest and no evidence — not because the design excludes them, but because they cannot reach a Postgres on VLAN 20. That is a hole in the record, which makes it a defect against R5 and R8 of the rebuild.
 
-**This reverses the "park vuoro.cloud" verdict in §15 of the rebuild.** That verdict was correct given the premise that the hosted variant served nobody. The premise was wrong: it serves every runtime you do not host, which is most of them now.
+**This reverses the "park vuoro.cloud" verdict recorded in the rebuild's Build-vs-buy ledger** (`docs/plans/2026-09-19-agentic-pipeline-first-principles-rebuild.md`, row "**Revisit**. superseded — see the companion doc Vuoro at the Edge"; its open question "Does vuoro.cloud stay up?" is the same verdict). That verdict was correct given the premise that the hosted variant served nobody. The premise was wrong: it serves every runtime you do not host, which is most of them now.
 
 ### One finding changes the economics
 
