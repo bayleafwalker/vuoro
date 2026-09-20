@@ -65,6 +65,13 @@ class EvidenceItem:
     validity: ValidityWindow
     claims: tuple[Claim, ...] = ()
     provenance: Mapping[str, Any] = field(default_factory=dict)
+    # Chain linkage (evidence chaining, agentops#2464). `chain_seq` is this
+    # item's 0-based position in its run's chain; `chain_prev_digest` is the
+    # entry hash (see core.chain.entry_digest) of the item at `chain_seq - 1`,
+    # or None at `chain_seq == 0`. Unset on both means the item is not part of
+    # a chain (pre-chaining callers, or genuinely standalone evidence).
+    chain_seq: int | None = None
+    chain_prev_digest: str | None = None
 
 
 class GrantUse(str, Enum):
