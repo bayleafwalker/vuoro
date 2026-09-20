@@ -25,6 +25,7 @@ _PRINCIPAL_SUBJECT = re.compile(r"^[A-Za-z0-9._-]+$")
 _NBF_CLOCK_SKEW_SECONDS = 2
 _REQUIRED_CLAIMS = (
     "actor",
+    "aud",
     "authorities",
     "principal_epoch",
     "subject",
@@ -184,6 +185,12 @@ class GatewayAssertionIdentityResolver:
         ):
             raise IdentityResolutionError("gateway identity assertion header is invalid")
         try:
+            # `aud` is checked against `self._audience` (RFC 8707 resource
+            # parameter, minted per-surface by the gateway) and, since "aud"
+            # is now in `_REQUIRED_CLAIMS`, an assertion with no audience
+            # claim at all is refused the same as one minted for another
+            # surface -- a token is never passed onward on the strength of
+            # its signature alone (agentops#2464, E0 acceptance (e)).
             claims = jwt.decode(
                 token,
                 self._public_key,

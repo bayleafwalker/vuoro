@@ -103,6 +103,20 @@ def _token(private: Ed25519PrivateKey, **overrides: object) -> str:
     )
 
 
+def _token_missing_claims(private: Ed25519PrivateKey, *missing: str) -> str:
+    private_pem = private.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    )
+    claims = _claims()
+    for field in missing:
+        claims.pop(field, None)
+    return jwt.encode(
+        claims, private_pem, algorithm="EdDSA", headers={"typ": "JWT", "kid": "gateway-2026-01"}
+    )
+
+
 def _token_with_headers(
     private: Ed25519PrivateKey, headers: dict[str, str], **overrides: object
 ) -> str:
@@ -147,6 +161,20 @@ def test_gateway_assertion_resolver_rejects_scope_or_correlation_disagreement(
     path, private = _key_file(tmp_path)
     with pytest.raises(IdentityResolutionError):
         _resolver(path)(_request(_token(private, **overrides)))
+
+
+def test_gateway_assertion_resolver_rejects_assertion_with_no_audience_claim_at_all(
+    tmp_path: Path,
+) -> None:
+    # Distinct from the wrong-audience case above: this token has no "aud"
+    # claim whatsoever (e.g. a well-formed but non-resource-scoped token from
+    # a misconfigured or older minter). It must be refused identically to a
+    # wrong-audience token, not accepted for lack of anything to compare.
+    path, private = _key_file(tmp_path)
+    resolver = _resolver(path)
+    token = _token_missing_claims(private, "aud")
+    with pytest.raises(IdentityResolutionError):
+        resolver(_request(token))
 
 
 def test_gateway_assertion_resolver_rejects_expired_bad_signature_unknown_key_and_duplicate_header(
