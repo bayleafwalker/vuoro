@@ -106,24 +106,35 @@ Four amendments land inline, each marked `[edge 2026-09-20]` where it lands:
    surface is consistent with a projection that is not a runner. §1.2 gains a per-non-goal pass:
    which are unaffected, which is amended in scope, and which is an open conflict. No non-goal is
    widened by silence.
-3. **Reversal of the rebuild's park verdict (§9.3, §14).** The first-principles rebuild's §15 verdict
-   was to park vuoro.cloud. It is reversed as of 2026-09-20: vuoro.cloud proceeds, as hosted
-   coordination with an inbound surface and no hosted execution. The rebuild is a chat artifact, not
-   in the repo as of 2026-09-20 — a reader cannot open it, and this entry plus the edge doc is the
-   only durable record of the verdict being reversed.
+3. **Reversal of the rebuild's park verdict (§9.3, §14).** The first-principles rebuild's verdict was
+   to park vuoro.cloud. It is reversed as of 2026-09-20: vuoro.cloud proceeds, as hosted
+   coordination with an inbound surface and no hosted execution. The rebuild has since landed as
+   `docs/plans/2026-09-19-agentic-pipeline-first-principles-rebuild.md` (merge d47b98cb), so a reader
+   can open it. Its headings are unnumbered — there is no §15 to cite. The verdict being reversed is
+   the build-versus-buy ledger row for vuoro.cloud, which reads "**Revisit**. superseded — see the
+   companion doc Vuoro at the Edge", together with its open question "Does vuoro.cloud stay up?".
 4. **Falsifier (§13 falsifier 12).** If a month of E1 passes without the substrate being reached from
    a hosted runtime, the rest is not built.
 
-**Two conflicts are recorded rather than resolved.** Both are listed in §14 as open decisions.
+**One conflict resolved, one recorded rather than resolved.** Both are tracked in §14.
 
-- **E3's intent queue against §1.2's "no new execution control plane".** E0 through E2 are clear of
-  it: reading, claiming, recording and proposing add no execution path. E3 is not. An `EffectIntent`
-  queue that a poller drains and executes is control-plane-shaped whatever the poller is called, and
-  it is close to §11's explicitly deferred "Vuoro-owned queue, retry engine, worker supervisor"; that
-  `actionq-dispatcher` already exists and already holds the credentials is an argument, not a
-  settlement. This is not resolved in the edge work's favour here. E3 depends on E2, so the decision
-  can be taken with a live surface in evidence; until it is taken, E3 is unauthorized by this
-  document.
+- **E3's intent queue — resolved 2026-09-20, and the blocker withdrawn.** The earlier reading of this
+  entry held that E3 was unauthorized until a decision was taken, and grounded that in §1.2's "no new
+  execution control plane" non-goal. Two things were wrong with it. First the grounding: this
+  document's own header records that owner decision D1 (2026-09-14) overrides §1, §1.1, §1.2 and
+  §14, and defers agent tooling to `agentops docs/plans/2026-09-17-target-state.md`, so an active
+  blocker could not rest on §1.2. The live exclusion is TS-1's — Vuoro "is not a runner, queue,
+  model router or worker supervisor". Second the substance: E3 does not cross it. An `EffectIntent`
+  is a *record* of a proposed change that one homelab-side consumer polls and executes, the same
+  shape as a commit Flux reconciles. Vuoro stores it and serves it on read; it never assigns an
+  intent to a consumer, never schedules, never retries, never expires one and never supervises the
+  consumer. That is strictly less queue-like than `claim_work`, which TS-1 already permits, since no
+  lease and no dispatch attach to an intent at all. §11's deferred "Vuoro-owned queue, retry engine,
+  worker supervisor" is deferred on exactly the three verbs E3 does not perform. **So the §0.2
+  constraint is withdrawn: E3 is authorized, bounded.** The bound is the reason, not decoration — if
+  assignment, retry, scheduling or supervision of intents is ever added, TS-1's exclusion bites and
+  that behaviour belongs outside Vuoro. The reconciliation is recorded against TS-1 itself in the
+  agentops target state so the live document carries it too.
 - **Where a hosted runtime's evidence is authoritative.** §1.2 keeps repo shards authoritative and
   §14 settles auditctl as the canonical home of `EvidenceSet` and `Decision`. A hosted runtime holds
   no merge rights, so it cannot write a shard; `append_evidence` therefore lands in the substrate
@@ -218,9 +229,11 @@ as they are.
 
 The 2026-09-20 edge work touches four of these and is silent on the rest, taken one at a time so
 that none is widened by omission. `[edge 2026-09-20]` *No new execution control plane, and no
-takeover runner* holds for E0 through E2 and is an **open conflict at E3**, recorded in §0.2 and
-not resolved here. *No Vuoro ownership of code, intent, evidence or acceptance* was already
-overridden by D1 (2026-09-14) and is not further amended by the edge work; what the edge work adds is
+takeover runner* holds for E0 through E2, and for E3 as well: an `EffectIntent` is a record one
+homelab-side consumer polls, not a queue Vuoro assigns, retries or supervises from. That is settled
+against the live exclusion — TS-1's "not a runner, queue, model router or worker supervisor" —
+rather than against this section, which D1 overrides; see §0.2. *No Vuoro ownership of code,
+intent, evidence or acceptance* was already overridden by D1 (2026-09-14) and is not further amended by the edge work; what the edge work adds is
 an internet-reachable write path into a record D1 had already placed inside Vuoro's semantics. *No
 centralized evidence ownership in auditctl — repo shards stay authoritative* is **amended in scope**:
 a hosted runtime cannot write a shard it has no merge rights to, which makes the authoritative
@@ -645,9 +658,9 @@ Users retain repositories, worktrees, workers, native harnesses, credentials, ex
 
 Connector transport defaulted to outbound pull. That default is **amended, not deleted** (operator, 2026-09-20). Outbound pull remains the default for anything this host can reach; an **inbound public MCP surface is now in the target state** for read, coordinate, record and propose, alongside the Managed Agents self-hosted worker for unattended runs, which exposes no endpoint at all. Both paths, public E1 first. The reason is reachability rather than preference: a Cowork, claude.ai, mobile, Routines, cloud or OpenAI Responses session is not a host this substrate can dial, and outbound pull has no way to reach the runtimes now doing a growing share of the work. `[edge 2026-09-20]`
 
-**Hosted execution remains outside the core promise, and that still holds.** The inbound surface does not weaken it, because effects and credentials never cross the boundary. Intent, coordination and evidence cross; applied changes do not. No credential issued to a hosted runtime can name a cluster resource, there is no `effect.apply` scope, and leaving it undefined is a recorded design decision rather than an omission. A hosted runtime proposes an `EffectIntent`; a homelab-side reconciler that already holds the credentials executes it and signs it, so branch protection and signature verification apply unchanged. See `2026-09-20-vuoro-at-the-edge.md` §3 (the boundary) and §8 (threat model change). §8 is also where the price of the reversal is stated plainly: a public, credential-holding endpoint with one user and no on-call, whose Phase 0 controls — evidence chaining, lease expiry, audience validation, rate limiting, endpoint monitoring — stop being hygiene and become load-bearing. `[edge 2026-09-20]`
+**Hosted execution remains outside the core promise, and that still holds.** The inbound surface does not weaken it, because effects and credentials never cross the boundary. Intent, coordination and evidence cross; applied changes do not. No credential issued to a hosted runtime can name a cluster resource, there is no `effect.apply` scope, and leaving it undefined is a recorded design decision rather than an omission. A hosted runtime proposes an `EffectIntent`; a homelab-side reconciler that already holds the credentials executes it and signs it, so branch protection and signature verification apply unchanged. Be exact about what that signature is worth. It is the reconciler's own, and it attests that the reconciler applied the change — nothing more. It does not attest the hosted run that proposed it: the property obtained is a verifiable chain from a signed commit back to a run record naming runtime, model and profile revision, which is **recorded and reconstructable, not attested**, and must not be described as attestation anywhere downstream. Nothing here vouches for what the hosted runtime actually did; it vouches for what was proposed, what was applied, and by whom. See `2026-09-20-vuoro-at-the-edge.md` §3 (the boundary) and §8 (threat model change). §8 is also where the price of the reversal is stated plainly: a public, credential-holding endpoint with one user and no on-call, whose Phase 0 controls — evidence chaining, lease expiry, audience validation, rate limiting, endpoint monitoring — stop being hygiene and become load-bearing. `[edge 2026-09-20]`
 
-This reverses the first-principles rebuild's §15 verdict to park vuoro.cloud (the rebuild is a chat artifact, not in the repo as of 2026-09-20). §0.2 records the reversal and the two conflicts it leaves open. `[edge 2026-09-20]`
+This reverses the first-principles rebuild's verdict to park vuoro.cloud — its build-versus-buy ledger row, "**Revisit**. superseded — see the companion doc Vuoro at the Edge", and its open question "Does vuoro.cloud stay up?". The rebuild landed as `docs/plans/2026-09-19-agentic-pipeline-first-principles-rebuild.md` (merge d47b98cb); its headings are unnumbered, so cite the ledger row rather than a § number. §0.2 records the reversal, the conflict it resolves and the one it leaves open. `[edge 2026-09-20]`
 
 ## 10. Composition v4 direction
 
@@ -785,6 +798,17 @@ If ordinary solo work remains neutral or negative and multi-agent bursts do not 
 - Logical agent profiles, skills, and hooks must exist above individual harnesses.
 - Provider portability is checkpoint-based, not transparent live-session migration.
 - Local mode and direct recovery remain first-class.
+- **E3's `EffectIntent` plus homelab reconciler is a record, not a queue, and is authorized.**
+  `[settled 2026-09-20]` It was carried as an open decision against §1.2's "no new execution control
+  plane"; §1.2 is overridden by D1, and against the live exclusion — TS-1's "not a runner, queue,
+  model router or worker supervisor" — E3 does not cross it, because Vuoro stores and serves intents
+  and never assigns, schedules, retries or supervises. Bounded: adding any of those four verbs puts
+  the behaviour outside Vuoro. §0.2 carries the reasoning. Falsifier: an intent Vuoro hands to a
+  named consumer, re-queues after a failure, or expires on its own.
+- **E4 records and parks; it does not route.** `[settled 2026-09-20]` On a rate-limit denial the
+  substrate records the `rate_limit_event`, releases the lease, parks the claim and records which
+  model family the next attempt used. Choosing that family is the harness's or the dispatcher's act
+  — TS-1 excludes model routing and TS-2 keeps model choice native to the harness.
 - Experimentation is versioned memory before automated optimization.
 
 ### Open architecture decisions
@@ -798,8 +822,6 @@ If ordinary solo work remains neutral or negative and multi-agent bursts do not 
 - whether served/cloud demand becomes real enough to justify productization — **under test rather
   than open in principle** since 2026-09-20: E1 is the cheap experiment and §13 falsifier 12 is its
   stop condition; `[edge 2026-09-20]`
-- whether E3's `EffectIntent` queue plus homelab reconciler constitutes a new execution control plane
-  under §1.2, and therefore whether E3 is authorized at all; `[edge 2026-09-20]`
 - where a hosted runtime's evidence is authoritative, given that it holds no merge rights and so
   cannot write the repo shard §1.2 keeps authoritative. `[edge 2026-09-20]`
 
