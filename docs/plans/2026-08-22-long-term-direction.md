@@ -12,6 +12,10 @@
 **Subsequent correction:** `2026-08-27-effect-intent-projection.md` rejects a
 cluster-granularity single-writer reading, retains native DevOps fencing, and
 limits new work to an advisory resource-graph projection for imperative effects.  
+**Subsequent amendment:** `2026-09-20-vuoro-at-the-edge.md` reverses the parked verdict on
+vuoro.cloud and puts an inbound public MCP surface into the target state for read, coordinate,
+record and propose. §0.2 records where it lands, which non-goals it does and does not touch, and
+the two conflicts it leaves open.  
 **Evidence input:** `docs/evidence/2026-08-22-agentic-eventstorm.html` — a big-picture EventStorming pass over Codex, OpenCode, Claude Code and local-inference session logs on this host and the devbox (1,730 / 239 / 194 sessions sampled, $33.50 hosted spend). Its six ranked hotspots are the first evidence Vuoro has about itself; §0.1 records how they reorder §11.
 
 ## 0. Assessment and reconciliation (2026-08-22)
@@ -83,6 +87,62 @@ Not changed, and worth stating: the draft's `WorkRelease`-first priority order i
 Restate pilot stays an unstarted, separately authorized qualification exercise; W5 and W7 stay
 operator-owned / unauthorized; ActionQ PR #40 disposition matches what is already recorded.
 
+### 0.2 Reachability reversal (2026-09-20)
+
+The 2026-09-19 edge research (`2026-09-20-vuoro-at-the-edge.md`) found that a growing share of the
+runtimes doing the work are runtimes this host does not run and cannot dial: Cowork, claude.ai,
+mobile, Routines, cloud sessions, the OpenAI Responses API. Outbound pull cannot reach them. The
+operator decided on 2026-09-20: **both paths, public E1 first** — a narrow public MCP surface for
+interactive runtimes *and* the Managed Agents self-hosted worker for unattended runs, at the cost of
+one more component, which is accepted (edge doc "Decisions left open" item 1, now marked decided).
+Four amendments land inline, each marked `[edge 2026-09-20]` where it lands:
+
+1. **Connector transport default (§9.3).** The outbound-pull default is amended, not deleted.
+   Outbound pull stays the default for anything this host can reach; an inbound public MCP surface
+   enters the target state for read, coordinate, record and propose. *Hosted execution remains
+   outside the core promise*, and §9.3 now says explicitly that it still holds, because effects and
+   credentials never cross the boundary.
+2. **The surviving boundary and the non-goals (§1.1, §1.2).** §1.1 gains the structural reason the
+   surface is consistent with a projection that is not a runner. §1.2 gains a per-non-goal pass:
+   which are unaffected, which is amended in scope, and which is an open conflict. No non-goal is
+   widened by silence.
+3. **Reversal of the rebuild's park verdict (§9.3, §14).** The first-principles rebuild's §15 verdict
+   was to park vuoro.cloud. It is reversed as of 2026-09-20: vuoro.cloud proceeds, as hosted
+   coordination with an inbound surface and no hosted execution. The rebuild is a chat artifact, not
+   in the repo as of 2026-09-20 — a reader cannot open it, and this entry plus the edge doc is the
+   only durable record of the verdict being reversed.
+4. **Falsifier (§13 falsifier 12).** If a month of E1 passes without the substrate being reached from
+   a hosted runtime, the rest is not built.
+
+**Two conflicts are recorded rather than resolved.** Both are listed in §14 as open decisions.
+
+- **E3's intent queue against §1.2's "no new execution control plane".** E0 through E2 are clear of
+  it: reading, claiming, recording and proposing add no execution path. E3 is not. An `EffectIntent`
+  queue that a poller drains and executes is control-plane-shaped whatever the poller is called, and
+  it is close to §11's explicitly deferred "Vuoro-owned queue, retry engine, worker supervisor"; that
+  `actionq-dispatcher` already exists and already holds the credentials is an argument, not a
+  settlement. This is not resolved in the edge work's favour here. E3 depends on E2, so the decision
+  can be taken with a live surface in evidence; until it is taken, E3 is unauthorized by this
+  document.
+- **Where a hosted runtime's evidence is authoritative.** §1.2 keeps repo shards authoritative and
+  §14 settles auditctl as the canonical home of `EvidenceSet` and `Decision`. A hosted runtime holds
+  no merge rights, so it cannot write a shard; `append_evidence` therefore lands in the substrate
+  first. Whether the substrate's hash chain is the authoritative capture and the shard a projection
+  of it, or the reverse, is undecided. `agentops docs/plans/2026-09-17-target-state.md` names no MCP
+  surface, no public endpoint and no cloud runtime anywhere: TS-6 ("evidence is append-only and has
+  one home") and TS-9 (resumability and successor export proven by rehearsal) have no story for a run
+  that cannot reach that home. That gap is theirs to close and is not closed here.
+
+**One correction, pre-emptive.** Quota portfolio routing came out materially weaker than it was
+pitched. There is no supported programmatic read of individual plan consumption on either vendor, so
+predictive balancing — dispatch to whichever pool has headroom — cannot be built on published
+interfaces today; only reactive failover on an observed denial is buildable, which is why it is E4
+and last (edge doc §6). This document does not claim otherwise, and nothing in it needed rewriting:
+§4.2 already says the token-economics fix is architectural "not merely a routing optimization", and
+§8.1 lists a task-routing decision as something an experiment may vary, not a capability Vuoro has.
+Recorded so that a later session does not read §16's "portfolio of agentic-work providers" as a
+headroom forecast. `[edge 2026-09-20]`
+
 ## 1. Executive decision
 
 Vuoro should become a **market-composed agentic-work distribution and control projection**.
@@ -126,6 +186,13 @@ Market-composed distribution, as §1 describes it, is the **v7 horizon** and not
 implementation phase. Vuoro survives the narrowing as the thing that projects and
 reconciles state it does not own; it does not survive as a runner.
 
+The 2026-09-20 inbound surface is consistent with that, and the consistency is structural rather
+than asserted: every tool on the published surface must classify as read, coordinate, record or
+propose, and there is no `vuoro:effect.apply` scope to issue — no credential a hosted runtime holds
+can name a cluster resource, so its maximum achievable outcome is an unmergeable branch and a queued
+intent. Vuoro is still projecting and reconciling state it does not own; what the reversal changes is
+the direction of the transport, not the ownership. `[edge 2026-09-20]`
+
 ### 1.2 Non-goals [current]
 
 Operative, from the cross-repo dogfood plan §7, and binding on every packet until
@@ -148,6 +215,20 @@ and the six unonboarded `hostproto` successors found on 2026-08-29
 (`agentops docs/assessments/dispatch-manifest-classification-2026-08-29.md`) are recorded
 rather than fixed. *No renovation of guidance-only manifests* is why eleven manifests stay
 as they are.
+
+The 2026-09-20 edge work touches four of these and is silent on the rest, taken one at a time so
+that none is widened by omission. `[edge 2026-09-20]` *No new execution control plane, and no
+takeover runner* holds for E0 through E2 and is an **open conflict at E3**, recorded in §0.2 and
+not resolved here. *No Vuoro ownership of code, intent, evidence or acceptance* was already
+overridden by D1 (2026-09-14) and is not further amended by the edge work; what the edge work adds is
+an internet-reachable write path into a record D1 had already placed inside Vuoro's semantics. *No
+centralized evidence ownership in auditctl — repo shards stay authoritative* is **amended in scope**:
+a hosted runtime cannot write a shard it has no merge rights to, which makes the authoritative
+capture point for its evidence an open question, also in §0.2. *No pre-emptive enablement of
+repositories without a consumer* is unaffected, and is in fact the rule the E1 stop condition applies
+to the surface itself (§13 falsifier 12). The remaining non-goals — no federation schema on
+speculation, no `scribedispatch` integration, no W7, no `hostproto-semantics` merge, no renovation of
+guidance-only manifests — are unaffected: nothing in E0 through E4 requires any of them.
 
 The architecture must remain valid for a future multi-operator or hosted product, but the next implementation phase must be honest about current scale: one operator, one principal environment, low run counts per task class, and no independent ecosystem consumer. Core contracts and the cockpit are current product work. Provider SDKs, signed distribution machinery, automated statistical promotion, and a general ecosystem release train remain activation-gated topology.
 
@@ -560,7 +641,13 @@ If Vuoro Cloud proceeds, it hosts shared coordination and authority rather than 
 - evidence indexes and receipts;
 - compatibility and migration control.
 
-Users retain repositories, worktrees, workers, native harnesses, credentials, execution hosts, and optionally artifact storage. Connector transport should default to outbound pull. Hosted execution remains outside the core promise.
+Users retain repositories, worktrees, workers, native harnesses, credentials, execution hosts, and optionally artifact storage.
+
+Connector transport defaulted to outbound pull. That default is **amended, not deleted** (operator, 2026-09-20). Outbound pull remains the default for anything this host can reach; an **inbound public MCP surface is now in the target state** for read, coordinate, record and propose, alongside the Managed Agents self-hosted worker for unattended runs, which exposes no endpoint at all. Both paths, public E1 first. The reason is reachability rather than preference: a Cowork, claude.ai, mobile, Routines, cloud or OpenAI Responses session is not a host this substrate can dial, and outbound pull has no way to reach the runtimes now doing a growing share of the work. `[edge 2026-09-20]`
+
+**Hosted execution remains outside the core promise, and that still holds.** The inbound surface does not weaken it, because effects and credentials never cross the boundary. Intent, coordination and evidence cross; applied changes do not. No credential issued to a hosted runtime can name a cluster resource, there is no `effect.apply` scope, and leaving it undefined is a recorded design decision rather than an omission. A hosted runtime proposes an `EffectIntent`; a homelab-side reconciler that already holds the credentials executes it and signs it, so branch protection and signature verification apply unchanged. See `2026-09-20-vuoro-at-the-edge.md` §3 (the boundary) and §8 (threat model change). §8 is also where the price of the reversal is stated plainly: a public, credential-holding endpoint with one user and no on-call, whose Phase 0 controls — evidence chaining, lease expiry, audience validation, rate limiting, endpoint monitoring — stop being hygiene and become load-bearing. `[edge 2026-09-20]`
+
+This reverses the first-principles rebuild's §15 verdict to park vuoro.cloud (the rebuild is a chat artifact, not in the repo as of 2026-09-20). §0.2 records the reversal and the two conflicts it leaves open. `[edge 2026-09-20]`
 
 ## 10. Composition v4 direction
 
@@ -667,6 +754,12 @@ The direction is wrong or overbuilt if any of the following cannot be demonstrat
 9. The cockpit provides material operational value beyond concatenating native provider UIs.
 10. Deferred ecosystem packaging remains absent until an activation trigger is observed.
 11. Every ledger contract names the lifecycle events its transitions emit, and those events are observed in auditctl. A Vuoro object that emits no lifecycle events is not an object, it is a name — `vuoro-dispatch-ready` is the counterexample already on record. `[board]`
+12. The read surface proves the need. If a month of E1 — `list_ready_work` and `describe_work`, one
+    static bearer token — passes without the substrate once being reached from a hosted runtime, the
+    rest of the edge work is not built: no claims over MCP, no evidence, no `EffectIntent`, no
+    reactive failover. This is the falsifier the operator attached to the 2026-09-20 decision, and
+    it is §1.2's "no pre-emptive enablement without a consumer" applied to the surface itself.
+    `[edge 2026-09-20]`
 
 If ordinary solo work remains neutral or negative and multi-agent bursts do not compensate for the carrying cost, minimization or removal remains a valid outcome.
 
@@ -702,7 +795,13 @@ If ordinary solo work remains neutral or negative and multi-agent bursts do not 
 - the minimal v4 manifest and migration proof;
 - where each ledger object and versioned specification is canonically stored — which bound provider owns `WorkRelease` (Sprintctl as work authority is the default candidate) and `EffectGrant` (ActionQ federation), and where logical agent profiles and skill artifacts live; `EvidenceSet` and `Decision` are settled below. `[reconciled]` `[narrowed 2026-08-30]`
 - the smallest cockpit that measurably improves takeover and supervision;
-- whether served/cloud demand becomes real enough to justify productization.
+- whether served/cloud demand becomes real enough to justify productization — **under test rather
+  than open in principle** since 2026-09-20: E1 is the cheap experiment and §13 falsifier 12 is its
+  stop condition; `[edge 2026-09-20]`
+- whether E3's `EffectIntent` queue plus homelab reconciler constitutes a new execution control plane
+  under §1.2, and therefore whether E3 is authorized at all; `[edge 2026-09-20]`
+- where a hosted runtime's evidence is authoritative, given that it holds no merge rights and so
+  cannot write the repo shard §1.2 keeps authoritative. `[edge 2026-09-20]`
 
 ### Deferred topology
 
