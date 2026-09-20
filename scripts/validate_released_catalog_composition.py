@@ -8,7 +8,7 @@ from vuoro_service.catalog import CatalogRegistry
 
 
 EXPECTED_TOTAL = 55
-EXPECTED_REVISION = "a330146a1fb6937ecc98d034949b9e9524c3c73bcd0c247df1cdbc052bbadcd9"
+EXPECTED_REVISION = "775a16aa23aff295e28420356d3692ea46e3ac606afb2f437e053f411a3a434d"
 EXPECTED_DOMAIN_COUNTS = {"work": 50, "audit": 5}
 
 
