@@ -107,6 +107,23 @@ uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests
 uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests
 ```
 
+### Run it locally
+
+The installed console scripts are `vuoro-service` and `vuoro-client` (the
+client's own `--help` reports its argparse prog name as `vuoro`):
+
+```console
+$ uv run --package vuoro-service vuoro-service --help
+usage: vuoro-service [-h] [--version] {serve} ...
+$ uv run --package vuoro-client vuoro-client --help
+usage: vuoro [-h] [--version] {recovery} ...
+```
+
+For a local client/service/PostgreSQL evaluation stack, see
+[`deploy/compose/README.md`](deploy/compose/README.md). That Compose stack is
+a disposable local packaging check, not a `vuoro-dev` deployment, and must not
+receive production endpoints, credentials, mounts, or identities.
+
 See [`docs/architecture/packaging.md`](docs/architecture/packaging.md) for the
 enforced dependency and ownership boundaries and
 [`docs/architecture/protocol-v1.md`](docs/architecture/protocol-v1.md) for the
