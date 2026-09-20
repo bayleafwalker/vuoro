@@ -6,7 +6,7 @@
 
 2026-09-19 · @Someone
 
-## Scope and method
+## 1. Scope and method
 
 This derives an agentic pipeline from requirements without reference to your current components, then reconciles the result against what you run. Scope is substrate, runtime and platform: work coordination, the execution edge, secrets, policy, context, evidence, cluster placement and the meta-layer.
 
@@ -21,7 +21,7 @@ Out of scope by choice: fully autonomous delegation, realtime tool-framework flo
 
 One reading rule. The derived target in §4–13 is not a plan. It is the thing §15 measures your stack against, and only §16 is a sequence you would act on.
 
-## First principles
+## 2. First principles
 
 Five facts about agentic work are not design choices, and everything else follows from them.
 
@@ -55,7 +55,7 @@ Five facts about agentic work are not design choices, and everything else follow
 
 R13 is the recovery-first rule you already apply to the cluster, applied to the pipeline. R3, R8 and R12 are the three that most implementations — including most of the market — quietly skip.
 
-## Constraints, and the shape they force
+## 3. Constraints, and the shape they force
 
 Four constraints bind harder than any technical choice, and three of them push the design the same direction.
 
@@ -74,7 +74,7 @@ Four constraints bind harder than any technical choice, and three of them push t
 - **Proportionality is a design input.** The same test you applied to assurance methods at kotona.app applies here: adopt the small version of an established practice, and skip anything whose smallest version is still a cluster.
 - **Prefer boring, self-hosted, permissively licensed state.** The 2026 mortality list in this category is long: Terragon shut down January, Vibe Kanban's vendor April, BeadHub abandoned May, Zep's Community Edition discontinued.
 
-## Reference architecture
+## 4. Reference architecture
 
 The pipeline decomposes into seven planes, separated by what happens when a provider disappears. Three planes you own because their objects must outlive any vendor. One you rent. Three you delegate to practice that already exists and already works.
 
@@ -120,7 +120,7 @@ This lands almost exactly on your 2026-08-22 set, which is the expected outcome 
 
 **RunManifest should be promoted out of EvidenceSet.** Your set names inputs and outputs but not the binding between them. ExperimentRecord compares two RunManifests; provider switching replays one; R8 and R9 are both unverifiable without it as a first-class, addressable object. Checkpoint was right to demote; this is the object that should take the slot.
 
-## Intake and specification
+## 5. Intake and specification
 
 Work enters as a dependency graph whose readiness is computed, never asserted. The specification lives in the repo; the queue state lives outside it. That split is the load-bearing decision here, and it is the one most tools get wrong in one direction or the other.
 
@@ -144,7 +144,7 @@ Work enters as a dependency graph whose readiness is computed, never asserted. T
 
 The honest finding: nothing in the market does intake better than what you have. Spec Kit's artifact convention is worth absorbing because it is what other harnesses already look for; the rest is a lateral move.
 
-## Execution edge
+## 6. Execution edge
 
 The harness is a subprocess with a three-part contract, and that contract is the most stable thing in the stack. Five vendors converged on it independently under CI pressure: a non-interactive prompt entry, newline-delimited JSON events, and a resume verb.
 
@@ -166,7 +166,7 @@ The harness is a subprocess with a three-part contract, and that contract is the
 
 **Watch ACP, not A2A.** The [Agent Client Protocol registry](https://zed.dev/blog/acp-registry) went live January 2026 listing Claude Code, Codex, Copilot CLI, OpenCode and Gemini CLI, with JetBrains adopting it first-party. It commoditizes *driving* a harness. A2A v1.0 is real but solves inter-organizational federation, which you do not have.
 
-## Coordination
+## 7. Coordination
 
 Coordination has exactly two jobs: stop two workers doing the same thing, and stop any worker doing something it was not granted. Everything else people put in this layer is scheduling, and scheduling is §12.
 
@@ -184,7 +184,7 @@ The ceiling is spend, so state it in spend terms. Anthropic's own reported figur
 
 That last point deserves weight. Your target of 5 meta-coordinators × 10 sessions is not blocked by your substrate; it is blocked by a plan ceiling and, more awkwardly, by evidence that fan-out is the wrong shape for coding work. The defensible version is fan-out across *independent repos and independent WorkReleases*, which your worktree-per-claim model already gives, rather than multiple agents on one shared context.
 
-## Evidence, audit and lineage
+## 8. Evidence, audit and lineage
 
 Evidence is defined by the questions it must answer later, and only those. Six questions justify the whole plane:
 
@@ -207,7 +207,7 @@ Question 2 is the one your current EvidenceSet answers weakly and RunManifest fi
 
 **Signing stops at the commit, and that is the honest state of the art.** There is no standard for attesting agent generation — which model, which prompt, which plan — and the sketches circulating are sketches. What works today: the agent commits under its own identity with its own signing key, CI attests build provenance via Sigstore, and the GitOps reconciler verifies the signature before applying. That chain is real and verifiable. Claiming more than that is the thing to avoid in any write-up.
 
-## Memory and context
+## 9. Memory and context
 
 The repo is the memory. For code work, git plus a progress file plus a machine-readable task list beats every memory product, because those artifacts are already durable, diffable and reviewable. A graph memory layer earns its keep only where facts change over time and you need to know when they changed.
 
@@ -226,7 +226,7 @@ The repo is the memory. For code work, git plus a progress file plus a machine-r
 
 **Benchmark hygiene.** Treat any LoCoMo number published after mid-2025 as marketing: its conversations are 16k–26k tokens, so they fit in a window, and a plain full-context baseline scored ~73% against Mem0's ~68% — the memory systems lost to no memory system. Use LongMemEval and BEAM, which is the only one with an independent academic home.
 
-## Identity, secrets, policy, sandboxing
+## 10. Identity, secrets, policy, sandboxing
 
 The design rule is the lethal trifecta, decomposed per task: private data access, untrusted content, external communication — a run gets at most two. Every realized 2026 MCP incident had all three, and removing any one leg would have contained it.
 
@@ -249,7 +249,7 @@ Skip SPIRE. Bound-audience projected SA tokens are attested workload identity �
 
 **One thing to not believe.** No deployed product does prompt-injection mitigation as an enforcement boundary. Every claim I checked resolves to classifiers and heuristics — useful as telemetry, never as a boundary. Assume injection succeeds and verify the architecture survives it.
 
-## Platform
+## 11. Platform
 
 The pipeline is a tenant of the cluster you already run, and it must be rebuildable from git plus one database restore. That is R13 as an operational requirement, and it decides most of the placement questions.
 
@@ -271,7 +271,7 @@ The pipeline is a tenant of the cluster you already run, and it must be rebuilda
 
 **Two platform frictions your own EventStorming survey found, restated as requirements.** Devbox and workstation never reconciling is a configuration-plane problem: if profiles and recipes are versioned artifacts pulled by revision (§13), the two machines converge by construction. Cost-blind reruns of live-infrastructure commands is an EffectGrant problem: a grant that names the resource makes the second run visible as a duplicate before it executes.
 
-## Telemetry, cost and the improvement loop
+## 12. Telemetry, cost and the improvement loop
 
 Quota is the ceiling (§3), so the scheduler must see it. This plane exists to make R10 and R12 real, and it is the plane your current stack has least of.
 
@@ -291,7 +291,7 @@ This is what ExperimentRecord is for, and there is now tooling that does it prop
 
 The actionable finding: the tooling to test whether a CLAUDE.md structure, a subagent topology or a handoff template actually helps now exists and is cheap, and almost nobody has published results from it. ExperimentRecord has no vendor equivalent because nobody is running the experiments. That is the gap you flagged in August, and it is still open.
 
-## Meta-layer
+## 13. Meta-layer
 
 This is the piece you named missing in August, and it is the one place where the derived design asks for something genuinely new. The meta-layer turns "how an agent is configured" from ambient machine state into versioned, addressable, testable data.
 
@@ -309,7 +309,7 @@ So the meta-layer stores revisions in its own format and *renders* them per harn
 
 **Meta-coordination, sized honestly.** A coordinator that observes worker output and hands off is already working in your stack. What the meta-layer adds is that a coordinator dispatching across harnesses needs no new coordination protocol — it needs RunManifest, a driver adapter, and quota-aware dispatch. The swarm is not the hard part; the swarm is the expensive part.
 
-## Build-vs-buy ledger
+## 14. Build-vs-buy ledger
 
 One verdict per plane, with the candidate that would replace it and the reason it does or does not.
 
@@ -334,7 +334,7 @@ One verdict per plane, with the candidate that would replace it and the reason i
 
 **The candidate worth a second look.** [Tembo Agent Studio](https://github.com/tembo/agent-studio) is architecturally the closest published match to this design — agent specs as versioned files in your own repo, runs, audit, identity, secrets and approvals in your own Postgres, MIT, self-hosted. It also has fifteen stars. That is a bus-factor problem, not an architecture problem, and it is worth reading for its data model even if you never run it.
 
-## Reconciliation
+## 15. Reconciliation
 
 The derived design lands on your stack more often than not, which is the expected result when a design is convergent. The interesting output is the three places it does not.
 
@@ -362,7 +362,7 @@ The derived design lands on your stack more often than not, which is the expecte
 
 Your July assessment was that the market is arriving at the same governance you have been building, and that your involvement adds nothing another competent person would not. The scan mostly supports the first half and not the second. The market converged on *work queues, worktrees and spec artifacts*; it did not converge on leases with expiry, on run-level provenance, or on admitting configuration changes on measured evidence. Those three are absent from every candidate surveyed. That is not a market position — there is no market here for you — but as a statement about the corpus it is more accurate than "convergent".
 
-## Migration path
+## 16. Migration path
 
 Six phases, each independently valuable and each reversible on its own. Nothing here requires the phase after it to be worth doing.
 
@@ -382,7 +382,7 @@ Six phases, each independently valuable and each reversible on its own. Nothing 
 
 One deliberate omission: nothing here scales parallelism. That is §3's point — the ceiling is spend, and the phases above make each run more legible rather than making more runs. If you later decide to buy the parallelism, every phase here makes it safer, and none of them is wasted.
 
-## ADRs
+## 17. ADRs
 
 Eight decisions carry this design. Each states what would reverse it, since a decision without a reversal condition is a preference.
 
@@ -402,7 +402,7 @@ Eight decisions carry this design. Each states what would reverse it, since a de
 
 **ADR-08 — Configuration is admitted on measured evidence.** A profile revision ships with a case set and a positive ablation Δ. Consequence: the abstraction ratchet becomes a measurement. *Reversed if* the measurement cost exceeds the value of the decision it informs — which is a real risk for small profile changes and should be scoped by a threshold, not by exception.
 
-## Open decisions and bets
+## 18. Open decisions and bets
 
 ### Decisions I could not make for you
 

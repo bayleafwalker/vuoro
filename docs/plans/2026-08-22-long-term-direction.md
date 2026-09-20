@@ -110,8 +110,8 @@ Four amendments land inline, each marked `[edge 2026-09-20]` where it lands:
    to park vuoro.cloud. It is reversed as of 2026-09-20: vuoro.cloud proceeds, as hosted
    coordination with an inbound surface and no hosted execution. The rebuild has since landed as
    `docs/plans/2026-09-19-agentic-pipeline-first-principles-rebuild.md` (merge d47b98cb), so a reader
-   can open it. Its headings are unnumbered — there is no §15 to cite. The verdict being reversed is
-   the build-versus-buy ledger row for vuoro.cloud, which reads "**Revisit**. superseded — see the
+   can open it. The verdict being reversed is the vuoro.cloud row of its §15 Reconciliation
+   table — §15 is the fifteenth `##` section, the numbering the rebuild's own prose uses — which reads "**Revisit**. superseded — see the
    companion doc Vuoro at the Edge", together with its open question "Does vuoro.cloud stay up?".
 4. **Falsifier (§13 falsifier 12).** If a month of E1 passes without the substrate being reached from
    a hosted runtime, the rest is not built.
@@ -663,7 +663,7 @@ Connector transport defaulted to outbound pull. That default is **amended, not d
 
 **Hosted execution remains outside the core promise, and that still holds.** The inbound surface does not weaken it, because effects and credentials never cross the boundary. Intent, coordination and evidence cross; applied changes do not. No credential issued to a hosted runtime can name a cluster resource, there is no `effect.apply` scope, and leaving it undefined is a recorded design decision rather than an omission. A hosted runtime proposes an `EffectIntent`; a homelab-side reconciler that already holds the credentials executes it and signs it, so branch protection and signature verification apply unchanged. Be exact about what that signature is worth. It is the reconciler's own, and it attests that the reconciler applied the change — nothing more. It does not attest the hosted run that proposed it: the property obtained is a verifiable chain from a signed commit back to a run record naming runtime, model and profile revision, which is **recorded and reconstructable, not attested**, and must not be described as attestation anywhere downstream. Nothing here vouches for what the hosted runtime actually did; it vouches for what was proposed, what was applied, and by whom. See `2026-09-20-vuoro-at-the-edge.md` §3 (the boundary) and §8 (threat model change). §8 is also where the price of the reversal is stated plainly: a public, credential-holding endpoint with one user and no on-call, whose Phase 0 controls — evidence chaining, lease expiry, audience validation, rate limiting, endpoint monitoring — stop being hygiene and become load-bearing. `[edge 2026-09-20]`
 
-This reverses the first-principles rebuild's verdict to park vuoro.cloud — its build-versus-buy ledger row, "**Revisit**. superseded — see the companion doc Vuoro at the Edge", and its open question "Does vuoro.cloud stay up?". The rebuild landed as `docs/plans/2026-09-19-agentic-pipeline-first-principles-rebuild.md` (merge d47b98cb); its headings are unnumbered, so cite the ledger row rather than a § number. §0.2 records the reversal, the conflict it resolves and the one it leaves open. `[edge 2026-09-20]`
+This reverses the first-principles rebuild's §15 verdict to park vuoro.cloud — the vuoro.cloud row of its §15 Reconciliation table, "**Revisit**. superseded — see the companion doc Vuoro at the Edge", and its open question "Does vuoro.cloud stay up?". The rebuild landed as `docs/plans/2026-09-19-agentic-pipeline-first-principles-rebuild.md` (merge d47b98cb); its `##` sections are numbered 1-18 as of 2026-09-20, the numbering its own prose already used, so § numbers resolve literally. §0.2 records the reversal, the conflict it resolves and the one it leaves open. `[edge 2026-09-20]`
 
 ## 10. Composition v4 direction
 
