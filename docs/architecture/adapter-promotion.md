@@ -207,6 +207,8 @@ uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests
 uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests
 uv build --package vuoro-client --wheel --out-dir dist/vuoro-client
 uv build --package vuoro-service --wheel --out-dir dist/vuoro-service
+uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime
+uv build --package vuoro-adapter-kit --wheel --out-dir dist/vuoro-adapter-kit
 uv run pytest
 python /projects/dev/agentops/scripts/validate_verification_artifacts.py --root .
 ```
