@@ -462,3 +462,60 @@ async def test_scope_without_work_read_is_rejected() -> None:
             headers=_auth_headers(),
         )
     assert response.status_code == 401
+
+
+@pytest.mark.anyio
+async def test_mcp_method_header_body_mismatch_is_rejected() -> None:
+    app = _app()
+    async with await _client(app) as client:
+        response = await client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/list",
+                "params": {},
+            },
+            headers={**_auth_headers(), "Mcp-Method": "tools/call"},
+        )
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == -32020
+
+
+@pytest.mark.anyio
+async def test_missing_method_is_invalid_request() -> None:
+    app = _app()
+    async with await _client(app) as client:
+        response = await client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "id": 1},
+            headers=_auth_headers(),
+        )
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == -32600
+
+
+@pytest.mark.anyio
+async def test_json_array_body_is_invalid_request() -> None:
+    app = _app()
+    async with await _client(app) as client:
+        response = await client.post(
+            "/mcp",
+            json=[{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}],
+            headers=_auth_headers(),
+        )
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == -32600
+
+
+@pytest.mark.anyio
+async def test_basic_auth_with_correct_token_value_is_401() -> None:
+    app = _app()
+    async with await _client(app) as client:
+        response = await client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+            headers={"Authorization": f"Basic {TOKEN}"},
+        )
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"
