@@ -356,7 +356,7 @@ The derived design lands on your stack more often than not, which is the expecte
 
 **2. The judgment plane has no loop.** You have Decision and ExperimentRecord as contracts, but no experiment has been run, so the abstraction ratchet advances on conviction rather than measurement. The tooling to fix this shipped in 2026 and is cheap (§12).
 
-**3. Execution-neutrality is currently asserted, not tested.** The hedge against runtime lock-in is sound engineering reasoning, but a single-runtime adapter that has never run a second runtime is indistinguishable from a brittle one. A second driver adapter — Codex, say — running one real WorkRelease end to end is what converts the claim into a fact.
+**3. Execution-neutrality is currently asserted, not tested.** The hedge against runtime lock-in is sound engineering reasoning, but a single-runtime adapter that has never run a second runtime is indistinguishable from a brittle one. A second driver adapter — Codex, say — running one real WorkRelease end to end is what converts the claim into a fact. **Superseded 2026-09-20:** the remedy named here is Phase 3, which was killed as contrary to TS-1/TS-2 (see §16). The observation stands; the proposed fix does not belong in this substrate.
 
 ### On the convergence question
 
@@ -366,19 +366,21 @@ Your July assessment was that the market is arriving at the same governance you 
 
 Six phases, each independently valuable and each reversible on its own. Nothing here requires the phase after it to be worth doing.
 
+> **Two of the six are killed.** Phase 3 (second driver) and Phase 4 (profiles as revisions) were killed in the 2026-09-20 extended-backlog harvest as contrary to agentops target state TS-1/TS-2 and TS-3 respectively. They are left in place with their reasoning and a kill note rather than deleted, so the derivation still reads. Do not open work against them; see the note under each.
+
 **Phase 0 — Harden what exists.** Add JCS canonicalization and hash chaining to auditctl. Verify the agent identity is distinct and cannot self-merge, and that Flux verifies its signature. Confirm the sandbox covers MCP servers and hooks, not just Bash — on Linux, re-check after any session that cloned a repo. *Reversible: all additive.*
 
 **Phase 1 — RunManifest.** Define it, emit it from actionq-dispatcher at session start, reference it from every EvidenceSet. This is the phase that unblocks three others, and it is small. *Reversible: a field nothing yet reads.*
 
 **Phase 2 — Lease semantics explicit.** Make claim expiry a contract property with a heartbeat and a documented reclaim path, rather than a behaviour of the queue. Test it by killing a worker mid-run. *Reversible: expiry can be set to infinity.*
 
-**Phase 3 — The second driver.** Write one adapter — Codex or Gemini CLI — and run one real WorkRelease through it end to end, bare, with configuration injected. This is the test of execution-neutrality, and it will find things. *Reversible: it is a new code path nothing depends on.*
+**Phase 3 — The second driver.** Write one adapter — Codex or Gemini CLI — and run one real WorkRelease through it end to end, bare, with configuration injected. This is the test of execution-neutrality, and it will find things. *Reversible: it is a new code path nothing depends on.* **KILLED 2026-09-20 (extended-backlog harvest); do not implement.** A second driver adapter is execution, and agentops `docs/plans/2026-09-17-target-state.md` TS-1/TS-2 put execution, sandboxing and model choice outside Vuoro and agentops: the substrate records the observed profile digest and never runs or selects a runtime. Execution-neutrality, if it is ever tested, is tested in the harness layer, not by an adapter this substrate owns. Kept here for the reasoning, not as work.
 
-**Phase 4 — Profiles as revisions.** Move agent definitions out of machine state into addressable revisions, rendered per harness. Devbox and workstation converge as a side effect. *Reversible: rendering still produces the files you use today.*
+**Phase 4 — Profiles as revisions.** Move agent definitions out of machine state into addressable revisions, rendered per harness. Devbox and workstation converge as a side effect. *Reversible: rendering still produces the files you use today.* **KILLED 2026-09-20 (extended-backlog harvest); do not implement.** This contradicts TS-3 verbatim: "Role and skills are observed, not compiled: instruction and skill digests are recorded at session start (S6). No compiled profile, skill lock or role preset." Rendering agent definitions per harness *is* compiling a profile. The convergence this phase wants is reached instead by S6 recording instruction and skill digests in the session binding (agentops #2481). Kept here for the reasoning, not as work.
 
 **Phase 5 — The experiment loop.** Build a case set from work you have actually done, and run one ablation on one profile. The answer matters less than having the apparatus. *Reversible: nothing in production depends on it.*
 
-**Phase 6 — Quota-aware dispatch.** Record failover as an event, park claims on plan limits, re-dispatch across families on family limits. Do this last because it needs RunManifest, leases and the second driver to mean anything. *Reversible: falls back to the current behaviour, which is failing and retrying by hand.*
+**Phase 6 — Quota-aware dispatch.** Record failover as an event, park claims on plan limits, re-dispatch across families on family limits. Do this last because it needs RunManifest and leases to mean anything (the original text also named the second driver; Phase 3 is killed, and TS-1/TS-2 already narrow this phase to *record and park*, never re-route — agentops #2472). *Reversible: falls back to the current behaviour, which is failing and retrying by hand.*
 
 One deliberate omission: nothing here scales parallelism. That is §3's point — the ceiling is spend, and the phases above make each run more legible rather than making more runs. If you later decide to buy the parallelism, every phase here makes it safer, and none of them is wasted.
 
