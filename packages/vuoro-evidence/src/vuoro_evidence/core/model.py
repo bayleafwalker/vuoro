@@ -72,6 +72,12 @@ class EvidenceItem:
     # a chain (pre-chaining callers, or genuinely standalone evidence).
     chain_seq: int | None = None
     chain_prev_digest: str | None = None
+    # Reference to the run record that composed this evidence (agentops#2479).
+    # An opaque address; the record it addresses lives outside core, which may
+    # not name what a run is composed of. `None` means unattributed evidence.
+    # `provenance` above stays freeform for genuine extras only: anything the
+    # run record names belongs there, not in the dict.
+    run_id: str | None = None
 
 
 class GrantUse(str, Enum):
@@ -97,6 +103,7 @@ class EvidenceSet:
     set_id: str
     items: tuple[EvidenceItem, ...]
     grants: tuple[EffectGrant, ...] = ()
+    run_id: str | None = None   # see EvidenceItem.run_id
 
 
 @dataclass(frozen=True)

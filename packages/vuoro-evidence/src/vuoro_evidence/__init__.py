@@ -12,5 +12,7 @@ from .core.decision import RerunQuestion, decide_rerun
 from .core.chain import (ChainBreak, ChainBreakReason, ChainVerification, entry_digest, link,
                          verify_chain)
 from .core.set_builder import EvidenceSetBuilder, verify_evidence_set
+from .run import (ObservedProfile, RunManifest, RunManifestError, UnknownRunError, index_runs,
+                  resolve_run)
 
 __all__ = [n for n in dir() if not n.startswith("_")]
