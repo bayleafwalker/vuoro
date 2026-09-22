@@ -121,6 +121,24 @@ One reverse-proxy gotcha worth pre-empting: buffering breaks streaming. Send `X-
 
 ## 5. Auth and the grant model
 
+> **SUPERSEDED 2026-09-22.** The static-bearer recommendation below no longer
+> holds. Operator direction that day — "Building in deprecation at this point is
+> excessively wasteful. Plans should always aim for assumption of use." — removed
+> the framing the shortcut rested on, and E1 is now built with OAuth 2.1:
+> short-lived, audience-bound, workspace-scoped tokens, with the authorization
+> server in the vuoro.cloud control service and the gateway `/mcp` route as the
+> resource server. See agentops#2514, which supersedes #2465 and the acceptance
+> of #2470.
+>
+> The reasoning below is left unedited because it is the honest record of what
+> was recommended on 2026-09-19, and because §5's account of *what the full path
+> requires* is the part that survived — it is now the specification rather than
+> the deferred alternative. What did not survive is the premise that identity you
+> already know needs no authorization server: a static bearer has no expiry, no
+> revocation semantics, no client identity, and is replayable if stolen, and an
+> audit showed that with a single bearer the operator's own probes satisfied the
+> stop condition the design existed to test.
+
 Start with a static bearer token, and design the schema as if it were OAuth. That is the honest recommendation: for one operator, standing up an authorization server buys identity you already know, while the token *scoping* — which is where the design content lives — works identically either way.
 
 **What the shortcut costs.** Anthropic's connector dialog supports request headers with up to four fixed credentials, and OpenAI's Responses API takes a bearer in the `authorization` field. Both cover the static path. Two caveats: header auth in Claude connectors is beta and limited to a subset of organizations, and **connector auth settings are immutable after adding** — changing them means removing and re-adding the connector. Pick the mode deliberately the first time.
@@ -225,6 +243,14 @@ Five phases, folded into the rebuild's own phasing rather than running beside it
 
 **E1 — Read-only surface, static bearer.** `list_ready_work` and `describe_work` only, one token, dual-era protocol support. This is a day of work and it answers the real question: does querying the substrate from Cowork on a phone actually change how you work, or is it a demo? *Reversible: delete the connector.*
 
+> **SUPERSEDED 2026-09-22 — see the note in §5.** E1 is OAuth 2.1 on the existing
+> vuoro.cloud public gateway, not a static bearer, and "a day of work" no longer
+> holds: the estate has no MCP authorization server and no protected-resource
+> metadata endpoint today. *Reversible: delete the connector* is struck with the
+> rest of the disposal framing — ordinary GitOps rollback is sufficient
+> reversibility. Only the dual-era protocol requirement carries over unchanged.
+> Tracked as agentops#2514.
+
 **E2 — Claims and evidence.** Add `claim_work`, `heartbeat`, `append_evidence`, `write_session_note`, `complete_work`. Lease handles, idempotency throughout, `(handle, auth_context)` validated on every call. At this point a cloud session becomes a first-class citizen of the record, which is the actual goal. *Depends on: E0, rebuild Phase 1.*
 
 **E3 — EffectIntent and the reconciler.** `propose_effect` on the surface, actionq-dispatcher polling and executing on the homelab side. Diff-shaped intents only to begin with. *Depends on: E2.*
@@ -253,17 +279,49 @@ flowchart LR
 
 1. **Public surface, self-hosted worker, or both?** §8's real decision. Public reaches interactive runtimes including Cowork on a phone; the worker is strictly safer and reaches only Managed Agents and the Messages API.
 
-   **Decided (operator, 2026-09-20):** both. The target state is a narrow public MCP surface for interactive runtimes (Cowork, claude.ai, mobile, Routines, cloud sessions, OpenAI Responses) *and* the Managed Agents self-hosted worker for unattended runs. It costs one more component and that is accepted. The E1 stop condition stands as the falsifier: if a month of E1 passes without the substrate being reached from a hosted runtime, the rest is not built.
+   **Decided (operator, 2026-09-20):** both. The target state is a narrow public MCP surface for interactive runtimes (Cowork, claude.ai, mobile, Routines, cloud sessions, OpenAI Responses) *and* the Managed Agents self-hosted worker for unattended runs. It costs one more component and that is accepted. ~~The E1 stop condition stands as the falsifier: if a month of E1 passes without the substrate being reached from a hosted runtime, the rest is not built.~~
+
+   **The placement half stands; the stop condition does not (2026-09-22).** Both
+   paths and public-first remain operator-decided and are not reopened. The
+   month-long stop condition is demoted to at most a post-launch prioritisation
+   review and must not shape the deployment, the telemetry or the auth design.
+   It is also where E1 is served that was decided since: vuoro.cloud (Estate B),
+   not the homelab — blast radius dominates data locality, and the homelab
+   co-hosts a forge, a password manager and an identity provider.
 2. **Static bearer or full OAuth?** Static is right for one operator and costs you the ability to distinguish callers. If you ever want per-runtime scopes rather than one shared credential, that is the moment to move.
 
    **Decided 2026-09-20:** static bearer for E1, with the token schema designed as if OAuth; the scope set is vuoro:work.read / vuoro:work.claim with grant instances bound to lease_id, and there is deliberately no vuoro:effect.apply scope. Recorded as agentops#2470.
+
+   **REOPENED AND RE-DECIDED 2026-09-22:** OAuth 2.1, superseding the acceptance
+   of #2470. Short-lived, audience-bound, workspace-scoped tokens; the
+   authorization server is the vuoro.cloud control service, which already owns
+   sign-in, PKCE transactions, sessions, memberships and JWT signing, and the
+   gateway `/mcp` route is the resource server. The claude.ai connector dialog
+   supports a pre-registered client, so the client side was never the obstacle.
+   **What does NOT change: there is still deliberately no vuoro:effect.apply
+   scope, and its absence is binding** — under the new design the authorization
+   server must refuse it, with a test that proves the refusal. Tracked as
+   agentops#2514.
 3. **Does the connector immutability rule change the sequencing?** Connector auth settings cannot be edited after adding. If E1 registers with a static header and E2 wants OAuth, that is a remove-and-re-add. Possibly worth deciding the auth mode before E1 rather than after.
 
    **Decided 2026-09-20:** no change to the sequencing - E1 still ships first with a static bearer; connector-auth immutability is why the mode was decided before E1 registers, and a later move to OAuth is accepted as a remove-and-re-add. Recorded as agentops#2470.
 
+   **SUPERSEDED 2026-09-22:** the remove-and-re-add is not being taken. E1 now
+   registers with OAuth the first time, which is what connector-auth
+   immutability argued for all along — the 2026-09-20 decision accepted the
+   re-add as the price of shipping sooner, and that trade was made under the
+   month-long-trial framing the operator has since removed. Tracked as
+   agentops#2514.
+
 ### Falsifiable bets
 
-- **The read surface proves the need.** If a month of E1 passes without you reaching for it, the rest is unbuilt and the hypothesis is refuted cheaply.
+- ~~**The read surface proves the need.** If a month of E1 passes without you reaching for it, the rest is unbuilt and the hypothesis is refuted cheaply.~~
+  **Superseded 2026-09-22.** Struck through rather than deleted, because a
+  falsifiable bet that simply vanishes reads as one that was won. The underlying
+  question survives in a form that does not build a deletion into the design: a
+  read-only surface moves the reconstructability metric by zero on its own, so
+  if E1 is in use with no E2-E4 follow-on and no session producing a
+  reconstructable record, stop investing — do not delete a working capability.
 - **Cloud sessions are a meaningful share of work.** If, after E2, fewer than one in ten claims come from a hosted runtime, the edge is serving a case that does not exist.
 - **The boundary holds without pressure.** If within six months there is a concrete case that genuinely requires an effect scope, ADR-05's "name the class explicitly" clause was hiding a real gap rather than an empty one.
 - **Reactive failover is enough.** If parked claims routinely sit long enough to matter, the missing predictive signal is a real constraint rather than an inconvenience, and the answer is spend rather than engineering.
