@@ -95,6 +95,25 @@ def test_service_image_installs_both_locked_shared_dependencies() -> None:
         assert f"/opt/vuoro/adapters/{retired}" not in dockerfile
 
 
+def test_service_image_carries_the_mcp_server_beside_the_service() -> None:
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+
+    # `vuoro-service mcp-serve` needs vuoro-mcp-edge; installing both in one
+    # resolution satisfies its vuoro-service dependency from the local tree.
+    assert "COPY packages/vuoro-mcp-edge ./packages/vuoro-mcp-edge" in dockerfile
+    first_install = dockerfile.split("&& python -m pip install", 1)[0]
+    assert "./packages/vuoro-mcp-edge" in first_install
+    assert "./packages/vuoro-service" in first_install
+
+
+def test_ci_runs_the_mcp_edge_suite() -> None:
+    workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+    assert (
+        "uv run --package vuoro-mcp-edge --extra test pytest packages/vuoro-mcp-edge/tests"
+        in workflow
+    )
+
+
 def test_ci_exercises_the_released_audit_composition() -> None:
     workflow = CI_WORKFLOW.read_text(encoding="utf-8")
     assert "name: Exercise pinned released audit adapter" in workflow

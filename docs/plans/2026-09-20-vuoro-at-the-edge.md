@@ -119,6 +119,14 @@ A minimal server in September 2026: one HTTPS POST endpoint, `405` on GET and DE
 
 One reverse-proxy gotcha worth pre-empting: buffering breaks streaming. Send `X-Accel-Buffering: no`, tune read timeouts, and emit SSE keep-alive comments on long-lived listen streams.
 
+> **Implemented 2026-09-23.** The surface is served by
+> `vuoro-service mcp-serve --port 8081` from `packages/vuoro-mcp-edge`
+> (`list_ready_work`, `describe_work`; JSON-only `POST /mcp`, dual-era). Inbound
+> auth is the gateway's `X-Vuoro-Identity` assertion only; the process holds no
+> credential and forwards that assertion to the runtime shell on localhost,
+> which reads sprintctl's `work.public.*-v1` contract. See that package's
+> README.
+
 ## 5. Auth and the grant model
 
 > **SUPERSEDED 2026-09-22.** The static-bearer recommendation below no longer

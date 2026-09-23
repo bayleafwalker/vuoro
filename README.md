@@ -105,6 +105,7 @@ The client and service can also be tested independently:
 ```bash
 uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests
 uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests
+uv run --package vuoro-mcp-edge --extra test pytest packages/vuoro-mcp-edge/tests
 ```
 
 ### Run it locally
@@ -114,10 +115,14 @@ client's own `--help` reports its argparse prog name as `vuoro`):
 
 ```console
 $ uv run --package vuoro-service vuoro-service --help
-usage: vuoro-service [-h] [--version] {serve} ...
+usage: vuoro-service [-h] [--version] {serve,mcp-serve} ...
 $ uv run --package vuoro-client vuoro-client --help
 usage: vuoro [-h] [--version] {recovery} ...
 ```
+
+`vuoro-service mcp-serve --port 8081` runs the MCP protocol server for hosted
+runtimes; it needs `packages/vuoro-mcp-edge` installed (the image has it) and
+is described in [`packages/vuoro-mcp-edge/README.md`](packages/vuoro-mcp-edge/README.md).
 
 For a local client/service/PostgreSQL evaluation stack, see
 [`deploy/compose/README.md`](deploy/compose/README.md). That Compose stack is

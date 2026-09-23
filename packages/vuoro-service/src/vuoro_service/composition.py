@@ -747,6 +747,85 @@ def _validate_identity_mode(
         )
 
 
+def _gateway_assertion_resolver(
+    environ: Mapping[str, str],
+    *,
+    environment_name: str,
+    project_binding: ProjectBinding,
+) -> GatewayAssertionIdentityResolver:
+    gateway_key_path = _runtime_path(
+        "VUORO_GATEWAY_PUBLIC_KEY_FILE",
+        environ,
+        default=_CLOUD_GATEWAY_PUBLIC_KEY_PATH,
+        mounted_path=_CLOUD_GATEWAY_PUBLIC_KEY_PATH,
+        mount_label="approved Cloud gateway key mount",
+    )
+    try:
+        return GatewayAssertionIdentityResolver.from_file(
+            gateway_key_path,
+            issuer=_runtime_env("VUORO_GATEWAY_ASSERTION_ISSUER", environ),
+            audience=environ.get("VUORO_GATEWAY_ASSERTION_AUDIENCE", "vuoro-service"),
+            environment=environment_name,
+            expected_workspace_id=_runtime_env("VUORO_WORKSPACE_ID", environ),
+            allowed_repo_ids=frozenset(project_binding.repo_ids),
+            key_id=environ.get("VUORO_GATEWAY_ASSERTION_KEY_ID", "gateway-2026-01"),
+            trusted_root=_CLOUD_BINDINGS_TRUST_ROOT,
+        )
+    except GatewayAssertionConfigurationError as error:
+        raise CompositionError("cannot configure gateway assertion identity") from error
+
+
+def load_gateway_assertion_resolver(
+    environ: Mapping[str, str] | None = None,
+    *,
+    project_bindings_path: Path | None = None,
+) -> GatewayAssertionIdentityResolver:
+    """Build the gateway assertion verifier exactly as the runtime shell does.
+
+    For a sibling process that must trust precisely what this shell trusts:
+    the same key mount, issuer, audience, key id, workspace, environment and
+    project binding, read from the same variables, with the same refusals.
+    It loads no DSN and no identity registry, and it refuses to start
+    without gateway assertion identity mode configured.
+    """
+
+    import os
+
+    environ = os.environ if environ is None else environ
+    environment_name = _validate_expected_environment(
+        _runtime_env(
+            "VUORO_ENVIRONMENT_NAME", environ, aliases=("VUORO_ENVIRONMENT",)
+        )
+    )
+    bindings_path = project_bindings_path or _runtime_path(
+        "VUORO_PROJECT_BINDINGS_FILE",
+        environ,
+        default=_DEFAULT_PROJECT_BINDINGS_PATH,
+    )
+    project_binding = _load_project_binding_for_composition(
+        bindings_path,
+        expected_environment=environment_name,
+        trusted_root=(
+            _CLOUD_BINDINGS_TRUST_ROOT
+            if bindings_path == _CLOUD_PROJECT_BINDINGS_PATH
+            else None
+        ),
+    )
+    if environ.get("VUORO_GATEWAY_PUBLIC_KEY_FILE") is None:
+        raise CompositionError(
+            "gateway assertion identity mode requires VUORO_GATEWAY_PUBLIC_KEY_FILE"
+        )
+    if project_binding.environment is None:
+        raise CompositionError(
+            "gateway assertion identity mode requires hosted project bindings"
+        )
+    return _gateway_assertion_resolver(
+        environ,
+        environment_name=environment_name,
+        project_binding=project_binding,
+    )
+
+
 def _pg_connection_factory(dsn: str) -> Callable[[], Any]:
     try:
         import psycopg
@@ -900,26 +979,11 @@ def create_composed_app(
             raise CompositionError(
                 "gateway assertion identity mode requires hosted project bindings"
             )
-        gateway_key_path = _runtime_path(
-            "VUORO_GATEWAY_PUBLIC_KEY_FILE",
+        resolver = _gateway_assertion_resolver(
             environ,
-            default=_CLOUD_GATEWAY_PUBLIC_KEY_PATH,
-            mounted_path=_CLOUD_GATEWAY_PUBLIC_KEY_PATH,
-            mount_label="approved Cloud gateway key mount",
+            environment_name=environment_name,
+            project_binding=project_binding,
         )
-        try:
-            resolver = GatewayAssertionIdentityResolver.from_file(
-                gateway_key_path,
-                issuer=_runtime_env("VUORO_GATEWAY_ASSERTION_ISSUER", environ),
-                audience=environ.get("VUORO_GATEWAY_ASSERTION_AUDIENCE", "vuoro-service"),
-                environment=environment_name,
-                expected_workspace_id=_runtime_env("VUORO_WORKSPACE_ID", environ),
-                allowed_repo_ids=frozenset(project_binding.repo_ids),
-                key_id=environ.get("VUORO_GATEWAY_ASSERTION_KEY_ID", "gateway-2026-01"),
-                trusted_root=_CLOUD_BINDINGS_TRUST_ROOT,
-            )
-        except GatewayAssertionConfigurationError as error:
-            raise CompositionError("cannot configure gateway assertion identity") from error
     else:
         resolver = load_identities(
             identity_path or Path(_runtime_env("VUORO_IDENTITIES_FILE", environ)),
@@ -1046,6 +1110,7 @@ __all__ = [
     "RuntimeAdapterDescriptor",
     "create_composed_app",
     "load_development_identities",
+    "load_gateway_assertion_resolver",
     "load_identities",
     "verify_adapter_artifacts",
     "verify_installed_composition",

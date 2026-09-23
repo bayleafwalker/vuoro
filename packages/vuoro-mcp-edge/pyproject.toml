@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vuoro-mcp-edge"
+version = "0.1.0"
+description = "Vuoro MCP protocol server: read tools over gateway identity assertions"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "vuoro-service",
+  "httpx>=0.27,<1",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.3,<9"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vuoro_mcp_edge"]
+
+[tool.uv.sources]
+vuoro-service = { workspace = true }
