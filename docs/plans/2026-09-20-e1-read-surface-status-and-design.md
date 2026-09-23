@@ -1,5 +1,10 @@
 # E1 read-only public MCP surface — status and design (agentops#2465)
 
+> **Superseded 2026-09-23.** `mcp_surface.py` and its static bearer are gone.
+> The protocol server now lives in `packages/vuoro-mcp-edge` behind gateway
+> identity assertions and runs as `vuoro-service mcp-serve`; see that
+> package's README.
+
 ## What landed
 
 `packages/vuoro-service/src/vuoro_service/mcp_surface.py`: a standalone,
