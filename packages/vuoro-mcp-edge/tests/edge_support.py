@@ -159,9 +159,16 @@ def rejected(status: int, code: str, message: str = "rejected") -> httpx.Respons
 class FakeShell:
     """An httpx MockTransport handler standing in for the runtime shell."""
 
-    def __init__(self, *responses: Any, operations: tuple[str, ...] = CATALOG_OPERATIONS) -> None:
+    def __init__(
+        self,
+        *responses: Any,
+        operations: tuple[str, ...] = CATALOG_OPERATIONS,
+        revisions: tuple[str, ...] = (CATALOG_REVISION,),
+    ) -> None:
         self._responses = list(responses)
         self.operations = operations
+        #: Catalog revisions served in turn; the last one repeats.
+        self._revisions = list(revisions)
         self.requests: list[httpx.Request] = []
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
@@ -170,7 +177,9 @@ class FakeShell:
             return httpx.Response(
                 200,
                 json={
-                    "revision": CATALOG_REVISION,
+                    "revision": (
+                        self._revisions.pop(0) if len(self._revisions) > 1 else self._revisions[0]
+                    ),
                     "operations": [{"name": name} for name in self.operations],
                 },
             )

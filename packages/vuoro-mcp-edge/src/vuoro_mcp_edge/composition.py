@@ -35,6 +35,14 @@ __all__ = [
 ENV_UPSTREAM_URL = "VUORO_MCP_UPSTREAM_URL"
 ENV_UPSTREAM_TIMEOUT = "VUORO_MCP_UPSTREAM_TIMEOUT_SECONDS"
 _TOKEN_PREFIX = "vuo_pat_"
+#: Named here so a missing one is reported as this server's requirement; the
+#: shell's loader then validates every value exactly as the shell does.
+_REQUIRED: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("VUORO_ENVIRONMENT_NAME", ("VUORO_ENVIRONMENT",)),
+    ("VUORO_WORKSPACE_ID", ()),
+    ("VUORO_GATEWAY_PUBLIC_KEY_FILE", ()),
+    ("VUORO_GATEWAY_ASSERTION_ISSUER", ()),
+)
 
 
 class EdgeConfigurationError(RuntimeError):
@@ -77,6 +85,9 @@ def _timeout(env: Mapping[str, str]) -> float:
 def create_app_from_environment(env: Mapping[str, str] | None = None) -> FastAPI:
     env = os.environ if env is None else env
     refuse_credentials(env)
+    for name, aliases in _REQUIRED:
+        if not any(env.get(candidate, "").strip() for candidate in (name, *aliases)):
+            raise EdgeConfigurationError(f"{name} is required for the MCP edge")
     try:
         resolver = load_gateway_assertion_resolver(env)
     except CompositionError as error:

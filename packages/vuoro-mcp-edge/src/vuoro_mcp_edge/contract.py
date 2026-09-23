@@ -42,6 +42,9 @@ REQUIRED_OPERATIONS: tuple[str, ...] = (OPERATION_LIST, OPERATION_ITEM)
 
 AUTHORITY = "sprintctl"
 TITLE_MAX_LENGTH = 160
+#: Cap on every other string field (timestamps, resolution, as_of).
+STRING_MAX_LENGTH = 256
+PRIORITY_RANGE = range(1, 10)
 STATUSES: frozenset[str] = frozenset({"pending", "active", "done", "blocked"})
 
 #: Exact list-record key set.
@@ -105,9 +108,13 @@ def _check_envelope(
         raise WorkSourceUnavailable(
             "authority-unavailable", f"{operation}: work authority state is not ok"
         )
-    if not isinstance(result["as_of"], str) or not result["as_of"]:
+    if not _bounded_string(result["as_of"]):
         raise _invalid(operation, "as_of is not a timestamp string")
     return result
+
+
+def _bounded_string(value: Any) -> bool:
+    return isinstance(value, str) and 0 < len(value) <= STRING_MAX_LENGTH
 
 
 def _check_list_fields(record: Mapping[str, Any], operation: str) -> None:
@@ -118,14 +125,14 @@ def _check_list_fields(record: Mapping[str, Any], operation: str) -> None:
     if not isinstance(title, str) or not title or len(title) > TITLE_MAX_LENGTH:
         raise _invalid(operation, "title is not a string of 1..160 characters")
     priority = record["priority"]
-    if priority is not None and not _is_int(priority):
-        raise _invalid(operation, "priority is not an integer or null")
+    if priority is not None and (not _is_int(priority) or priority not in PRIORITY_RANGE):
+        raise _invalid(operation, "priority is not an integer 1..9 or null")
     if record["status"] not in STATUSES:
         raise _invalid(operation, "status is outside the contract vocabulary")
     if not isinstance(record["blocked"], bool):
         raise _invalid(operation, "blocked is not a boolean")
-    if not isinstance(record["updated_at"], str):
-        raise _invalid(operation, "updated_at is not a string")
+    if not _bounded_string(record["updated_at"]):
+        raise _invalid(operation, "updated_at is not a string of 1..256 characters")
 
 
 def _check_list_record(record: Any, operation: str) -> dict[str, Any]:
@@ -133,6 +140,12 @@ def _check_list_record(record: Any, operation: str) -> dict[str, Any]:
         raise _invalid(operation, "list record is not an object")
     _exact_keys(record, LIST_ITEM_FIELDS, operation, "record")
     _check_list_fields(record, operation)
+    if record["status"] == "done":
+        # The list is every item whose status is not done; a done record in
+        # it means the upstream no longer honours the contract.
+        raise WorkSourceUnavailable(
+            "contract-violation", f"{operation}: list carries a done item"
+        )
     return record
 
 
@@ -141,11 +154,13 @@ def _check_item_record(record: Any, operation: str) -> dict[str, Any]:
         raise _invalid(operation, "item record is not an object")
     _exact_keys(record, ITEM_FIELDS, operation, "record")
     _check_list_fields(record, operation)
-    if not isinstance(record["created_at"], str):
-        raise _invalid(operation, "created_at is not a string")
+    if not _bounded_string(record["created_at"]):
+        raise _invalid(operation, "created_at is not a string of 1..256 characters")
     resolution = record["resolution"]
-    if resolution is not None and not isinstance(resolution, str):
-        raise _invalid(operation, "resolution is not a string or null")
+    if resolution is not None and (
+        not isinstance(resolution, str) or len(resolution) > STRING_MAX_LENGTH
+    ):
+        raise _invalid(operation, "resolution is not a string of <= 256 characters or null")
     blocked_by = record["blocked_by"]
     if not isinstance(blocked_by, list) or not all(
         _is_int(value) and value >= 1 for value in blocked_by
@@ -168,12 +183,17 @@ def validate_list_result(result: Any) -> dict[str, Any]:
     }
 
 
-def validate_item_result(result: Any) -> dict[str, Any]:
-    """Return ``{authority, as_of, item}`` with the record validated."""
+def validate_item_result(result: Any, *, work_id: int) -> dict[str, Any]:
+    """Return ``{authority, as_of, item}`` with the record validated.
+
+    The item must be the one asked for: a record for any other work_id is
+    refused whole, and nothing from it is returned.
+    """
 
     envelope = _check_envelope(result, _ITEM_ENVELOPE_FIELDS, OPERATION_ITEM)
-    return {
-        "authority": envelope["authority"],
-        "as_of": envelope["as_of"],
-        "item": _check_item_record(envelope["item"], OPERATION_ITEM),
-    }
+    item = _check_item_record(envelope["item"], OPERATION_ITEM)
+    if item["work_id"] != work_id:
+        raise WorkSourceUnavailable(
+            "upstream-mismatch", f"{OPERATION_ITEM}: returned a different work_id"
+        )
+    return {"authority": envelope["authority"], "as_of": envelope["as_of"], "item": item}

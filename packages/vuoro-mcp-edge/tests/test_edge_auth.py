@@ -154,13 +154,15 @@ def test_two_repositories_in_the_assertion_is_workspace_ambiguous(keys) -> None:
     assert shell.invoke_requests == []
 
 
-def test_missing_scope_authority_is_a_tool_error_without_upstream_call(keys) -> None:
+@pytest.mark.parametrize(
+    "authorities",
+    [["audit:read"], ["work:read", "work:write"], ["work:read", "audit:read"]],
+)
+def test_an_assertion_broader_or_other_than_work_read_is_401(keys, authorities) -> None:
     shell = FakeShell()
-    token = assertion(keys[1], authorities=["audit:read"])
+    token = assertion(keys[1], authorities=authorities)
     response = edge_client(keys[0], shell).post(
         MCP_PATH, headers=identity_headers(token), json=call("describe_work", {"work_id": 1})
     )
-    result = response.json()["result"]
-    assert result["isError"] is True
-    assert result["structuredContent"]["error"]["code"] == "authority-required"
+    _assert_unauthorized(response)
     assert shell.requests == []

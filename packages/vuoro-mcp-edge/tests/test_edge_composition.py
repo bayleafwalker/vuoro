@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -126,8 +127,41 @@ def test_upstream_default_is_the_local_shell() -> None:
     assert DEFAULT_UPSTREAM_URL == "http://127.0.0.1:8080"
 
 
-@pytest.mark.parametrize("module", ["server.py", "work_source.py", "contract.py"])
+#: A credential mechanism in either quote style, or written as a bare header.
+_CREDENTIAL_PATTERNS = (
+    r"[\"']authorization",
+    r"\bauthorization\s*:",
+    r"[\"']bearer",
+    r"\bbearer\s+[a-z0-9{_$]",
+    r"vuo_pat_",
+    r"_dsn\b",
+    r"psycopg",
+)
+
+
+@pytest.mark.parametrize(
+    "module", ["server.py", "work_source.py", "contract.py", "errors.py", "__init__.py"]
+)
 def test_request_path_modules_carry_no_credential_mechanism(module) -> None:
-    source = (SRC / module).read_text(encoding="utf-8").lower()
-    for needle in ("\"authorization", "\"bearer", "vuo_pat_", "_dsn", "psycopg"):
-        assert needle not in source, (module, needle)
+    source = (SRC / module).read_text(encoding="utf-8")
+    hits = [
+        pattern
+        for pattern in _CREDENTIAL_PATTERNS
+        if re.search(pattern, source, re.IGNORECASE)
+    ]
+    assert hits == [], (module, hits)
+
+
+@pytest.mark.parametrize(
+    "snippet",
+    [
+        'headers={"Authorization": token}',
+        "headers={'Authorization': token}",
+        "Authorization: Bearer abc",
+        'f"Bearer {token}"',
+        "'bearer ' + token",
+        "VUORO_WORK_DSN",
+    ],
+)
+def test_the_credential_search_catches_each_form(snippet) -> None:
+    assert any(re.search(p, snippet, re.IGNORECASE) for p in _CREDENTIAL_PATTERNS)

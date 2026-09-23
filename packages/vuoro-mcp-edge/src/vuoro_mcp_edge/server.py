@@ -18,6 +18,12 @@ Tools are table-driven: `TOOL_SCOPES` classifies every callable tool into a
 scope bucket, and `SCOPE_AUTHORITIES` names the authority each bucket
 requires.  A tool without a row cannot be listed or called.
 
+JSON-RPC errors travel as HTTP 200 with an error body; tool failures
+(including bad arguments and unknown tools) are tool results with
+``isError: true``.  HTTP status carries only transport-level refusals: 401
+(assertion), 400 (unsupported ``MCP-Protocol-Version``), 413 (body over
+64 KiB), 415 (not JSON), 405 (GET/DELETE), 202 (notifications and responses).
+
 Protocol handling (edge plan section 4): ``405`` on GET and DELETE,
 header-to-body agreement on ``MCP-Protocol-Version``, ``Mcp-Method`` and
 ``Mcp-Name`` (mismatch is ``-32020``), ``server/discover``, ``resultType`` on
@@ -41,7 +47,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 from vuoro_service.identity import Identity, IdentityResolutionError
 
-from .errors import WorkSourceUnavailable
+from .errors import WorkSourceUnavailable, client_error
 from .work_source import ForwardedIdentity, ShellWorkSource
 
 __all__ = [
@@ -68,7 +74,7 @@ SERVER_NAME = "vuoro"
 #: `initialize`.  The client matrix is third-party and dated July 2026;
 #: re-check it before dropping `initialize` support.
 LEGACY_PROTOCOL_VERSIONS: frozenset[str] = frozenset(
-    {"2024-11-05", "2025-03-26", "2025-06-18"}
+    {"2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25"}
 )
 #: The current, sessionless revision.
 CURRENT_PROTOCOL_VERSION = "2026-07-28"
@@ -98,7 +104,6 @@ _TOOL_TTL_MS = 15_000
 _JSONRPC_PARSE_ERROR = -32700
 _JSONRPC_INVALID_REQUEST = -32600
 _JSONRPC_METHOD_NOT_FOUND = -32601
-_JSONRPC_INVALID_PARAMS = -32602
 _JSONRPC_UNAUTHORIZED = -32001
 _JSONRPC_HEADER_BODY_MISMATCH = -32020
 
@@ -108,16 +113,27 @@ _JSONRPC_HEADER_BODY_MISMATCH = -32020
 # because the model reads the description, not only the schema.
 # ---------------------------------------------------------------------------
 
+_READ_ONLY_ANNOTATIONS: dict[str, bool] = {
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "idempotentHint": True,
+    "openWorldHint": False,
+}
+
 _TOOL_DEFS: dict[str, dict[str, Any]] = {
     "list_ready_work": {
         "name": "list_ready_work",
+        "title": "List ready work",
         "description": (
-            "Lists the workspace's open work items that are not blocked by an "
-            "unresolved dependency, in the tracker's next-work order (priority "
-            "first, unset last, then creation order). Each item has work_id, "
-            "title, priority, status, blocked (always false here) and "
-            "updated_at. Read-only: calling this creates no state, claims "
-            "nothing and holds no lease. The answer is a live snapshot, not a "
+            "Lists the workspace's ready work items: status pending and not "
+            "blocked by any unresolved dependency. Active, blocked and done "
+            "items are not included. Order is the tracker's next-work order "
+            "(priority 1 highest, unset last, then creation order). Each item "
+            "has exactly work_id, title, priority (1-9 or null), status "
+            "(always pending here), blocked (always false here) and "
+            "updated_at; the result also carries as_of, the time of the read. "
+            "Read-only: calling this creates no state, claims nothing and "
+            "holds no lease. The answer is a live snapshot, not a "
             "reservation; an item listed here can stop being ready before you "
             "act on it. Cache it for at most ttlMs milliseconds. A failure is "
             "reported as a tool error, never as an empty list: an empty list "
@@ -136,9 +152,11 @@ _TOOL_DEFS: dict[str, dict[str, Any]] = {
             },
             "additionalProperties": False,
         },
+        "annotations": _READ_ONLY_ANNOTATIONS,
     },
     "describe_work": {
         "name": "describe_work",
+        "title": "Describe a work item",
         "description": (
             "Returns one work item by its integer work_id, in any status: "
             "title, priority, status, blocked, blocked_by (the work_ids of "
@@ -160,8 +178,12 @@ _TOOL_DEFS: dict[str, dict[str, Any]] = {
             "required": ["work_id"],
             "additionalProperties": False,
         },
+        "annotations": _READ_ONLY_ANNOTATIONS,
     },
 }
+
+#: The request body cap, checked before parsing.
+MAX_BODY_BYTES = 64 * 1024
 
 
 def _callable_tools() -> list[str]:
@@ -170,6 +192,10 @@ def _callable_tools() -> list[str]:
 
 def _tool_list_payload() -> list[dict[str, Any]]:
     return [_TOOL_DEFS[name] for name in _callable_tools()]
+
+
+def _allowed_authorities() -> frozenset[str]:
+    return frozenset(SCOPE_AUTHORITIES[scope] for scope in set(TOOL_SCOPES.values()))
 
 
 # ---------------------------------------------------------------------------
@@ -209,27 +235,33 @@ def _tool_success(structured: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _tool_error(code: str, message: str) -> dict[str, Any]:
+def _tool_error(error: dict[str, str]) -> dict[str, Any]:
+    """A tool error.  Every string in `error` is written in this package."""
+
     return {
-        "content": [{"type": "text", "text": f"{code}: {message}"}],
-        "structuredContent": {"error": {"code": code, "message": message}},
+        "content": [{"type": "text", "text": f"{error['code']}: {error['message']}"}],
+        "structuredContent": {"error": error},
         "isError": True,
     }
 
 
-class _InvalidParams(ValueError):
-    pass
-
-
 class _ToolFailure(Exception):
-    def __init__(self, code: str, message: str) -> None:
+    def __init__(self, code: str, message: str, **extra: str) -> None:
         super().__init__(f"{code}: {message}")
-        self.code = code
-        self.message = message
+        self.error = {"code": code, "message": message, **extra}
 
 
 def _is_int(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _is_json_content_type(value: str | None) -> bool:
+    if not value:
+        return False
+    media_type = value.split(";", 1)[0].strip().lower()
+    return media_type == "application/json" or (
+        media_type.startswith("application/") and media_type.endswith("+json")
+    )
 
 
 IdentityVerifier = Callable[[Request], Identity | Awaitable[Identity]]
@@ -282,6 +314,11 @@ def create_edge_app(
             return None
         if not isinstance(identity, Identity):
             return None
+        # The gateway mints MCP assertions carrying only what this surface's
+        # scope table can use.  A broader assertion was minted for something
+        # else and is refused, not narrowed.
+        if not identity.authorities or not identity.authorities <= _allowed_authorities():
+            return None
         return identity, assertion, request_id
 
     def _header_body_mismatch(request: Request, body: dict[str, Any]) -> str | None:
@@ -328,50 +365,60 @@ def create_edge_app(
             assertion=assertion, request_id=request_id, repo_id=repo_ids[0]
         )
 
-    async def _list_ready_work(
-        arguments: dict[str, Any], forwarded: ForwardedIdentity
-    ) -> dict[str, Any]:
-        unknown = set(arguments) - {"limit"}
-        if unknown:
-            raise _InvalidParams("list_ready_work accepts only limit")
+    def _invalid_params(message: str) -> _ToolFailure:
+        return _ToolFailure("invalid-params", message)
+
+    def _list_arguments(arguments: dict[str, Any]) -> int:
+        if set(arguments) - {"limit"}:
+            raise _invalid_params("list_ready_work accepts only limit")
         limit = arguments.get("limit", LIST_LIMIT_MAX)
         if not _is_int(limit) or not 1 <= limit <= LIST_LIMIT_MAX:
-            raise _InvalidParams(f"limit must be an integer from 1 to {LIST_LIMIT_MAX}")
+            raise _invalid_params(f"limit must be an integer from 1 to {LIST_LIMIT_MAX}")
+        return limit
+
+    def _describe_arguments(arguments: dict[str, Any]) -> int:
+        if set(arguments) - {"work_id"}:
+            raise _invalid_params("describe_work accepts only work_id")
+        work_id = arguments.get("work_id")
+        if not _is_int(work_id) or work_id < 1:
+            raise _invalid_params("work_id must be an integer >= 1")
+        return work_id
+
+    async def _list_ready_work(limit: int, forwarded: ForwardedIdentity) -> dict[str, Any]:
         listing = await work_source.list_work(forwarded)
-        ready = [item for item in listing["items"] if item["blocked"] is False]
+        # sprintctl's own ready rule: pending and not blocked.
+        ready = [
+            item
+            for item in listing["items"]
+            if item["status"] == "pending" and item["blocked"] is False
+        ]
         return {
             "authority": listing["authority"],
             "as_of": listing["as_of"],
             "items": ready[:limit],
         }
 
-    async def _describe_work(
-        arguments: dict[str, Any], forwarded: ForwardedIdentity
-    ) -> dict[str, Any]:
-        unknown = set(arguments) - {"work_id"}
-        if unknown:
-            raise _InvalidParams("describe_work accepts only work_id")
-        work_id = arguments.get("work_id")
-        if not _is_int(work_id) or work_id < 1:
-            raise _InvalidParams("work_id must be an integer >= 1")
+    async def _describe_work(work_id: int, forwarded: ForwardedIdentity) -> dict[str, Any]:
         return await work_source.describe_work(forwarded, work_id)
 
-    handlers = {
-        "list_ready_work": _list_ready_work,
-        "describe_work": _describe_work,
+    tools = {
+        "list_ready_work": (_list_arguments, _list_ready_work),
+        "describe_work": (_describe_arguments, _describe_work),
     }
 
     async def _call_tool(
-        name: str,
-        arguments: Any,
-        identity: Identity,
-        assertion: str,
-        request_id: str,
+        params: dict[str, Any], identity: Identity, assertion: str, request_id: str
     ) -> dict[str, Any]:
+        name = params.get("name")
+        if not isinstance(name, str) or name not in _callable_tools() or name not in tools:
+            raise _ToolFailure("unknown-tool", "no callable tool has that name")
+        arguments = params.get("arguments")
         if arguments is None:
             arguments = {}
         if not isinstance(arguments, dict):
-            raise _InvalidParams("arguments must be an object")
+            raise _invalid_params("arguments must be an object")
+        parse, run = tools[name]
+        parsed = parse(arguments)
         scope = TOOL_SCOPES[name]
         authority = SCOPE_AUTHORITIES.get(scope)
         if authority is None or authority not in identity.authorities:
@@ -381,13 +428,27 @@ def create_edge_app(
             )
         forwarded = _forwarded(identity, assertion, request_id)
         try:
-            structured = await handlers[name](arguments, forwarded)
+            structured = await run(parsed, forwarded)
         except WorkSourceUnavailable as error:
-            raise _ToolFailure(error.code, error.message) from error
+            LOGGER.warning(
+                "work source failed",
+                extra={
+                    "tool": name,
+                    "code": error.code,
+                    "upstream": error.upstream,
+                    "detail": error.message,
+                    "request_id": request_id,
+                },
+            )
+            raise _ToolFailure(**client_error(error)) from error
         return _tool_success(structured)
 
     def _json(payload: dict[str, Any], status_code: int = 200) -> JSONResponse:
         return JSONResponse(payload, status_code=status_code)
+
+    def _rpc_fail(id_: Any, code: int, message: str) -> JSONResponse:
+        # JSON-RPC errors travel as HTTP 200 with an error body.
+        return _json(_rpc_error(id_=id_, code=code, message=message))
 
     @app.post(MCP_PATH, include_in_schema=False)
     async def mcp_endpoint(request: Request) -> Response:
@@ -403,37 +464,70 @@ def create_edge_app(
             )
         identity, assertion, request_id = verified
 
-        raw_body = await request.body()
-        try:
-            body = json.loads(raw_body) if raw_body else {}
-        except json.JSONDecodeError:
-            return _json(
-                _rpc_error(id_=None, code=_JSONRPC_PARSE_ERROR, message="invalid JSON"), 400
-            )
-        if not isinstance(body, dict):
+        header_version = request.headers.get("mcp-protocol-version")
+        if header_version is not None and header_version not in SUPPORTED_PROTOCOL_VERSIONS:
             return _json(
                 _rpc_error(
                     id_=None,
                     code=_JSONRPC_INVALID_REQUEST,
-                    message="request body must be a JSON-RPC object",
+                    message="unsupported MCP-Protocol-Version",
                 ),
                 400,
             )
-        rpc_id = body.get("id")
-        method = body.get("method")
-        if not isinstance(method, str) or not method:
+        if not _is_json_content_type(request.headers.get("content-type")):
             return _json(
                 _rpc_error(
-                    id_=rpc_id, code=_JSONRPC_INVALID_REQUEST, message="method is required"
+                    id_=None,
+                    code=_JSONRPC_INVALID_REQUEST,
+                    message="Content-Type must be application/json",
                 ),
-                400,
+                415,
             )
+        declared_length = request.headers.get("content-length")
+        if declared_length is not None and (
+            not declared_length.isdigit() or int(declared_length) > MAX_BODY_BYTES
+        ):
+            return _json(
+                _rpc_error(id_=None, code=_JSONRPC_INVALID_REQUEST, message="request too large"),
+                413,
+            )
+        raw_body = b""
+        async for chunk in request.stream():
+            raw_body += chunk
+            if len(raw_body) > MAX_BODY_BYTES:
+                return _json(
+                    _rpc_error(
+                        id_=None, code=_JSONRPC_INVALID_REQUEST, message="request too large"
+                    ),
+                    413,
+                )
+        try:
+            body = json.loads(raw_body)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return _rpc_fail(None, _JSONRPC_PARSE_ERROR, "invalid JSON")
+        if isinstance(body, list):
+            return _rpc_fail(None, _JSONRPC_INVALID_REQUEST, "batch requests are not supported")
+        if not isinstance(body, dict):
+            return _rpc_fail(None, _JSONRPC_INVALID_REQUEST, "request must be a JSON-RPC object")
+        rpc_id = body.get("id")
+        if body.get("jsonrpc") != "2.0":
+            return _rpc_fail(rpc_id, _JSONRPC_INVALID_REQUEST, 'jsonrpc must be "2.0"')
+        method = body.get("method")
+        if method is None and ("result" in body or "error" in body):
+            # A client's response to a server request.  This server sends
+            # none, so there is nothing to correlate; acknowledge it.
+            return Response(status_code=202)
+        if not isinstance(method, str) or not method:
+            return _rpc_fail(rpc_id, _JSONRPC_INVALID_REQUEST, "method is required")
+        if "id" not in body:
+            # A notification (including notifications/initialized): no body,
+            # and nothing is executed on its behalf.
+            return Response(status_code=202)
+        if rpc_id is None or isinstance(rpc_id, bool) or not isinstance(rpc_id, (str, int)):
+            return _rpc_fail(None, _JSONRPC_INVALID_REQUEST, "id must be a string or integer")
         mismatch = _header_body_mismatch(request, body)
         if mismatch is not None:
-            return _json(
-                _rpc_error(id_=rpc_id, code=_JSONRPC_HEADER_BODY_MISMATCH, message=mismatch),
-                400,
-            )
+            return _rpc_fail(rpc_id, _JSONRPC_HEADER_BODY_MISMATCH, mismatch)
         params = body.get("params")
         params = params if isinstance(params, dict) else {}
         server_info = {"name": SERVER_NAME, "version": __version__}
@@ -458,6 +552,9 @@ def create_edge_app(
                 cache_scope="none",
             )
             return _json(_rpc_result(id_=rpc_id, result=result))
+
+        if method == "ping":
+            return _json(_rpc_result(id_=rpc_id, result={}))
 
         if method == "server/discover":
             result = _with_envelope(
@@ -484,36 +581,17 @@ def create_edge_app(
             return _json(_rpc_result(id_=rpc_id, result=result))
 
         if method == "tools/call":
-            name = params.get("name")
-            if not isinstance(name, str) or name not in _callable_tools():
-                return _json(
-                    _rpc_error(
-                        id_=rpc_id,
-                        code=_JSONRPC_INVALID_PARAMS,
-                        message="unknown or missing tool name",
-                    ),
-                    400,
-                )
             try:
-                tool_result = await _call_tool(
-                    name, params.get("arguments"), identity, assertion, request_id
-                )
+                tool_result = await _call_tool(params, identity, assertion, request_id)
                 ttl_ms = _TOOL_TTL_MS
-            except _InvalidParams as error:
-                return _json(
-                    _rpc_error(id_=rpc_id, code=_JSONRPC_INVALID_PARAMS, message=str(error)),
-                    400,
-                )
             except _ToolFailure as failure:
-                LOGGER.warning(
-                    "tool call failed",
-                    extra={"tool": name, "code": failure.code, "request_id": request_id},
-                )
-                tool_result = _tool_error(failure.code, failure.message)
+                tool_result = _tool_error(failure.error)
                 ttl_ms = 0
             except Exception:
-                LOGGER.exception("tool handler failed", extra={"tool": name})
-                tool_result = _tool_error("internal-error", "the tool handler failed")
+                LOGGER.exception("tool handler failed", extra={"tool": params.get("name")})
+                tool_result = _tool_error(
+                    {"code": "internal-error", "message": "the tool handler failed"}
+                )
                 ttl_ms = 0
             result = _with_envelope(
                 tool_result,
@@ -523,16 +601,7 @@ def create_edge_app(
             )
             return _json(_rpc_result(id_=rpc_id, result=result))
 
-        if method.startswith("notifications/"):
-            # Includes notifications/initialized: no response body.
-            return Response(status_code=202)
-
-        return _json(
-            _rpc_error(
-                id_=rpc_id, code=_JSONRPC_METHOD_NOT_FOUND, message=f"unknown method: {method}"
-            ),
-            404,
-        )
+        return _rpc_fail(rpc_id, _JSONRPC_METHOD_NOT_FOUND, "method not found")
 
     @app.get(MCP_PATH, include_in_schema=False)
     async def mcp_get_not_allowed() -> Response:

@@ -38,6 +38,18 @@ def test_mcp_serve_runs_the_edge_factory(monkeypatch) -> None:
     assert kwargs == {"factory": True, "host": "127.0.0.1", "port": 8081}
 
 
+def test_the_factory_string_resolves_to_the_edge_factory() -> None:
+    """What uvicorn will import at run time, imported the same way."""
+
+    from uvicorn.importer import import_from_string
+
+    factory = import_from_string(cli.MCP_APP_FACTORY)
+    from vuoro_mcp_edge.composition import create_app_from_environment
+
+    assert factory is create_app_from_environment
+    assert callable(factory)
+
+
 def test_mcp_serve_without_the_edge_package_exits_2(monkeypatch, capsys) -> None:
     import importlib.util
 

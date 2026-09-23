@@ -34,9 +34,10 @@ def _call(keys, auth, shell, tool, arguments=None):
 
 def _assert_tool_error(result, code: str) -> None:
     assert result["isError"] is True
-    assert result["structuredContent"] == {
-        "error": {"code": code, "message": result["structuredContent"]["error"]["message"]}
-    }
+    error = result["structuredContent"]["error"]
+    assert set(result["structuredContent"]) == {"error"}
+    assert error["code"] == code
+    assert set(error) <= {"code", "message", "upstream_code"}
     assert "items" not in result["structuredContent"]
     assert "item" not in result["structuredContent"]
     assert result["ttlMs"] == 0
@@ -100,21 +101,21 @@ def test_default_limit_is_fifty(keys, auth) -> None:
 
 
 @pytest.mark.parametrize("limit", [0, 51, -1, "5", 2.5, True, None])
-def test_out_of_range_limit_is_invalid_params(keys, auth, limit) -> None:
+def test_out_of_range_limit_is_an_invalid_params_tool_error(keys, auth, limit) -> None:
     shell = FakeShell()
-    response = edge_client(keys[0], shell).post(
-        MCP_PATH, headers=auth, json=call("list_ready_work", {"limit": limit})
-    )
-    assert response.status_code == 400
-    assert response.json()["error"]["code"] == -32602
-    assert shell.invoke_requests == []
+    _, result = _call(keys, auth, shell, "list_ready_work", {"limit": limit})
+    _assert_tool_error(result, "invalid-params")
+    assert shell.requests == []
 
 
-def test_unknown_argument_is_invalid_params(keys, auth) -> None:
-    response = edge_client(keys[0], FakeShell()).post(
-        MCP_PATH, headers=auth, json=call("list_ready_work", {"sprint_id": 3})
-    )
-    assert response.json()["error"]["code"] == -32602
+def test_unknown_argument_is_an_invalid_params_tool_error(keys, auth) -> None:
+    _, result = _call(keys, auth, FakeShell(), "list_ready_work", {"sprint_id": 3})
+    _assert_tool_error(result, "invalid-params")
+
+
+def test_non_object_arguments_is_an_invalid_params_tool_error(keys, auth) -> None:
+    _, result = _call(keys, auth, FakeShell(), "list_ready_work", [1])
+    _assert_tool_error(result, "invalid-params")
 
 
 # -- strict emission ----------------------------------------------------------
@@ -263,11 +264,13 @@ def test_stale_catalog_refetches_and_retries_exactly_once(keys, auth) -> None:
     shell = FakeShell(
         rejected(409, "stale-catalog"),
         accepted(list_result(list_record(1))),
+        revisions=("rev-1", "rev-2"),
     )
     _, result = _call(keys, auth, shell, "list_ready_work")
     assert result["isError"] is False
     assert len(shell.catalog_requests) == 2
-    assert len(shell.invoke_requests) == 2
+    assert [call["catalog_revision"] for call in shell.invocations] == ["rev-1", "rev-2"]
+    assert shell.invocations[0]["request_id"] == shell.invocations[1]["request_id"]
 
 
 def test_second_stale_catalog_surfaces_as_a_tool_error(keys, auth) -> None:
@@ -294,12 +297,17 @@ def test_catalog_is_checked_once_across_calls_and_results_are_never_cached(keys,
 @pytest.mark.parametrize("work_id", ["repo-a#1", "1", 0, -3, 1.5, True, None])
 def test_describe_work_rejects_a_non_positive_integer_id(keys, auth, work_id) -> None:
     shell = FakeShell()
-    response = edge_client(keys[0], shell).post(
-        MCP_PATH, headers=auth, json=call("describe_work", {"work_id": work_id})
-    )
-    assert response.status_code == 400
-    assert response.json()["error"]["code"] == -32602
+    _, result = _call(keys, auth, shell, "describe_work", {"work_id": work_id})
+    _assert_tool_error(result, "invalid-params")
     assert shell.requests == []
+
+
+def test_describe_work_refuses_a_record_for_another_work_id(keys, auth) -> None:
+    other = item_record(8, title="Someone else's item")
+    shell = FakeShell(accepted(item_result(other), "work.public.item-v1"))
+    response, result = _call(keys, auth, shell, "describe_work", {"work_id": 7})
+    assert "Someone else" not in response.text
+    _assert_tool_error(result, "upstream-mismatch")
 
 
 def test_describe_work_returns_the_item_verbatim(keys, auth) -> None:
@@ -324,8 +332,10 @@ def test_a_tool_without_a_scope_row_is_neither_listed_nor_callable(
     ).json()["result"]["tools"]
     assert [tool["name"] for tool in tools] == ["list_ready_work"]
     response = client.post(MCP_PATH, headers=auth, json=call("describe_work", {"work_id": 1}))
-    assert response.status_code == 400
-    assert response.json()["error"]["code"] == -32602
+    assert response.status_code == 200
+    result = response.json()["result"]
+    assert result["isError"] is True
+    assert result["structuredContent"]["error"]["code"] == "unknown-tool"
     assert shell.requests == []
 
 
@@ -333,3 +343,101 @@ def test_every_defined_tool_has_a_scope_row_and_every_scope_an_authority() -> No
     assert set(server.TOOL_ORDER) == set(server.TOOL_SCOPES)
     assert set(server.TOOL_SCOPES.values()) <= set(server.SCOPE_AUTHORITIES)
     assert set(server.TOOL_SCOPES.values()) == {"read"}
+
+
+# -- ready rule and list contract ------------------------------------------------
+
+
+def test_ready_means_pending_and_unblocked(keys, auth) -> None:
+    records = [
+        list_record(1),
+        list_record(2, status="active"),
+        list_record(3, status="blocked", blocked=True),
+        list_record(4, status="pending", blocked=True),
+        list_record(5),
+    ]
+    _, result = _call(keys, auth, FakeShell(accepted(list_result(*records))), "list_ready_work")
+    assert [item["work_id"] for item in result["structuredContent"]["items"]] == [1, 5]
+    assert all(item["status"] == "pending" for item in result["structuredContent"]["items"])
+
+
+def test_a_done_record_in_the_list_is_a_contract_violation(keys, auth) -> None:
+    records = [list_record(1), list_record(2, status="done")]
+    _, result = _call(keys, auth, FakeShell(accepted(list_result(*records))), "list_ready_work")
+    _assert_tool_error(result, "contract-violation")
+
+
+@pytest.mark.parametrize("priority", [0, 10, -1])
+def test_priority_outside_one_to_nine_is_a_tool_error(keys, auth, priority) -> None:
+    record = {**list_record(1), "priority": priority}
+    _, result = _call(keys, auth, FakeShell(accepted(list_result(record))), "list_ready_work")
+    _assert_tool_error(result, "invalid-response")
+
+
+@pytest.mark.parametrize("priority", [1, 9, None])
+def test_priority_one_to_nine_or_null_passes(keys, auth, priority) -> None:
+    record = {**list_record(1), "priority": priority}
+    _, result = _call(keys, auth, FakeShell(accepted(list_result(record))), "list_ready_work")
+    assert result["isError"] is False
+
+
+def test_long_as_of_is_a_tool_error(keys, auth) -> None:
+    body = {**list_result(list_record(1)), "as_of": "2" * 257}
+    _, result = _call(keys, auth, FakeShell(accepted(body)), "list_ready_work")
+    _assert_tool_error(result, "invalid-response")
+
+
+@pytest.mark.parametrize("field", ["resolution", "created_at", "updated_at"])
+def test_item_string_over_256_is_a_tool_error(keys, auth, field) -> None:
+    record = {**item_record(1), field: "x" * 257}
+    shell = FakeShell(accepted(item_result(record), "work.public.item-v1"))
+    _, result = _call(keys, auth, shell, "describe_work", {"work_id": 1})
+    _assert_tool_error(result, "invalid-response")
+
+
+# -- upstream text never passes through --------------------------------------------
+
+UPSTREAM_TEXT = "psycopg.OperationalError: connection to server at 10.0.3.7 failed"
+
+
+@pytest.mark.parametrize(
+    ("status", "code"),
+    [
+        (404, "item-not-found"),
+        (503, "postgres-runtime-unavailable"),
+        (409, "catalog-mismatch"),
+        (422, "schema-validation-failed"),
+        (401, "identity-required"),
+        (403, "authority-required"),
+        (502, "transport"),
+    ],
+)
+def test_known_upstream_codes_get_local_messages(keys, auth, status, code) -> None:
+    shell = FakeShell(rejected(status, code, UPSTREAM_TEXT))
+    response, result = _call(keys, auth, shell, "describe_work", {"work_id": 1})
+    assert UPSTREAM_TEXT not in response.text
+    assert "10.0.3.7" not in response.text
+    expected = "transport-error" if code == "transport" else code
+    _assert_tool_error(result, expected)
+    assert "upstream_code" not in result["structuredContent"]["error"]
+
+
+def test_unknown_upstream_code_is_upstream_rejected_with_only_the_code(keys, auth) -> None:
+    shell = FakeShell(rejected(500, "operation-handler-failed", UPSTREAM_TEXT))
+    response, result = _call(keys, auth, shell, "list_ready_work")
+    assert UPSTREAM_TEXT not in response.text
+    _assert_tool_error(result, "upstream-rejected")
+    assert result["structuredContent"]["error"]["upstream_code"] == "operation-handler-failed"
+
+
+def test_upstream_code_is_capped_at_64_characters(keys, auth) -> None:
+    shell = FakeShell(rejected(500, "c" * 200, UPSTREAM_TEXT))
+    _, result = _call(keys, auth, shell, "list_ready_work")
+    assert result["structuredContent"]["error"]["upstream_code"] == "c" * 64
+
+
+def test_upstream_code_with_odd_characters_is_not_echoed(keys, auth) -> None:
+    shell = FakeShell(rejected(500, "<script>alert(1)</script>", UPSTREAM_TEXT))
+    response, result = _call(keys, auth, shell, "list_ready_work")
+    assert "<script>" not in response.text
+    assert result["structuredContent"]["error"]["upstream_code"] == "unrecognized"

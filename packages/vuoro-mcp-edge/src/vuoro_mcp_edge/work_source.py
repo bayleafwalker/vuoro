@@ -10,7 +10,7 @@ constraints, each load-bearing:
   the shell verifies both again.  The invocation's `request_id` *is* that
   request id, because the shell binds the signed `request_id` claim to the
   invocation envelope.
-* **No response cache.** Authorization is per caller: a cached answer would
+* **No response cache.** Access is decided per caller: a cached answer would
   hand one caller's result to another without the shell ever seeing the
   second caller's assertion.  Only the catalog check is cached, and the
   catalog is public and caller-independent.
@@ -88,7 +88,7 @@ class ShellWorkSource:
         )
         self._catalog_revision: str | None = None
         self._catalog_checked = False
-        self._catalog_lock = asyncio.Lock()
+        self._catalog_fetch: asyncio.Future[None] | None = None
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -107,54 +107,64 @@ class ShellWorkSource:
         """`work.public.item-v1`: one item, validated.  Not-found is an error."""
 
         result = await self._invoke(OPERATION_ITEM, {"work_id": work_id}, identity)
-        return validate_item_result(result)
+        return validate_item_result(result, work_id=work_id)
 
     # -- transport -----------------------------------------------------------
 
     async def _ensure_catalog(self, *, force_refresh: bool = False) -> None:
-        async with self._catalog_lock:
-            if self._catalog_checked and not force_refresh:
-                return
-            self._catalog_checked = False
-            try:
-                response = await self._client.get("/api/catalog/v1")
-            except httpx.HTTPError as exc:
-                raise WorkSourceUnavailable(
-                    "transport-error", f"catalog fetch failed: {type(exc).__name__}"
-                ) from exc
-            if response.status_code >= 400:
-                raise WorkSourceUnavailable(
-                    "catalog-unavailable",
-                    f"catalog fetch returned HTTP {response.status_code}",
-                    status_code=response.status_code,
-                )
-            try:
-                catalog = response.json()
-            except ValueError as exc:
-                raise WorkSourceUnavailable(
-                    "invalid-response", "catalog body is not JSON"
-                ) from exc
-            if not isinstance(catalog, dict) or not isinstance(
-                catalog.get("revision"), str
-            ):
-                raise WorkSourceUnavailable(
-                    "invalid-response", "catalog body has no revision"
-                )
-            advertised = {
-                operation.get("name")
-                for operation in catalog.get("operations") or ()
-                if isinstance(operation, dict)
-            }
-            missing = [name for name in REQUIRED_OPERATIONS if name not in advertised]
-            if missing:
-                raise WorkSourceUnavailable(
-                    "catalog-mismatch",
-                    "the runtime catalog does not advertise "
-                    f"{', '.join(missing)}; advertised work.public operations: "
-                    f"{', '.join(sorted(n for n in advertised if isinstance(n, str) and n.startswith('work.public.'))) or 'none'}",
-                )
-            self._catalog_revision = catalog["revision"]
-            self._catalog_checked = True
+        """Load the catalog once; share one in-flight fetch between callers.
+
+        A loaded catalog costs callers nothing (no lock, no await).  While a
+        fetch is in flight, callers join it rather than queue behind a lock,
+        so when it fails they all fail at once with its error, and the next
+        caller starts a fresh fetch.
+        """
+
+        if self._catalog_checked and not force_refresh:
+            return
+        fetch = self._catalog_fetch
+        if fetch is None or fetch.done():
+            fetch = asyncio.ensure_future(self._fetch_catalog())
+            self._catalog_fetch = fetch
+        # Shielded: one caller's cancellation must not cancel the fetch the
+        # others are waiting on.
+        await asyncio.shield(fetch)
+
+    async def _fetch_catalog(self) -> None:
+        self._catalog_checked = False
+        try:
+            response = await self._client.get("/api/catalog/v1")
+        except httpx.HTTPError as exc:
+            raise WorkSourceUnavailable(
+                "transport-error", f"catalog fetch failed: {type(exc).__name__}"
+            ) from exc
+        if response.status_code >= 400:
+            raise WorkSourceUnavailable(
+                "catalog-unavailable",
+                f"catalog fetch returned HTTP {response.status_code}",
+                status_code=response.status_code,
+            )
+        try:
+            catalog = response.json()
+        except ValueError as exc:
+            raise WorkSourceUnavailable(
+                "invalid-response", "catalog body is not JSON"
+            ) from exc
+        if not isinstance(catalog, dict) or not isinstance(catalog.get("revision"), str):
+            raise WorkSourceUnavailable("invalid-response", "catalog body has no revision")
+        advertised = {
+            operation.get("name")
+            for operation in catalog.get("operations") or ()
+            if isinstance(operation, dict)
+        }
+        missing = [name for name in REQUIRED_OPERATIONS if name not in advertised]
+        if missing:
+            raise WorkSourceUnavailable(
+                "catalog-mismatch",
+                f"the runtime catalog does not advertise {', '.join(missing)}",
+            )
+        self._catalog_revision = catalog["revision"]
+        self._catalog_checked = True
 
     async def _invoke(
         self, operation: str, arguments: dict[str, Any], identity: ForwardedIdentity
@@ -229,6 +239,7 @@ def _unwrap(response: httpx.Response, operation: str) -> Any:
             if isinstance(message, str) and message
             else f"{operation} was not accepted (HTTP {response.status_code})",
             status_code=response.status_code,
+            upstream=True,
         )
     if body.get("operation") not in (None, operation):
         raise WorkSourceUnavailable(
