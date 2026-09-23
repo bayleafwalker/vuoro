@@ -19,6 +19,11 @@ finished set, the way a persistence layer would on load.
 When that run-tracking object lands, the run-scoped chain replaces this: its
 id becomes the chain key instead of `EvidenceSet.set_id`, and this builder's
 `extend`/`build` shape can be reused directly against that new scope.
+
+Update (agentops#2479): that run-tracking object now exists, and a builder
+can be given its `run_id` so every item it stores carries the reference. The
+chain key is still `set_id` -- re-scoping the chain is E0's own item, not
+this one -- so the two ids stay separate on purpose.
 """
 
 from __future__ import annotations
@@ -36,12 +41,19 @@ class EvidenceSetBuilder:
     because the builder is the only place `chain_seq` is assigned.
     """
 
-    def __init__(self, set_id: str) -> None:
+    def __init__(self, set_id: str, *, run_id: str | None = None) -> None:
         self._set_id = set_id
+        self._run_id = run_id
         self._items: list[EvidenceItem] = []
 
     def add(self, item: EvidenceItem) -> EvidenceItem:
-        chained = link(self._items, item)
+        if self._run_id is not None and item.run_id not in (None, self._run_id):
+            raise ValueError(
+                f"item {item.item_id!r} carries run_id {item.run_id!r}, "
+                f"but this set is being built for run {self._run_id!r}"
+            )
+        stamped = item if item.run_id is not None else _with_run_id(item, self._run_id)
+        chained = link(self._items, stamped)
         self._items.append(chained)
         return chained
 
@@ -50,7 +62,19 @@ class EvidenceSetBuilder:
             self.add(item)
 
     def build(self, *, grants: tuple = ()) -> EvidenceSet:
-        return EvidenceSet(set_id=self._set_id, items=tuple(self._items), grants=grants)
+        return EvidenceSet(
+            set_id=self._set_id, items=tuple(self._items), grants=grants, run_id=self._run_id
+        )
+
+
+def _with_run_id(item: EvidenceItem, run_id: str | None) -> EvidenceItem:
+    """`item` re-issued carrying `run_id` (frozen dataclass, so a new one)."""
+    return EvidenceItem(
+        item_id=item.item_id, kind=item.kind, ref=item.ref, digest=item.digest,
+        collector=item.collector, validity=item.validity, claims=item.claims,
+        provenance=item.provenance, chain_seq=item.chain_seq,
+        chain_prev_digest=item.chain_prev_digest, run_id=run_id,
+    )
 
 
 def verify_evidence_set(

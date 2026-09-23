@@ -52,6 +52,11 @@ def link(items: Sequence[EvidenceItem], next_item: EvidenceItem) -> EvidenceItem
         digest=next_item.digest, collector=next_item.collector, validity=next_item.validity,
         claims=next_item.claims, provenance=next_item.provenance,
         chain_seq=seq, chain_prev_digest=prev,
+        # Carried, never re-derived: linking an item must not drop which run
+        # produced it. `entry_digest` deliberately does not cover `run_id` --
+        # the chain hashes entry identity and content, and that payload is not
+        # changed here.
+        run_id=next_item.run_id,
     )
 
 
