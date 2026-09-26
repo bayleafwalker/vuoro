@@ -69,6 +69,22 @@ def test_environment_builds_a_server_that_verifies_assertions(cloud_mounts, auth
     assert listed.status_code == 200
 
 
+def test_environment_composition_wires_a_durable_record_bucket(cloud_mounts, auth) -> None:
+    """composition.py's one line (``runs=record_tools.build_run_registry(env)``)
+    must actually reach ``create_edge_app`` -- not just type-check -- so the
+    record bucket's tools are discoverable, not silently absent the way they
+    are with the shared ``UnavailableRunRegistry`` placeholder
+    (test_toolsets.py's ``test_default_composition_ships_no_write_tools``)."""
+
+    client = TestClient(create_app_from_environment(cloud_mounts))
+    listed = client.post(
+        "/mcp", headers=auth, json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+    )
+    assert listed.status_code == 200
+    names = {tool["name"] for tool in listed.json()["result"]["tools"]}
+    assert {"register_run", "append_evidence", "write_session_note"} <= names
+
+
 def test_wrong_audience_configuration_rejects_the_gateway_assertion(cloud_mounts, auth) -> None:
     env = {**cloud_mounts, "VUORO_GATEWAY_ASSERTION_AUDIENCE": "vuoro-other"}
     client = TestClient(create_app_from_environment(env))

@@ -40,7 +40,7 @@ and the two frozen-Protocol gaps this module works around):
 
 from __future__ import annotations
 
-import secrets
+import hashlib
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from typing import Any
@@ -105,8 +105,19 @@ def _placeholder_item(
     )
 
 
-def _mint_item_id() -> str:
-    return "evi_" + secrets.token_hex(16)
+def _mint_item_id(run_id: str, idempotency_key: str) -> str:
+    """A stable id for this (run_id, idempotency_key) append.
+
+    Deterministic, not random: a retry of the same idempotency_key must
+    resend the same item_id, or its request digest (which includes item_id;
+    see append_evidence's arguments) would differ from the one stored under
+    that key and a clean replay would come back as a spurious
+    idempotency-conflict instead. Uniqueness relies on idempotency_key's own
+    per-(workspace, tool) uniqueness at the ledger; it need not be secret.
+    """
+
+    digest = hashlib.sha256(f"{run_id}:{idempotency_key}".encode()).hexdigest()
+    return "evi_" + digest[:32]
 
 
 class RecordShellClient:
@@ -756,7 +767,7 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
         binding = binding_for(forwarded)
         await store.resolve(parsed["run_id"], binding, forwarded=forwarded)
         tail = await store.evidence_tail(parsed["run_id"], forwarded=forwarded)
-        item_id = _mint_item_id()
+        item_id = _mint_item_id(parsed["run_id"], parsed["idempotency_key"])
         next_item = _placeholder_item(
             item_id=item_id, digest=parsed["digest"], chain_seq=None, chain_prev_digest=None
         )

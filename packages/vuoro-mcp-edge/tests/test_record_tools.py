@@ -322,7 +322,7 @@ class TestAppendEvidence:
         append_request = shell.requests[2]
         assert append_request["arguments"]["chain_seq"] == 0
         assert append_request["arguments"]["chain_prev_digest"] is None
-        # item_id is minted fresh per call, not taken from the caller.
+        # item_id is derived here, not taken from the caller.
         assert append_request["arguments"]["item_id"]
 
     def test_a_second_append_extends_the_observed_tail(self) -> None:
@@ -381,6 +381,140 @@ class TestAppendEvidence:
             validity=placeholder_validity, chain_seq=0, chain_prev_digest=None,
         )
         assert append_request["arguments"]["chain_prev_digest"] == entry_digest(tail_item)
+
+    def test_retrying_the_same_idempotency_key_sends_the_same_item_id(self) -> None:
+        """A retry (same run_id, same idempotency_key) must resend the same
+        item_id, or sprintctl's idempotency ledger -- which digests item_id
+        along with the rest of the arguments -- would see a "different"
+        request and refuse the retry as idempotency-conflict instead of
+        replaying cleanly (agentops#2466 E2 final report, gap 1)."""
+
+        def _one_round(shell: _FakeShell) -> str:
+            toolset = build_toolset(_context(_store(shell)))
+            spec = next(t for t in toolset.tools if t.name == "append_evidence")
+            parsed = spec.parse(
+                {
+                    "run_id": RUN_ID, "kind": "test", "ref": "ref-1", "digest": "sha256:" + "b" * 64,
+                    "collector": "tester", "validity": VALIDITY, "idempotency_key": "evidence-key-retry",
+                }
+            )
+            _run(spec.run(parsed, _forwarded()))
+            return shell.requests[2]["arguments"]["item_id"]
+
+        # Two independent rounds (as an original call and a client-side retry
+        # each would be), each observing a *different* tail -- item_id must
+        # not depend on it.
+        first = _one_round(
+            _FakeShell(
+                _accepted(
+                    "work.run.resolve-v1",
+                    {"repo_id": REPO_ID, "run_id": RUN_ID, "principal_id": PRINCIPAL_ID, "workspace_id": WORKSPACE_ID},
+                ),
+                _accepted("work.evidence.tail-v1", {"repo_id": REPO_ID, "run_id": RUN_ID, "item": None}),
+                _accepted(
+                    "work.evidence.append-v1",
+                    {
+                        "repo_id": REPO_ID, "run_id": RUN_ID,
+                        "item": {
+                            "item_id": "evi_1", "kind": "test", "ref": "ref-1", "digest": "sha256:" + "b" * 64,
+                            "collector": "tester", "validity": VALIDITY, "claims": [], "provenance": {},
+                            "chain_seq": 0, "chain_prev_digest": None,
+                        },
+                    },
+                ),
+            )
+        )
+        second = _one_round(
+            _FakeShell(
+                _accepted(
+                    "work.run.resolve-v1",
+                    {"repo_id": REPO_ID, "run_id": RUN_ID, "principal_id": PRINCIPAL_ID, "workspace_id": WORKSPACE_ID},
+                ),
+                _accepted(
+                    "work.evidence.tail-v1",
+                    {
+                        "repo_id": REPO_ID, "run_id": RUN_ID,
+                        "item": {
+                            "item_id": "evi_other", "kind": "test", "ref": "ref-other", "digest": "sha256:" + "e" * 64,
+                            "collector": "tester", "validity": VALIDITY, "claims": [], "provenance": {},
+                            "chain_seq": 1, "chain_prev_digest": "sha256:" + "f" * 64,
+                        },
+                    },
+                ),
+                _accepted(
+                    "work.evidence.append-v1",
+                    {
+                        "repo_id": REPO_ID, "run_id": RUN_ID,
+                        "item": {
+                            "item_id": "evi_1", "kind": "test", "ref": "ref-1", "digest": "sha256:" + "b" * 64,
+                            "collector": "tester", "validity": VALIDITY, "claims": [], "provenance": {},
+                            "chain_seq": 0, "chain_prev_digest": None,
+                        },
+                    },
+                ),
+            )
+        )
+        assert first == second
+
+    def test_a_different_idempotency_key_sends_a_different_item_id(self) -> None:
+        shell_a = _FakeShell(
+            _accepted(
+                "work.run.resolve-v1",
+                {"repo_id": REPO_ID, "run_id": RUN_ID, "principal_id": PRINCIPAL_ID, "workspace_id": WORKSPACE_ID},
+            ),
+            _accepted("work.evidence.tail-v1", {"repo_id": REPO_ID, "run_id": RUN_ID, "item": None}),
+            _accepted(
+                "work.evidence.append-v1",
+                {
+                    "repo_id": REPO_ID, "run_id": RUN_ID,
+                    "item": {
+                        "item_id": "evi_1", "kind": "test", "ref": "ref-1", "digest": "sha256:" + "b" * 64,
+                        "collector": "tester", "validity": VALIDITY, "claims": [], "provenance": {},
+                        "chain_seq": 0, "chain_prev_digest": None,
+                    },
+                },
+            ),
+        )
+        toolset = build_toolset(_context(_store(shell_a)))
+        spec = next(t for t in toolset.tools if t.name == "append_evidence")
+        parsed = spec.parse(
+            {
+                "run_id": RUN_ID, "kind": "test", "ref": "ref-1", "digest": "sha256:" + "b" * 64,
+                "collector": "tester", "validity": VALIDITY, "idempotency_key": "evidence-key-a",
+            }
+        )
+        _run(spec.run(parsed, _forwarded()))
+        item_id_a = shell_a.requests[2]["arguments"]["item_id"]
+
+        shell_b = _FakeShell(
+            _accepted(
+                "work.run.resolve-v1",
+                {"repo_id": REPO_ID, "run_id": RUN_ID, "principal_id": PRINCIPAL_ID, "workspace_id": WORKSPACE_ID},
+            ),
+            _accepted("work.evidence.tail-v1", {"repo_id": REPO_ID, "run_id": RUN_ID, "item": None}),
+            _accepted(
+                "work.evidence.append-v1",
+                {
+                    "repo_id": REPO_ID, "run_id": RUN_ID,
+                    "item": {
+                        "item_id": "evi_2", "kind": "test", "ref": "ref-1", "digest": "sha256:" + "b" * 64,
+                        "collector": "tester", "validity": VALIDITY, "claims": [], "provenance": {},
+                        "chain_seq": 0, "chain_prev_digest": None,
+                    },
+                },
+            ),
+        )
+        toolset_b = build_toolset(_context(_store(shell_b)))
+        spec_b = next(t for t in toolset_b.tools if t.name == "append_evidence")
+        parsed_b = spec_b.parse(
+            {
+                "run_id": RUN_ID, "kind": "test", "ref": "ref-1", "digest": "sha256:" + "b" * 64,
+                "collector": "tester", "validity": VALIDITY, "idempotency_key": "evidence-key-b",
+            }
+        )
+        _run(spec_b.run(parsed_b, _forwarded()))
+        item_id_b = shell_b.requests[2]["arguments"]["item_id"]
+        assert item_id_a != item_id_b
 
     def test_appending_to_someone_elses_run_is_run_not_found_before_any_append(self) -> None:
         shell = _FakeShell(_rejected("work.run.resolve-v1", "run-not-found", status=404))
