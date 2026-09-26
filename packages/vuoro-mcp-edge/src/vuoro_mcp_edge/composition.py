@@ -21,7 +21,10 @@ from collections.abc import Mapping
 from fastapi import FastAPI
 from vuoro_service.composition import CompositionError, load_gateway_assertion_resolver
 
+from . import claim_tools, effect_tools, record_tools
+from .runs import UnavailableRunRegistry
 from .server import create_edge_app
+from .toolsets import ToolSet, ToolsetContext
 from .work_source import DEFAULT_UPSTREAM_URL, ShellWorkSource
 
 __all__ = [
@@ -93,4 +96,24 @@ def create_app_from_environment(env: Mapping[str, str] | None = None) -> FastAPI
     except CompositionError as error:
         raise EdgeConfigurationError(str(error)) from error
     work_source = ShellWorkSource(base_url=_upstream_url(env), request_timeout=_timeout(env))
-    return create_edge_app(identity_resolver=resolver, work_source=work_source)
+    context = ToolsetContext(env=env, work_source=work_source, runs=UnavailableRunRegistry())
+    return create_edge_app(
+        identity_resolver=resolver,
+        work_source=work_source,
+        toolsets=build_toolsets(context),
+    )
+
+
+def build_toolsets(context: ToolsetContext) -> tuple[ToolSet, ...]:
+    """E2's record and claim toolsets, then E3's effect toolset.
+
+    Each builder returns None until its work item ships tools; the order here
+    is the tool order clients see after the built-in read tools.
+    """
+
+    built = (
+        record_tools.build_toolset(context),
+        claim_tools.build_toolset(context),
+        effect_tools.build_toolset(context),
+    )
+    return tuple(toolset for toolset in built if toolset is not None)

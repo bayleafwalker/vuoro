@@ -24,7 +24,7 @@ constraints, each load-bearing:
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -36,6 +36,9 @@ from .contract import (
     validate_list_result,
 )
 from .errors import WorkSourceUnavailable
+
+if TYPE_CHECKING:
+    from vuoro_service.identity import Identity
 
 __all__ = [
     "CLIENT_PROTOCOL",
@@ -56,12 +59,22 @@ _REQUEST_ID_HEADER = "X-Request-Id"
 class ForwardedIdentity:
     """The inbound request's assertion and correlation id, passed through."""
 
-    __slots__ = ("assertion", "repo_id", "request_id")
+    __slots__ = ("assertion", "identity", "repo_id", "request_id")
 
-    def __init__(self, *, assertion: str, request_id: str, repo_id: str) -> None:
+    def __init__(
+        self,
+        *,
+        assertion: str,
+        request_id: str,
+        repo_id: str,
+        identity: Identity | None = None,
+    ) -> None:
         self.assertion = assertion
         self.request_id = request_id
         self.repo_id = repo_id
+        #: The verified caller (principal, workspace, authorities); toolsets
+        #: bind runs and idempotency to it.  Never forwarded upstream.
+        self.identity = identity
 
     def headers(self) -> dict[str, str]:
         return {
