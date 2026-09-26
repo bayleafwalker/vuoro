@@ -53,7 +53,7 @@ def _client(
 
 
 def _register_run(runs: InMemoryRunRegistry, *, key: str = "run-key-0001") -> str:
-    return asyncio.run(runs.register(BINDING, idempotency_key=key))
+    return asyncio.run(runs.register(BINDING, idempotency_key=key, forwarded=None, manifest={}))
 
 
 def _call_with(client, keys, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
@@ -257,7 +257,7 @@ def test_unregistered_run_id_is_run_not_found(keys) -> None:
 def test_a_run_bound_to_another_caller_is_run_not_found(keys) -> None:
     client, _, runs = _client(keys)
     other = RunBinding(principal_id="other:0", workspace_id=WORKSPACE_ID, repo_id=REPO_ID)
-    run_id = asyncio.run(runs.register(other, idempotency_key="k"))
+    run_id = asyncio.run(runs.register(other, idempotency_key="k", forwarded=None, manifest={}))
     result = _call_with(client, keys, "propose_effect", _args(run_id=run_id))
     _assert_error(result, "run-not-found")
 
@@ -700,8 +700,8 @@ class _YieldingStore(InMemoryIntentStore):
     """Suspends in lookup so two proposals interleave exactly where a real
     store's round trip would."""
 
-    async def lookup(self, workspace_id, tool, key):
-        found = await super().lookup(workspace_id, tool, key)
+    async def lookup(self, workspace_id, principal_id, tool, key):
+        found = await super().lookup(workspace_id, principal_id, tool, key)
         await asyncio.sleep(0)
         await asyncio.sleep(0)
         return found
@@ -716,7 +716,10 @@ def test_a_concurrent_duplicate_propose_yields_exactly_one_intent() -> None:
     toolset = effect_tools._build(intent_store=store, runs=runs, repository_policies={})
     propose = next(spec for spec in toolset.tools if spec.name == "propose_effect")
     forwarded = SimpleNamespace(
-        identity=SimpleNamespace(principal_id=PRINCIPAL_ID, workspace_id=WORKSPACE_ID), repo_id=REPO_ID
+        identity=SimpleNamespace(
+            principal_id=PRINCIPAL_ID, workspace_id=WORKSPACE_ID, client_id=None, grant_id=None
+        ),
+        repo_id=REPO_ID,
     )
     parsed = effect_tools._parse_propose(_args(run_id=run_id))
 
@@ -737,7 +740,10 @@ def test_a_concurrent_conflicting_propose_is_refused_and_leaves_no_orphan() -> N
     toolset = effect_tools._build(intent_store=store, runs=runs, repository_policies={})
     propose = next(spec for spec in toolset.tools if spec.name == "propose_effect")
     forwarded = SimpleNamespace(
-        identity=SimpleNamespace(principal_id=PRINCIPAL_ID, workspace_id=WORKSPACE_ID), repo_id=REPO_ID
+        identity=SimpleNamespace(
+            principal_id=PRINCIPAL_ID, workspace_id=WORKSPACE_ID, client_id=None, grant_id=None
+        ),
+        repo_id=REPO_ID,
     )
     one = effect_tools._parse_propose(_args(run_id=run_id))
     two = effect_tools._parse_propose(_args(run_id=run_id, title="Another title"))
@@ -859,3 +865,40 @@ def test_colon_and_leading_dash_paths_are_refused(path) -> None:
 
 def test_a_glob_character_filename_is_accepted_as_a_literal_path() -> None:
     validate_diff(add_diff("docs/*"), policy=RepositoryEffectPolicy())
+
+
+# -- contract section 5 as amended 2026-09-26: the ledger key includes the principal --
+
+
+def test_two_principals_in_one_workspace_do_not_share_idempotency_keys() -> None:
+    """Principal B reusing principal A's key with other arguments gets its own
+    intent: no replay of A's result and no idempotency-conflict probe."""
+    from types import SimpleNamespace
+
+    store = InMemoryIntentStore()
+    runs = InMemoryRunRegistry()
+    other = RunBinding(principal_id="other:0", workspace_id=WORKSPACE_ID, repo_id=REPO_ID)
+    run_a = _register_run(runs)
+    run_b = asyncio.run(runs.register(other, idempotency_key="k-b", forwarded=None, manifest={}))
+    toolset = effect_tools._build(intent_store=store, runs=runs, repository_policies={})
+    propose = next(spec for spec in toolset.tools if spec.name == "propose_effect")
+
+    def forwarded_for(principal_id: str):
+        return SimpleNamespace(
+            identity=SimpleNamespace(
+                principal_id=principal_id, workspace_id=WORKSPACE_ID, client_id=None, grant_id=None
+            ),
+            repo_id=REPO_ID,
+        )
+
+    a = asyncio.run(
+        propose.run(effect_tools._parse_propose(_args(run_id=run_a)), forwarded_for(PRINCIPAL_ID))
+    )
+    b = asyncio.run(
+        propose.run(
+            effect_tools._parse_propose(_args(run_id=run_b, title="B's own title")),
+            forwarded_for("other:0"),
+        )
+    )
+    assert a["intent_id"] != b["intent_id"]
+    assert sorted(store._intents) == sorted([a["intent_id"], b["intent_id"]])

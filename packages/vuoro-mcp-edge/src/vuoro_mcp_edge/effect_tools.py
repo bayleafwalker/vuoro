@@ -501,12 +501,21 @@ class IntentStore(Protocol):
     the trusted side's (an operator or an opt-in policy, never the
     proposer), so nothing the edge holds can accept an intent."""
 
-    async def lookup(self, workspace_id: str, tool: str, key: str) -> StoredResult | None: ...
+    async def lookup(
+        self, workspace_id: str, principal_id: str, tool: str, key: str
+    ) -> StoredResult | None: ...
 
     async def create(
-        self, workspace_id: str, tool: str, key: str, stored: StoredResult, intent: EffectIntent
+        self,
+        workspace_id: str,
+        principal_id: str,
+        tool: str,
+        key: str,
+        stored: StoredResult,
+        intent: EffectIntent,
     ) -> StoredResult:
-        """Atomically record the ledger row for (workspace, tool, key) and
+        """Atomically record the ledger row for (workspace, principal, tool,
+        key) -- contract section 5 as amended 2026-09-26 -- and
         `intent` -- or, if a row already exists, record neither and return
         that row. First write wins (section 5): a racing duplicate never
         leaves an orphan `proposed` intent behind."""
@@ -525,11 +534,19 @@ class UnavailableIntentStore:
     """The store until ActionQ's intent-lifecycle operation lands: every
     call fails closed, exactly as `UnavailableRunRegistry` does for runs."""
 
-    async def lookup(self, workspace_id: str, tool: str, key: str) -> StoredResult | None:
+    async def lookup(
+        self, workspace_id: str, principal_id: str, tool: str, key: str
+    ) -> StoredResult | None:
         raise ToolFailure("effects-unavailable", "the effect intent store is not available yet")
 
     async def create(
-        self, workspace_id: str, tool: str, key: str, stored: StoredResult, intent: EffectIntent
+        self,
+        workspace_id: str,
+        principal_id: str,
+        tool: str,
+        key: str,
+        stored: StoredResult,
+        intent: EffectIntent,
     ) -> StoredResult:
         raise ToolFailure("effects-unavailable", "the effect intent store is not available yet")
 
@@ -548,16 +565,32 @@ class InMemoryIntentStore:
         self._ledger = InMemoryIdempotencyLedger()
         self._intents: dict[str, EffectIntent] = {}
 
-    async def lookup(self, workspace_id: str, tool: str, key: str) -> StoredResult | None:
-        return await self._ledger.lookup(workspace_id, tool, key)
+    @staticmethod
+    def _scope(workspace_id: str, principal_id: str) -> str:
+        # The shared ledger protocol still takes a workspace only; fold the
+        # principal in unambiguously (contract section 5 amendment).
+        return json.dumps([workspace_id, principal_id], separators=(",", ":"))
+
+    async def lookup(
+        self, workspace_id: str, principal_id: str, tool: str, key: str
+    ) -> StoredResult | None:
+        return await self._ledger.lookup(self._scope(workspace_id, principal_id), tool, key)
 
     async def create(
-        self, workspace_id: str, tool: str, key: str, stored: StoredResult, intent: EffectIntent
+        self,
+        workspace_id: str,
+        principal_id: str,
+        tool: str,
+        key: str,
+        stored: StoredResult,
+        intent: EffectIntent,
     ) -> StoredResult:
         # The ledger's store never suspends, so the row and the intent are
         # written together on one event loop: the intent exists only if
         # this call's row is the one that won.
-        winner = await self._ledger.store(workspace_id, tool, key, stored)
+        winner = await self._ledger.store(
+            self._scope(workspace_id, principal_id), tool, key, stored
+        )
         if winner is stored:
             self._intents[intent.intent_id] = intent
         return winner
@@ -767,14 +800,16 @@ def _build(
                 "repository does not match the caller's bound repository",
             )
         digest = request_digest("propose_effect", parsed)
-        stored = await intent_store.lookup(binding.workspace_id, "propose_effect", parsed["idempotency_key"])
+        stored = await intent_store.lookup(
+            binding.workspace_id, binding.principal_id, "propose_effect", parsed["idempotency_key"]
+        )
         replay = replay_or_conflict(stored, digest)
         if replay is not None:
             return dict(replay)
 
         # Bind to the caller's E2 run: a mismatched or unknown run_id fails
         # here with run-not-found (or runs-unavailable before E2 lands).
-        await runs.resolve(parsed["run_id"], binding)
+        await runs.resolve(parsed["run_id"], binding, forwarded=forwarded)
 
         policy = _policy_for(parsed["repository"], repository_policies)
         validate_diff(parsed["unified_diff"], policy=policy)
@@ -792,6 +827,7 @@ def _build(
         result = {"intent_id": intent.intent_id, "state": intent.state}
         winner = await intent_store.create(
             binding.workspace_id,
+            binding.principal_id,
             "propose_effect",
             parsed["idempotency_key"],
             StoredResult(digest, result),
