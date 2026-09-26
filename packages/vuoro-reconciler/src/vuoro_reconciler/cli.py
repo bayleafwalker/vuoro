@@ -35,12 +35,16 @@ __all__ = ["main", "visible"]
 def visible(text: str) -> str:
     """`text` with every non-printable character -- C0/C1 controls (ESC,
     CR, ...), DEL, bidi overrides/isolates (U+202A-202E, U+2066-2069) and
-    other format or separator characters -- shown as an escape. Newline and
-    tab are kept: they cannot overwrite or reorder what is already shown."""
+    other format or separator characters -- shown as an escape. A literal
+    backslash is shown as `\\\\`, so the text `\\x1b` can never pass for an
+    escaped ESC. Newline and tab are kept: they cannot overwrite or reorder
+    what is already shown."""
 
     out = []
     for char in text:
-        if char in "\n\t" or char.isprintable():
+        if char == "\\":
+            out.append("\\\\")
+        elif char in "\n\t" or char.isprintable():
             out.append(char)
         elif ord(char) < 0x100:
             out.append(f"\\x{ord(char):02x}")
@@ -73,23 +77,46 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+#: Frame lines. Proposer text can never produce one: single-line fields have
+#: their newlines escaped, and every line of the rationale and diff is
+#: prefixed with RATIONALE_PREFIX or DIFF_PREFIX, so any line that starts
+#: with neither prefix comes from this CLI.
+RATIONALE_PREFIX = "| "
+DIFF_PREFIX = "> "
+HEADER = "==== vuoro-reconciler: effect intent (proposer text is escaped and prefixed) ===="
+RATIONALE_HEADER = f'---- rationale: every line prefixed "{RATIONALE_PREFIX}" ----'
+DIFF_HEADER = f'---- unified diff: every line prefixed "{DIFF_PREFIX}" ----'
+FOOTER = "==== end of effect intent ===="
+
+
+def _one_line(text: str) -> str:
+    return visible(text).replace("\n", "\\n")
+
+
+def _prefixed(text: str, prefix: str) -> str:
+    lines = visible(text).split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    return "".join(f"{prefix}{line}\n" for line in lines)
+
+
 def _show(intent: EffectIntent, out: TextIO) -> None:
-    v = visible
-    # The title is one line: a newline in it is escaped too.
-    title = v(intent.title).replace("\n", "\\n")
+    v = _one_line
     out.write(
+        f"{HEADER}\n"
         f"intent:     {v(intent.intent_id)}\n"
         f"run:        {v(intent.run_id)}\n"
         f"workspace:  {v(intent.workspace_id)}\n"
         f"repository: {v(intent.repository)} @ {v(intent.base_commit)}\n"
         f"proposer:   {v(intent.proposer_principal)}\n"
         f"kind:       {v(intent.effect_kind)}\n"
-        f"title:      {title}\n\n"
-        f"{v(intent.rationale)}\n\n"
-        f"{v(intent.unified_diff)}"
+        f"title:      {v(intent.title)}\n"
+        f"{RATIONALE_HEADER}\n"
+        f"{_prefixed(intent.rationale, RATIONALE_PREFIX)}"
+        f"{DIFF_HEADER}\n"
+        f"{_prefixed(intent.unified_diff, DIFF_PREFIX)}"
+        f"{FOOTER}\n"
     )
-    if not intent.unified_diff.endswith("\n"):
-        out.write("\n")
 
 
 async def _run(

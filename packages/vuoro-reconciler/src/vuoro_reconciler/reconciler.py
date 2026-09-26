@@ -24,7 +24,9 @@ from .diff_policy import (
     DiffPolicy,
     DiffPolicyViolation,
     check_changes,
+    check_patch_is_text,
     check_patch_text,
+    check_staged_content,
     is_git_control_path,
     patch_paths,
     staged_changes,
@@ -212,11 +214,14 @@ class Reconciler:
         """Validate, checkout, apply, re-validate and sign; the commit exists
         only in `workdir` until something pushes it."""
 
-        # Before anything is applied: no NUL bytes, and no path git would
-        # read as configuration (a .gitattributes could re-label binary
-        # content or name a filter driver for the `git add` below).
+        # Before anything is applied: no NUL byte, no binary hunk (by line
+        # and by git's own parse -- git apply cannot be told to refuse
+        # binary itself), and no path git would read as configuration (a
+        # .gitattributes could re-label binary content or name a filter
+        # driver for the `git add` below).
         try:
             check_patch_text(intent.unified_diff)
+            check_patch_is_text(intent.unified_diff)
             for path in patch_paths(intent.unified_diff):
                 if is_git_control_path(path):
                     raise DiffPolicyViolation("git-control-file-refused", path)
@@ -236,6 +241,7 @@ class Reconciler:
         try:
             changes = staged_changes(workdir)
             check_changes(changes, self.config.diff_policy_for(intent.repository))
+            check_staged_content(workdir, changes)
         except DiffPolicyViolation as violation:
             raise _Refused(f"diff-policy-refused: {violation.code}") from None
         if isinstance(acceptor, PolicyAcceptor) and not scope_admits(

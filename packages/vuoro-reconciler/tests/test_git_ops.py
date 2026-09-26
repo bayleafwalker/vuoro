@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 
 import pytest
+from vuoro_reconciler.gitenv import run_git
 from vuoro_reconciler.git_ops import (
     CheckoutFailed,
     DiffDoesNotApply,
@@ -82,7 +83,8 @@ def _head(bare_remote: Path) -> str:
 def test_checkout_disables_hooks(bare_remote: Path, tmp_path: Path) -> None:
     dest = tmp_path / "work"
     checkout_at(str(bare_remote), _head(bare_remote), str(dest))
-    hooks = subprocess.run(
-        ["git", "-C", str(dest), "config", "core.hooksPath"], capture_output=True, text=True, check=True
-    ).stdout.strip()
-    assert hooks == "/dev/null"
+    # Read through the scrubbed env, so an ambient global/system config
+    # cannot supply (or mask) the value being checked.
+    hooks = run_git("-C", str(dest), "config", "--local", "core.hooksPath")
+    assert hooks.returncode == 0, hooks.stderr
+    assert hooks.stdout.strip() == "/dev/null"

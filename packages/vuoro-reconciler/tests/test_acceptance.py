@@ -195,7 +195,7 @@ def test_cli_accept_shows_the_diff_and_records_the_operator(bare_remote: Path) -
         stdout=out,
     )
     assert code == 0
-    assert MODIFY_DIFF in out.getvalue()
+    assert "".join(f"> {line}\n" for line in MODIFY_DIFF.splitlines()) in out.getvalue()
     assert PROPOSER in out.getvalue()
     assert source.states["effect_acc0001"] == "accepted"
     assert source.records["effect_acc0001"].acceptor == OperatorAcceptor(subject="ops:alice")

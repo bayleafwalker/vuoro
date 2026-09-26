@@ -59,8 +59,25 @@ filter drivers, hooks, attribute files, aliases and credential helpers
 therefore never apply to a proposer's diff. Git control files
 (`.gitattributes`, `.gitmodules`, `.mailmap`, `.gitignore`, any other
 `.git*` name, `info/attributes`-style paths) are refused before the diff is
-applied and again on the staged result, whatever the path allowlist says,
-and so is any NUL byte in the patch.
+applied and again on the staged result, whatever the path allowlist says.
+
+Binary content is refused three times over, because a `GIT binary patch`
+literal is base85 (no NUL) and a base-commit attribute such as `*.md diff`
+makes git's own binary detection say "text":
+
+1. before applying, any NUL byte or binary-patch line (`GIT binary patch`,
+   `literal `, `delta `, `Binary files `) in the patch text;
+2. before applying, any hunk that `git apply --numstat`, parsing the patch
+   outside the checkout, reports as binary (git apply has no switch to
+   turn binary support off, so a binary hunk simply never reaches it);
+3. after applying, any staged blob containing NUL, a C0/C1 control
+   character other than tab and LF, DEL, or invalid UTF-8.
+
+The accept/reject view frames proposer text: a header and footer line,
+every rationale line prefixed `| `, every diff line prefixed `> `, and
+single-line fields with newlines escaped, so proposer text cannot produce a
+frame line. Backslashes are shown as `\\`, so the text `\x1b` cannot pass
+for an escaped ESC.
 
 ## What it does
 

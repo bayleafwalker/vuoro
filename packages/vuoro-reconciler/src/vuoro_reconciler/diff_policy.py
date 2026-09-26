@@ -10,8 +10,16 @@ its own, independently configured policy before anything is committed:
 - `staged_changes` reads the *result* of applying the patch to a clean
   checkout (`git diff --cached --raw --numstat --no-renames`), so no patch
   grammar trick can hide a touched path, a mode or a binary blob from it;
-- `check_patch_text` refuses a NUL byte anywhere in the patch text, before
-  it is applied (binary content in disguise);
+- binary content is refused three times over, because a `GIT binary patch`
+  literal carries no NUL byte (it is base85) and a base-commit attribute
+  such as `*.md diff` makes git's own binary detection say "text":
+  `check_patch_text` refuses a NUL byte or any binary-patch line
+  (`GIT binary patch`, `literal `, `delta `, `Binary files `) before
+  applying; `check_patch_is_text` refuses any hunk `git apply --numstat`
+  itself reports as binary, whatever the repository's attributes; and
+  `check_staged_content` reads every staged blob after applying and
+  refuses NUL, C0/C1 control characters other than tab and LF, DEL, or
+  invalid UTF-8 -- whatever the attributes say;
 - `check_changes` refuses what section 7 refuses: binary content, mode
   changes (including a new file created executable), symlinks, submodules,
   unsafe paths, deletes outside the repository's path allowlist, and CI
@@ -42,7 +50,9 @@ __all__ = [
     "DiffPolicyViolation",
     "StagedChange",
     "check_changes",
+    "check_patch_is_text",
     "check_patch_text",
+    "check_staged_content",
     "is_git_control_path",
     "patch_paths",
     "staged_changes",
@@ -116,12 +126,53 @@ def _git(*args: str, cwd: str) -> subprocess.CompletedProcess[bytes]:
     return run_git(*args, cwd=cwd, text=False)
 
 
+#: Lines that only ever appear in a binary patch, outside any hunk (inside a
+#: hunk every line starts with ' ', '+', '-' or '\\').
+_BINARY_PATCH_LINES: tuple[str, ...] = ("GIT binary patch", "literal ", "delta ", "Binary files ")
+
+
 def check_patch_text(unified_diff: str) -> None:
-    """Refuse a NUL byte anywhere in the patch text: text patches never
-    carry one, and git can be talked into treating such a file as text."""
+    """Refuse a NUL byte anywhere in the patch text, and any binary-patch
+    line: a `GIT binary patch` literal is base85 and carries no NUL, so the
+    NUL check alone would let binary (or control-character) content in."""
 
     if "\x00" in unified_diff:
         raise DiffPolicyViolation("binary-patch-refused", "the patch contains a NUL byte")
+    for line in unified_diff.splitlines():
+        if line.startswith(_BINARY_PATCH_LINES):
+            raise DiffPolicyViolation("binary-patch-refused", f"binary patch line {line[:40]!r}")
+
+
+def _numstat(unified_diff: str) -> list[tuple[bytes, bytes, str]]:
+    """`git apply --numstat -z` rows for `unified_diff`, parsed outside any
+    repository (it only parses; it applies nothing)."""
+
+    with tempfile.TemporaryDirectory(prefix="vuoro-patch-") as scratch:
+        patch = os.path.join(scratch, "intent.patch")
+        with open(patch, "w", encoding="utf-8") as handle:
+            handle.write(unified_diff)
+        result = _git("apply", "--numstat", "-z", patch, cwd=scratch)
+    if result.returncode != 0:
+        raise DiffPolicyViolation("diff-unparseable", "git apply could not parse the patch")
+    rows = []
+    for record in result.stdout.split(b"\0"):
+        if not record:
+            continue
+        added, deleted, path = record.split(b"\t", 2)
+        rows.append((added, deleted, path.decode("utf-8", "surrogateescape")))
+    return rows
+
+
+def check_patch_is_text(unified_diff: str) -> None:
+    """Refuse any hunk git's own patch parser reports as binary (`-` in
+    `--numstat`). git apply has no switch to turn binary support off, so
+    this is how the reconciler applies without it: a patch with a binary
+    hunk never reaches `git apply`. The patch is parsed outside the
+    checkout, so no attribute in the repository can re-label it."""
+
+    for added, deleted, path in _numstat(unified_diff):
+        if added == b"-" or deleted == b"-":
+            raise DiffPolicyViolation("binary-patch-refused", path)
 
 
 def patch_paths(unified_diff: str) -> tuple[str, ...]:
@@ -134,19 +185,7 @@ def patch_paths(unified_diff: str) -> tuple[str, ...]:
     git rejects the patch.
     """
 
-    with tempfile.TemporaryDirectory(prefix="vuoro-patch-") as scratch:
-        patch = os.path.join(scratch, "intent.patch")
-        with open(patch, "w", encoding="utf-8") as handle:
-            handle.write(unified_diff)
-        result = _git("apply", "--numstat", "-z", patch, cwd=scratch)
-    if result.returncode != 0:
-        raise DiffPolicyViolation("diff-unparseable", "git apply could not parse the patch")
-    paths = []
-    for record in result.stdout.split(b"\0"):
-        if not record:
-            continue
-        _added, _deleted, path = record.split(b"\t", 2)
-        paths.append(path.decode("utf-8", "surrogateescape"))
+    paths = [path for _added, _deleted, path in _numstat(unified_diff)]
     # Sources are taken from every such line, wherever it appears: an extra
     # path only makes a policy's path_globs harder to satisfy, never easier.
     for line in unified_diff.splitlines():
@@ -191,8 +230,37 @@ def staged_changes(repo_path: str) -> tuple[StagedChange, ...]:
     return tuple(changes)
 
 
+def check_staged_content(repo_path: str, changes: Iterable[StagedChange]) -> None:
+    """Read every added or modified blob from the index and refuse NUL
+    (binary), C0/C1 control characters other than tab and LF, DEL, or
+    invalid UTF-8 -- whatever `.gitattributes` in the base commit says
+    about the file. This is the last word on content: it looks at the bytes
+    that would be committed, not at any patch or attribute."""
+
+    for change in changes:
+        if change.status == "D":
+            continue
+        blob = _git("cat-file", "blob", f":{change.path}", cwd=repo_path)
+        if blob.returncode != 0:
+            raise DiffPolicyViolation("diff-unreadable", change.path)
+        if b"\0" in blob.stdout:
+            raise DiffPolicyViolation("binary-content-refused", change.path)
+        try:
+            text = blob.stdout.decode("utf-8")
+        except UnicodeDecodeError:
+            raise DiffPolicyViolation("non-utf8-content-refused", change.path) from None
+        for char in text:
+            code = ord(char)
+            if (code < 0x20 and char not in "\t\n") or 0x7F <= code <= 0x9F:
+                raise DiffPolicyViolation(
+                    "control-character-content-refused", f"{change.path}: U+{code:04X}"
+                )
+
+
 def _is_path_safe(path: str) -> bool:
     if not path or path.startswith("/") or "\x00" in path:
+        return False
+    if not path.isprintable():
         return False
     parts = path.split("/")
     return not any(part in ("", ".", "..", ".git") for part in parts)

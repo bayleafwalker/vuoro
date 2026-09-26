@@ -415,6 +415,13 @@ def validate_diff(unified_diff: str, *, policy: RepositoryEffectPolicy) -> None:
         if not touched:
             raise ToolFailure("diff-not-supported", "a diff section names no path")
         for path in touched:
+            if not path.isprintable():
+                # Control, bidi-override or other format characters in a
+                # path could rewrite or reorder what an operator sees.
+                raise ToolFailure(
+                    "path-not-printable",
+                    "a path contains a control or formatting character",
+                )
             if not _is_path_safe(path):
                 raise ToolFailure(
                     "path-outside-repository",

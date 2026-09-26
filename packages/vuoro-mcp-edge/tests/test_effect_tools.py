@@ -833,3 +833,18 @@ def test_a_multi_line_rationale_is_still_accepted(keys) -> None:
         client, keys, "propose_effect", _args(run_id=run_id, rationale="First line.\n\n\tIndented detail.")
     )
     assert result["isError"] is False, result
+
+
+@pytest.mark.parametrize(
+    "path", ["docs/evil\x1b[2K.md", "docs/re‮dm.md", "docs/a\rb.md", "docs/⁦x⁩.md", "docs/a\x85.md"]
+)
+def test_control_and_bidi_characters_in_diff_paths_are_refused(path) -> None:
+    with pytest.raises(ToolFailure) as failure:
+        validate_diff(modify_diff(path), policy=RepositoryEffectPolicy())
+    assert failure.value.code == "path-not-printable"
+
+
+def test_control_characters_in_a_rename_path_are_refused() -> None:
+    with pytest.raises(ToolFailure) as failure:
+        validate_diff(rename_diff("docs/a.md", "docs/‮b.md"), policy=RepositoryEffectPolicy(path_allowlist=frozenset({"*"})))
+    assert failure.value.code == "path-not-printable"

@@ -11,8 +11,10 @@ setup. Every call gets:
   `GIT_ATTR_NOSYSTEM=1`;
 - a fresh, empty `HOME` (and `XDG_CONFIG_HOME` under it), removed afterwards;
 - no inherited `GIT_*`, `GNUPGHOME` or `SSH_AUTH_SOCK`;
-- then `extra_env` -- in practice `SigningKey.env`, the one explicit
-  channel for signing configuration.
+- `extra_env` -- in practice `SigningKey.env`, the one explicit channel
+  for signing configuration -- merged *under* the isolation settings, so
+  it can add e.g. `GNUPGHOME` but never override `HOME`,
+  `XDG_CONFIG_HOME` or any `GIT_*` variable.
 """
 
 from __future__ import annotations
@@ -33,6 +35,10 @@ def scrubbed_env(home: str, extra_env: Mapping[str, str] | None = None) -> dict[
         for name, value in os.environ.items()
         if not name.startswith("GIT_") and name not in _DROPPED
     }
+    # extra_env first, isolation last: even an extra_env that slipped past
+    # SigningKey's own refusal cannot re-point HOME, XDG_CONFIG_HOME or
+    # any GIT_* variable.
+    env.update({name: value for name, value in (extra_env or {}).items() if not name.startswith("GIT_")})
     env.update(
         {
             "HOME": home,
@@ -43,7 +49,6 @@ def scrubbed_env(home: str, extra_env: Mapping[str, str] | None = None) -> dict[
             "GIT_TERMINAL_PROMPT": "0",
         }
     )
-    env.update(extra_env or {})
     return env
 
 

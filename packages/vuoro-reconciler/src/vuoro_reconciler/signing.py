@@ -19,6 +19,11 @@ __all__ = ["SigningKey", "configure_signing", "verify_commit"]
 
 KeyFormat = Literal["openpgp", "ssh"]
 
+#: What `gitenv` pins for isolation; a key may not point git back at a
+#: real home directory or config (every `GIT_*` is refused as well, which
+#: covers GIT_CONFIG_*, GIT_DIR, GIT_WORK_TREE and GIT_INDEX_FILE).
+_ISOLATION_VARIABLES = frozenset({"HOME", "XDG_CONFIG_HOME"})
+
 
 @dataclass(frozen=True)
 class SigningKey:
@@ -36,7 +41,7 @@ class SigningKey:
     signing input: every git call runs in `gitenv`'s scrubbed environment
     (no global/system config, fresh `HOME`, no inherited `GIT_*`,
     `GNUPGHOME` or `SSH_AUTH_SOCK`), with `env` merged on top. It may not
-    set `GIT_*` variables.
+    set `GIT_*` variables, `HOME` or `XDG_CONFIG_HOME`.
     """
 
     key_format: KeyFormat
@@ -50,9 +55,11 @@ class SigningKey:
         # Git itself is configured only through the checkout's own config
         # (configure_signing); `env` is for the signing backend (e.g.
         # GNUPGHOME), never a way to re-inject ambient git configuration.
-        smuggled = sorted(name for name in self.env if name.startswith("GIT_"))
+        smuggled = sorted(
+            name for name in self.env if name.startswith("GIT_") or name in _ISOLATION_VARIABLES
+        )
         if smuggled:
-            raise ValueError(f"SigningKey.env may not set git variables: {smuggled}")
+            raise ValueError(f"SigningKey.env may not set git or isolation variables: {smuggled}")
 
 
 def configure_signing(repo_path: str, key: SigningKey) -> None:
