@@ -48,7 +48,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 from vuoro_service.identity import Identity, IdentityResolutionError
 
-from .errors import WorkSourceUnavailable, client_error
+from .errors import WorkSourceUnavailable, client_error, is_not_found
 from .work_source import ForwardedIdentity, ShellWorkSource
 
 __all__ = [
@@ -434,17 +434,30 @@ def create_edge_app(
         try:
             structured = await run(parsed, forwarded)
         except WorkSourceUnavailable as error:
-            LOGGER.warning(
-                "work source failed",
-                extra={
-                    "tool": name,
-                    "code": error.code,
-                    "upstream": error.upstream,
-                    "detail": error.message,
-                    "request_id": request_id,
-                },
-            )
-            raise _ToolFailure(**client_error(error)) from error
+            failure = client_error(error)
+            if is_not_found(error):
+                # An ordinary not-found answer from the contract, not the
+                # work source failing to answer: never "work source failed".
+                LOGGER.info(
+                    "work item not found",
+                    extra={
+                        "tool": name,
+                        "code": failure["code"],
+                        "request_id": request_id,
+                    },
+                )
+            else:
+                LOGGER.warning(
+                    "work source failed",
+                    extra={
+                        "tool": name,
+                        "code": error.code,
+                        "upstream": error.upstream,
+                        "detail": error.message,
+                        "request_id": request_id,
+                    },
+                )
+            raise _ToolFailure(**failure) from error
         return _tool_success(structured)
 
     def _json(payload: dict[str, Any], status_code: int = 200) -> JSONResponse:

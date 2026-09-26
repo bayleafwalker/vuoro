@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 
 import httpx
 import pytest
@@ -224,6 +225,32 @@ def test_unknown_work_id_is_item_not_found_tool_error(keys, auth) -> None:
     _assert_tool_error(result, "item-not-found")
     assert shell.invocations[0]["arguments"] == {"work_id": 99}
     assert shell.invocations[0]["operation"] == "work.public.item-v1"
+
+
+def test_unknown_work_id_is_not_logged_as_a_work_source_failure(keys, auth, caplog) -> None:
+    """Not-found is an ordinary contract answer, not the work source failing."""
+
+    shell = FakeShell(rejected(404, "item-not-found", "Item #99 not found"))
+    with caplog.at_level(logging.INFO, logger="vuoro_mcp_edge.server"):
+        _, result = _call(keys, auth, shell, "describe_work", {"work_id": 99})
+    _assert_tool_error(result, "item-not-found")
+    messages = [record.getMessage() for record in caplog.records]
+    assert "work source failed" not in messages
+    assert not any(record.levelno == logging.WARNING for record in caplog.records)
+    assert any(record.levelno == logging.INFO for record in caplog.records)
+
+
+def test_genuine_unavailability_still_logs_work_source_failed_at_warning(
+    keys, auth, caplog
+) -> None:
+    shell = FakeShell(rejected(503, "postgres-runtime-unavailable", "work runtime unavailable"))
+    with caplog.at_level(logging.INFO, logger="vuoro_mcp_edge.server"):
+        _, result = _call(keys, auth, shell, "list_ready_work")
+    _assert_tool_error(result, "postgres-runtime-unavailable")
+    warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    assert warnings[0].getMessage() == "work source failed"
+    assert warnings[0].code == "postgres-runtime-unavailable"
 
 
 def test_shell_identity_rejection_is_a_tool_error(keys, auth) -> None:
