@@ -50,7 +50,7 @@ def test_initialize_echoes_every_supported_version(client, auth, version) -> Non
     result = response.json()["result"]
     assert result["protocolVersion"] == version
     assert result["capabilities"] == {"tools": {"listChanged": False}}
-    assert result["resultType"] == "initialize-result"
+    assert result["resultType"] == "complete"
     assert "mcp-session-id" not in response.headers
 
 
@@ -105,7 +105,7 @@ def test_current_era_discover_without_any_handshake(client, auth) -> None:
     assert response.status_code == 200
     result = response.json()["result"]
     assert result["protocolVersion"] == CURRENT_VERSION
-    assert result["resultType"] == "discover-result"
+    assert result["resultType"] == "complete"
     assert [tool["name"] for tool in result["tools"]] == list(TOOL_ORDER)
     assert result["supportedVersions"] == sorted([*LEGACY_VERSIONS, CURRENT_VERSION])
 
@@ -113,9 +113,36 @@ def test_current_era_discover_without_any_handshake(client, auth) -> None:
 def test_tools_list_order_is_fixed_and_envelope_carries_cache_fields(client, auth) -> None:
     result = client.post(MCP_PATH, headers=auth, json=rpc("tools/list")).json()["result"]
     assert [tool["name"] for tool in result["tools"]] == ["list_ready_work", "describe_work"]
-    assert result["resultType"] == "tools-list-result"
+    assert result["resultType"] == "complete"
     assert result["ttlMs"] == 0
-    assert result["cacheScope"] == "none"
+    assert result["cacheScope"] == "private"
+
+
+@pytest.mark.parametrize(
+    "method, params",
+    [
+        ("server/discover", None),
+        ("tools/list", None),
+        ("tools/call", {"name": "no_such_tool", "arguments": {}}),
+    ],
+)
+def test_results_satisfy_the_2026_07_28_client_contract(client, auth, method, params) -> None:
+    """What a 2026-07-28 client (Claude Code 2.1.283) enforces before it keeps a
+    result: resultType is a completion kind, never a per-method name, and list
+    results carry an integer ttlMs and a public/private cacheScope. Per-method
+    names made Claude Code drop every Vuoro tool ("Unsupported result type
+    'tools-list-result' for tools/list") while claude.ai chat still worked."""
+    response = client.post(
+        MCP_PATH,
+        headers={**auth, "MCP-Protocol-Version": CURRENT_VERSION},
+        json=rpc(method, params),
+    )
+    result = response.json()["result"]
+    assert result["resultType"] in {"complete", "input_required", "task"}
+    assert result["resultType"] == "complete"
+    if method in ("server/discover", "tools/list"):
+        assert isinstance(result["ttlMs"], int) and result["ttlMs"] >= 0
+        assert result["cacheScope"] in {"public", "private"}
 
 
 def test_describe_work_takes_an_integer_work_id(client, auth) -> None:

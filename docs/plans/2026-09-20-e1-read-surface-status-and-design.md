@@ -43,8 +43,10 @@ sufficient per the operator's silent-pass rule.
   `-32020`. Absence on either side is not a mismatch -- a dual-era client
   legitimately omits these headers.
 - `server/discover` implemented, callable with no prior `initialize`.
-- `resultType` on every result (`initialize-result`, `discover-result`,
-  `tools-list-result`, `tool-call-result`).
+- `resultType: "complete"` on every result. (Until 2026-09-26 the edge sent
+  per-method names -- `tools-list-result` and so on -- which the 2026-07-28
+  revision does not allow: Claude Code refused the tool list and hosted
+  Routines saw no Vuoro tools.)
 - `ttlMs` and `cacheScope` on every list and read result (both tools).
 - Deterministic tool ordering: `TOOL_ORDER = ("list_ready_work",
   "describe_work")`, a fixed tuple, never a dict-iteration or a sort.
