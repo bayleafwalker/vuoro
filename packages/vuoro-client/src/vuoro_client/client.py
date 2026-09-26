@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from importlib.metadata import PackageNotFoundError, version
 import asyncio
 import math
 import time
@@ -30,6 +31,16 @@ SUPPORTED_SCHEMA_FEATURES = frozenset(
 )
 
 
+def _client_version() -> str:
+    try:
+        return version("vuoro-client")
+    except PackageNotFoundError:
+        return "unknown"
+
+
+USER_AGENT = f"vuoro-client/{_client_version()}"
+
+
 CredentialResolver = Callable[[str], str]
 ObservationHook = Callable[[Mapping[str, Any]], None]
 
@@ -48,7 +59,11 @@ class AsyncVuoroClient:
         self.profile = profile
         self._credential_resolver = credential_resolver
         self.supported_schema_features = supported_schema_features
-        self._http = httpx.AsyncClient(base_url=profile.endpoint, transport=transport)
+        self._http = httpx.AsyncClient(
+            base_url=profile.endpoint,
+            transport=transport,
+            headers={"User-Agent": USER_AGENT},
+        )
         self._catalog: dict[str, Any] | None = None
         self._catalog_etag: str | None = None
         self.active_environment: str | None = None
@@ -84,7 +99,8 @@ class AsyncVuoroClient:
         return headers
 
     async def handshake(self) -> dict[str, Any]:
-        response = await self._http.get("/api/meta/v1/handshake")
+        headers = self._headers(authenticated=bool(self.profile.credential_ref))
+        response = await self._http.get("/api/meta/v1/handshake", headers=headers)
         response.raise_for_status()
         handshake = response.json()
         protocol_range = handshake["client_protocol"]
@@ -143,7 +159,7 @@ class AsyncVuoroClient:
         return "\n".join(lines)
 
     async def catalog(self, *, force_refresh: bool = False) -> dict[str, Any]:
-        headers = self._headers(authenticated=False)
+        headers = self._headers(authenticated=bool(self.profile.credential_ref))
         if self._catalog_etag and not force_refresh:
             headers["If-None-Match"] = self._catalog_etag
         response = await self._http.get("/api/catalog/v1", headers=headers)
