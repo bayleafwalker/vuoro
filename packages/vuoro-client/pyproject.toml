@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "vuoro-client"
-version = "0.1.0"
+version = "0.1.1"
 description = "Transport-only client for Vuoro governed-work services"
 readme = "README.md"
 requires-python = ">=3.12"

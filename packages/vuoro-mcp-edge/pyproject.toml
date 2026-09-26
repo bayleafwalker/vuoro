@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "vuoro-mcp-edge"
-version = "0.1.1"
+version = "0.1.2"
 description = "Vuoro MCP protocol server: read tools over gateway identity assertions"
 readme = "README.md"
 requires-python = ">=3.12"
