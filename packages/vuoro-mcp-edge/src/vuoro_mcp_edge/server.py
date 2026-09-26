@@ -39,7 +39,7 @@ from __future__ import annotations
 import inspect
 import json
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
@@ -49,6 +49,7 @@ from fastapi.responses import JSONResponse, Response
 from vuoro_service.identity import Identity, IdentityResolutionError
 
 from .errors import WorkSourceUnavailable, client_error, is_not_found
+from .toolsets import BUCKET_AUTHORITIES, ToolFailure, ToolSet, merge_toolsets
 from .work_source import ForwardedIdentity, ShellWorkSource
 
 __all__ = [
@@ -187,18 +188,6 @@ _TOOL_DEFS: dict[str, dict[str, Any]] = {
 MAX_BODY_BYTES = 64 * 1024
 
 
-def _callable_tools() -> list[str]:
-    return [name for name in TOOL_ORDER if name in TOOL_SCOPES and name in _TOOL_DEFS]
-
-
-def _tool_list_payload() -> list[dict[str, Any]]:
-    return [_TOOL_DEFS[name] for name in _callable_tools()]
-
-
-def _allowed_authorities() -> frozenset[str]:
-    return frozenset(SCOPE_AUTHORITIES[scope] for scope in set(TOOL_SCOPES.values()))
-
-
 # ---------------------------------------------------------------------------
 # JSON-RPC helpers
 # ---------------------------------------------------------------------------
@@ -280,13 +269,47 @@ def create_edge_app(
     *,
     identity_resolver: IdentityVerifier,
     work_source: ShellWorkSource,
+    toolsets: Sequence[ToolSet] = (),
 ) -> FastAPI:
     """Build the MCP protocol server.
 
     `identity_resolver` is the runtime shell's gateway assertion verifier
     (`GatewayAssertionIdentityResolver`); `work_source` reads the
     public-work contract through the shell.  Neither holds a credential.
+    `toolsets` add write-class tools after the built-in read tools (see
+    `toolsets.py`); a name collision is a startup error.
     """
+
+    tool_order, toolset_specs = merge_toolsets(TOOL_ORDER, toolsets)
+
+    def _tool_bucket(name: str) -> str | None:
+        if name in toolset_specs:
+            return toolset_specs[name].bucket
+        return TOOL_SCOPES.get(name)
+
+    def _bucket_authority(bucket: str) -> str | None:
+        return SCOPE_AUTHORITIES.get(bucket) or BUCKET_AUTHORITIES.get(bucket)
+
+    def _app_callable_tools() -> list[str]:
+        return [
+            name
+            for name in tool_order
+            if name in toolset_specs or (name in TOOL_SCOPES and name in _TOOL_DEFS)
+        ]
+
+    def _app_tool_list_payload() -> list[dict[str, Any]]:
+        return [
+            dict(toolset_specs[name].definition) if name in toolset_specs else _TOOL_DEFS[name]
+            for name in _app_callable_tools()
+        ]
+
+    def _app_allowed_authorities() -> frozenset[str]:
+        buckets = {_tool_bucket(name) for name in _app_callable_tools()}
+        return frozenset(
+            authority
+            for authority in (_bucket_authority(bucket) for bucket in buckets if bucket)
+            if authority
+        )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -321,7 +344,7 @@ def create_edge_app(
         # The gateway mints MCP assertions carrying only what this surface's
         # scope table can use.  A broader assertion was minted for something
         # else and is refused, not narrowed.
-        if not identity.authorities or not identity.authorities <= _allowed_authorities():
+        if not identity.authorities or not identity.authorities <= _app_allowed_authorities():
             return None
         return identity, assertion, request_id
 
@@ -366,7 +389,10 @@ def create_edge_app(
                 "the caller's assertion names more than one repository",
             )
         return ForwardedIdentity(
-            assertion=assertion, request_id=request_id, repo_id=repo_ids[0]
+            assertion=assertion,
+            request_id=request_id,
+            repo_id=repo_ids[0],
+            identity=identity,
         )
 
     def _invalid_params(message: str) -> _ToolFailure:
@@ -414,17 +440,27 @@ def create_edge_app(
         params: dict[str, Any], identity: Identity, assertion: str, request_id: str
     ) -> dict[str, Any]:
         name = params.get("name")
-        if not isinstance(name, str) or name not in _callable_tools() or name not in tools:
+        if not isinstance(name, str) or name not in _app_callable_tools():
+            raise _ToolFailure("unknown-tool", "no callable tool has that name")
+        if name not in tools and name not in toolset_specs:
             raise _ToolFailure("unknown-tool", "no callable tool has that name")
         arguments = params.get("arguments")
         if arguments is None:
             arguments = {}
         if not isinstance(arguments, dict):
             raise _invalid_params("arguments must be an object")
-        parse, run = tools[name]
-        parsed = parse(arguments)
-        scope = TOOL_SCOPES[name]
-        authority = SCOPE_AUTHORITIES.get(scope)
+        if name in toolset_specs:
+            spec = toolset_specs[name]
+            try:
+                parsed = spec.parse(arguments)
+            except ToolFailure as failure:
+                raise _ToolFailure(failure.code, failure.message) from failure
+            run = spec.run
+        else:
+            parse, run = tools[name]
+            parsed = parse(arguments)
+        scope = _tool_bucket(name) or ""
+        authority = _bucket_authority(scope)
         if authority is None or authority not in identity.authorities:
             raise _ToolFailure(
                 "authority-required",
@@ -433,6 +469,8 @@ def create_edge_app(
         forwarded = _forwarded(identity, assertion, request_id)
         try:
             structured = await run(parsed, forwarded)
+        except ToolFailure as failure:
+            raise _ToolFailure(failure.code, failure.message) from failure
         except WorkSourceUnavailable as error:
             failure = client_error(error)
             if is_not_found(error):
@@ -579,7 +617,7 @@ def create_edge_app(
                     "supportedVersions": sorted(SUPPORTED_PROTOCOL_VERSIONS),
                     "capabilities": capabilities,
                     "serverInfo": server_info,
-                    "tools": _tool_list_payload(),
+                    "tools": _app_tool_list_payload(),
                 },
                 ttl_ms=0,
                 cache_scope="private",
@@ -588,7 +626,7 @@ def create_edge_app(
 
         if method == "tools/list":
             result = _with_envelope(
-                {"tools": _tool_list_payload()},
+                {"tools": _app_tool_list_payload()},
                 ttl_ms=0,
                 cache_scope="private",
             )

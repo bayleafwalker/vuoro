@@ -203,14 +203,18 @@ class FakeShell:
         return [json.loads(r.content) for r in self.invoke_requests]
 
 
-def edge_client(key_path: Path, shell: Any, **resolver_kwargs: Any) -> TestClient:
+def edge_client(
+    key_path: Path, shell: Any, *, toolsets: tuple[Any, ...] = (), **resolver_kwargs: Any
+) -> TestClient:
     from vuoro_mcp_edge.server import create_edge_app
     from vuoro_mcp_edge.work_source import ShellWorkSource
 
     transport = shell if isinstance(shell, httpx.AsyncBaseTransport) else httpx.MockTransport(shell)
     source = ShellWorkSource(base_url="http://127.0.0.1:8080", transport=transport)
     app = create_edge_app(
-        identity_resolver=resolver(key_path, **resolver_kwargs), work_source=source
+        identity_resolver=resolver(key_path, **resolver_kwargs),
+        work_source=source,
+        toolsets=toolsets,
     )
     return TestClient(app)
 
