@@ -848,3 +848,14 @@ def test_control_characters_in_a_rename_path_are_refused() -> None:
     with pytest.raises(ToolFailure) as failure:
         validate_diff(rename_diff("docs/a.md", "docs/‮b.md"), policy=RepositoryEffectPolicy(path_allowlist=frozenset({"*"})))
     assert failure.value.code == "path-not-printable"
+
+
+@pytest.mark.parametrize("path", ["0:docs/readme.md", "docs/a:b.md", ":(glob)*", "-rf", "-docs/x.md"])
+def test_colon_and_leading_dash_paths_are_refused(path) -> None:
+    with pytest.raises(ToolFailure) as failure:
+        validate_diff(add_diff(path), policy=RepositoryEffectPolicy())
+    assert failure.value.code == "unsupported-path"
+
+
+def test_a_glob_character_filename_is_accepted_as_a_literal_path() -> None:
+    validate_diff(add_diff("docs/*"), policy=RepositoryEffectPolicy())

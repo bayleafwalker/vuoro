@@ -16,6 +16,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 import logging
+import re
 import shutil
 import tempfile
 
@@ -28,6 +29,7 @@ from .diff_policy import (
     check_patch_text,
     check_staged_content,
     is_git_control_path,
+    is_unsupported_path,
     patch_paths,
     staged_changes,
 )
@@ -56,6 +58,10 @@ __all__ = [
 
 
 _log = logging.getLogger(__name__)
+
+#: An intent id becomes part of a branch name and a push refspec, so only
+#: plain ref-safe characters: no '.', ':', '/', '~', '^', '-' prefix, ...
+_INTENT_ID = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_-]{0,127}")
 
 
 class RepositoryNotAllowlisted(Exception):
@@ -157,6 +163,8 @@ class Reconciler:
                 raise _Refused(f"policy-acceptor-stale: {stale}")
             if not scope_admits(acceptor.scope, intent, ()):
                 raise _Refused("outside-policy-scope")
+        if not _INTENT_ID.fullmatch(intent.intent_id or ""):
+            raise _Refused("invalid-intent-id")
         if intent.effect_kind != "diff":
             raise _Refused("effect-kind-not-supported")
         if intent.repository not in self.config.repository_allowlist:
@@ -223,6 +231,8 @@ class Reconciler:
             check_patch_text(intent.unified_diff)
             check_patch_is_text(intent.unified_diff)
             for path in patch_paths(intent.unified_diff):
+                if is_unsupported_path(path):
+                    raise DiffPolicyViolation("unsupported-path", path)
                 if is_git_control_path(path):
                     raise DiffPolicyViolation("git-control-file-refused", path)
         except DiffPolicyViolation as violation:

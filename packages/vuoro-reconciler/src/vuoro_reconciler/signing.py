@@ -66,21 +66,21 @@ def configure_signing(repo_path: str, key: SigningKey) -> None:
     """Set the checkout's git config so `git commit -S` commits as the
     reconciler's identity and signs with `key`."""
 
-    _git(repo_path, "config", "user.name", key.committer_name, key=key)
-    _git(repo_path, "config", "user.email", key.committer_email, key=key)
-    _git(repo_path, "config", "commit.gpgsign", "true", key=key)
-    _git(repo_path, "config", "gpg.format", key.key_format, key=key)
-    _git(repo_path, "config", "user.signingkey", key.signing_key, key=key)
+    _git(repo_path, "config", "--", "user.name", key.committer_name, key=key)
+    _git(repo_path, "config", "--", "user.email", key.committer_email, key=key)
+    _git(repo_path, "config", "--", "commit.gpgsign", "true", key=key)
+    _git(repo_path, "config", "--", "gpg.format", key.key_format, key=key)
+    _git(repo_path, "config", "--", "user.signingkey", key.signing_key, key=key)
     if key.key_format == "ssh":
         if not key.allowed_signers_file:
             raise ValueError("an ssh SigningKey needs allowed_signers_file to verify with")
-        _git(repo_path, "config", "gpg.ssh.allowedSignersFile", key.allowed_signers_file, key=key)
+        _git(repo_path, "config", "--", "gpg.ssh.allowedSignersFile", key.allowed_signers_file, key=key)
 
 
 def verify_commit(repo_path: str, ref: str, key: SigningKey) -> bool:
     """True if `ref`'s signature verifies against `key`."""
 
-    result = _git(repo_path, "verify-commit", ref, key=key, check=False)
+    result = _git(repo_path, "verify-commit", "--end-of-options", ref, key=key, check=False)
     return result.returncode == 0
 
 

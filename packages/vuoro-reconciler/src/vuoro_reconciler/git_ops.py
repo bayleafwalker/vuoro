@@ -7,10 +7,15 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import os
+import re
 import subprocess
 import tempfile
 
 from .intents import Acceptor
+
+#: A full object id (SHA-1 or SHA-256), the only form of a commit this
+#: module passes to git on a proposer's behalf.
+OBJECT_ID = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 from .gitenv import run_git
 from .signing import SigningKey, configure_signing
 
@@ -55,10 +60,14 @@ def checkout_at(clone_url: str, base_commit: str, dest: str) -> None:
     runs on checkout or commit.
     """
 
-    cloned = _run("clone", "-c", "core.hooksPath=/dev/null", "--no-local", clone_url, dest)
+    # base_commit comes from the proposer: only a full object id is ever
+    # passed to git, never a revision expression or anything option-like.
+    if not OBJECT_ID.fullmatch(base_commit or ""):
+        raise CheckoutFailed(f"base_commit {base_commit!r} is not a full object id")
+    cloned = _run("clone", "-c", "core.hooksPath=/dev/null", "--no-local", "--", clone_url, dest)
     if cloned.returncode != 0:
         raise CheckoutFailed(f"git clone failed: {cloned.stderr.strip()}")
-    checked_out = _run("-C", dest, "checkout", "--detach", base_commit)
+    checked_out = _run("-C", dest, "checkout", "--detach", base_commit, "--")
     if checked_out.returncode != 0:
         raise CheckoutFailed(f"base_commit {base_commit!r} could not be checked out")
 
@@ -75,10 +84,10 @@ def try_apply_diff(repo_path: str, unified_diff: str) -> None:
         handle.write(unified_diff)
         patch_path = handle.name
     try:
-        checked = _run("-C", repo_path, "apply", "--check", patch_path)
+        checked = _run("-C", repo_path, "apply", "--check", "--", patch_path)
         if checked.returncode != 0:
             raise DiffDoesNotApply(checked.stderr.strip() or "git apply --check failed")
-        applied = _run("-C", repo_path, "apply", patch_path)
+        applied = _run("-C", repo_path, "apply", "--", patch_path)
         if applied.returncode != 0:
             # A second, independent check: --check and the real apply can
             # disagree (e.g. a race on the working tree), so this path is
@@ -125,9 +134,17 @@ def commit_signed(
     if add.returncode != 0:  # pragma: no cover - defensive
         raise RuntimeError(f"git add failed: {add.stderr.strip()}")
     message = f"{title}\n\n{rationale}\n\n{trailer(run_id, intent_id, acceptor)}\n"
-    committed = _run(
-        "-C", repo_path, "commit", "--no-verify", "-S", "-m", message, env=key.env
-    )
+    # The message is proposer text: pass it as a file, never as an argv
+    # value git could mistake for an option.
+    with tempfile.NamedTemporaryFile("w", suffix=".msg", delete=False, encoding="utf-8") as handle:
+        handle.write(message)
+        message_path = handle.name
+    try:
+        committed = _run(
+            "-C", repo_path, "commit", "--no-verify", "-S", "--file", message_path, env=key.env
+        )
+    finally:
+        os.unlink(message_path)
     if committed.returncode != 0:
         raise RuntimeError(f"signed commit failed: {committed.stderr.strip()}")
     sha = _run("-C", repo_path, "rev-parse", "HEAD", env=key.env)
@@ -138,7 +155,10 @@ def remote_branch_tip(repo_path: str, branch: str) -> str | None:
     """The commit `branch` pointed at on the clone's origin when it was
     cloned, or `None` if it did not exist there."""
 
-    tip = _run("-C", repo_path, "rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{branch}^{{commit}}")
+    tip = _run(
+        "-C", repo_path, "rev-parse", "--verify", "--quiet", "--end-of-options",
+        f"refs/remotes/origin/{branch}^{{commit}}",
+    )
     return tip.stdout.strip() if tip.returncode == 0 else None
 
 
@@ -148,8 +168,8 @@ def same_change(repo_path: str, existing: str, candidate: str) -> bool:
     from the first run's only in its timestamp and signature."""
 
     def shape(ref: str) -> tuple[str, str]:
-        tree = _run("-C", repo_path, "rev-parse", f"{ref}^{{tree}}").stdout.strip()
-        parents = _run("-C", repo_path, "rev-list", "--parents", "-n", "1", ref).stdout.split()[1:]
+        tree = _run("-C", repo_path, "rev-parse", "--end-of-options", f"{ref}^{{tree}}").stdout.strip()
+        parents = _run("-C", repo_path, "rev-list", "--parents", "-n", "1", ref, "--").stdout.split()[1:]
         return tree, " ".join(parents)
 
     return shape(existing) == shape(candidate)
@@ -176,7 +196,7 @@ def push_branch(
 
     refuse_if_protected(branch, protected_branches)
     pushed = _run(
-        "-C", repo_path, "push", remote_url, f"HEAD:refs/heads/{branch}"
+        "-C", repo_path, "push", "--", remote_url, f"HEAD:refs/heads/{branch}"
     )
     if pushed.returncode != 0:
         raise RuntimeError(f"git push failed: {pushed.stderr.strip()}")

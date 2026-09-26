@@ -40,6 +40,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 import fnmatch
 import os
+import re
 import subprocess
 import tempfile
 
@@ -54,6 +55,7 @@ __all__ = [
     "check_patch_text",
     "check_staged_content",
     "is_git_control_path",
+    "is_unsupported_path",
     "patch_paths",
     "staged_changes",
 ]
@@ -120,10 +122,13 @@ class StagedChange:
     old_mode: str
     new_mode: str
     binary: bool
+    #: The staged blob's full object id (from `--raw --no-abbrev`); the
+    #: content scan reads by this id, never by path.
+    new_sha: str = ""
 
 
-def _git(*args: str, cwd: str) -> subprocess.CompletedProcess[bytes]:
-    return run_git(*args, cwd=cwd, text=False)
+def _git(*args: str, cwd: str, input: bytes | None = None) -> subprocess.CompletedProcess[bytes]:
+    return run_git(*args, cwd=cwd, text=False, input=input)
 
 
 #: Lines that only ever appear in a binary patch, outside any hunk (inside a
@@ -198,7 +203,7 @@ def patch_paths(unified_diff: str) -> tuple[str, ...]:
 def staged_changes(repo_path: str) -> tuple[StagedChange, ...]:
     """What the index of `repo_path` changes relative to HEAD."""
 
-    raw = _git("diff", "--cached", "--raw", "-z", "--no-renames", cwd=repo_path)
+    raw = _git("diff", "--cached", "--raw", "-z", "--no-renames", "--no-abbrev", cwd=repo_path)
     numstat = _git("diff", "--cached", "--numstat", "-z", "--no-renames", cwd=repo_path)
     if raw.returncode != 0 or numstat.returncode != 0:
         raise DiffPolicyViolation("diff-unreadable", "git diff --cached failed")
@@ -217,7 +222,7 @@ def staged_changes(repo_path: str) -> tuple[StagedChange, ...]:
         meta = tokens[index].decode()
         path = tokens[index + 1].decode("utf-8", "surrogateescape")
         index += 2
-        old_mode, new_mode, _old_sha, _new_sha, status = meta.lstrip(":").split(" ")
+        old_mode, new_mode, _old_sha, new_sha, status = meta.lstrip(":").split(" ")
         changes.append(
             StagedChange(
                 path=path,
@@ -225,36 +230,93 @@ def staged_changes(repo_path: str) -> tuple[StagedChange, ...]:
                 old_mode=old_mode,
                 new_mode=new_mode,
                 binary=binary.get(path, False),
+                new_sha=new_sha,
             )
         )
     return tuple(changes)
 
 
+_OBJECT_ID = re.compile(rb"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+
+
+def _read_blobs(repo_path: str, object_ids: list[str]) -> dict[str, bytes]:
+    """The content of every blob in `object_ids`, read by object id through
+    one `git cat-file --batch` call. Any object that is missing, not a
+    blob, or not reported exactly as asked is a refusal -- never skipped."""
+
+    if not object_ids:
+        return {}
+    request = "".join(f"{oid}\n" for oid in object_ids).encode("ascii")
+    result = _git("cat-file", "--batch", cwd=repo_path, input=request)
+    if result.returncode != 0:
+        raise DiffPolicyViolation("diff-unreadable", "git cat-file --batch failed")
+    out = result.stdout
+    blobs: dict[str, bytes] = {}
+    offset = 0
+    for oid in object_ids:
+        newline = out.find(b"\n", offset)
+        if newline < 0:
+            raise DiffPolicyViolation("diff-unreadable", f"truncated batch output at {oid}")
+        header = out[offset:newline].split(b" ")
+        offset = newline + 1
+        if len(header) != 3 or header[0].decode("ascii", "replace") != oid or header[1] != b"blob":
+            raise DiffPolicyViolation("blob-missing", f"{oid}: {b' '.join(header)[:80]!r}")
+        if not header[2].isdigit():
+            raise DiffPolicyViolation("diff-unreadable", f"{oid}: bad size")
+        size = int(header[2])
+        if offset + size + 1 > len(out) or out[offset + size : offset + size + 1] != b"\n":
+            raise DiffPolicyViolation("diff-unreadable", f"{oid}: truncated content")
+        blobs[oid] = out[offset : offset + size]
+        offset += size + 1
+    if offset != len(out):
+        raise DiffPolicyViolation("diff-unreadable", "unexpected trailing batch output")
+    return blobs
+
+
+def _check_text(path: str, data: bytes) -> None:
+    if b"\0" in data:
+        raise DiffPolicyViolation("binary-content-refused", path)
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        raise DiffPolicyViolation("non-utf8-content-refused", path) from None
+    for index, char in enumerate(text):
+        code = ord(char)
+        if char == "\r" and text[index + 1 : index + 2] == "\n":
+            continue  # CRLF line ending: allowed; a lone CR is not
+        if (code < 0x20 and char not in "\t\n") or 0x7F <= code <= 0x9F:
+            raise DiffPolicyViolation("control-character-content-refused", f"{path}: U+{code:04X}")
+
+
 def check_staged_content(repo_path: str, changes: Iterable[StagedChange]) -> None:
-    """Read every added or modified blob from the index and refuse NUL
-    (binary), C0/C1 control characters other than tab and LF, DEL, or
+    """Read every added or modified blob and refuse NUL (binary), C0/C1
+    control characters other than tab, LF and the CR of a CRLF, DEL, or
     invalid UTF-8 -- whatever `.gitattributes` in the base commit says
     about the file. This is the last word on content: it looks at the bytes
-    that would be committed, not at any patch or attribute."""
+    that would be committed, not at any patch or attribute.
 
+    Blobs are read by the staged object id from `--raw`, never by path: a
+    path such as `0:docs/readme.md` would otherwise be read as the revision
+    `:0:docs/readme.md` (stage 0 of another file) and scan the wrong blob."""
+
+    wanted: list[tuple[StagedChange, str]] = []
     for change in changes:
         if change.status == "D":
             continue
-        blob = _git("cat-file", "blob", f":{change.path}", cwd=repo_path)
-        if blob.returncode != 0:
-            raise DiffPolicyViolation("diff-unreadable", change.path)
-        if b"\0" in blob.stdout:
-            raise DiffPolicyViolation("binary-content-refused", change.path)
-        try:
-            text = blob.stdout.decode("utf-8")
-        except UnicodeDecodeError:
-            raise DiffPolicyViolation("non-utf8-content-refused", change.path) from None
-        for char in text:
-            code = ord(char)
-            if (code < 0x20 and char not in "\t\n") or 0x7F <= code <= 0x9F:
-                raise DiffPolicyViolation(
-                    "control-character-content-refused", f"{change.path}: U+{code:04X}"
-                )
+        if not _OBJECT_ID.match(change.new_sha.encode("ascii", "replace")) or not change.new_sha.strip("0"):
+            raise DiffPolicyViolation("blob-missing", f"{change.path}: no staged object id")
+        wanted.append((change, change.new_sha))
+    blobs = _read_blobs(repo_path, list(dict.fromkeys(oid for _change, oid in wanted)))
+    for change, oid in wanted:
+        _check_text(change.path, blobs[oid])
+
+
+def is_unsupported_path(path: str) -> bool:
+    """True for a path git could read as something else: any ':' (revision
+    or pathspec syntax -- `:0:<path>` is stage 0 of another file,
+    `:(glob)*` is pathspec magic) or a leading '-' (an option)."""
+
+    return ":" in path or path.startswith("-")
 
 
 def _is_path_safe(path: str) -> bool:
@@ -274,6 +336,8 @@ def check_changes(changes: Iterable[StagedChange], policy: DiffPolicy) -> None:
         raise DiffPolicyViolation("empty-diff", "the diff changes nothing")
     for change in changes:
         path = change.path
+        if is_unsupported_path(path):
+            raise DiffPolicyViolation("unsupported-path", path)
         if not _is_path_safe(path):
             raise DiffPolicyViolation("path-outside-repository", path)
         if is_git_control_path(path):

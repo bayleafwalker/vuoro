@@ -57,8 +57,10 @@ def run_git(
     cwd: str | None = None,
     extra_env: Mapping[str, str] | None = None,
     text: bool = True,
+    input: bytes | str | None = None,
 ) -> subprocess.CompletedProcess:
-    """`git *args`, never raising for a non-zero exit (callers check)."""
+    """`git *args`, never raising for a non-zero exit (callers check).
+    `input` is fed to stdin (e.g. object ids for `cat-file --batch`)."""
 
     with tempfile.TemporaryDirectory(prefix="vuoro-git-home-") as home:
         return subprocess.run(
@@ -67,4 +69,5 @@ def run_git(
             env=scrubbed_env(home, extra_env),
             capture_output=True,
             text=text,
+            input=input,
         )

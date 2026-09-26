@@ -71,7 +71,16 @@ makes git's own binary detection say "text":
    outside the checkout, reports as binary (git apply has no switch to
    turn binary support off, so a binary hunk simply never reaches it);
 3. after applying, any staged blob containing NUL, a C0/C1 control
-   character other than tab and LF, DEL, or invalid UTF-8.
+   character other than tab, LF and the CR of a CRLF line ending, DEL, or
+   invalid UTF-8. Blobs are read by their staged object id through one
+   `git cat-file --batch`, never by path; a missing object is a refusal.
+
+Paths git could read as something other than a file name are refused
+before and after applying: any `:` (revision or pathspec syntax --
+`:0:docs/readme.md` is stage 0 of another file) and a leading `-`. Every
+other proposer value that reaches git's argv is a validated object id
+(`base_commit`), a ref-safe intent id, a file (the commit message), or
+comes after `--` / `--end-of-options`.
 
 The accept/reject view frames proposer text: a header and footer line,
 every rationale line prefixed `| `, every diff line prefixed `> `, and

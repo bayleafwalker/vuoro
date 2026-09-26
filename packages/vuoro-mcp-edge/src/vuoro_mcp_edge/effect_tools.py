@@ -422,6 +422,14 @@ def validate_diff(unified_diff: str, *, policy: RepositoryEffectPolicy) -> None:
                     "path-not-printable",
                     "a path contains a control or formatting character",
                 )
+            if ":" in path or path.startswith("-"):
+                # ':' is git revision/pathspec syntax (`:0:<path>` names
+                # stage 0 of another file, `:(glob)*` is pathspec magic);
+                # a leading '-' reads as an option.
+                raise ToolFailure(
+                    "unsupported-path",
+                    f"path {path!r} contains ':' or starts with '-'",
+                )
             if not _is_path_safe(path):
                 raise ToolFailure(
                     "path-outside-repository",
