@@ -61,7 +61,8 @@ def test_tool_call_with_bearer_token_succeeds(client: httpx.Client):
         headers={"authorization": f"Bearer {TOKEN}"},
     )
     body = response.json()
-    assert body["result"]["resultType"] == "work_list"
+    assert body["result"]["resultType"] == "complete"
+    assert body["result"]["kind"] == "work_list"
     assert body["result"]["content"]["items"][0]["subject"] == "item-1"
 
 
