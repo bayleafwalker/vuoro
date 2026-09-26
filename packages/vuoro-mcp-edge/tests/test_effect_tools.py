@@ -1,0 +1,539 @@
+"""E3 (agentops#2467): propose_effect / get_effect -- schema, refusals,
+idempotency, run binding and state reporting. No path here ever applies a
+diff or reaches an executor; see effect_tools.py's module docstring."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+from typing import Any
+
+import pytest
+from edge_support import FakeShell, ISSUER, REPO_ID, SUBJECT, WORKSPACE_ID, edge_client, identity_headers, assertion, rpc
+from vuoro_mcp_edge import effect_tools
+from vuoro_mcp_edge.effect_tools import (
+    ENV_REPOSITORY_POLICY,
+    INTENT_ID,
+    EffectIntent,
+    InMemoryIntentStore,
+    RepositoryEffectPolicy,
+    UnavailableIntentStore,
+    _load_repository_policies,
+    validate_diff,
+)
+from vuoro_mcp_edge.runs import InMemoryRunRegistry, RunBinding, UnavailableRunRegistry
+from vuoro_mcp_edge.server import CURRENT_PROTOCOL_VERSION, MCP_PATH, TOOL_ORDER
+from vuoro_mcp_edge.toolsets import ToolFailure, ToolsetContext
+from vuoro_mcp_edge.work_source import ShellWorkSource
+
+PRINCIPAL_ID = f"{ISSUER}:{SUBJECT}:0"
+BINDING = RunBinding(principal_id=PRINCIPAL_ID, workspace_id=WORKSPACE_ID, repo_id=REPO_ID)
+EFFECT_AUTHORITY = "effect:propose"
+
+
+def _auth(keys: Any) -> dict[str, str]:
+    return identity_headers(assertion(keys[1], authorities=[EFFECT_AUTHORITY]))
+
+
+def _client(
+    keys: Any,
+    shell: Any = None,
+    *,
+    intent_store: Any = None,
+    runs: Any = None,
+    policies: dict[str, RepositoryEffectPolicy] | None = None,
+):
+    intent_store = InMemoryIntentStore() if intent_store is None else intent_store
+    runs = InMemoryRunRegistry() if runs is None else runs
+    toolset = effect_tools._build(
+        intent_store=intent_store, runs=runs, repository_policies=policies or {}
+    )
+    client = edge_client(keys[0], shell or FakeShell(), toolsets=(toolset,))
+    return client, intent_store, runs
+
+
+def _register_run(runs: InMemoryRunRegistry, *, key: str = "run-key-0001") -> str:
+    return asyncio.run(runs.register(BINDING, idempotency_key=key))
+
+
+def _call_with(client, keys, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    response = client.post(
+        MCP_PATH, headers=_auth(keys), json=rpc("tools/call", {"name": name, "arguments": arguments})
+    )
+    return response.json()["result"]
+
+
+def _assert_error(result: dict[str, Any], code: str) -> None:
+    assert result["isError"] is True, result
+    assert result["structuredContent"]["error"]["code"] == code, result
+
+
+# -- diff fixtures -------------------------------------------------------------
+
+_OLD_SHA = "a" * 40
+_NEW_SHA = "b" * 40
+
+
+def modify_diff(path: str = "docs/readme.md") -> str:
+    return (
+        f"diff --git a/{path} b/{path}\n"
+        f"index 1111111..2222222 100644\n"
+        f"--- a/{path}\n"
+        f"+++ b/{path}\n"
+        "@@ -1 +1 @@\n"
+        "-old\n"
+        "+new\n"
+    )
+
+
+def add_diff(path: str = "docs/new.md") -> str:
+    return (
+        f"diff --git a/{path} b/{path}\n"
+        "new file mode 100644\n"
+        "index 0000000..1111111\n"
+        "--- /dev/null\n"
+        f"+++ b/{path}\n"
+        "@@ -0,0 +1 @@\n"
+        "+hello\n"
+    )
+
+
+def delete_diff(path: str = "docs/old.md") -> str:
+    return (
+        f"diff --git a/{path} b/{path}\n"
+        "deleted file mode 100644\n"
+        "index 1111111..0000000\n"
+        f"--- a/{path}\n"
+        "+++ /dev/null\n"
+        "@@ -1 +0,0 @@\n"
+        "-bye\n"
+    )
+
+
+def rename_diff(old_path: str = "docs/old.md", new_path: str = "docs/new.md") -> str:
+    return (
+        f"diff --git a/{old_path} b/{new_path}\n"
+        "similarity index 100%\n"
+        f"rename from {old_path}\n"
+        f"rename to {new_path}\n"
+    )
+
+
+def binary_diff(path: str = "img.png") -> str:
+    return (
+        f"diff --git a/{path} b/{path}\n"
+        "index 1111111..2222222 100644\n"
+        f"Binary files a/{path} and b/{path} differ\n"
+    )
+
+
+def mode_change_diff(path: str = "script.sh") -> str:
+    return f"diff --git a/{path} b/{path}\nold mode 100644\nnew mode 100755\n"
+
+
+def symlink_diff(path: str = "link") -> str:
+    return (
+        f"diff --git a/{path} b/{path}\n"
+        "new file mode 120000\n"
+        "index 0000000..1111111\n"
+        "--- /dev/null\n"
+        f"+++ b/{path}\n"
+        "@@ -0,0 +1 @@\n"
+        "+target\n"
+    )
+
+
+def submodule_diff(path: str = "sub") -> str:
+    return (
+        f"diff --git a/{path} b/{path}\n"
+        f"index {_OLD_SHA[:7]}..{_NEW_SHA[:7]} 160000\n"
+        f"--- a/{path}\n"
+        f"+++ b/{path}\n"
+        "@@ -1 +1 @@\n"
+        f"-Subproject commit {_OLD_SHA}\n"
+        f"+Subproject commit {_NEW_SHA}\n"
+    )
+
+
+def traversal_diff(path: str = "../../etc/passwd") -> str:
+    return (
+        f"diff --git a/{path} b/{path}\n"
+        "index 1111111..2222222 100644\n"
+        f"--- a/{path}\n"
+        f"+++ b/{path}\n"
+        "@@ -1 +1 @@\n"
+        "-a\n"
+        "+b\n"
+    )
+
+
+def ci_workflow_diff(path: str = ".github/workflows/ci.yml") -> str:
+    return modify_diff(path)
+
+
+def _args(**overrides: Any) -> dict[str, Any]:
+    base = {
+        "run_id": "run_placeholder",
+        "repository": REPO_ID,
+        "base_commit": _OLD_SHA,
+        "title": "Fix the typo",
+        "rationale": "A short rationale for the change.",
+        "unified_diff": modify_diff(),
+        "idempotency_key": "propose-key-0001",
+    }
+    base.update(overrides)
+    return base
+
+
+# -- schema validation ----------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"title": "x" * 201},
+        {"rationale": "x" * 4001},
+        {"base_commit": "not-hex"},
+        {"base_commit": "a" * 39},
+        {"idempotency_key": "short"},
+        {"unified_diff": ""},
+        {"title": ""},
+    ],
+)
+def test_propose_effect_rejects_out_of_shape_arguments(keys, overrides) -> None:
+    client, _, runs = _client(keys)
+    run_id = _register_run(runs)
+    result = _call_with(client, keys, "propose_effect", _args(run_id=run_id, **overrides))
+    _assert_error(result, "invalid-arguments")
+
+
+def test_propose_effect_rejects_unexpected_argument(keys) -> None:
+    client, _, runs = _client(keys)
+    run_id = _register_run(runs)
+    result = _call_with(client, keys, "propose_effect", {**_args(run_id=run_id), "extra": 1})
+    _assert_error(result, "invalid-arguments")
+
+
+def test_propose_effect_rejects_a_missing_argument(keys) -> None:
+    client, _, runs = _client(keys)
+    run_id = _register_run(runs)
+    arguments = _args(run_id=run_id)
+    del arguments["rationale"]
+    result = _call_with(client, keys, "propose_effect", arguments)
+    _assert_error(result, "invalid-arguments")
+
+
+def test_unified_diff_over_256_kib_is_rejected() -> None:
+    # At the unit level, not over HTTP: server.py's transport body cap
+    # (MAX_BODY_BYTES, 64 KiB) is smaller than section 7's own 256 KiB
+    # unified_diff cap, so a request this large never reaches tool dispatch
+    # in the current composition -- see the PR body for this discrepancy.
+    oversized = modify_diff() + ("+" + "x" * 300_000 + "\n")
+    with pytest.raises(ToolFailure) as failure:
+        effect_tools._parse_propose(_args(unified_diff=oversized))
+    assert failure.value.code == "invalid-arguments"
+
+
+# -- run binding ------------------------------------------------------------------
+
+
+def test_propose_effect_succeeds_with_a_bound_run(keys) -> None:
+    client, store, runs = _client(keys)
+    run_id = _register_run(runs)
+    result = _call_with(client, keys, "propose_effect", _args(run_id=run_id))
+    assert result["isError"] is False
+    body = result["structuredContent"]
+    assert INTENT_ID.fullmatch(body["intent_id"])
+    assert body["state"] == "proposed"
+    assert set(body) == {"intent_id", "state"}
+
+
+def test_unregistered_run_id_is_run_not_found(keys) -> None:
+    client, _, _runs = _client(keys)
+    result = _call_with(client, keys, "propose_effect", _args(run_id="run_" + "0" * 26))
+    _assert_error(result, "run-not-found")
+
+
+def test_a_run_bound_to_another_caller_is_run_not_found(keys) -> None:
+    client, _, runs = _client(keys)
+    other = RunBinding(principal_id="other:0", workspace_id=WORKSPACE_ID, repo_id=REPO_ID)
+    run_id = asyncio.run(runs.register(other, idempotency_key="k"))
+    result = _call_with(client, keys, "propose_effect", _args(run_id=run_id))
+    _assert_error(result, "run-not-found")
+
+
+def test_unavailable_run_registry_fails_closed(keys) -> None:
+    client, _, _runs = _client(keys, runs=UnavailableRunRegistry())
+    result = _call_with(client, keys, "propose_effect", _args(run_id="run_" + "0" * 26))
+    _assert_error(result, "runs-unavailable")
+
+
+def test_repository_argument_must_match_the_callers_bound_repository(keys) -> None:
+    client, _, runs = _client(keys)
+    run_id = _register_run(runs)
+    result = _call_with(client, keys, "propose_effect", _args(run_id=run_id, repository="some-other-repo"))
+    _assert_error(result, "repository-mismatch")
+
+
+# -- diff structural refusals ---------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("diff", "code"),
+    [
+        (binary_diff(), "binary-patch-refused"),
+        (mode_change_diff(), "mode-change-refused"),
+        (symlink_diff(), "symlink-refused"),
+        (submodule_diff(), "submodule-refused"),
+        (traversal_diff(), "path-outside-repository"),
+        (delete_diff(), "path-not-allowlisted"),
+        (rename_diff(), "path-not-allowlisted"),
+        (ci_workflow_diff(), "protected-path-refused"),
+        ("please just fix the typo in the readme", "diff-not-supported"),
+    ],
+)
+def test_propose_effect_refuses_each_structural_case(keys, diff, code) -> None:
+    client, _, runs = _client(keys)
+    run_id = _register_run(runs)
+    result = _call_with(client, keys, "propose_effect", _args(run_id=run_id, unified_diff=diff))
+    _assert_error(result, code)
+
+
+def test_a_plain_modify_or_add_needs_no_allowlist_entry(keys) -> None:
+    client, _, runs = _client(keys)
+    for diff in (modify_diff("docs/a.md"), add_diff("docs/b.md")):
+        run_id = _register_run(runs, key=f"key-{diff[:5]}")
+        result = _call_with(
+            client, keys, "propose_effect", _args(run_id=run_id, unified_diff=diff, idempotency_key=f"k-{hash(diff)}")
+        )
+        assert result["isError"] is False, result
+
+
+def test_delete_and_rename_succeed_once_allowlisted(keys) -> None:
+    policy = {REPO_ID: RepositoryEffectPolicy(path_allowlist=frozenset({"docs/*"}))}
+    client, _, runs = _client(keys, policies=policy)
+    run_id = _register_run(runs)
+    result = _call_with(client, keys, "propose_effect", _args(run_id=run_id, unified_diff=delete_diff()))
+    assert result["isError"] is False, result
+    run_id2 = _register_run(runs, key="k2")
+    result2 = _call_with(
+        client, keys, "propose_effect",
+        _args(run_id=run_id2, unified_diff=rename_diff(), idempotency_key="k-rename"),
+    )
+    assert result2["isError"] is False, result2
+
+
+def test_ci_workflow_path_succeeds_once_allowlisted(keys) -> None:
+    policy = {REPO_ID: RepositoryEffectPolicy(path_allowlist=frozenset({".github/workflows/*"}))}
+    client, _, runs = _client(keys, policies=policy)
+    run_id = _register_run(runs)
+    result = _call_with(client, keys, "propose_effect", _args(run_id=run_id, unified_diff=ci_workflow_diff()))
+    assert result["isError"] is False, result
+
+
+def test_sops_like_protected_pattern_is_configurable_per_repository(keys) -> None:
+    policy = {REPO_ID: RepositoryEffectPolicy(protected_path_patterns=frozenset({"secrets/*"}))}
+    client, _, runs = _client(keys, policies=policy)
+    run_id = _register_run(runs)
+    result = _call_with(
+        client, keys, "propose_effect", _args(run_id=run_id, unified_diff=modify_diff("secrets/config.yaml"))
+    )
+    _assert_error(result, "protected-path-refused")
+
+
+# -- idempotency -----------------------------------------------------------------
+
+
+def test_replaying_the_same_key_and_arguments_returns_the_same_intent_no_second_create(keys) -> None:
+    client, store, runs = _client(keys)
+    run_id = _register_run(runs)
+    first = _call_with(client, keys, "propose_effect", _args(run_id=run_id))
+    assert first["isError"] is False
+    second = _call_with(client, keys, "propose_effect", _args(run_id=run_id))
+    assert second["isError"] is False
+    assert first["structuredContent"] == second["structuredContent"]
+    assert len(store._intents) == 1
+
+
+def test_same_key_different_arguments_is_idempotency_conflict(keys) -> None:
+    client, _, runs = _client(keys)
+    run_id = _register_run(runs)
+    first = _call_with(client, keys, "propose_effect", _args(run_id=run_id))
+    assert first["isError"] is False
+    second = _call_with(
+        client, keys, "propose_effect", _args(run_id=run_id, title="A completely different title")
+    )
+    _assert_error(second, "idempotency-conflict")
+
+
+def test_unavailable_intent_store_fails_closed_for_both_tools(keys) -> None:
+    client, _, runs = _client(keys, intent_store=UnavailableIntentStore())
+    run_id = _register_run(runs)
+    proposed = _call_with(client, keys, "propose_effect", _args(run_id=run_id))
+    _assert_error(proposed, "effects-unavailable")
+    fetched = _call_with(client, keys, "get_effect", {"intent_id": "effect_" + "0" * 26})
+    _assert_error(fetched, "effects-unavailable")
+
+
+def test_production_default_composition_fails_closed(keys) -> None:
+    context = ToolsetContext(
+        env={}, work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"), runs=UnavailableRunRegistry()
+    )
+    toolset = effect_tools.build_toolset(context)
+    assert toolset is not None
+    assert {tool.name for tool in toolset.tools} == {"propose_effect", "get_effect"}
+    client = edge_client(keys[0], FakeShell(), toolsets=(toolset,))
+    result = _call_with(client, keys, "propose_effect", _args(run_id="run_" + "0" * 26))
+    _assert_error(result, "effects-unavailable")
+
+
+# -- get_effect --------------------------------------------------------------------
+
+
+def test_get_effect_reports_the_proposed_state(keys) -> None:
+    client, _, runs = _client(keys)
+    run_id = _register_run(runs)
+    proposed = _call_with(client, keys, "propose_effect", _args(run_id=run_id))
+    intent_id = proposed["structuredContent"]["intent_id"]
+    fetched = _call_with(client, keys, "get_effect", {"intent_id": intent_id})
+    assert fetched["structuredContent"] == {"intent_id": intent_id, "state": "proposed"}
+
+
+def test_get_effect_unknown_id_is_effect_not_found(keys) -> None:
+    client, _, _runs = _client(keys)
+    result = _call_with(client, keys, "get_effect", {"intent_id": "effect_" + "0" * 26})
+    _assert_error(result, "effect-not-found")
+
+
+def test_get_effect_refuses_an_intent_bound_to_another_caller(keys) -> None:
+    store = InMemoryIntentStore()
+    other_binding = RunBinding(principal_id="other:0", workspace_id=WORKSPACE_ID, repo_id=REPO_ID)
+    intent = EffectIntent(
+        intent_id="effect_" + "1" * 26,
+        run_id="run_" + "0" * 26,
+        binding=other_binding,
+        repository=REPO_ID,
+        base_commit=_OLD_SHA,
+        title="t",
+        rationale="r",
+        unified_diff=modify_diff(),
+    )
+    asyncio.run(store.create(intent))
+    client, _, _runs = _client(keys, intent_store=store)
+    result = _call_with(client, keys, "get_effect", {"intent_id": intent.intent_id})
+    _assert_error(result, "effect-not-found")
+
+
+@pytest.mark.parametrize("state", ["accepted", "rejected", "applied", "failed"])
+def test_get_effect_surfaces_every_reconciler_reported_state(keys, state) -> None:
+    client, store, runs = _client(keys)
+    run_id = _register_run(runs)
+    proposed = _call_with(client, keys, "propose_effect", _args(run_id=run_id))
+    intent_id = proposed["structuredContent"]["intent_id"]
+    store.set_state(intent_id, state)
+    fetched = _call_with(client, keys, "get_effect", {"intent_id": intent_id})
+    assert fetched["structuredContent"] == {"intent_id": intent_id, "state": state}
+
+
+def test_get_effect_rejects_unknown_argument(keys) -> None:
+    client, _, _runs = _client(keys)
+    result = _call_with(client, keys, "get_effect", {"intent_id": "x", "extra": 1})
+    _assert_error(result, "invalid-arguments")
+
+
+# -- authority and protocol conformance --------------------------------------------
+
+
+def test_effect_tools_need_the_propose_authority(keys) -> None:
+    client, _, runs = _client(keys)
+    run_id = _register_run(runs)
+    response = client.post(
+        MCP_PATH,
+        headers=identity_headers(assertion(keys[1], authorities=["work:read"])),
+        json=rpc("tools/call", {"name": "propose_effect", "arguments": _args(run_id=run_id)}),
+    )
+    result = response.json()["result"]
+    _assert_error(result, "authority-required")
+
+
+def test_effect_tools_follow_the_builtins_in_order(keys) -> None:
+    client, _, _runs = _client(keys)
+    listed = client.post(MCP_PATH, headers=_auth(keys), json=rpc("tools/list")).json()["result"]
+    names = [tool["name"] for tool in listed["tools"]]
+    assert names == [*TOOL_ORDER, "propose_effect", "get_effect"]
+    for tool in listed["tools"]:
+        if tool["name"] == "propose_effect":
+            assert tool["annotations"]["idempotentHint"] is True
+            assert tool["annotations"]["readOnlyHint"] is False
+        if tool["name"] == "get_effect":
+            assert tool["annotations"]["readOnlyHint"] is True
+
+
+@pytest.mark.parametrize(
+    ("method", "params"),
+    [
+        ("tools/list", None),
+        ("server/discover", None),
+        ("tools/call", {"name": "get_effect", "arguments": {"intent_id": "effect_" + "0" * 26}}),
+        ("tools/call", {"name": "propose_effect", "arguments": {}}),
+    ],
+)
+def test_effect_tools_satisfy_the_2026_07_28_client_contract(keys, method, params) -> None:
+    client, _, _runs = _client(keys)
+    response = client.post(
+        MCP_PATH,
+        headers={**_auth(keys), "MCP-Protocol-Version": CURRENT_PROTOCOL_VERSION},
+        json=rpc(method, params),
+    )
+    result = response.json()["result"]
+    assert result["resultType"] in {"complete", "input_required", "task"}
+    assert result["resultType"] == "complete"
+    if method in ("tools/list", "server/discover"):
+        assert isinstance(result["ttlMs"], int) and result["ttlMs"] >= 0
+        assert result["cacheScope"] in {"public", "private"}
+
+
+# -- validate_diff unit-level (no HTTP) ---------------------------------------------
+
+
+def test_validate_diff_accepts_a_plain_modify() -> None:
+    validate_diff(modify_diff(), policy=RepositoryEffectPolicy())
+
+
+def test_validate_diff_refuses_binary_directly() -> None:
+    with pytest.raises(ToolFailure) as failure:
+        validate_diff(binary_diff(), policy=RepositoryEffectPolicy())
+    assert failure.value.code == "binary-patch-refused"
+
+
+# -- repository policy configuration parsing ---------------------------------------
+
+
+def test_load_repository_policies_empty_env_means_no_configured_repository() -> None:
+    assert _load_repository_policies({}) == {}
+
+
+def test_load_repository_policies_parses_json() -> None:
+    env = {
+        ENV_REPOSITORY_POLICY: json.dumps(
+            {"repo-a": {"path_allowlist": ["docs/*"], "protected_path_patterns": ["secrets/*"]}}
+        )
+    }
+    policies = _load_repository_policies(env)
+    assert policies["repo-a"].path_allowlist == frozenset({"docs/*"})
+    assert policies["repo-a"].protected_path_patterns == frozenset({"secrets/*"})
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "not json",
+        "[]",
+        json.dumps({"repo-a": "not-an-object"}),
+        json.dumps({"repo-a": {"path_allowlist": "not-a-list"}}),
+        json.dumps({"repo-a": {"protected_path_patterns": [1]}}),
+    ],
+)
+def test_load_repository_policies_rejects_malformed_configuration(raw) -> None:
+    with pytest.raises(ValueError):
+        _load_repository_policies({ENV_REPOSITORY_POLICY: raw})

@@ -21,6 +21,7 @@ jobs:
       - run: uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests
       - run: uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests
       - run: uv run --package vuoro-mcp-edge --extra test pytest packages/vuoro-mcp-edge/tests
+      - run: uv run --package vuoro-reconciler --extra test pytest packages/vuoro-reconciler/tests
       - run: uv build --package vuoro-client --wheel --out-dir dist/vuoro-client
       - run: uv build --package vuoro-service --wheel --out-dir dist/vuoro-service
       - run: uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime
