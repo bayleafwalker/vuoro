@@ -14,6 +14,15 @@ http://mcp.internal:8000/mcp"). It is deliberately not the public E1-E4
 surface -- no gateway-signed assertions, no internet exposure -- and it
 must never be deployed with a publicly routable listener (see
 `deploy/poller/README.md`).
+
+Every result carries the 2026-07-28 envelope: ``resultType`` is the
+result's completion kind (``"complete" | "input_required" | "task"``),
+never a per-method or per-tool name -- a client on this revision (e.g.
+Claude Code 2.1.283) rejects any other value and drops the tool. A tool's
+own domain-kind label (``"work_list"``, ``"lease"``, ...) travels
+separately as ``kind`` inside the result. Cacheable list/read results
+(``server/discover``, ``list_ready_work``, ``describe_work``) also carry
+an integer ``ttlMs`` and a ``"public" | "private"`` ``cacheScope``.
 """
 
 from __future__ import annotations
@@ -44,7 +53,15 @@ def _rpc_result(request_id: Any, result: Mapping[str, Any]) -> JSONResponse:
 
 
 def _tool_call_json(result: ToolCallResult) -> dict[str, Any]:
-    body: dict[str, Any] = {"resultType": result.result_type, "content": dict(result.payload)}
+    # 2026-07-28 resultType is the completion kind, not the domain result
+    # name: a client on this revision rejects anything else. The
+    # domain-specific kind travels separately as `kind`, for callers that
+    # switch on it (agentops#2469 tool wiring, `poller.py`'s dispatch).
+    body: dict[str, Any] = {
+        "resultType": "complete",
+        "kind": result.result_type,
+        "content": dict(result.payload),
+    }
     if result.ttl_ms is not None:
         body["ttlMs"] = result.ttl_ms
     if result.cache_scope is not None:
@@ -122,6 +139,7 @@ def create_mcp_app(
             return _rpc_result(
                 request_id,
                 {
+                    "resultType": "complete",
                     "protocolVersion": _PROTOCOL_VERSIONS[1],
                     "serverInfo": {"name": "vuoro-internal-mcp", "version": "0.1.0"},
                     "capabilities": {"tools": {}},
@@ -133,7 +151,18 @@ def create_mcp_app(
                 {"name": name, "description": server.tool_description(name)}
                 for name in server.tool_names()
             ]
-            return _rpc_result(request_id, {"tools": tools})
+            # Tool descriptions don't vary by caller (no identity is
+            # resolved for this method), so this list is cacheable across
+            # every caller, not just the requester: `cacheScope: "public"`.
+            return _rpc_result(
+                request_id,
+                {
+                    "resultType": "complete",
+                    "tools": tools,
+                    "ttlMs": 0,
+                    "cacheScope": "public",
+                },
+            )
 
         if method not in server.tool_names():
             return _rpc_error(request_id, -32601, f"unknown method {method!r}")

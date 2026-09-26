@@ -100,7 +100,14 @@ class StaticWorkSource:
 class ToolCallResult:
     """The envelope §4's "what compliance actually costs" asks every list
     and read result to carry: a `result_type` tag, and (for cacheable
-    reads) `ttl_ms`/`cache_scope`."""
+    reads) `ttl_ms`/`cache_scope`.
+
+    `result_type` is this tool's own domain-kind label (``"work_list"``,
+    ``"lease"``, ...), not the wire-level MCP ``resultType`` (the
+    completion kind: ``"complete" | "input_required" | "task"``).
+    `mcp_server.py` projects this dataclass onto the wire and is
+    responsible for keeping the two apart -- see its `_tool_call_json`.
+    """
 
     result_type: str
     payload: Mapping[str, Any]
@@ -233,7 +240,7 @@ class InternalToolServer:
             result_type="work_list",
             payload={"items": [item.__dict__ for item in self._work_source.list_ready()]},
             ttl_ms=5_000,
-            cache_scope="per-token",
+            cache_scope="private",
         ))
 
     def describe_work(self, token: str, *, subject: str) -> ToolCallResult:
@@ -249,7 +256,7 @@ class InternalToolServer:
                     "prior_attempts": list(detail.prior_attempts),
                 },
                 ttl_ms=5_000,
-                cache_scope="per-token",
+                cache_scope="private",
             )
         return self._call(token, run)
 
