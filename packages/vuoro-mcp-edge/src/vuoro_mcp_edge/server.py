@@ -26,8 +26,9 @@ JSON-RPC errors travel as HTTP 200 with an error body; tool failures
 
 Protocol handling (edge plan section 4): ``405`` on GET and DELETE,
 header-to-body agreement on ``MCP-Protocol-Version``, ``Mcp-Method`` and
-``Mcp-Name`` (mismatch is ``-32020``), ``server/discover``, ``resultType`` on
-every result, ``ttlMs``/``cacheScope`` on list and read results, and a fixed
+``Mcp-Name`` (mismatch is ``-32020``), ``server/discover``, ``resultType:
+"complete"`` on every result, ``ttlMs``/``cacheScope`` (``"private"``) on list
+and read results, and a fixed
 tool order.  Both protocol eras work: legacy clients open with
 ``initialize`` / ``notifications/initialized``; clients on the 2026-07-28
 revision call ``server/discover`` / ``tools/call`` with no handshake.
@@ -214,12 +215,15 @@ def _rpc_error(*, id_: Any, code: int, message: str) -> dict[str, Any]:
 def _with_envelope(
     result: dict[str, Any],
     *,
-    result_type: str,
     ttl_ms: int | None = None,
     cache_scope: str | None = None,
 ) -> dict[str, Any]:
+    # 2026-07-28 resultType is the result's completion kind, not its method:
+    # "complete" | "input_required" | "task". Clients reject anything else
+    # ("Unsupported result type"), and list results need cacheScope
+    # "public" | "private".
     payload = dict(result)
-    payload["resultType"] = result_type
+    payload["resultType"] = "complete"
     if ttl_ms is not None:
         payload["ttlMs"] = ttl_ms
     if cache_scope is not None:
@@ -547,9 +551,8 @@ def create_edge_app(
                     "capabilities": capabilities,
                     "serverInfo": server_info,
                 },
-                result_type="initialize-result",
                 ttl_ms=0,
-                cache_scope="none",
+                cache_scope="private",
             )
             return _json(_rpc_result(id_=rpc_id, result=result))
 
@@ -565,18 +568,16 @@ def create_edge_app(
                     "serverInfo": server_info,
                     "tools": _tool_list_payload(),
                 },
-                result_type="discover-result",
                 ttl_ms=0,
-                cache_scope="none",
+                cache_scope="private",
             )
             return _json(_rpc_result(id_=rpc_id, result=result))
 
         if method == "tools/list":
             result = _with_envelope(
                 {"tools": _tool_list_payload()},
-                result_type="tools-list-result",
                 ttl_ms=0,
-                cache_scope="none",
+                cache_scope="private",
             )
             return _json(_rpc_result(id_=rpc_id, result=result))
 
@@ -595,7 +596,6 @@ def create_edge_app(
                 ttl_ms = 0
             result = _with_envelope(
                 tool_result,
-                result_type="tool-call-result",
                 ttl_ms=ttl_ms,
                 cache_scope="private",
             )

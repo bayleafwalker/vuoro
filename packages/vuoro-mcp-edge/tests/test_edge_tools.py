@@ -57,7 +57,7 @@ def test_list_returns_only_unblocked_items_verbatim_in_owner_order(keys, auth) -
     assert result["structuredContent"]["as_of"] == "2026-09-23T10:00:00Z"
     assert json.loads(result["content"][0]["text"]) == result["structuredContent"]
     assert (result["resultType"], result["ttlMs"], result["cacheScope"]) == (
-        "tool-call-result",
+        "complete",
         15_000,
         "private",
     )
