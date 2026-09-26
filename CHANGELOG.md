@@ -5,6 +5,17 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service 0.1.76 / vuoro-mcp-edge 0.1.3: the work adapter is pinned to
+  sprintctl 0.8.0 (remote schema 17; its migration runs in each tenant's
+  `vuoro-migrate` job on roll-out). The edge gains E2's record bucket
+  (`register_run`, `append_evidence`, `write_session_note`; agentops#2466),
+  listed only with a durable run registry. E3's propose bucket
+  (`propose_effect`, `get_effect`; agentops#2467) lists nothing until a
+  durable intent store exists; its trusted-side reconciler,
+  `packages/vuoro-reconciler` 0.1.0, is not part of the service image. The
+  E2/E3 contract amends `RunRegistry` (forwarded identity) and keys
+  idempotency by (workspace, principal, tool, key). (#131, #130, #132)
+
 - vuoro-client 0.1.1: authenticate `GET /api/meta/v1/handshake` and
   `GET /api/catalog/v1` whenever the profile has a credential (hosted
   vuoro.cloud answered 401 to served sprintctl), and send a named
