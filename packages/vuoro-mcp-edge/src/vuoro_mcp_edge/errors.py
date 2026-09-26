@@ -13,10 +13,19 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["LOCAL_MESSAGES", "WorkSourceUnavailable", "client_error"]
+__all__ = [
+    "LOCAL_MESSAGES",
+    "NOT_FOUND_CODE",
+    "WorkSourceUnavailable",
+    "client_error",
+    "is_not_found",
+]
 
 UPSTREAM_CODE_MAX_LENGTH = 64
 _CODE_SHAPE = re.compile(r"^[A-Za-z0-9._:-]+$")
+
+#: The one code that means "no such item", not "could not answer".
+NOT_FOUND_CODE = "item-not-found"
 
 #: The only messages a client sees for a work-source failure.
 LOCAL_MESSAGES: dict[str, str] = {
@@ -67,6 +76,17 @@ class WorkSourceUnavailable(RuntimeError):
         self.message = message
         self.status_code = status_code
         self.upstream = upstream
+
+
+def is_not_found(error: WorkSourceUnavailable) -> bool:
+    """True for an ordinary not-found answer, never for an outage.
+
+    A not-found is a normal contract response, not evidence the work source
+    failed to answer, so it must not be logged or counted alongside
+    genuine unavailability.
+    """
+
+    return _ALIASES.get(error.code, error.code) == NOT_FOUND_CODE
 
 
 def client_error(error: WorkSourceUnavailable) -> dict[str, str]:
