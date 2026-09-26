@@ -75,13 +75,20 @@ def _write_auth(keys: Any) -> dict[str, str]:
     return identity_headers(assertion(keys[1], authorities=["work:read", EVIDENCE]))
 
 
-def test_default_composition_ships_no_write_tools() -> None:
+def test_default_composition_ships_only_the_landed_toolsets() -> None:
+    """E2 (record, coordinate) is still a stub; E3 (propose) has landed, so
+    the default composition ships propose_effect/get_effect only -- both
+    fail closed (UnavailableIntentStore) until a durable intent store is
+    wired in, the same posture UnavailableRunRegistry takes for runs."""
+
     context = ToolsetContext(
         env={},
         work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"),
         runs=UnavailableRunRegistry(),
     )
-    assert build_toolsets(context) == ()
+    toolsets = build_toolsets(context)
+    names = [tool.name for toolset in toolsets for tool in toolset.tools]
+    assert names == ["propose_effect", "get_effect"]
 
 
 def test_toolset_tools_follow_the_builtins_in_list_and_discover(keys, auth) -> None:

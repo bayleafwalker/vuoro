@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vuoro-reconciler"
+version = "0.1.0"
+description = "Trusted-side reconciler: applies accepted effect intents to a clean checkout, signs the commit and opens a PR. Never executes on the public MCP surface's say-so alone; location-independent (agentops docs/plans/2026-09-26-trusted-service-boundary-design.md)."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+vuoro-reconciler = "vuoro_reconciler.cli:main"
+
+[project.optional-dependencies]
+test = ["pytest>=8.3,<9"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vuoro_reconciler"]
