@@ -32,9 +32,12 @@ __all__ = [
 class OperatorAcceptor:
     """An operator accepted (or rejected) the intent interactively.
 
-    `subject` is the operator's authenticated trusted-side identity, in the
-    same principal namespace as `EffectIntent.proposer_principal` (so the
-    "never the proposer" comparison is meaningful)."""
+    `subject` is *self-asserted* by whoever runs the trusted-side CLI
+    (`--operator`); nothing here authenticates it. The acceptance authority
+    is whoever holds the `IntentSource` credentials on the trusted side;
+    `subject` records who they say they are, for attribution and for the
+    "never the proposer" check. It must use the same principal namespace as
+    `EffectIntent.proposer_principal` for that check to mean anything."""
 
     subject: str
     kind: Literal["operator"] = "operator"

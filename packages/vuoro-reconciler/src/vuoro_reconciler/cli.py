@@ -6,9 +6,15 @@ trusted side reads the intent and its diff and records
 surface, and the proposing principal cannot accept its own intent.
 
 `--intent-source module:factory` names a trusted-side callable returning an
-`IntentSource`; whoever can run this CLI with that source's credentials is
-the separately authenticated actor. `--operator` is that actor's subject,
-in the same principal namespace as the intent's `proposer_principal`.
+`IntentSource`. Trust assumption: acceptance authority is whoever holds
+that source's credentials on the trusted side. `--operator` is a
+*self-asserted* subject -- recorded for attribution and compared against
+`proposer_principal` (same principal namespace), not authenticated here.
+
+Everything shown comes from the proposer, so it is displayed with every
+non-printable character escaped visibly (`\x1b`, `\r`, `\u202e`, ...):
+ESC/CR sequences or bidi overrides cannot hide or reorder diff lines on
+the operator's terminal.
 """
 
 from __future__ import annotations
@@ -23,7 +29,26 @@ import sys
 from .acceptance import AcceptanceRefused, OperatorAcceptance
 from .intents import EffectIntent, IntentSource
 
-__all__ = ["main"]
+__all__ = ["main", "visible"]
+
+
+def visible(text: str) -> str:
+    """`text` with every non-printable character -- C0/C1 controls (ESC,
+    CR, ...), DEL, bidi overrides/isolates (U+202A-202E, U+2066-2069) and
+    other format or separator characters -- shown as an escape. Newline and
+    tab are kept: they cannot overwrite or reorder what is already shown."""
+
+    out = []
+    for char in text:
+        if char in "\n\t" or char.isprintable():
+            out.append(char)
+        elif ord(char) < 0x100:
+            out.append(f"\\x{ord(char):02x}")
+        elif ord(char) < 0x10000:
+            out.append(f"\\u{ord(char):04x}")
+        else:
+            out.append(f"\\U{ord(char):08x}")
+    return "".join(out)
 
 
 def _load_source(spec: str) -> IntentSource:
@@ -49,16 +74,19 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _show(intent: EffectIntent, out: TextIO) -> None:
+    v = visible
+    # The title is one line: a newline in it is escaped too.
+    title = v(intent.title).replace("\n", "\\n")
     out.write(
-        f"intent:     {intent.intent_id}\n"
-        f"run:        {intent.run_id}\n"
-        f"workspace:  {intent.workspace_id}\n"
-        f"repository: {intent.repository} @ {intent.base_commit}\n"
-        f"proposer:   {intent.proposer_principal}\n"
-        f"kind:       {intent.effect_kind}\n"
-        f"title:      {intent.title}\n\n"
-        f"{intent.rationale}\n\n"
-        f"{intent.unified_diff}"
+        f"intent:     {v(intent.intent_id)}\n"
+        f"run:        {v(intent.run_id)}\n"
+        f"workspace:  {v(intent.workspace_id)}\n"
+        f"repository: {v(intent.repository)} @ {v(intent.base_commit)}\n"
+        f"proposer:   {v(intent.proposer_principal)}\n"
+        f"kind:       {v(intent.effect_kind)}\n"
+        f"title:      {title}\n\n"
+        f"{v(intent.rationale)}\n\n"
+        f"{v(intent.unified_diff)}"
     )
     if not intent.unified_diff.endswith("\n"):
         out.write("\n")
@@ -71,7 +99,7 @@ async def _run(
     try:
         intent = await acceptance.pending(arguments.intent_id)
     except AcceptanceRefused as refused:
-        stdout.write(f"refused: {refused}\n")
+        stdout.write(f"refused: {visible(str(refused))}\n")
         return 1
     _show(intent, stdout)
     if not arguments.yes:
@@ -88,9 +116,9 @@ async def _run(
                 intent.intent_id, arguments.operator, arguments.reason
             )
     except AcceptanceRefused as refused:
-        stdout.write(f"refused: {refused}\n")
+        stdout.write(f"refused: {visible(str(refused))}\n")
         return 1
-    stdout.write(f"{arguments.command}ed by {acceptor.trailer_value()}\n")
+    stdout.write(f"{arguments.command}ed by {visible(acceptor.trailer_value())}\n")
     return 0
 
 

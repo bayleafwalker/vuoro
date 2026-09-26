@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 from typing import Literal
 import subprocess
 
+from .gitenv import run_git
+
 __all__ = ["SigningKey", "configure_signing", "verify_commit"]
 
 KeyFormat = Literal["openpgp", "ssh"]
@@ -30,9 +32,11 @@ class SigningKey:
     or a path to an SSH public key file for `key_format="ssh"`.
     `allowed_signers_file` is SSH-only: a `gpg.ssh.allowedSignersFile`-shaped
     file, needed to verify (not to sign). `env` carries whatever the signing
-    backend needs in-process (e.g. `GNUPGHOME` for an isolated keyring);
-    it is merged over the ambient environment for every git invocation this
-    package makes against the checkout.
+    backend needs (e.g. `GNUPGHOME`, `SSH_AUTH_SOCK`). It is the only
+    signing input: every git call runs in `gitenv`'s scrubbed environment
+    (no global/system config, fresh `HOME`, no inherited `GIT_*`,
+    `GNUPGHOME` or `SSH_AUTH_SOCK`), with `env` merged on top. It may not
+    set `GIT_*` variables.
     """
 
     key_format: KeyFormat
@@ -41,6 +45,14 @@ class SigningKey:
     committer_email: str
     allowed_signers_file: str | None = None
     env: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # Git itself is configured only through the checkout's own config
+        # (configure_signing); `env` is for the signing backend (e.g.
+        # GNUPGHOME), never a way to re-inject ambient git configuration.
+        smuggled = sorted(name for name in self.env if name.startswith("GIT_"))
+        if smuggled:
+            raise ValueError(f"SigningKey.env may not set git variables: {smuggled}")
 
 
 def configure_signing(repo_path: str, key: SigningKey) -> None:
@@ -67,12 +79,8 @@ def verify_commit(repo_path: str, ref: str, key: SigningKey) -> bool:
 
 def _git(
     repo_path: str, *args: str, key: SigningKey, check: bool = True
-) -> subprocess.CompletedProcess[bytes]:
-    import os
-
-    return subprocess.run(
-        ["git", "-C", repo_path, *args],
-        env={**os.environ, **key.env},
-        check=check,
-        capture_output=True,
-    )
+) -> subprocess.CompletedProcess[str]:
+    result = run_git("-C", repo_path, *args, extra_env=key.env)
+    if check and result.returncode != 0:
+        raise subprocess.CalledProcessError(result.returncode, ["git", *args], result.stdout, result.stderr)
+    return result

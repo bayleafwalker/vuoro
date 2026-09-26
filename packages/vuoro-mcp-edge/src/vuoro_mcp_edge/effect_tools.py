@@ -89,7 +89,30 @@ _REPOSITORY = re.compile(r"^[A-Za-z0-9._:/-]{1,200}$")
 #: CI workflow paths are always refused unless the repository's allowlist
 #: names them. `fnmatch` patterns: `*` matches across `/`, so a single `*`
 #: already behaves like a recursive glob for these purposes.
-_CI_WORKFLOW_PATTERNS: tuple[str, ...] = (".github/workflows/*", ".forgejo/workflows/*")
+_CI_WORKFLOW_PATTERNS: tuple[str, ...] = (
+    ".github/workflows/*",
+    ".forgejo/workflows/*",
+    ".gitea/workflows/*",
+)
+
+#: Final path components git reads as checkout configuration (see
+#: `_is_git_control_path`); never admissible, whatever the allowlist says.
+_GIT_INFO_FILES = frozenset({"attributes", "exclude", "sparse-checkout"})
+
+
+def _is_git_control_path(path: str) -> bool:
+    """`.gitattributes`, `.gitmodules`, `.gitignore`, `.mailmap`, any other
+    `.git*` name (but not the inert `.gitkeep`), or an `info/attributes`-style
+    path. A proposer-supplied `.gitattributes` could re-label binary content
+    as text or name a filter driver the reconciler's `git add` would run."""
+
+    parts = path.lower().split("/")
+    name = parts[-1]
+    if name.startswith(".git") and name != ".gitkeep":
+        return True
+    if name == ".mailmap":
+        return True
+    return len(parts) >= 2 and parts[-2] == "info" and name in _GIT_INFO_FILES
 
 _NOT_YOURS = "no effect intent with that id belongs to the caller"
 
@@ -192,10 +215,11 @@ def _policy_for(repository: str, policies: Mapping[str, RepositoryEffectPolicy])
 # what was touched from the applied result; this is the edge's half.)
 # ---------------------------------------------------------------------------
 
-_HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?: .*)?$")
-_MODE_RE = re.compile(r"^(old mode|new mode|deleted file mode|new file mode) (\d{6})$")
-_INDEX_RE = re.compile(r"^index [0-9a-f]{4,64}\.\.[0-9a-f]{4,64}(?: (\d{6}))?$")
-_SIMILARITY_RE = re.compile(r"^(?:dis)?similarity index \d{1,3}%$")
+#: `[0-9]`, never `\d`: in a `str` pattern `\d` also matches non-ASCII digits.
+_HUNK_RE = re.compile(r"^@@ -([0-9]+)(?:,([0-9]+))? \+([0-9]+)(?:,([0-9]+))? @@(?: .*)?$")
+_MODE_RE = re.compile(r"^(old mode|new mode|deleted file mode|new file mode) ([0-9]{6})$")
+_INDEX_RE = re.compile(r"^index [0-9a-f]{4,64}\.\.[0-9a-f]{4,64}(?: ([0-9]{6}))?$")
+_SIMILARITY_RE = re.compile(r"^(?:dis)?similarity index [0-9]{1,3}%$")
 _PATH_LINE_RE = re.compile(r"^(rename from|rename to|copy from|copy to) (.+)$")
 
 _REGULAR_MODE = "100644"
@@ -224,7 +248,7 @@ def _is_path_safe(path: str) -> bool:
     if not path or path.startswith("/") or "\x00" in path:
         return False
     parts = path.split("/")
-    return not any(part in ("", "..", ".git") for part in parts)
+    return not any(part in ("", ".", "..", ".git") for part in parts)
 
 
 def _mark_mode(mode: str, change: _FileChange) -> None:
@@ -384,6 +408,8 @@ def validate_diff(unified_diff: str, *, policy: RepositoryEffectPolicy) -> None:
     """Raise `ToolFailure` on any refusal in section 7's list. Returns
     normally for a diff-shaped intent this policy allows."""
 
+    if "\x00" in unified_diff:
+        raise ToolFailure("binary-patch-refused", "the diff contains a NUL byte")
     for change in _parse_diff(unified_diff):
         touched = tuple(p for p in (change.old_path, change.new_path) if p is not None)
         if not touched:
@@ -393,6 +419,11 @@ def validate_diff(unified_diff: str, *, policy: RepositoryEffectPolicy) -> None:
                 raise ToolFailure(
                     "path-outside-repository",
                     f"path {path!r} is outside the repository",
+                )
+            if _is_git_control_path(path):
+                raise ToolFailure(
+                    "git-control-file-refused",
+                    f"path {path!r} is a git control file (.gitattributes, .gitmodules, ...)",
                 )
         if change.is_binary:  # pragma: no cover - _parse_file raises first
             raise ToolFailure("binary-patch-refused", "binary patches are not accepted")
@@ -564,7 +595,10 @@ _PROPOSE_DEFINITION: dict[str, Any] = {
         "submodules, paths outside the repository, renames or deletes "
         "outside the repository's path allowlist, CI workflow paths and "
         "protected (e.g. SOPS-matched) paths unless the allowlist names "
-        "them, and any payload that is not a unified diff. run_id must "
+        "them, git control files (.gitattributes, .gitmodules, .mailmap, "
+        ".gitignore, ...) always, NUL bytes, control or bidi-override "
+        "characters in title or rationale, and any payload that is not a "
+        "unified diff. run_id must "
         "come from register_run and must be bound to the same caller and "
         "repository."
     ),
@@ -636,6 +670,20 @@ def _require_str(arguments: Mapping[str, Any], name: str) -> str:
     return value
 
 
+def _refuse_unprintable(name: str, value: str, *, allowed: str) -> None:
+    """Refuse control characters (ESC, CR, other C0/C1), bidi overrides and
+    isolates (U+202A-202E, U+2066-2069) and every other non-printable
+    character: this text is shown to an operator deciding whether to
+    accept, and must not be able to rewrite or reorder what they see."""
+
+    for char in value:
+        if char not in allowed and not char.isprintable():
+            raise ToolFailure(
+                "invalid-arguments",
+                f"{name} contains a control or formatting character (U+{ord(char):04X})",
+            )
+
+
 def _parse_propose(arguments: dict[str, Any]) -> dict[str, Any]:
     allowed = {
         "run_id",
@@ -664,9 +712,11 @@ def _parse_propose(arguments: dict[str, Any]) -> dict[str, Any]:
     title = _require_str(arguments, "title")
     if len(title) > _TITLE_MAX:
         raise ToolFailure("invalid-arguments", f"title must be at most {_TITLE_MAX} characters")
+    _refuse_unprintable("title", title, allowed="")
     rationale = _require_str(arguments, "rationale")
     if len(rationale) > _RATIONALE_MAX:
         raise ToolFailure("invalid-arguments", f"rationale must be at most {_RATIONALE_MAX} characters")
+    _refuse_unprintable("rationale", rationale, allowed="\n\t")
     unified_diff = _require_str(arguments, "unified_diff")
     if len(unified_diff.encode("utf-8")) > _DIFF_MAX_BYTES:
         raise ToolFailure("invalid-arguments", f"unified_diff must be at most {_DIFF_MAX_BYTES} bytes")

@@ -28,6 +28,40 @@ and never reachable through any edge/MCP tool:
   each `run_once`, and records `{kind: "policy", policy_id, version, scope,
   config_digest}` as the acceptor.
 
+### Trust assumption
+
+Acceptance authority is **whoever holds the `IntentSource` credentials on
+the trusted side**. `--operator` is a self-asserted subject: it is recorded
+for attribution (`Vuoro-Accepted-By: operator:<subject>`) and compared
+against `proposer_principal` so a proposer cannot accept its own intent
+under its own name, but nothing in this package authenticates it. Keep the
+`IntentSource` credentials (and the auto-accept config file) where only
+operators can reach them.
+
+The CLI shows every proposer-supplied field with non-printable characters
+escaped visibly (`\x1b`, `\x0d`, `\u202e`, ...), so ESC/CR sequences or
+bidi overrides cannot hide or reorder diff lines; the edge also refuses
+them in `title` and `rationale`.
+
+A `PolicyAcceptor` is honoured only if it still matches the config the
+reconciler is running with: the policy exists and is enabled, and the
+recorded version, config digest and scope are current. Each policy must
+name a `repository` or `path_globs` (or both).
+
+## Git isolation
+
+Every git command runs through `gitenv.run_git`: `GIT_CONFIG_GLOBAL=/dev/null`,
+`GIT_CONFIG_NOSYSTEM=1`, `GIT_ATTR_NOSYSTEM=1`, a fresh empty `HOME` and
+`XDG_CONFIG_HOME`, and no inherited `GIT_*`, `GNUPGHOME` or `SSH_AUTH_SOCK`.
+Signing configuration reaches git only through the explicit `SigningKey`
+(its `env` carries e.g. `GNUPGHOME`, and may not set `GIT_*`). Ambient
+filter drivers, hooks, attribute files, aliases and credential helpers
+therefore never apply to a proposer's diff. Git control files
+(`.gitattributes`, `.gitmodules`, `.mailmap`, `.gitignore`, any other
+`.git*` name, `info/attributes`-style paths) are refused before the diff is
+applied and again on the staged result, whatever the path allowlist says,
+and so is any NUL byte in the patch.
+
 ## What it does
 
 1. Applies auto-accept (if configured) to `poll_proposed()`, then polls

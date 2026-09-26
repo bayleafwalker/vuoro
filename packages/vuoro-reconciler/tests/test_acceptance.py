@@ -293,18 +293,17 @@ def test_a_matching_policy_records_its_id_and_version_in_the_report_and_trailer(
 def test_policy_path_globs_are_rechecked_against_what_the_diff_actually_touched(
     bare_remote: Path, reconciler_signing_key, tmp_path: Path
 ) -> None:
-    """A policy acceptor whose recorded scope does not cover the applied
-    change is refused by the reconciler, whoever recorded it."""
+    """A current, valid policy acceptor whose scope does not cover the
+    applied change is refused after applying, whoever recorded it."""
 
-    acceptor = PolicyAcceptor(
-        policy_id="src-only",
-        version=1,
-        scope={"workspace_id": WORKSPACE, "repository": "repo-a", "effect_kinds": ["diff"], "path_globs": ["src/*"]},
-        config_digest="0" * 64,
-    )
+    config = AutoAcceptConfig(_write_config(tmp_path, [_docs_policy(id="src-only", path_globs=["src/*"])]))
+    policy = config.policy("src-only")
+    acceptor = PolicyAcceptor("src-only", config.version, policy.scope(), config.digest)
     source = FakeIntentSource(accepted=[_intent(bare_remote, acceptor=acceptor)])
     provider = FakeProviderClient(repositories={"repo-a": bare_remote})
-    outcomes = asyncio.run(_reconciler(source, provider, reconciler_signing_key).run_once())
+    outcomes = asyncio.run(
+        _reconciler(source, provider, reconciler_signing_key, auto_accept=config).run_once()
+    )
     assert outcomes[0].reason == "outside-policy-scope"
     assert provider.pushed_branches == []
 

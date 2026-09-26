@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 
 from .intents import Acceptor
+from .gitenv import run_git
 from .signing import SigningKey, configure_signing
 
 __all__ = [
@@ -39,10 +40,9 @@ class DiffDoesNotApply(Exception):
 def _run(
     *args: str, cwd: str | None = None, env: Mapping[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
-    full_env = {**os.environ, **(env or {})}
-    return subprocess.run(
-        ["git", *args], cwd=cwd, env=full_env, capture_output=True, text=True
-    )
+    # Scrubbed: no global/system git config, no inherited GIT_*, fresh HOME
+    # (see gitenv.py). `env` is only ever `SigningKey.env`.
+    return run_git(*args, cwd=cwd, extra_env=env)
 
 
 def checkout_at(clone_url: str, base_commit: str, dest: str) -> None:

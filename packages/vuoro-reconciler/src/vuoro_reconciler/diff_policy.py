@@ -10,10 +10,16 @@ its own, independently configured policy before anything is committed:
 - `staged_changes` reads the *result* of applying the patch to a clean
   checkout (`git diff --cached --raw --numstat --no-renames`), so no patch
   grammar trick can hide a touched path, a mode or a binary blob from it;
+- `check_patch_text` refuses a NUL byte anywhere in the patch text, before
+  it is applied (binary content in disguise);
 - `check_changes` refuses what section 7 refuses: binary content, mode
   changes (including a new file created executable), symlinks, submodules,
   unsafe paths, deletes outside the repository's path allowlist, and CI
-  workflow or protected paths the allowlist does not name.
+  workflow or protected paths the allowlist does not name -- plus any git
+  control file (`.gitattributes`, `.gitmodules`, `.mailmap`, `.gitignore`,
+  any other `.git*` name, `info/attributes`-style paths), which no
+  allowlist can admit: a proposer-supplied `.gitattributes` could
+  otherwise re-label binary content as text or name a filter driver.
 
 With `--no-renames` a rename is seen as a delete of the old path plus an
 add of the new one, so the old path must be on the allowlist exactly as a
@@ -29,17 +35,42 @@ import os
 import subprocess
 import tempfile
 
+from .gitenv import run_git
+
 __all__ = [
     "DiffPolicy",
     "DiffPolicyViolation",
     "StagedChange",
     "check_changes",
+    "check_patch_text",
+    "is_git_control_path",
     "patch_paths",
     "staged_changes",
 ]
 
 #: Same fixed patterns the edge uses; `fnmatch`'s `*` spans `/`.
-CI_WORKFLOW_PATTERNS: tuple[str, ...] = (".github/workflows/*", ".forgejo/workflows/*")
+CI_WORKFLOW_PATTERNS: tuple[str, ...] = (
+    ".github/workflows/*",
+    ".forgejo/workflows/*",
+    ".gitea/workflows/*",
+)
+
+#: Final path components git reads as configuration of the checkout.
+_GIT_INFO_FILES = frozenset({"attributes", "exclude", "sparse-checkout"})
+
+
+def is_git_control_path(path: str) -> bool:
+    """True for a file git itself reads as configuration: `.gitattributes`,
+    `.gitmodules`, `.gitignore`, `.mailmap`, any other `.git*` name (but
+    not the inert `.gitkeep`), or an `info/attributes`-style path."""
+
+    parts = path.lower().split("/")
+    name = parts[-1]
+    if name.startswith(".git") and name != ".gitkeep":
+        return True
+    if name == ".mailmap":
+        return True
+    return len(parts) >= 2 and parts[-2] == "info" and name in _GIT_INFO_FILES
 
 _REGULAR = "100644"
 _EXECUTABLE = "100755"
@@ -82,11 +113,21 @@ class StagedChange:
 
 
 def _git(*args: str, cwd: str) -> subprocess.CompletedProcess[bytes]:
-    return subprocess.run(["git", *args], cwd=cwd, capture_output=True)
+    return run_git(*args, cwd=cwd, text=False)
+
+
+def check_patch_text(unified_diff: str) -> None:
+    """Refuse a NUL byte anywhere in the patch text: text patches never
+    carry one, and git can be talked into treating such a file as text."""
+
+    if "\x00" in unified_diff:
+        raise DiffPolicyViolation("binary-patch-refused", "the patch contains a NUL byte")
 
 
 def patch_paths(unified_diff: str) -> tuple[str, ...]:
-    """Every path git would write for `unified_diff`, as git parses it.
+    """Every path `unified_diff` touches, as git parses it: what
+    `git apply --numstat` would write, plus every rename/copy source (which
+    `--numstat` omits).
 
     Runs `git apply --numstat` outside any repository (it only parses; it
     applies nothing). Raises `DiffPolicyViolation("diff-unparseable")` if
@@ -106,7 +147,13 @@ def patch_paths(unified_diff: str) -> tuple[str, ...]:
             continue
         _added, _deleted, path = record.split(b"\t", 2)
         paths.append(path.decode("utf-8", "surrogateescape"))
-    return tuple(paths)
+    # Sources are taken from every such line, wherever it appears: an extra
+    # path only makes a policy's path_globs harder to satisfy, never easier.
+    for line in unified_diff.splitlines():
+        for prefix in ("rename from ", "copy from "):
+            if line.startswith(prefix):
+                paths.append(line[len(prefix) :])
+    return tuple(dict.fromkeys(paths))
 
 
 def staged_changes(repo_path: str) -> tuple[StagedChange, ...]:
@@ -148,7 +195,7 @@ def _is_path_safe(path: str) -> bool:
     if not path or path.startswith("/") or "\x00" in path:
         return False
     parts = path.split("/")
-    return not any(part in ("", "..", ".git") for part in parts)
+    return not any(part in ("", ".", "..", ".git") for part in parts)
 
 
 def check_changes(changes: Iterable[StagedChange], policy: DiffPolicy) -> None:
@@ -161,6 +208,8 @@ def check_changes(changes: Iterable[StagedChange], policy: DiffPolicy) -> None:
         path = change.path
         if not _is_path_safe(path):
             raise DiffPolicyViolation("path-outside-repository", path)
+        if is_git_control_path(path):
+            raise DiffPolicyViolation("git-control-file-refused", path)
         if change.binary:
             raise DiffPolicyViolation("binary-patch-refused", path)
         modes = {change.old_mode, change.new_mode}

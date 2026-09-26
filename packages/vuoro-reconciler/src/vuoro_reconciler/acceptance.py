@@ -22,9 +22,16 @@ Config file shape (JSON)::
                    "effect_kinds": ["diff"], "path_globs": ["docs/*"]}]}
 
 A missing file, an empty file, or no enabled policy means auto-accept is
-off. `repository` and `path_globs` are optional narrowing; `workspace_id`
-and a non-empty `effect_kinds` are required, so a policy can never match
-"everything".
+off. `workspace_id`, a non-empty `effect_kinds`, and at least one of
+`repository` or `path_globs` are required, so a policy can never match
+"everything in a workspace"; a policy without them is a config error, and
+the whole file then fails to load (closed).
+
+Before acting on a `PolicyAcceptor`, the reconciler checks it against the
+config as it is *now* (`AutoAcceptConfig.stale_reason`): the policy must
+still exist and be enabled, and the recorded version, config digest and
+scope must match. An acceptance recorded under an older or different
+config is refused, not honoured.
 """
 
 from __future__ import annotations
@@ -36,10 +43,13 @@ from typing import Any
 import fnmatch
 import hashlib
 import json
+import logging
 import os
 
 from .diff_policy import DiffPolicyViolation, patch_paths
 from .intents import EffectIntent, IntentSource, OperatorAcceptor, PolicyAcceptor
+
+_log = logging.getLogger(__name__)
 
 __all__ = [
     "AcceptanceRefused",
@@ -132,6 +142,8 @@ def _parse_policy(entry: Any, index: int) -> AutoAcceptPolicy:
         path_globs = tuple(_str_list(path_globs, f"{where}.path_globs"))
         if not path_globs:
             raise ValueError(f"{where}.path_globs must be omitted or non-empty")
+    if repository is None and path_globs is None:
+        raise ValueError(f"{where} must name a repository or path_globs (or both)")
     return AutoAcceptPolicy(
         id=policy_id,
         enabled=enabled,
@@ -187,6 +199,22 @@ class AutoAcceptConfig:
     def policy(self, policy_id: str) -> AutoAcceptPolicy | None:
         return next((policy for policy in self.policies if policy.id == policy_id), None)
 
+    def stale_reason(self, acceptor: PolicyAcceptor) -> str | None:
+        """Why `acceptor` no longer holds under this config, or `None`."""
+
+        policy = self.policy(acceptor.policy_id)
+        if policy is None:
+            return "policy-not-found"
+        if not policy.enabled:
+            return "policy-disabled"
+        if acceptor.version != self.version:
+            return "policy-version-mismatch"
+        if acceptor.config_digest != self.digest:
+            return "policy-config-digest-mismatch"
+        if dict(acceptor.scope) != policy.scope():
+            return "policy-scope-mismatch"
+        return None
+
     def evaluate(self, intent: EffectIntent) -> PolicyAcceptor | None:
         """The acceptor of the first enabled policy that matches `intent`,
         or `None` (leave it for an operator)."""
@@ -209,16 +237,29 @@ async def apply_auto_accept(
 ) -> list[tuple[str, PolicyAcceptor]]:
     """Accept every proposed intent a policy matches. Returns what was
     accepted. With no config, or no enabled policy, does nothing at all --
-    not even a poll."""
+    not even a poll.
+
+    Never raises: a poll that fails, or one intent whose evaluation or
+    `accept` fails (e.g. a lost compare-and-set race with an operator), is
+    logged and skipped, and the rest of the cycle carries on."""
 
     if config is None or not config.active:
         return []
+    try:
+        proposed = await intent_source.poll_proposed()
+    except Exception:
+        _log.exception("auto-accept: poll_proposed failed; skipping auto-accept this cycle")
+        return []
     accepted = []
-    for intent in await intent_source.poll_proposed():
-        acceptor = config.evaluate(intent)
-        if acceptor is None:
+    for intent in proposed:
+        try:
+            acceptor = config.evaluate(intent)
+            if acceptor is None:
+                continue
+            await intent_source.accept(intent.intent_id, acceptor)
+        except Exception:
+            _log.exception("auto-accept: intent %s could not be accepted; skipped", intent.intent_id)
             continue
-        await intent_source.accept(intent.intent_id, acceptor)
         accepted.append((intent.intent_id, acceptor))
     return accepted
 

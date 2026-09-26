@@ -748,3 +748,88 @@ def test_a_concurrent_conflicting_propose_is_refused_and_leaves_no_orphan() -> N
     first, second = asyncio.run(race())
     assert isinstance(second, ToolFailure) and second.code == "idempotency-conflict"
     assert list(store._intents) == [first["intent_id"]]
+
+
+# -- review of 6020c69: git control files, NUL bytes, control characters ------------
+
+GITATTRIBUTES_BLOB_DIFF = (
+    "diff --git a/.gitattributes b/.gitattributes\n"
+    "new file mode 100644\n"
+    "--- /dev/null\n"
+    "+++ b/.gitattributes\n"
+    "@@ -0,0 +1 @@\n"
+    "+blob diff\n"
+)
+NUL_HUNK_DIFF = (
+    "diff --git a/blob b/blob\n"
+    "new file mode 100644\n"
+    "--- /dev/null\n"
+    "+++ b/blob\n"
+    "@@ -0,0 +1 @@\n"
+    "+a\x00b\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("diff", "code"),
+    [
+        (GITATTRIBUTES_BLOB_DIFF, "git-control-file-refused"),
+        (NUL_HUNK_DIFF, "binary-patch-refused"),
+        (GITATTRIBUTES_BLOB_DIFF + NUL_HUNK_DIFF, "binary-patch-refused"),
+        (modify_diff(".gitmodules"), "git-control-file-refused"),
+        (modify_diff(".mailmap"), "git-control-file-refused"),
+        (modify_diff(".gitignore"), "git-control-file-refused"),
+        (modify_diff("docs/.GitAttributes"), "git-control-file-refused"),
+        (modify_diff("info/attributes"), "git-control-file-refused"),
+        (modify_diff(".gitea/workflows/ci.yml"), "protected-path-refused"),
+        (modify_diff("docs/./readme.md"), "path-outside-repository"),
+        # Non-ASCII digits in a hunk header are not part of the grammar.
+        (modify_diff().replace("@@ -1 +1 @@", "@@ -١ +١ @@"), "diff-not-supported"),
+    ],
+)
+def test_git_control_files_nul_bytes_and_gitea_are_refused(diff, code) -> None:
+    with pytest.raises(ToolFailure) as failure:
+        validate_diff(diff, policy=RepositoryEffectPolicy())
+    assert failure.value.code == code
+
+
+def test_git_control_files_are_refused_even_when_allowlisted() -> None:
+    policy = RepositoryEffectPolicy(path_allowlist=frozenset({"*", ".gitattributes"}))
+    with pytest.raises(ToolFailure) as failure:
+        validate_diff(GITATTRIBUTES_BLOB_DIFF, policy=policy)
+    assert failure.value.code == "git-control-file-refused"
+
+
+def test_a_gitkeep_is_not_a_control_file() -> None:
+    validate_diff(add_diff("docs/.gitkeep"), policy=RepositoryEffectPolicy())
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("title", "Fix the typo\x1b[2K"),
+        ("title", "Fix\rthe typo"),
+        ("title", "Fix\nthe typo"),
+        ("title", "Fix the ‮typo"),
+        ("title", "Fix the ⁦typo⁩"),
+        ("title", "Fix\x85"),
+        ("rationale", "Looks fine\x1b[1A\x1b[2K"),
+        ("rationale", "line\rover"),
+        ("rationale", "bidi ‪ override"),
+    ],
+)
+def test_control_and_bidi_characters_in_title_and_rationale_are_refused(keys, field, value) -> None:
+    client, store, runs = _client(keys)
+    run_id = _register_run(runs)
+    result = _call_with(client, keys, "propose_effect", _args(run_id=run_id, **{field: value}))
+    _assert_error(result, "invalid-arguments")
+    assert store._intents == {}
+
+
+def test_a_multi_line_rationale_is_still_accepted(keys) -> None:
+    client, _, runs = _client(keys)
+    run_id = _register_run(runs)
+    result = _call_with(
+        client, keys, "propose_effect", _args(run_id=run_id, rationale="First line.\n\n\tIndented detail.")
+    )
+    assert result["isError"] is False, result

@@ -15,11 +15,20 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+import logging
 import shutil
 import tempfile
 
 from .acceptance import AutoAcceptConfig, apply_auto_accept, scope_admits
-from .diff_policy import DiffPolicy, DiffPolicyViolation, check_changes, staged_changes
+from .diff_policy import (
+    DiffPolicy,
+    DiffPolicyViolation,
+    check_changes,
+    check_patch_text,
+    is_git_control_path,
+    patch_paths,
+    staged_changes,
+)
 from .git_ops import (
     CheckoutFailed,
     DiffDoesNotApply,
@@ -42,6 +51,9 @@ __all__ = [
     "ReconcilerConfig",
     "RepositoryNotAllowlisted",
 ]
+
+
+_log = logging.getLogger(__name__)
 
 
 class RepositoryNotAllowlisted(Exception):
@@ -110,7 +122,10 @@ class Reconciler:
         """Apply auto-accept (if configured) to proposed intents, then poll
         once and reconcile every accepted intent. Returns one `Outcome` per
         accepted intent, in poll order; never raises for an individual
-        intent's failure (that is reported and recorded, not propagated)."""
+        intent's failure (that is reported and recorded, not propagated),
+        nor for auto-accept or reporting failures (logged, and the cycle
+        continues). Only a failing `poll_accepted` -- no work to do at
+        all -- propagates."""
 
         await apply_auto_accept(self.intent_source, self.auto_accept)
         intents = await self.intent_source.poll_accepted()
@@ -131,8 +146,15 @@ class Reconciler:
             raise _Refused("no-acceptor")
         if isinstance(acceptor, OperatorAcceptor) and acceptor.subject == intent.proposer_principal:
             raise _Refused("acceptor-is-proposer")
-        if isinstance(acceptor, PolicyAcceptor) and not scope_admits(acceptor.scope, intent, ()):
-            raise _Refused("outside-policy-scope")
+        if isinstance(acceptor, PolicyAcceptor):
+            # Honour a policy acceptance only under the config as it is now.
+            if self.auto_accept is None:
+                raise _Refused("policy-acceptor-stale: auto-accept-not-configured")
+            stale = self.auto_accept.stale_reason(acceptor)
+            if stale is not None:
+                raise _Refused(f"policy-acceptor-stale: {stale}")
+            if not scope_admits(acceptor.scope, intent, ()):
+                raise _Refused("outside-policy-scope")
         if intent.effect_kind != "diff":
             raise _Refused("effect-kind-not-supported")
         if intent.repository not in self.config.repository_allowlist:
@@ -175,16 +197,31 @@ class Reconciler:
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
 
-        await self.intent_source.report_applied(
-            intent.intent_id, commit_sha=commit_sha, pr_url=result.url, acceptor=acceptor
-        )
+        try:
+            await self.intent_source.report_applied(
+                intent.intent_id, commit_sha=commit_sha, pr_url=result.url, acceptor=acceptor
+            )
+        except Exception:
+            # The branch and PR exist; a re-run finds them and reports again.
+            _log.exception("report_applied failed for intent %s", intent.intent_id)
         return Outcome(
             intent.intent_id, "applied", commit_sha=commit_sha, pr_url=result.url, acceptor=acceptor
         )
 
     def _prepare_commit(self, intent: EffectIntent, acceptor: Acceptor, workdir: str) -> str:
-        """Checkout, apply, re-validate and sign; the commit exists only in
-        `workdir` until something pushes it."""
+        """Validate, checkout, apply, re-validate and sign; the commit exists
+        only in `workdir` until something pushes it."""
+
+        # Before anything is applied: no NUL bytes, and no path git would
+        # read as configuration (a .gitattributes could re-label binary
+        # content or name a filter driver for the `git add` below).
+        try:
+            check_patch_text(intent.unified_diff)
+            for path in patch_paths(intent.unified_diff):
+                if is_git_control_path(path):
+                    raise DiffPolicyViolation("git-control-file-refused", path)
+        except DiffPolicyViolation as violation:
+            raise _Refused(f"diff-policy-refused: {violation.code}") from None
 
         try:
             checkout_at(self.provider.clone_url(intent.repository), intent.base_commit, workdir)
@@ -220,5 +257,8 @@ class Reconciler:
             raise _Refused(f"commit-failed: {error}") from None
 
     async def _fail(self, intent: EffectIntent, reason: str) -> Outcome:
-        await self.intent_source.report_failed(intent.intent_id, reason=reason)
+        try:
+            await self.intent_source.report_failed(intent.intent_id, reason=reason)
+        except Exception:
+            _log.exception("report_failed failed for intent %s (%s)", intent.intent_id, reason)
         return Outcome(intent.intent_id, "failed", reason=reason, acceptor=intent.acceptor)
