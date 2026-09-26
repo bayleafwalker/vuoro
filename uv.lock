@@ -774,7 +774,7 @@ provides-extras = ["test"]
 
 [[package]]
 name = "vuoro-client"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/vuoro-client" }
 dependencies = [
     { name = "httpx" },
@@ -812,7 +812,7 @@ provides-extras = ["test"]
 
 [[package]]
 name = "vuoro-mcp-edge"
-version = "0.1.1"
+version = "0.1.2"
 source = { editable = "packages/vuoro-mcp-edge" }
 dependencies = [
     { name = "httpx" },
@@ -848,7 +848,7 @@ provides-extras = ["test"]
 
 [[package]]
 name = "vuoro-service"
-version = "0.1.74"
+version = "0.1.75"
 source = { editable = "packages/vuoro-service" }
 dependencies = [
     { name = "cryptography" },

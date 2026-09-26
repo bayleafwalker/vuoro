@@ -5,6 +5,18 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-client 0.1.1: authenticate `GET /api/meta/v1/handshake` and
+  `GET /api/catalog/v1` whenever the profile has a credential (hosted
+  vuoro.cloud answered 401 to served sprintctl), and send a named
+  `User-Agent: vuoro-client/<version>` on every request (Cloudflare refuses
+  generic ones). (#125)
+- vuoro-service 0.1.75 / vuoro-mcp-edge 0.1.2: `describe_work` for a missing
+  item is an ordinary `item-not-found` tool error logged at INFO, no longer a
+  "work source failed" warning; real unavailability is unchanged. (#126)
+- vuoro-worker: the internal MCP server answers with 2026-07-28
+  `resultType: "complete"` (the domain kind moves to `kind`) and
+  `cacheScope` public/private. (#127)
+
 - vuoro-service 0.1.74 / vuoro-mcp-edge 0.1.1: MCP results carry
   `resultType: "complete"` and list results `cacheScope: "private"`, as
   revision 2026-07-28 requires. The per-method names before this made Claude
