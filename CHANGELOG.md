@@ -5,6 +5,11 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service 0.1.74 / vuoro-mcp-edge 0.1.1: MCP results carry
+  `resultType: "complete"` and list results `cacheScope: "private"`, as
+  revision 2026-07-28 requires. The per-method names before this made Claude
+  Code and hosted Routines drop every Vuoro tool.
+
 - Add `vuoro-service mcp-serve` and restore `packages/vuoro-mcp-edge`: the MCP
   protocol server (`list_ready_work`, `describe_work`) over gateway identity
   assertions, reading sprintctl's `work.public.*-v1` contract through the
