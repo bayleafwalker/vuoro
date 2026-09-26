@@ -375,16 +375,14 @@ def test_unavailable_intent_store_fails_closed_for_both_tools(keys) -> None:
     _assert_error(fetched, "effects-unavailable")
 
 
-def test_production_default_composition_fails_closed(keys) -> None:
-    context = ToolsetContext(
-        env={}, work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"), runs=UnavailableRunRegistry()
-    )
-    toolset = effect_tools.build_toolset(context)
-    assert toolset is not None
-    assert {tool.name for tool in toolset.tools} == {"propose_effect", "get_effect"}
-    client = edge_client(keys[0], FakeShell(), toolsets=(toolset,))
-    result = _call_with(client, keys, "propose_effect", _args(run_id="run_" + "0" * 26))
-    _assert_error(result, "effects-unavailable")
+def test_production_composition_advertises_no_effect_tools_without_a_store() -> None:
+    """Until a durable intent store exists, the production builder lists no
+    tools at all, rather than two that would fail every call."""
+    for runs in (UnavailableRunRegistry(), InMemoryRunRegistry()):
+        context = ToolsetContext(
+            env={}, work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"), runs=runs
+        )
+        assert effect_tools.build_toolset(context) is None
 
 
 # -- get_effect --------------------------------------------------------------------
@@ -544,9 +542,12 @@ def test_load_repository_policies_rejects_malformed_configuration(raw) -> None:
 _TRANSITION_WORDS = ("accept", "approve", "reject", "transition", "apply", "execute", "settle")
 
 
-def test_the_edge_tool_list_has_no_accept_or_transition_tool(keys) -> None:
+def test_the_edge_tool_list_has_no_accept_or_transition_tool(keys, monkeypatch) -> None:
     from vuoro_mcp_edge.composition import build_toolsets
 
+    # The production composition, with a store wired in so the effect tools
+    # are listed at all.
+    monkeypatch.setattr(effect_tools, "_production_intent_store", InMemoryIntentStore)
     context = ToolsetContext(
         env={"VUORO_MCP_EFFECT_AUTO_ACCEPT": "1"},
         work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"),
@@ -591,7 +592,7 @@ def test_auto_accept_env_has_no_effect_on_the_edge(keys, monkeypatch) -> None:
         # Production composition, with only the store and registry swapped
         # for the reference ones so a proposal can actually be recorded.
         store = InMemoryIntentStore()
-        monkeypatch.setattr(effect_tools, "UnavailableIntentStore", lambda: store)
+        monkeypatch.setattr(effect_tools, "_production_intent_store", lambda: store)
         runs = InMemoryRunRegistry()
         context = ToolsetContext(env=env, work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"), runs=runs)
         toolset = effect_tools.build_toolset(context)

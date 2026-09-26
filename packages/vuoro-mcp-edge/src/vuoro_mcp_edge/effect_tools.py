@@ -862,8 +862,24 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
     construction: auto-accept is a trusted-side config file read by the
     reconciler (`vuoro_reconciler.acceptance`), never an edge setting."""
 
+    store = _production_intent_store()
+    if store is None:
+        # No durable intent store is wired in yet: this bucket has nothing it
+        # could serve, so it advertises nothing rather than two tools that
+        # fail every call -- the same posture record_tools takes without a
+        # durable run registry.
+        return None
     return _build(
-        intent_store=UnavailableIntentStore(),
+        intent_store=store,
         runs=context.runs,
         repository_policies=_load_repository_policies(context.env),
     )
+
+
+def _production_intent_store() -> IntentStore | None:
+    """The durable intent store production composes, or None while there is
+    none (ActionQ's intent-lifecycle operation has not landed). The single
+    seam a durable store is wired through; tests substitute the reference
+    store here to exercise the production composition path."""
+
+    return None
