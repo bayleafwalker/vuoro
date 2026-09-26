@@ -96,7 +96,7 @@ def create_app_from_environment(env: Mapping[str, str] | None = None) -> FastAPI
     except CompositionError as error:
         raise EdgeConfigurationError(str(error)) from error
     work_source = ShellWorkSource(base_url=_upstream_url(env), request_timeout=_timeout(env))
-    context = ToolsetContext(env=env, work_source=work_source, runs=UnavailableRunRegistry())
+    context = ToolsetContext(env=env, work_source=work_source, runs=record_tools.build_run_registry(env))
     return create_edge_app(
         identity_resolver=resolver,
         work_source=work_source,

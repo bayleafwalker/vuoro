@@ -12,12 +12,20 @@ owner, not in the edge: the edge holds no credential).  Until it lands,
 `UnavailableRunRegistry` refuses every lookup with `runs-unavailable`, so E3
 code paths fail closed instead of inventing a binding.  `InMemoryRunRegistry`
 is the reference behaviour both E2 and E3 test against.
+
+Contract amendment (2026-09-26, shared contract section 3): `register` and
+`resolve` take the caller's `ForwardedIdentity` as a required `forwarded`
+keyword, and `register` takes the run's `manifest`.  The durable registry
+reaches the run owner through the runtime shell with the caller's own
+assertion, so it cannot answer without it; a registry reached only through
+this protocol must be callable exactly as a toolset calls it.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 import re
 import secrets
 
@@ -67,17 +75,38 @@ def binding_for(forwarded: ForwardedIdentity) -> RunBinding:
         principal_id=identity.principal_id,
         workspace_id=identity.workspace_id,
         repo_id=forwarded.repo_id,
+        client_id=identity.client_id,
+        grant_id=identity.grant_id,
     )
 
 
 class RunRegistry(Protocol):
-    """Resolves and mints run handles.  Implementations must be durable."""
+    """Resolves and mints run handles.  Implementations must be durable.
 
-    async def register(self, binding: RunBinding, *, idempotency_key: str) -> str:
+    `forwarded` is the inbound caller's assertion, passed through unchanged
+    (the binding is derived from it with `binding_for`); an implementation
+    uses it only to reach the run owner as that caller.
+    """
+
+    async def register(
+        self,
+        binding: RunBinding,
+        *,
+        idempotency_key: str,
+        forwarded: ForwardedIdentity,
+        manifest: Mapping[str, Any],
+    ) -> str:
         """Mint a run for `binding`; the same key for the same binding returns
-        the same `run_id`."""
+        the same `run_id`.
 
-    async def resolve(self, run_id: str, caller: RunBinding) -> RunBinding:
+        `manifest` holds the RunManifest fields the run record carries:
+        `harness_id`, `harness_build`, `model_id`, `recipe_id` and
+        `observed_profile`.
+        """
+
+    async def resolve(
+        self, run_id: str, caller: RunBinding, *, forwarded: ForwardedIdentity
+    ) -> RunBinding:
         """The run's binding if `caller` matches it.
 
         Raises `ToolFailure("run-not-found", ...)` for an unknown, malformed
@@ -90,10 +119,19 @@ class RunRegistry(Protocol):
 class UnavailableRunRegistry:
     """The registry until E2 ships one: every call fails closed."""
 
-    async def register(self, binding: RunBinding, *, idempotency_key: str) -> str:
+    async def register(
+        self,
+        binding: RunBinding,
+        *,
+        idempotency_key: str,
+        forwarded: ForwardedIdentity,
+        manifest: Mapping[str, Any],
+    ) -> str:
         raise ToolFailure("runs-unavailable", "run handles are not available yet")
 
-    async def resolve(self, run_id: str, caller: RunBinding) -> RunBinding:
+    async def resolve(
+        self, run_id: str, caller: RunBinding, *, forwarded: ForwardedIdentity
+    ) -> RunBinding:
         raise ToolFailure("runs-unavailable", "run handles are not available yet")
 
 
@@ -108,7 +146,14 @@ class InMemoryRunRegistry:
         self._runs: dict[str, RunBinding] = {}
         self._by_key: dict[tuple[RunBinding, str], str] = {}
 
-    async def register(self, binding: RunBinding, *, idempotency_key: str) -> str:
+    async def register(
+        self,
+        binding: RunBinding,
+        *,
+        idempotency_key: str,
+        forwarded: ForwardedIdentity,
+        manifest: Mapping[str, Any],
+    ) -> str:
         existing = self._by_key.get((binding, idempotency_key))
         if existing is not None:
             return existing
@@ -117,7 +162,9 @@ class InMemoryRunRegistry:
         self._by_key[(binding, idempotency_key)] = run_id
         return run_id
 
-    async def resolve(self, run_id: str, caller: RunBinding) -> RunBinding:
+    async def resolve(
+        self, run_id: str, caller: RunBinding, *, forwarded: ForwardedIdentity
+    ) -> RunBinding:
         owner = self._runs.get(run_id) if RUN_ID.fullmatch(run_id or "") else None
         if owner is None or owner != caller:
             raise ToolFailure("run-not-found", _NOT_YOURS)

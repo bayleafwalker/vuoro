@@ -58,6 +58,16 @@
   - a `ToolFailure` becomes an `isError: true` result with a stable `code`.
 - **Authorities at the door.** The edge accepts only the authorities of the tools it actually registered. An assertion carrying `work:evidence` is refused while no record tool is registered.
 
+**Amendment (2026-09-26): the `RunRegistry` protocol takes the caller's forwarded identity.**
+- Why: E2's durable registry reaches the run owner through the runtime shell as the caller, so it cannot answer without the caller's assertion. The original protocol had no parameter for it. E2 first widened only its concrete store, which broke every caller that holds `context.runs` as the protocol (vuoro#131 review).
+- The protocol in `runs.py` is now:
+  - `register(binding, *, idempotency_key, forwarded, manifest) -> run_id`. `manifest` holds the RunManifest fields of the run record: `harness_id`, `harness_build`, `model_id`, `recipe_id`, `observed_profile`.
+  - `resolve(run_id, caller, *, forwarded) -> RunBinding`.
+  - `forwarded` is the `ForwardedIdentity` the toolset handler received, passed through unchanged, and `caller` is `binding_for(forwarded)`.
+- `UnavailableRunRegistry` and `InMemoryRunRegistry` take the same parameters. The reference registry ignores `forwarded` and `manifest`.
+- Every `RunRegistry` implementation must match these signatures exactly. A test runs the registry that `composition.py` wires in through a protocol-typed toolset call, so a mismatch fails in CI.
+- E3 passes `forwarded=` to `runs.resolve` when it rebases.
+
 ## 4. Run handles
 
 **Minting (E2).**
@@ -81,11 +91,16 @@
 ## 5. Idempotency (both items)
 
 - Every write tool requires `idempotency_key`: 8–128 characters from `A-Z a-z 0-9 . _ : -`. Use `IDEMPOTENCY_KEY_SCHEMA` in the input schema.
-- The ledger is keyed by (workspace, tool, key) and stores `request_digest(tool, arguments-without-key)` together with the first result.
+- The ledger is keyed by (workspace, principal, tool, key) and stores `request_digest(tool, arguments-without-key)` together with the first result. *(Amended 2026-09-26; was (workspace, tool, key).)*
   - Same key, same digest: replay the stored result, with no second effect.
   - Same key, different digest: `idempotency-conflict`.
 - The first write wins atomically, and a racing writer gets the stored row back.
 - Each item's ledger lives with its record owner, not in the edge. Both use the shared protocol and must pass behaviour tests equivalent to `InMemoryIdempotencyLedger`'s.
+
+**Amendment (2026-09-26): the ledger key includes the principal.**
+- Why: with a key of only (workspace, tool, key), two principals in one workspace share a key space. One principal could replay another's stored result by reusing their key. It could also probe which keys exist, because a different digest returns `idempotency-conflict` instead of a fresh write. Keying by principal removes both.
+- This matches E2's ledger in sprintctl (sprintctl#97), which keys on (workspace, principal, tool, key).
+- `idempotency.py`'s `IdempotencyLedger` protocol and `InMemoryIdempotencyLedger` still take `workspace_id` only. Until a follow-up changes that shared protocol, a ledger built on it must fold the principal into what it stores and looks up.
 
 ## 6. Claims (E2)
 

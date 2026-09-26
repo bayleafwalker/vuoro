@@ -816,6 +816,7 @@ version = "0.1.2"
 source = { editable = "packages/vuoro-mcp-edge" }
 dependencies = [
     { name = "httpx" },
+    { name = "vuoro-evidence" },
     { name = "vuoro-service" },
 ]
 
@@ -828,6 +829,7 @@ test = [
 requires-dist = [
     { name = "httpx", specifier = ">=0.27,<1" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" },
+    { name = "vuoro-evidence", editable = "packages/vuoro-evidence" },
     { name = "vuoro-service", editable = "packages/vuoro-service" },
 ]
 provides-extras = ["test"]

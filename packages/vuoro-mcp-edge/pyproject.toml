@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
   "vuoro-service",
+  "vuoro-evidence",
   "httpx>=0.27,<1",
 ]
 
@@ -21,3 +22,4 @@ packages = ["src/vuoro_mcp_edge"]
 
 [tool.uv.sources]
 vuoro-service = { workspace = true }
+vuoro-evidence = { workspace = true }
