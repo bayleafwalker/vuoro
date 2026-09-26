@@ -1,0 +1,488 @@
+"""agentops#2466 (E2): register_run, append_evidence, write_session_note --
+the record bucket's tools, and the durable SprintctlRecordStore behind them.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+from datetime import datetime, timezone
+from typing import Any
+
+import httpx
+import pytest
+from vuoro_service.identity import Identity
+from vuoro_mcp_edge.record_tools import (
+    RecordShellClient,
+    SprintctlRecordStore,
+    build_run_registry,
+    build_toolset,
+)
+from vuoro_mcp_edge.runs import RunBinding, UnavailableRunRegistry
+from vuoro_mcp_edge.toolsets import ToolFailure, ToolsetContext
+from vuoro_mcp_edge.work_source import ForwardedIdentity, ShellWorkSource
+
+REQUEST_ID = "01K33333333333333333333333"
+REPO_ID = "repo-a"
+PRINCIPAL_ID = "vuoro-cloud-control:github:123:0"
+WORKSPACE_ID = "01K11111111111111111111111"
+RUN_ID = "run_" + "0" * 24 + "AA"
+assert len(RUN_ID) == 30  # "run_" + 26 crockford chars
+
+
+def _forwarded(*, principal_id: str = PRINCIPAL_ID, workspace_id: str = WORKSPACE_ID) -> ForwardedIdentity:
+    identity = Identity(
+        actor="github:123",
+        environment="vuoro-dev",
+        authorities=frozenset({"work:evidence"}),
+        repo_ids=frozenset({REPO_ID}),
+        workspace_id=workspace_id,
+        principal_id=principal_id,
+    )
+    return ForwardedIdentity(
+        assertion="a.b.c", request_id=REQUEST_ID, repo_id=REPO_ID, identity=identity
+    )
+
+
+def _context(runs: Any) -> ToolsetContext:
+    return ToolsetContext(
+        env={}, work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"), runs=runs
+    )
+
+
+def _accepted(operation: str, result: Any) -> httpx.Response:
+    return httpx.Response(
+        200,
+        json={
+            "schema_version": "invocation-result/v1",
+            "request_id": REQUEST_ID,
+            "operation": operation,
+            "catalog_revision": "rev-1",
+            "status": "accepted",
+            "result": result,
+            "error": None,
+        },
+    )
+
+
+def _rejected(operation: str, code: str, message: str = "rejected", status: int = 409) -> httpx.Response:
+    return httpx.Response(
+        status,
+        json={
+            "schema_version": "invocation-result/v1",
+            "request_id": REQUEST_ID,
+            "operation": operation,
+            "catalog_revision": "rev-1",
+            "status": "rejected",
+            "result": None,
+            "error": {"code": code, "message": message},
+        },
+    )
+
+
+class _FakeShell:
+    """A minimal ``/api/invoke/v1`` handler: canned responses, in order."""
+
+    def __init__(self, *responses: httpx.Response) -> None:
+        self._responses = list(responses)
+        self.requests: list[dict[str, Any]] = []
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/invoke/v1"
+        self.requests.append(json.loads(request.content))
+        if not self._responses:
+            raise AssertionError("unexpected extra request")
+        return self._responses.pop(0)
+
+
+def _store(shell: _FakeShell) -> SprintctlRecordStore:
+    return SprintctlRecordStore(
+        base_url="http://127.0.0.1:8080", timeout=5.0, transport=httpx.MockTransport(shell)
+    )
+
+
+def _run(coro):
+    return asyncio.run(coro)
+
+
+OBSERVED_PROFILE = {"instruction_digest": "sha256:" + "a" * 64, "skill_digests": []}
+
+
+def _run_row(**overrides: Any) -> dict[str, Any]:
+    row = {
+        "run_id": RUN_ID,
+        "principal_id": PRINCIPAL_ID,
+        "workspace_id": WORKSPACE_ID,
+        "harness_id": "claude-code",
+        "harness_build": "1.0.0",
+        "model_id": "claude-sonnet-5",
+        "recipe_id": "recipe-1",
+        "observed_profile": OBSERVED_PROFILE,
+        "grant_ids": [],
+        "claim_ids": [],
+        "created_at": "2026-09-26T00:00:00Z",
+    }
+    row.update(overrides)
+    return row
+
+
+class TestBuildToolsetGate:
+    def test_returns_none_for_the_unavailable_placeholder(self) -> None:
+        assert build_toolset(_context(UnavailableRunRegistry())) is None
+
+    def test_returns_tools_for_a_durable_store(self) -> None:
+        toolset = build_toolset(_context(_store(_FakeShell())))
+        assert toolset is not None
+        assert [spec.name for spec in toolset.tools] == [
+            "register_run", "append_evidence", "write_session_note",
+        ]
+        assert all(spec.bucket == "record" for spec in toolset.tools)
+
+
+class TestBuildRunRegistry:
+    def test_default_upstream(self) -> None:
+        registry = build_run_registry({})
+        assert isinstance(registry, SprintctlRecordStore)
+
+    def test_malformed_timeout_falls_back(self) -> None:
+        # Does not raise: composition.py already validated this before
+        # constructing ShellWorkSource; this function has no one to raise to.
+        build_run_registry({"VUORO_MCP_UPSTREAM_TIMEOUT_SECONDS": "not-a-number"})
+        build_run_registry({"VUORO_MCP_UPSTREAM_TIMEOUT_SECONDS": "999"})
+
+
+class TestRegisterRun:
+    def test_mints_a_run_bound_to_the_caller(self) -> None:
+        shell = _FakeShell(_accepted("work.run.register-v1", {"repo_id": REPO_ID, "run": _run_row()}))
+        store = _store(shell)
+        toolset = build_toolset(_context(store))
+        spec = next(t for t in toolset.tools if t.name == "register_run")
+        parsed = spec.parse(
+            {
+                "harness_id": "claude-code", "harness_build": "1.0.0", "model_id": "claude-sonnet-5",
+                "recipe_id": "recipe-1", "observed_profile": OBSERVED_PROFILE,
+                "idempotency_key": "register-key-0001",
+            }
+        )
+        result = _run(spec.run(parsed, _forwarded()))
+        assert result == {"run_id": RUN_ID}
+        sent = shell.requests[0]
+        assert sent["operation"] == "work.run.register-v1"
+        assert sent["arguments"]["idempotency_key"] == "register-key-0001"
+        assert sent["arguments"]["observed_profile"] == OBSERVED_PROFILE
+
+    def test_an_invalid_run_id_from_sprintctl_is_a_tool_failure(self) -> None:
+        shell = _FakeShell(
+            _accepted("work.run.register-v1", {"repo_id": REPO_ID, "run": _run_row(run_id="not-a-run-id")})
+        )
+        store = _store(shell)
+        with pytest.raises(ToolFailure) as excinfo:
+            _run(
+                store.register(
+                    RunBinding(principal_id=PRINCIPAL_ID, workspace_id=WORKSPACE_ID, repo_id=REPO_ID),
+                    idempotency_key="register-key-0002",
+                    forwarded=_forwarded(),
+                    manifest={
+                        "harness_id": "claude-code", "harness_build": "1.0.0",
+                        "model_id": "claude-sonnet-5", "recipe_id": "recipe-1",
+                        "observed_profile": OBSERVED_PROFILE,
+                    },
+                )
+            )
+        assert excinfo.value.code == "record-shell-unavailable"
+
+    def test_sprintctl_s_idempotency_conflict_surfaces_as_a_tool_failure(self) -> None:
+        shell = _FakeShell(_rejected("work.run.register-v1", "idempotency-conflict"))
+        toolset = build_toolset(_context(_store(shell)))
+        spec = next(t for t in toolset.tools if t.name == "register_run")
+        parsed = spec.parse(
+            {
+                "harness_id": "claude-code", "harness_build": "1.0.0", "model_id": "claude-sonnet-5",
+                "recipe_id": "recipe-1", "observed_profile": OBSERVED_PROFILE,
+                "idempotency_key": "register-key-0003",
+            }
+        )
+        with pytest.raises(ToolFailure) as excinfo:
+            _run(spec.run(parsed, _forwarded()))
+        assert excinfo.value.code == "idempotency-conflict"
+
+    @pytest.mark.parametrize(
+        "bad_arguments",
+        [
+            {},
+            {"harness_id": ""},
+            {"harness_id": "x", "harness_build": "1", "model_id": "m", "recipe_id": "r",
+             "observed_profile": {}, "idempotency_key": "short"},
+            {"harness_id": "x", "harness_build": "1", "model_id": "m", "recipe_id": "r",
+             "observed_profile": {"skill_digests": []}, "idempotency_key": "register-key-0004"},
+            {"harness_id": "x", "harness_build": "1", "model_id": "m", "recipe_id": "r",
+             "observed_profile": {"instruction_digest": "d", "skill_digests": [{"skill_id": "a"}]},
+             "idempotency_key": "register-key-0004"},
+            {"harness_id": "x", "harness_build": "1", "model_id": "m", "recipe_id": "r",
+             "observed_profile": {"instruction_digest": "d", "skill_digests": []},
+             "idempotency_key": "register-key-0004", "unexpected": "x"},
+        ],
+    )
+    def test_bad_arguments_are_refused_before_any_call(self, bad_arguments: dict[str, Any]) -> None:
+        shell = _FakeShell()  # any use would raise: no responses queued
+        toolset = build_toolset(_context(_store(shell)))
+        spec = next(t for t in toolset.tools if t.name == "register_run")
+        with pytest.raises(ToolFailure) as excinfo:
+            spec.parse(bad_arguments)
+        assert excinfo.value.code == "invalid-arguments"
+        assert shell.requests == []
+
+
+class TestResolveRun:
+    def test_resolves_the_matching_binding(self) -> None:
+        shell = _FakeShell(
+            _accepted(
+                "work.run.resolve-v1",
+                {
+                    "repo_id": REPO_ID, "run_id": RUN_ID,
+                    "principal_id": PRINCIPAL_ID, "workspace_id": WORKSPACE_ID,
+                },
+            )
+        )
+        store = _store(shell)
+        caller = RunBinding(principal_id=PRINCIPAL_ID, workspace_id=WORKSPACE_ID, repo_id=REPO_ID)
+        resolved = _run(store.resolve(RUN_ID, caller, forwarded=_forwarded()))
+        assert resolved == caller
+
+    def test_a_malformed_run_id_is_run_not_found_without_a_call(self) -> None:
+        shell = _FakeShell()
+        store = _store(shell)
+        caller = RunBinding(principal_id=PRINCIPAL_ID, workspace_id=WORKSPACE_ID, repo_id=REPO_ID)
+        with pytest.raises(ToolFailure) as excinfo:
+            _run(store.resolve("not-a-run-id", caller, forwarded=_forwarded()))
+        assert excinfo.value.code == "run-not-found"
+        assert shell.requests == []
+
+    def test_sprintctl_s_run_not_found_propagates(self) -> None:
+        shell = _FakeShell(_rejected("work.run.resolve-v1", "run-not-found", status=404))
+        store = _store(shell)
+        caller = RunBinding(principal_id=PRINCIPAL_ID, workspace_id=WORKSPACE_ID, repo_id=REPO_ID)
+        with pytest.raises(ToolFailure) as excinfo:
+            _run(store.resolve(RUN_ID, caller, forwarded=_forwarded()))
+        assert excinfo.value.code == "run-not-found"
+
+    def test_a_mismatched_binding_in_the_response_is_refused(self) -> None:
+        """Defense in depth: even if the shell answered with someone else's
+        binding, this store never trusts it over the caller's own."""
+        shell = _FakeShell(
+            _accepted(
+                "work.run.resolve-v1",
+                {
+                    "repo_id": REPO_ID, "run_id": RUN_ID,
+                    "principal_id": "someone-else:9:0", "workspace_id": WORKSPACE_ID,
+                },
+            )
+        )
+        store = _store(shell)
+        caller = RunBinding(principal_id=PRINCIPAL_ID, workspace_id=WORKSPACE_ID, repo_id=REPO_ID)
+        with pytest.raises(ToolFailure) as excinfo:
+            _run(store.resolve(RUN_ID, caller, forwarded=_forwarded()))
+        assert excinfo.value.code == "run-not-found"
+
+
+VALIDITY = {"basis": "indefinite", "valid_from": "2026-09-26T00:00:00Z", "valid_until": None, "component_digests": {}}
+
+
+class TestAppendEvidence:
+    def test_first_append_starts_a_fresh_chain(self) -> None:
+        shell = _FakeShell(
+            _accepted(
+                "work.run.resolve-v1",
+                {"repo_id": REPO_ID, "run_id": RUN_ID, "principal_id": PRINCIPAL_ID, "workspace_id": WORKSPACE_ID},
+            ),
+            _accepted("work.evidence.tail-v1", {"repo_id": REPO_ID, "run_id": RUN_ID, "item": None}),
+            _accepted(
+                "work.evidence.append-v1",
+                {
+                    "repo_id": REPO_ID, "run_id": RUN_ID,
+                    "item": {
+                        "item_id": "evi_1", "kind": "test", "ref": "ref-1", "digest": "sha256:" + "b" * 64,
+                        "collector": "tester", "validity": VALIDITY, "claims": [], "provenance": {},
+                        "chain_seq": 0, "chain_prev_digest": None,
+                    },
+                },
+            ),
+        )
+        toolset = build_toolset(_context(_store(shell)))
+        spec = next(t for t in toolset.tools if t.name == "append_evidence")
+        parsed = spec.parse(
+            {
+                "run_id": RUN_ID, "kind": "test", "ref": "ref-1", "digest": "sha256:" + "b" * 64,
+                "collector": "tester", "validity": VALIDITY, "idempotency_key": "evidence-key-0001",
+            }
+        )
+        result = _run(spec.run(parsed, _forwarded()))
+        assert result["chain_seq"] == 0
+        assert result["chain_prev_digest"] is None
+        append_request = shell.requests[2]
+        assert append_request["arguments"]["chain_seq"] == 0
+        assert append_request["arguments"]["chain_prev_digest"] is None
+        # item_id is minted fresh per call, not taken from the caller.
+        assert append_request["arguments"]["item_id"]
+
+    def test_a_second_append_extends_the_observed_tail(self) -> None:
+        tail_digest = "sha256:" + "c" * 64
+        shell = _FakeShell(
+            _accepted(
+                "work.run.resolve-v1",
+                {"repo_id": REPO_ID, "run_id": RUN_ID, "principal_id": PRINCIPAL_ID, "workspace_id": WORKSPACE_ID},
+            ),
+            _accepted(
+                "work.evidence.tail-v1",
+                {
+                    "repo_id": REPO_ID, "run_id": RUN_ID,
+                    "item": {
+                        "item_id": "evi_1", "kind": "test", "ref": "ref-1", "digest": tail_digest,
+                        "collector": "tester", "validity": VALIDITY, "claims": [], "provenance": {},
+                        "chain_seq": 0, "chain_prev_digest": None,
+                    },
+                },
+            ),
+            _accepted(
+                "work.evidence.append-v1",
+                {
+                    "repo_id": REPO_ID, "run_id": RUN_ID,
+                    "item": {
+                        "item_id": "evi_2", "kind": "test", "ref": "ref-2", "digest": "sha256:" + "d" * 64,
+                        "collector": "tester", "validity": VALIDITY, "claims": [], "provenance": {},
+                        "chain_seq": 1, "chain_prev_digest": "will-be-overwritten-by-assertion-below",
+                    },
+                },
+            ),
+        )
+        toolset = build_toolset(_context(_store(shell)))
+        spec = next(t for t in toolset.tools if t.name == "append_evidence")
+        parsed = spec.parse(
+            {
+                "run_id": RUN_ID, "kind": "test", "ref": "ref-2", "digest": "sha256:" + "d" * 64,
+                "collector": "tester", "validity": VALIDITY, "idempotency_key": "evidence-key-0002",
+            }
+        )
+        _run(spec.run(parsed, _forwarded()))
+        append_request = shell.requests[2]
+        assert append_request["arguments"]["chain_seq"] == 1
+        # The computed chain_prev_digest is core.chain.entry_digest(tail),
+        # not an arbitrary string: a run bound to it must not be able to
+        # forge a link with a hand-picked value.
+        from vuoro_evidence.core.chain import entry_digest
+        from vuoro_evidence.core.model import EvidenceItem, ValidityBasis, ValidityWindow
+
+        placeholder_validity = ValidityWindow(
+            basis=ValidityBasis.INDEFINITE,
+            valid_from=datetime(1970, 1, 1, tzinfo=timezone.utc),
+        )
+        tail_item = EvidenceItem(
+            item_id="evi_1", kind="_", ref="_", digest=tail_digest, collector="_",
+            validity=placeholder_validity, chain_seq=0, chain_prev_digest=None,
+        )
+        assert append_request["arguments"]["chain_prev_digest"] == entry_digest(tail_item)
+
+    def test_appending_to_someone_elses_run_is_run_not_found_before_any_append(self) -> None:
+        shell = _FakeShell(_rejected("work.run.resolve-v1", "run-not-found", status=404))
+        toolset = build_toolset(_context(_store(shell)))
+        spec = next(t for t in toolset.tools if t.name == "append_evidence")
+        parsed = spec.parse(
+            {
+                "run_id": RUN_ID, "kind": "test", "ref": "ref-1", "digest": "sha256:" + "b" * 64,
+                "collector": "tester", "validity": VALIDITY, "idempotency_key": "evidence-key-0003",
+            }
+        )
+        with pytest.raises(ToolFailure) as excinfo:
+            _run(spec.run(parsed, _forwarded()))
+        assert excinfo.value.code == "run-not-found"
+        assert len(shell.requests) == 1  # resolve only; never reached tail or append
+
+    def test_claims_and_provenance_pass_through_untouched(self) -> None:
+        claim = {
+            "claim_type": "observation", "subject": "effect-1", "grant_id": None,
+            "freshness": {"scope": "repo", "position": 3}, "confirms": True, "detail": {"note": "ok"},
+        }
+        shell = _FakeShell(
+            _accepted(
+                "work.run.resolve-v1",
+                {"repo_id": REPO_ID, "run_id": RUN_ID, "principal_id": PRINCIPAL_ID, "workspace_id": WORKSPACE_ID},
+            ),
+            _accepted("work.evidence.tail-v1", {"repo_id": REPO_ID, "run_id": RUN_ID, "item": None}),
+            _accepted(
+                "work.evidence.append-v1",
+                {
+                    "repo_id": REPO_ID, "run_id": RUN_ID,
+                    "item": {
+                        "item_id": "evi_1", "kind": "test", "ref": "ref-1", "digest": "sha256:" + "e" * 64,
+                        "collector": "tester", "validity": VALIDITY, "claims": [claim],
+                        "provenance": {"session": "abc"}, "chain_seq": 0, "chain_prev_digest": None,
+                    },
+                },
+            ),
+        )
+        toolset = build_toolset(_context(_store(shell)))
+        spec = next(t for t in toolset.tools if t.name == "append_evidence")
+        parsed = spec.parse(
+            {
+                "run_id": RUN_ID, "kind": "test", "ref": "ref-1", "digest": "sha256:" + "e" * 64,
+                "collector": "tester", "validity": VALIDITY, "claims": [claim],
+                "provenance": {"session": "abc"}, "idempotency_key": "evidence-key-0004",
+            }
+        )
+        _run(spec.run(parsed, _forwarded()))
+        sent = shell.requests[2]["arguments"]
+        assert sent["claims"] == [claim]
+        assert sent["provenance"] == {"session": "abc"}
+
+
+class TestWriteSessionNote:
+    def test_writes_a_note(self) -> None:
+        shell = _FakeShell(
+            _accepted(
+                "work.run.resolve-v1",
+                {"repo_id": REPO_ID, "run_id": RUN_ID, "principal_id": PRINCIPAL_ID, "workspace_id": WORKSPACE_ID},
+            ),
+            _accepted(
+                "work.session-note.write-v1",
+                {"repo_id": REPO_ID, "run_id": RUN_ID, "note_id": 1, "note": "hi", "created_at": "2026-09-26T00:00:00Z"},
+            ),
+        )
+        toolset = build_toolset(_context(_store(shell)))
+        spec = next(t for t in toolset.tools if t.name == "write_session_note")
+        parsed = spec.parse({"run_id": RUN_ID, "note": "hi", "idempotency_key": "note-key-0001"})
+        result = _run(spec.run(parsed, _forwarded()))
+        assert result["note_id"] == 1
+        assert result["note"] == "hi"
+
+    def test_writing_to_someone_elses_run_is_run_not_found(self) -> None:
+        shell = _FakeShell(_rejected("work.run.resolve-v1", "run-not-found", status=404))
+        toolset = build_toolset(_context(_store(shell)))
+        spec = next(t for t in toolset.tools if t.name == "write_session_note")
+        parsed = spec.parse({"run_id": RUN_ID, "note": "hi", "idempotency_key": "note-key-0002"})
+        with pytest.raises(ToolFailure) as excinfo:
+            _run(spec.run(parsed, _forwarded()))
+        assert excinfo.value.code == "run-not-found"
+
+
+class TestRecordShellClientTransport:
+    def test_a_transport_error_is_a_tool_failure(self) -> None:
+        def _raise(_request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("boom")
+
+        client = RecordShellClient(
+            base_url="http://127.0.0.1:8080", timeout=1.0, transport=httpx.MockTransport(_raise)
+        )
+        with pytest.raises(ToolFailure) as excinfo:
+            _run(client.invoke("work.run.register-v1", {}, _forwarded()))
+        assert excinfo.value.code == "record-shell-unavailable"
+
+    def test_a_non_json_body_is_a_tool_failure(self) -> None:
+        def _text(_request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, text="not json")
+
+        client = RecordShellClient(
+            base_url="http://127.0.0.1:8080", timeout=1.0, transport=httpx.MockTransport(_text)
+        )
+        with pytest.raises(ToolFailure) as excinfo:
+            _run(client.invoke("work.run.register-v1", {}, _forwarded()))
+        assert excinfo.value.code == "record-shell-unavailable"
