@@ -51,6 +51,12 @@ def _required_text(value: Any, field: str) -> str:
     return value
 
 
+def _optional_text(value: Any, field: str) -> str | None:
+    if value is None:
+        return None
+    return _required_text(value, field)
+
+
 def _bounded_strings(value: Any, field: str, *, allow_empty: bool = False) -> tuple[str, ...]:
     if not isinstance(value, list):
         raise IdentityResolutionError(f"gateway identity assertion has invalid {field}")
@@ -266,6 +272,11 @@ class GatewayAssertionIdentityResolver:
             raise IdentityResolutionError("gateway identity nbf skew is invalid")
         if claims["exp"] <= claims["iat"] or claims["exp"] - claims["iat"] > 30:
             raise IdentityResolutionError("gateway identity assertion lifetime is invalid")
+        # Optional: only an OAuth-minted assertion (the `/mcp` path) carries
+        # them.  When present they must be well-formed, never silently dropped:
+        # run handles bind to them.
+        client_id = _optional_text(claims.get("client_id"), "client_id")
+        grant_id = _optional_text(claims.get("grant_id"), "grant_id")
         return Identity(
             actor=actor,
             environment=self._environment_name,
@@ -273,4 +284,6 @@ class GatewayAssertionIdentityResolver:
             repo_ids=frozenset(repo_ids),
             workspace_id=workspace_id,
             principal_id=f"{self._issuer}:{subject}:{epoch}",
+            client_id=client_id,
+            grant_id=grant_id,
         )

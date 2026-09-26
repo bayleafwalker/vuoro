@@ -2,20 +2,38 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 import re
 from pathlib import Path
+from typing import Any
 
+import httpx
 import pytest
 import vuoro_mcp_edge
 import vuoro_service.composition as service_composition
-from edge_support import ENVIRONMENT, ISSUER, KEY_ID, REPO_ID, WORKSPACE_ID, call
+from edge_support import (
+    ENVIRONMENT,
+    ISSUER,
+    KEY_ID,
+    REPO_ID,
+    SUBJECT,
+    WORKSPACE_ID,
+    assertion,
+    call,
+    identity_headers,
+)
 from fastapi.testclient import TestClient
+from vuoro_mcp_edge import composition
 from vuoro_mcp_edge.composition import (
     EdgeConfigurationError,
     create_app_from_environment,
     refuse_credentials,
 )
+from vuoro_mcp_edge.record_tools import SprintctlRecordStore
+from vuoro_mcp_edge.runs import RunRegistry, binding_for
+from vuoro_mcp_edge.toolsets import ToolSet, ToolsetContext, ToolSpec
+from vuoro_mcp_edge.work_source import ForwardedIdentity
 
 SRC = Path(vuoro_mcp_edge.__file__).parent
 
@@ -83,6 +101,122 @@ def test_environment_composition_wires_a_durable_record_bucket(cloud_mounts, aut
     assert listed.status_code == 200
     names = {tool["name"] for tool in listed.json()["result"]["tools"]}
     assert {"register_run", "append_evidence", "write_session_note"} <= names
+
+
+RUN_ID = "run_" + "0" * 24 + "AA"
+
+
+def _probe_toolset(runs: RunRegistry) -> ToolSet:
+    """A propose-bucket tool that uses ``context.runs`` exactly as E3's
+    ``propose_effect`` does: typed as the shared ``RunRegistry`` protocol,
+    never as E2's concrete store."""
+
+    async def run(parsed: dict[str, Any], forwarded: ForwardedIdentity) -> dict[str, Any]:
+        binding = binding_for(forwarded)
+        resolved = await runs.resolve(parsed["run_id"], binding, forwarded=forwarded)
+        return {"principal_id": resolved.principal_id, "grant_id": resolved.grant_id}
+
+    definition = {
+        "name": "probe_run",
+        "title": "Probe a run",
+        "description": "Test tool.",
+        "inputSchema": {"type": "object", "properties": {"run_id": {"type": "string"}}},
+    }
+    return ToolSet(name="probe", tools=(ToolSpec("probe_run", "propose", definition, dict, run),))
+
+
+def test_a_protocol_caller_resolves_through_the_production_registry(
+    cloud_mounts, keys, monkeypatch
+) -> None:
+    """The registry composition.py wires in as ``context.runs`` must accept
+    the calls the ``RunRegistry`` protocol promises.  Everything here is the
+    production path except the shell's HTTP transport: a toolset that calls
+    ``runs.resolve`` through the protocol and gets a TypeError would surface
+    as ``internal-error`` and fail this test."""
+
+    seen: list[dict[str, Any]] = []
+
+    def shell(request: httpx.Request) -> httpx.Response:
+        envelope = json.loads(request.content)
+        seen.append(envelope)
+        assert envelope["operation"] == "work.run.resolve-v1"
+        return httpx.Response(
+            200,
+            json={
+                "status": "accepted",
+                "operation": "work.run.resolve-v1",
+                "result": {
+                    "repo_id": REPO_ID,
+                    "run_id": RUN_ID,
+                    "principal_id": f"{ISSUER}:{SUBJECT}:0",
+                    "workspace_id": WORKSPACE_ID,
+                    "client_id": "claude-connector",
+                    "grant_id": "grant-1",
+                },
+            },
+        )
+
+    original_init = httpx.AsyncClient.__init__
+
+    def mocked_init(self, *args: Any, **kwargs: Any) -> None:
+        if kwargs.get("transport") is None:
+            kwargs["transport"] = httpx.MockTransport(shell)
+        original_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(httpx.AsyncClient, "__init__", mocked_init)
+
+    composed: list[ToolsetContext] = []
+    original_build = composition.build_toolsets
+
+    def build_with_probe(context: ToolsetContext) -> tuple[ToolSet, ...]:
+        composed.append(context)
+        return (*original_build(context), _probe_toolset(context.runs))
+
+    monkeypatch.setattr(composition, "build_toolsets", build_with_probe)
+
+    client = TestClient(create_app_from_environment(cloud_mounts))
+    # The registry under test is the durable one, not a test reference.
+    assert type(composed[0].runs) is SprintctlRecordStore
+    token = assertion(
+        keys[1],
+        authorities=["work:read", "effect:propose"],
+        client_id="claude-connector",
+        grant_id="grant-1",
+    )
+    result = client.post(
+        "/mcp", headers=identity_headers(token), json=call("probe_run", {"run_id": RUN_ID})
+    ).json()["result"]
+    assert result["isError"] is False, result
+    assert result["structuredContent"] == {
+        "principal_id": f"{ISSUER}:{SUBJECT}:0",
+        "grant_id": "grant-1",
+    }
+    assert [envelope["arguments"] for envelope in seen] == [{"run_id": RUN_ID}]
+
+
+@pytest.mark.parametrize("method", ["register", "resolve"])
+def test_the_production_registry_matches_the_protocol_signature(cloud_mounts, method) -> None:
+    """A second, cheaper guard: the composed registry's methods take exactly
+    the parameters ``RunRegistry`` declares, no more (a widened required
+    keyword breaks protocol callers) and no fewer."""
+
+    composed: list[ToolsetContext] = []
+    original_build = composition.build_toolsets
+
+    def capture(context: ToolsetContext) -> tuple[ToolSet, ...]:
+        composed.append(context)
+        return original_build(context)
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(composition, "build_toolsets", capture)
+        create_app_from_environment(cloud_mounts)
+    store_method = getattr(type(composed[0].runs), method)
+    protocol_method = getattr(RunRegistry, method)
+    assert inspect.signature(store_method).parameters.keys() == (
+        inspect.signature(protocol_method).parameters.keys()
+    )
+    for name, parameter in inspect.signature(protocol_method).parameters.items():
+        assert inspect.signature(store_method).parameters[name].kind == parameter.kind
 
 
 def test_wrong_audience_configuration_rejects_the_gateway_assertion(cloud_mounts, auth) -> None:

@@ -13,6 +13,8 @@ import httpx
 import pytest
 from vuoro_service.identity import Identity
 from vuoro_mcp_edge.record_tools import (
+    CHAIN_ATTEMPTS,
+    RECORD_OWNER_INCOMPATIBLE,
     RecordShellClient,
     SprintctlRecordStore,
     build_run_registry,
@@ -30,7 +32,13 @@ RUN_ID = "run_" + "0" * 24 + "AA"
 assert len(RUN_ID) == 30  # "run_" + 26 crockford chars
 
 
-def _forwarded(*, principal_id: str = PRINCIPAL_ID, workspace_id: str = WORKSPACE_ID) -> ForwardedIdentity:
+def _forwarded(
+    *,
+    principal_id: str = PRINCIPAL_ID,
+    workspace_id: str = WORKSPACE_ID,
+    client_id: str | None = None,
+    grant_id: str | None = None,
+) -> ForwardedIdentity:
     identity = Identity(
         actor="github:123",
         environment="vuoro-dev",
@@ -38,6 +46,8 @@ def _forwarded(*, principal_id: str = PRINCIPAL_ID, workspace_id: str = WORKSPAC
         repo_ids=frozenset({REPO_ID}),
         workspace_id=workspace_id,
         principal_id=principal_id,
+        client_id=client_id,
+        grant_id=grant_id,
     )
     return ForwardedIdentity(
         assertion="a.b.c", request_id=REQUEST_ID, repo_id=REPO_ID, identity=identity
@@ -283,6 +293,82 @@ class TestResolveRun:
         with pytest.raises(ToolFailure) as excinfo:
             _run(store.resolve(RUN_ID, caller, forwarded=_forwarded()))
         assert excinfo.value.code == "run-not-found"
+
+    def test_resolves_a_run_bound_to_the_same_client_and_grant(self) -> None:
+        shell = _FakeShell(_accepted("work.run.resolve-v1", _resolved(client_id="c1", grant_id="g1")))
+        caller = RunBinding(
+            principal_id=PRINCIPAL_ID, workspace_id=WORKSPACE_ID, repo_id=REPO_ID,
+            client_id="c1", grant_id="g1",
+        )
+        resolved = _run(_store(shell).resolve(RUN_ID, caller, forwarded=_forwarded()))
+        assert resolved == caller
+
+    @pytest.mark.parametrize(
+        ("run_owner", "caller"),
+        [
+            ({"client_id": "c1", "grant_id": "g1"}, {"client_id": "c2", "grant_id": "g1"}),
+            ({"client_id": "c1", "grant_id": "g1"}, {"client_id": "c1", "grant_id": "g2"}),
+            ({"client_id": "c1", "grant_id": "g1"}, {}),
+            ({}, {"client_id": "c1", "grant_id": "g1"}),
+        ],
+    )
+    def test_a_different_client_or_grant_is_run_not_found(
+        self, run_owner: dict[str, str], caller: dict[str, str]
+    ) -> None:
+        """Same principal, workspace and repository, but the run was minted
+        under another OAuth client or grant (or none): not the caller's."""
+        shell = _FakeShell(_accepted("work.run.resolve-v1", _resolved(**run_owner)))
+        binding = RunBinding(
+            principal_id=PRINCIPAL_ID, workspace_id=WORKSPACE_ID, repo_id=REPO_ID, **caller
+        )
+        with pytest.raises(ToolFailure) as excinfo:
+            _run(_store(shell).resolve(RUN_ID, binding, forwarded=_forwarded()))
+        assert (excinfo.value.code, excinfo.value.message) == (
+            "run-not-found", "no run with that id belongs to the caller",
+        )
+
+    def test_the_tools_bind_the_asserted_client_and_grant(self) -> None:
+        """binding_for carries the assertion's client and grant into resolve:
+        a run the owner reports under another grant is refused."""
+        shell = _FakeShell(_accepted("work.run.resolve-v1", _resolved(client_id="c1", grant_id="g1")))
+        toolset = build_toolset(_context(_store(shell)))
+        spec = next(t for t in toolset.tools if t.name == "write_session_note")
+        parsed = spec.parse({"run_id": RUN_ID, "note": "hi", "idempotency_key": "note-key-0009"})
+        with pytest.raises(ToolFailure) as excinfo:
+            _run(spec.run(parsed, _forwarded(client_id="c1", grant_id="g2")))
+        assert excinfo.value.code == "run-not-found"
+        assert len(shell.requests) == 1  # never reached the note write
+
+
+def _resolved(**binding: str) -> dict[str, Any]:
+    return {
+        "repo_id": REPO_ID, "run_id": RUN_ID,
+        "principal_id": PRINCIPAL_ID, "workspace_id": WORKSPACE_ID, **binding,
+    }
+
+
+def _tail(seq: int) -> dict[str, Any]:
+    return {
+        "repo_id": REPO_ID, "run_id": RUN_ID,
+        "item": {
+            "item_id": f"evi_{seq}", "kind": "test", "ref": f"ref-{seq}",
+            "digest": "sha256:" + "c" * 64, "collector": "tester", "validity": VALIDITY,
+            "claims": [], "provenance": {}, "chain_seq": seq, "chain_prev_digest": None,
+        },
+    }
+
+
+def _appended(seq: int) -> dict[str, Any]:
+    return {
+        "repo_id": REPO_ID, "run_id": RUN_ID,
+        "item": {**_tail(seq)["item"], "item_id": "evi_new"},
+    }
+
+
+APPEND_ARGUMENTS = {
+    "run_id": RUN_ID, "kind": "test", "ref": "ref-x", "digest": "sha256:" + "d" * 64,
+    "collector": "tester", "idempotency_key": "evidence-key-race",
+}
 
 
 VALIDITY = {"basis": "indefinite", "valid_from": "2026-09-26T00:00:00Z", "valid_until": None, "component_digests": {}}
@@ -620,3 +706,116 @@ class TestRecordShellClientTransport:
         with pytest.raises(ToolFailure) as excinfo:
             _run(client.invoke("work.run.register-v1", {}, _forwarded()))
         assert excinfo.value.code == "record-shell-unavailable"
+
+
+class TestAppendEvidenceChainRace:
+    """The tail read and the append are separate calls: a concurrent append
+    can take the computed slot, and sprintctl refuses the stale link with
+    evidence-chain-conflict.  append_evidence re-reads the tail and relinks,
+    at most CHAIN_ATTEMPTS times."""
+
+    def _spec(self, shell: _FakeShell):
+        toolset = build_toolset(_context(_store(shell)))
+        spec = next(t for t in toolset.tools if t.name == "append_evidence")
+        return spec, spec.parse({**APPEND_ARGUMENTS, "validity": VALIDITY})
+
+    def test_a_lost_race_relinks_against_the_new_tail(self) -> None:
+        shell = _FakeShell(
+            _accepted("work.run.resolve-v1", _resolved()),
+            _accepted("work.evidence.tail-v1", _tail(0)),
+            _rejected("work.evidence.append-v1", "evidence-chain-conflict"),
+            _accepted("work.evidence.tail-v1", _tail(1)),
+            _accepted("work.evidence.append-v1", _appended(2)),
+        )
+        spec, parsed = self._spec(shell)
+        result = _run(spec.run(parsed, _forwarded()))
+        assert result["chain_seq"] == 2
+        appends = [r["arguments"] for r in shell.requests if r["operation"] == "work.evidence.append-v1"]
+        assert [a["chain_seq"] for a in appends] == [1, 2]
+        # Same item and key on every attempt: only the link changes.
+        assert len({(a["item_id"], a["idempotency_key"]) for a in appends}) == 1
+
+    def test_it_gives_up_after_a_bounded_number_of_attempts(self) -> None:
+        responses = [_accepted("work.run.resolve-v1", _resolved())]
+        for seq in range(CHAIN_ATTEMPTS):
+            responses.append(_accepted("work.evidence.tail-v1", _tail(seq)))
+            responses.append(_rejected("work.evidence.append-v1", "evidence-chain-conflict"))
+        shell = _FakeShell(*responses)  # a further call would raise: none queued
+        spec, parsed = self._spec(shell)
+        with pytest.raises(ToolFailure) as excinfo:
+            _run(spec.run(parsed, _forwarded()))
+        assert excinfo.value.code == "evidence-chain-conflict"
+        assert len(shell.requests) == 1 + 2 * CHAIN_ATTEMPTS
+
+    def test_other_append_failures_are_not_retried(self) -> None:
+        shell = _FakeShell(
+            _accepted("work.run.resolve-v1", _resolved()),
+            _accepted("work.evidence.tail-v1", _tail(0)),
+            _rejected("work.evidence.append-v1", "idempotency-conflict"),
+        )
+        spec, parsed = self._spec(shell)
+        with pytest.raises(ToolFailure) as excinfo:
+            _run(spec.run(parsed, _forwarded()))
+        assert excinfo.value.code == "idempotency-conflict"
+        assert len(shell.requests) == 3
+
+    def test_the_description_does_not_promise_an_unconditional_extension(self) -> None:
+        toolset = build_toolset(_context(_store(_FakeShell())))
+        spec = next(t for t in toolset.tools if t.name == "append_evidence")
+        description = spec.definition["description"]
+        assert "automatically" not in description
+        assert "evidence-chain-conflict" in description
+
+
+class TestOlderSprintctl:
+    """Against a work adapter without the record operations (sprintctl
+    before 0.8.0) the shell answers unknown-operation; each tool reports a
+    typed record-owner-incompatible naming the release it needs."""
+
+    @pytest.mark.parametrize(
+        ("tool", "arguments", "operation"),
+        [
+            (
+                "register_run",
+                {
+                    "harness_id": "claude-code", "harness_build": "1.0.0", "model_id": "m",
+                    "recipe_id": "r", "observed_profile": OBSERVED_PROFILE,
+                    "idempotency_key": "register-key-old",
+                },
+                "work.run.register-v1",
+            ),
+            (
+                "append_evidence",
+                {**APPEND_ARGUMENTS, "validity": VALIDITY},
+                "work.run.resolve-v1",
+            ),
+            (
+                "write_session_note",
+                {"run_id": RUN_ID, "note": "hi", "idempotency_key": "note-key-old"},
+                "work.run.resolve-v1",
+            ),
+        ],
+    )
+    def test_an_older_sprintctl_is_a_typed_error(
+        self, tool: str, arguments: dict[str, Any], operation: str
+    ) -> None:
+        shell = _FakeShell(
+            _rejected(
+                operation, "unknown-operation",
+                "operation is not present in the active catalog", status=404,
+            )
+        )
+        toolset = build_toolset(_context(_store(shell)))
+        spec = next(t for t in toolset.tools if t.name == tool)
+        with pytest.raises(ToolFailure) as excinfo:
+            _run(spec.run(spec.parse(arguments), _forwarded()))
+        assert excinfo.value.code == RECORD_OWNER_INCOMPATIBLE
+        assert operation in excinfo.value.message
+        assert "sprintctl 0.8.0" in excinfo.value.message
+
+    def test_other_upstream_codes_pass_through(self) -> None:
+        shell = _FakeShell(_rejected("work.run.resolve-v1", "run-not-found", status=404))
+        caller = RunBinding(principal_id=PRINCIPAL_ID, workspace_id=WORKSPACE_ID, repo_id=REPO_ID)
+        with pytest.raises(ToolFailure) as excinfo:
+            _run(_store(shell).resolve(RUN_ID, caller, forwarded=_forwarded()))
+        assert excinfo.value.code == "run-not-found"

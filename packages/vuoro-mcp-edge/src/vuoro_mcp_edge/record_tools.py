@@ -3,8 +3,7 @@
 Returns `None` (no tools) until its work item lands.  Only the owning work
 item edits this module; see docs/plans/2026-09-26-e2-e3-shared-contract.md.
 
-Design notes (for reviewers; see the E2 final report for the full reasoning
-and the two frozen-Protocol gaps this module works around):
+Design notes (for reviewers; see the E2 final report for the full reasoning):
 
 * The edge holds no credential and no DSN (unchanged).  `SprintctlRecordStore`
   below reaches sprintctl's `work.run.*` / `work.evidence.*` /
@@ -13,17 +12,15 @@ and the two frozen-Protocol gaps this module works around):
   `ShellWorkSource` (work_source.py) uses, reimplemented as a small,
   independent client (`RecordShellClient`) because `work_source.py` is
   frozen/shared and does not expose these operations.
-* `runs.RunRegistry.register()`/`resolve()` (frozen) take no parameter for
-  the caller's forwarded assertion, yet reaching sprintctl at all requires
-  it.  `SprintctlRecordStore` widens both with a required `forwarded`
-  keyword.  `register()` is further widened with a required `manifest`
-  keyword, because the Protocol also has no parameter for the RunManifest
-  fields the run record must hold (harness_id, harness_build, model_id,
-  recipe_id, observed_profile) even though the shared contract says "the run
-  record IS a RunManifest".  Both widenings are safe today because this
-  module's own tools are the only caller of this concrete class; see the
-  final report for the forward-compatibility caveat this leaves for any
-  future caller (e.g. E3) that only holds the narrow `RunRegistry` type.
+* `SprintctlRecordStore` implements `runs.RunRegistry` exactly as amended
+  on 2026-09-26 (shared contract section 3): `register()` and `resolve()`
+  take the caller's `forwarded` assertion, without which sprintctl cannot be
+  reached at all, and `register()` takes the RunManifest fields the run
+  record holds.  Any toolset calling `context.runs` through the protocol
+  (E3's `propose_effect` included) calls this store the same way.
+* Every sprintctl operation used here is new in sprintctl 0.8.0.  Against an
+  older work adapter the shell answers `unknown-operation`; this module
+  reports that as `record-owner-incompatible`, never as a generic failure.
 * The evidence chain's hash math (`entry_digest`/`link`) is computed here,
   from `vuoro_evidence.core.chain`, never reimplemented -- "E2 must not fork
   a second evidence chain".  Only `chain_seq`/`chain_prev_digest` are needed
@@ -73,6 +70,18 @@ OPERATION_SESSION_NOTE_WRITE = "work.session-note.write-v1"
 
 _NOT_YOURS = "no run with that id belongs to the caller"
 
+#: The shell's code for an operation its active catalog lacks: here, a work
+#: adapter older than the sprintctl release that ships the record bucket.
+_UNKNOWN_OPERATION = "unknown-operation"
+RECORD_OWNER_INCOMPATIBLE = "record-owner-incompatible"
+REQUIRED_SPRINTCTL = "0.8.0"
+
+#: sprintctl's refusal of an append whose chain link is no longer the tail.
+CHAIN_CONFLICT = "evidence-chain-conflict"
+#: How many times append_evidence re-reads the tail and relinks after a
+#: concurrent append took the slot it computed.
+CHAIN_ATTEMPTS = 3
+
 #: A placeholder validity window for the internal-only EvidenceItem objects
 #: `_placeholder_item` builds: never read by entry_digest/link and never
 #: returned to any caller.
@@ -113,7 +122,8 @@ def _mint_item_id(run_id: str, idempotency_key: str) -> str:
     see append_evidence's arguments) would differ from the one stored under
     that key and a clean replay would come back as a spurious
     idempotency-conflict instead. Uniqueness relies on idempotency_key's own
-    per-(workspace, tool) uniqueness at the ledger; it need not be secret.
+    per-(workspace, principal, tool) uniqueness at the ledger; it need not
+    be secret.
     """
 
     digest = hashlib.sha256(f"{run_id}:{idempotency_key}".encode()).hexdigest()
@@ -191,6 +201,12 @@ def _unwrap(operation: str, response: httpx.Response) -> Any:
         error = body.get("error")
         code = error.get("code") if isinstance(error, dict) else None
         message = error.get("message") if isinstance(error, dict) else None
+        if code == _UNKNOWN_OPERATION:
+            raise ToolFailure(
+                RECORD_OWNER_INCOMPATIBLE,
+                f"the runtime's work adapter does not provide {operation}; the "
+                f"record tools need sprintctl {REQUIRED_SPRINTCTL} or later",
+            )
         raise ToolFailure(
             code if isinstance(code, str) and code else "record-shell-rejected",
             message if isinstance(message, str) and message else f"{operation} was not accepted",
@@ -210,9 +226,9 @@ def _expect_mapping(value: Any, operation: str) -> dict[str, Any]:
 
 class SprintctlRecordStore:
     """Reaches sprintctl's record-bucket operations through the runtime
-    shell.  Implements (and widens -- see the module docstring)
-    `vuoro_mcp_edge.runs.RunRegistry`, plus the evidence/session-note methods
-    that Protocol has no room for.
+    shell.  Implements `vuoro_mcp_edge.runs.RunRegistry` (as amended
+    2026-09-26), plus the evidence/session-note methods that protocol has no
+    room for.
     """
 
     def __init__(
@@ -280,10 +296,14 @@ class SprintctlRecordStore:
             raise ToolFailure("run-not-found", _NOT_YOURS)
         result = await self._client.invoke(OPERATION_RUN_RESOLVE, {"run_id": run_id}, forwarded)
         body = _expect_mapping(result, OPERATION_RUN_RESOLVE)
+        # The owner echoes the run's full binding; client and grant are
+        # absent (None) only for a run minted without an OAuth grant.
         binding = RunBinding(
             principal_id=body.get("principal_id"),
             workspace_id=body.get("workspace_id"),
             repo_id=caller.repo_id,
+            client_id=body.get("client_id"),
+            grant_id=body.get("grant_id"),
         )
         if binding != caller:
             # sprintctl already scopes by the caller's own identity, so this
@@ -556,8 +576,11 @@ _APPEND_EVIDENCE_DEFINITION: dict[str, Any] = {
         "label for what this evidence is; ref and digest are where it lives "
         "and its content digest; collector names what produced it; validity "
         "states how long it holds. The chain link is computed here, not by "
-        "you: call this once per item and it extends the run's chain in "
-        "order automatically. Idempotent: the same idempotency_key with the "
+        "you: call this once per item and it is appended at the run's "
+        "current tail. If other appends to the same run keep taking the "
+        "tail, it re-reads and relinks a bounded number of times, then "
+        "fails with evidence-chain-conflict; retrying with the same "
+        "idempotency_key is safe. Idempotent: the same idempotency_key with the "
         "same arguments replays the same append with no second item; the "
         "same key with different arguments is refused with "
         "idempotency-conflict. Mutating: appends an immutable evidence item."
@@ -766,37 +789,46 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
     ) -> dict[str, Any]:
         binding = binding_for(forwarded)
         await store.resolve(parsed["run_id"], binding, forwarded=forwarded)
-        tail = await store.evidence_tail(parsed["run_id"], forwarded=forwarded)
         item_id = _mint_item_id(parsed["run_id"], parsed["idempotency_key"])
         next_item = _placeholder_item(
             item_id=item_id, digest=parsed["digest"], chain_seq=None, chain_prev_digest=None
         )
-        if tail is None:
-            linked = link((), next_item)
-        else:
-            tail_item = _placeholder_item(
-                item_id=tail["item_id"],
-                digest=tail["digest"],
-                chain_seq=tail["chain_seq"],
-                chain_prev_digest=tail["chain_prev_digest"],
-            )
-            linked = link((tail_item,), next_item)
-        item = await store.append_evidence(
-            parsed["run_id"],
-            forwarded=forwarded,
-            idempotency_key=parsed["idempotency_key"],
-            item_id=item_id,
-            kind=parsed["kind"],
-            ref=parsed["ref"],
-            digest=parsed["digest"],
-            collector=parsed["collector"],
-            validity=parsed["validity"],
-            claims=parsed["claims"],
-            provenance=parsed["provenance"],
-            chain_seq=linked.chain_seq,
-            chain_prev_digest=linked.chain_prev_digest,
-        )
-        return item
+        # The tail read and the append are separate calls, so a concurrent
+        # append can take the slot linked here; sprintctl refuses the stale
+        # link and this relinks against the new tail, a bounded number of
+        # times.
+        for attempt in range(1, CHAIN_ATTEMPTS + 1):
+            tail = await store.evidence_tail(parsed["run_id"], forwarded=forwarded)
+            if tail is None:
+                linked = link((), next_item)
+            else:
+                tail_item = _placeholder_item(
+                    item_id=tail["item_id"],
+                    digest=tail["digest"],
+                    chain_seq=tail["chain_seq"],
+                    chain_prev_digest=tail["chain_prev_digest"],
+                )
+                linked = link((tail_item,), next_item)
+            try:
+                return await store.append_evidence(
+                    parsed["run_id"],
+                    forwarded=forwarded,
+                    idempotency_key=parsed["idempotency_key"],
+                    item_id=item_id,
+                    kind=parsed["kind"],
+                    ref=parsed["ref"],
+                    digest=parsed["digest"],
+                    collector=parsed["collector"],
+                    validity=parsed["validity"],
+                    claims=parsed["claims"],
+                    provenance=parsed["provenance"],
+                    chain_seq=linked.chain_seq,
+                    chain_prev_digest=linked.chain_prev_digest,
+                )
+            except ToolFailure as failure:
+                if failure.code != CHAIN_CONFLICT or attempt == CHAIN_ATTEMPTS:
+                    raise
+        raise AssertionError("unreachable")
 
     async def _run_write_session_note(
         parsed: dict[str, Any], forwarded: ForwardedIdentity

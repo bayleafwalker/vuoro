@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -31,7 +32,7 @@ from vuoro_mcp_edge.toolsets import (
     ToolsetContext,
     ToolSpec,
 )
-from vuoro_mcp_edge.work_source import ShellWorkSource
+from vuoro_mcp_edge.work_source import ForwardedIdentity, ShellWorkSource
 
 EVIDENCE = "work:evidence"
 
@@ -109,6 +110,29 @@ def test_a_toolset_tool_runs_with_the_callers_binding(keys) -> None:
     assert result["isError"] is False
     assert result["structuredContent"] == {"principal": seen[0].principal_id, "repo": "repo-a"}
     assert seen[0].workspace_id
+    # A workspace-token-shaped assertion carries no OAuth client or grant.
+    assert (seen[0].client_id, seen[0].grant_id) == (None, None)
+
+
+def test_the_run_binding_carries_the_asserted_client_and_grant(keys) -> None:
+    """Contract section 4: once the gateway asserts the OAuth client and
+    grant, a run binds to both."""
+
+    seen: list[Any] = []
+    client = edge_client(keys[0], FakeShell(), toolsets=(_record_toolset(seen),))
+    token = assertion(
+        keys[1],
+        authorities=["work:read", EVIDENCE],
+        client_id="claude-connector",
+        grant_id="grant-1",
+    )
+    result = client.post(
+        MCP_PATH,
+        headers=identity_headers(token),
+        json=call("write_test_note", {"note": "hi", "idempotency_key": "key-0001"}),
+    ).json()["result"]
+    assert result["isError"] is False
+    assert (seen[0].client_id, seen[0].grant_id) == ("claude-connector", "grant-1")
 
 
 def test_a_toolset_tool_needs_its_bucket_authority(keys, auth) -> None:
@@ -166,25 +190,46 @@ async def _never(parsed: Any, forwarded: Any) -> dict[str, Any]:  # pragma: no c
     raise AssertionError("must not run")
 
 
+_FORWARDED = ForwardedIdentity(assertion="a.b.c", request_id="req-1", repo_id="r1")
+_MANIFEST = {
+    "harness_id": "h", "harness_build": "1", "model_id": "m", "recipe_id": "r",
+    "observed_profile": {"instruction_digest": "d", "skill_digests": []},
+}
+
+
 def test_run_registry_binds_runs_to_their_caller() -> None:
     registry = InMemoryRunRegistry()
-    mine = RunBinding(principal_id="github:1:0", workspace_id="w1", repo_id="r1")
+    mine = RunBinding(
+        principal_id="github:1:0", workspace_id="w1", repo_id="r1",
+        client_id="claude-connector", grant_id="g1",
+    )
 
     async def scenario() -> None:
-        run_id = await registry.register(mine, idempotency_key="key-0001")
+        run_id = await registry.register(
+            mine, idempotency_key="key-0001", forwarded=_FORWARDED, manifest=_MANIFEST
+        )
         assert RUN_ID.fullmatch(run_id)
-        assert await registry.register(mine, idempotency_key="key-0001") == run_id
-        assert await registry.resolve(run_id, mine) == mine
+        assert (
+            await registry.register(
+                mine, idempotency_key="key-0001", forwarded=_FORWARDED, manifest=_MANIFEST
+            )
+            == run_id
+        )
+        assert await registry.resolve(run_id, mine, forwarded=_FORWARDED) == mine
         for other in (
-            RunBinding(principal_id="github:2:0", workspace_id="w1", repo_id="r1"),
-            RunBinding(principal_id="github:1:0", workspace_id="w2", repo_id="r1"),
-            RunBinding(principal_id="github:1:0", workspace_id="w1", repo_id="r2"),
+            replace(mine, principal_id="github:2:0"),
+            replace(mine, workspace_id="w2"),
+            replace(mine, repo_id="r2"),
+            replace(mine, client_id="other-client"),
+            replace(mine, client_id=None),
+            replace(mine, grant_id="g2"),
+            replace(mine, grant_id=None),
         ):
             with pytest.raises(ToolFailure) as refused:
-                await registry.resolve(run_id, other)
+                await registry.resolve(run_id, other, forwarded=_FORWARDED)
             assert refused.value.code == "run-not-found"
         with pytest.raises(ToolFailure) as unknown:
-            await registry.resolve("run_" + "0" * 26, mine)
+            await registry.resolve("run_" + "0" * 26, mine, forwarded=_FORWARDED)
         assert (unknown.value.code, unknown.value.message) == (
             refused.value.code,
             refused.value.message,
@@ -197,8 +242,10 @@ def test_unavailable_registry_fails_closed() -> None:
     registry = UnavailableRunRegistry()
     binding = RunBinding(principal_id="p", workspace_id="w", repo_id="r")
     for attempt in (
-        registry.register(binding, idempotency_key="key-0001"),
-        registry.resolve("run_" + "0" * 26, binding),
+        registry.register(
+            binding, idempotency_key="key-0001", forwarded=_FORWARDED, manifest=_MANIFEST
+        ),
+        registry.resolve("run_" + "0" * 26, binding, forwarded=_FORWARDED),
     ):
         with pytest.raises(ToolFailure) as refused:
             asyncio.run(attempt)

@@ -51,6 +51,11 @@ class Identity:
     #: field is optional here so that a caller with no federation involvement
     #: does not have to invent one.
     principal_id: str | None = None
+    #: The OAuth client and grant the gateway minted this assertion under
+    #: (the `/mcp` path).  ``None`` on paths without an OAuth grant, such as a
+    #: workspace token.  Run handles bind to both when present.
+    client_id: str | None = None
+    grant_id: str | None = None
 
     def __post_init__(self) -> None:
         if self.principal_id is not None and not (

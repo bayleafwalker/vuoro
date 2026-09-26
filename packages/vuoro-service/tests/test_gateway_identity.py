@@ -421,3 +421,31 @@ def test_the_principal_id_is_composed_from_the_colon_free_subject(tmp_path: Path
                        headers={"typ": "JWT", "kid": "gateway-2026-01"})
     with pytest.raises(IdentityResolutionError):
         resolver(_request(token))
+
+
+def test_the_oauth_client_and_grant_are_read_when_asserted(tmp_path: Path) -> None:
+    """The `/mcp` assertion carries the OAuth client and grant (vuoro-cloud
+    #5); run handles bind to both, so they must reach the Identity."""
+
+    key_path, private = _key_file(tmp_path)
+    resolver = _resolver(key_path)
+    identity = resolver(
+        _request(_token(private, client_id="claude-connector", grant_id="grant-1"))
+    )
+    assert identity.client_id == "claude-connector"
+    assert identity.grant_id == "grant-1"
+
+    # A workspace-token path asserts neither: absent, not invented.
+    identity = resolver(_request(_token(private)))
+    assert identity.client_id is None
+    assert identity.grant_id is None
+
+
+@pytest.mark.parametrize("field", ["client_id", "grant_id"])
+@pytest.mark.parametrize("value", ["", " grant-1", 7, ["grant-1"]])
+def test_a_malformed_client_or_grant_is_refused_not_dropped(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    key_path, private = _key_file(tmp_path)
+    with pytest.raises(IdentityResolutionError, match=field):
+        _resolver(key_path)(_request(_token(private, **{field: value})))
