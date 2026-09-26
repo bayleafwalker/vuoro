@@ -12,7 +12,10 @@ and opening a PR is `packages/vuoro-reconciler`'s job, running wherever the
 trusted-service-boundary design places it -- not here, and not from here.
 
 `get_effect` reports an intent's current state
-(proposed/accepted/rejected/applied/failed) to the caller that proposed it.
+(proposed/accepted/rejected/applied/failed), and the trusted-side acceptor
+once there is one, to the caller that proposed it. Nothing here moves an
+intent out of `proposed` (TS-16): acceptance is an operator or an opt-in
+policy on the trusted side (`vuoro_reconciler.acceptance`).
 
 The intent store's durable home is with its lifecycle owner. Per
 `vuoro-cloud/13-REPO-OWNERSHIP-AND-CHANGE-MATRIX.md` ("Hosted action
@@ -178,16 +181,32 @@ def _policy_for(repository: str, policies: Mapping[str, RepositoryEffectPolicy])
 # Diff validation: structural refusals only. Whether the diff applies to
 # base_commit is the reconciler's job, on a real checkout it has and the
 # edge does not (section 7).
+#
+# The parser is a strict grammar, not a scan for the first header: every
+# line must be a `diff --git` header, a recognised extended header, a
+# `---`/`+++` pair, a hunk header, or one of the lines that hunk header
+# counted. Anything else -- a preamble before the first header, a second
+# old-style `---`/`+++` hunk trailing a valid block, a stray line -- is
+# refused, because `git apply` would read it as more patch, touching paths
+# this validation never saw. (The reconciler independently re-derives
+# what was touched from the applied result; this is the edge's half.)
 # ---------------------------------------------------------------------------
 
+_HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?: .*)?$")
+_MODE_RE = re.compile(r"^(old mode|new mode|deleted file mode|new file mode) (\d{6})$")
+_INDEX_RE = re.compile(r"^index [0-9a-f]{4,64}\.\.[0-9a-f]{4,64}(?: (\d{6}))?$")
+_SIMILARITY_RE = re.compile(r"^(?:dis)?similarity index \d{1,3}%$")
+_PATH_LINE_RE = re.compile(r"^(rename from|rename to|copy from|copy to) (.+)$")
 
-#: Fallback path source when a block has no `---`/`+++`/rename lines: the
-#: symmetric case only (`a/<path> b/<path>` with the same path both sides).
-_HEADER_RE = re.compile(r"^diff --git a/(?P<path>.+) b/(?P=path)$")
+_REGULAR_MODE = "100644"
+_EXECUTABLE_MODE = "100755"
+_SYMLINK_MODE = "120000"
+_GITLINK_MODE = "160000"
 
 
 @dataclass
 class _FileChange:
+    header: str = ""
     old_path: str | None = None
     new_path: str | None = None
     is_rename: bool = False
@@ -197,94 +216,175 @@ class _FileChange:
     is_submodule: bool = False
 
 
+def _unsupported(message: str) -> ToolFailure:
+    return ToolFailure("diff-not-supported", message)
+
+
 def _is_path_safe(path: str) -> bool:
     if not path or path.startswith("/") or "\x00" in path:
         return False
     parts = path.split("/")
-    return not any(part in ("", "..") for part in parts)
+    return not any(part in ("", "..", ".git") for part in parts)
 
 
-def _mode_marks(token: str, change: _FileChange) -> None:
-    if "120000" in token:
+def _mark_mode(mode: str, change: _FileChange) -> None:
+    if mode == _SYMLINK_MODE:
         change.is_symlink = True
-    if "160000" in token:
+    elif mode == _GITLINK_MODE:
         change.is_submodule = True
 
 
-def _split_diff_blocks(diff_text: str) -> list[list[str]]:
-    lines = diff_text.splitlines()
-    starts = [i for i, line in enumerate(lines) if line.startswith("diff --git ")]
-    if not starts:
-        return []
-    blocks = []
-    for index, start in enumerate(starts):
-        end = starts[index + 1] if index + 1 < len(starts) else len(lines)
-        blocks.append(lines[start:end])
-    return blocks
+def _side_path(value: str, prefix: str) -> str | None:
+    """`a/<path>` / `b/<path>` -> `<path>`; `/dev/null` -> None. Quoted,
+    tab-suffixed (traditional timestamp) or unprefixed names are refused
+    rather than guessed at: git would strip or unquote them differently."""
+
+    if value == "/dev/null":
+        return None
+    if not value.startswith(prefix) or "\t" in value or value.startswith('"'):
+        raise _unsupported(f"unsupported file name line {value!r}")
+    return value[len(prefix) :]
 
 
-def _parse_block(block: list[str]) -> _FileChange:
-    change = _FileChange()
-    for line in block:
-        if line.startswith("old mode ") or line.startswith("new mode "):
-            change.is_mode_change = True
-            _mode_marks(line, change)
-        elif line.startswith("new file mode "):
-            _mode_marks(line, change)
-        elif line.startswith("deleted file mode "):
-            _mode_marks(line, change)
-        elif line.startswith("index "):
-            _mode_marks(line, change)
-        elif line.startswith("rename from "):
+def _parse_hunks(lines: list[str], index: int, change: _FileChange) -> int:
+    """Consume one or more hunks starting at `lines[index]`; return the
+    index of the first line after them."""
+
+    if index >= len(lines) or not lines[index].startswith("@@"):
+        raise _unsupported("a ---/+++ pair must be followed by a hunk")
+    while index < len(lines) and lines[index].startswith("@@"):
+        match = _HUNK_RE.match(lines[index])
+        if match is None:
+            raise _unsupported(f"malformed hunk header {lines[index]!r}")
+        old_left = int(match.group(2) if match.group(2) is not None else 1)
+        new_left = int(match.group(4) if match.group(4) is not None else 1)
+        index += 1
+        while old_left > 0 or new_left > 0:
+            if index >= len(lines):
+                raise _unsupported("a hunk ends before its line counts are met")
+            line = lines[index]
+            if line == "" or line.startswith(" "):
+                old_left -= 1
+                new_left -= 1
+            elif line.startswith("-"):
+                old_left -= 1
+                if line.startswith("-Subproject commit "):
+                    change.is_submodule = True
+            elif line.startswith("+"):
+                new_left -= 1
+                if line.startswith("+Subproject commit "):
+                    change.is_submodule = True
+            elif not line.startswith("\\"):
+                raise _unsupported(f"unexpected line inside a hunk: {line[:80]!r}")
+            if old_left < 0 or new_left < 0:
+                raise _unsupported("a hunk has more lines than its header counts")
+            index += 1
+        if index < len(lines) and lines[index].startswith("\\"):
+            index += 1  # "\ No newline at end of file" after the last line
+    return index
+
+
+def _parse_file(lines: list[str], index: int) -> tuple[_FileChange, int]:
+    change = _FileChange(header=lines[index])
+    index += 1
+    header_paths: dict[str, str] = {}
+
+    # Extended header lines, in any order, until something else.
+    while index < len(lines):
+        line = lines[index]
+        mode = _MODE_RE.match(line)
+        path_line = _PATH_LINE_RE.match(line)
+        index_line = _INDEX_RE.match(line)
+        if mode is not None:
+            kind, value = mode.groups()
+            _mark_mode(value, change)
+            if kind in ("old mode", "new mode"):
+                change.is_mode_change = True
+            elif kind == "new file mode" and value not in (_REGULAR_MODE, _SYMLINK_MODE, _GITLINK_MODE):
+                # A file created executable (100755) is a mode change too.
+                change.is_mode_change = True
+        elif index_line is not None:
+            if index_line.group(1) is not None:
+                _mark_mode(index_line.group(1), change)
+        elif _SIMILARITY_RE.match(line):
+            pass
+        elif path_line is not None:
+            kind, value = path_line.groups()
+            if kind in header_paths:
+                raise _unsupported(f"duplicate {kind!r} line")
+            header_paths[kind] = value
             change.is_rename = True
-            change.old_path = line[len("rename from ") :]
-        elif line.startswith("rename to "):
-            change.is_rename = True
-            change.new_path = line[len("rename to ") :]
-        elif line.startswith("copy from "):
-            change.is_rename = True
-            change.old_path = line[len("copy from ") :]
-        elif line.startswith("copy to "):
-            change.is_rename = True
-            change.new_path = line[len("copy to ") :]
-        elif line.startswith("--- "):
-            value = line[4:]
-            if value != "/dev/null" and change.old_path is None:
-                change.old_path = value[2:] if value.startswith("a/") else value
-        elif line.startswith("+++ "):
-            value = line[4:]
-            if value != "/dev/null" and change.new_path is None:
-                change.new_path = value[2:] if value.startswith("b/") else value
-        elif line.startswith("Binary files ") and line.rstrip().endswith("differ"):
-            change.is_binary = True
-        elif line.strip() == "GIT binary patch":
-            change.is_binary = True
-        elif line.startswith("+Subproject commit ") or line.startswith("-Subproject commit "):
-            change.is_submodule = True
-    if change.old_path is None and change.new_path is None and not change.is_rename:
-        # A pure mode change or a binary diff carries no `---`/`+++` lines at
-        # all (git omits them for both); the header is the only place left
-        # to find the path. Only the symmetric a/<path> b/<path> case is
-        # trusted here -- an asymmetric header without rename/copy lines is
-        # already unusual enough to refuse rather than guess.
-        header = _HEADER_RE.match(block[0]) if block else None
-        if header is not None:
-            change.old_path = change.new_path = header.group("path")
-    return change
+        else:
+            break
+        index += 1
+
+    if index < len(lines) and (
+        lines[index].startswith("Binary files ") or lines[index] == "GIT binary patch"
+    ):
+        change.is_binary = True
+        raise ToolFailure("binary-patch-refused", "binary patches are not accepted")
+
+    old_from_lines = new_from_lines = None
+    has_file_lines = False
+    if index < len(lines) and lines[index].startswith("--- "):
+        if index + 1 >= len(lines) or not lines[index + 1].startswith("+++ "):
+            raise _unsupported("a '---' line must be followed by a '+++' line")
+        old_from_lines = _side_path(lines[index][4:], "a/")
+        new_from_lines = _side_path(lines[index + 1][4:], "b/")
+        has_file_lines = True
+        index = _parse_hunks(lines, index + 2, change)
+
+    old_named = header_paths.get("rename from", header_paths.get("copy from"))
+    new_named = header_paths.get("rename to", header_paths.get("copy to"))
+    if change.is_rename and (old_named is None or new_named is None):
+        raise _unsupported("a rename or copy must name both sides")
+    if has_file_lines and change.is_rename and (old_from_lines, new_from_lines) != (old_named, new_named):
+        raise _unsupported("rename/copy lines disagree with the ---/+++ lines")
+
+    if has_file_lines:
+        change.old_path, change.new_path = old_from_lines, new_from_lines
+    elif change.is_rename:
+        change.old_path, change.new_path = old_named, new_named
+    else:
+        # A pure mode change carries no ---/+++ lines: only the symmetric
+        # `a/<path> b/<path>` header can name the path.
+        body = change.header[len("diff --git ") :]
+        half, remainder = divmod(len(body) - 1, 2)
+        if remainder or body[half] != " " or not body.startswith("a/"):
+            raise _unsupported("a diff section names no path")
+        left, right = body[:half], body[half + 1 :]
+        if left[2:] != right[2:] or not right.startswith("b/"):
+            raise _unsupported("a diff section names no path")
+        change.old_path = change.new_path = left[2:]
+
+    left_path = change.old_path if change.old_path is not None else change.new_path
+    right_path = change.new_path if change.new_path is not None else change.old_path
+    if left_path is None or change.header != f"diff --git a/{left_path} b/{right_path}":
+        raise _unsupported("the diff --git header disagrees with the paths below it")
+    return change, index
+
+
+def _parse_diff(diff_text: str) -> list[_FileChange]:
+    lines = diff_text.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    if not any(line.startswith("diff --git ") for line in lines):
+        raise _unsupported("the payload does not contain a unified diff (no 'diff --git' header)")
+    changes = []
+    index = 0
+    while index < len(lines):
+        if not lines[index].startswith("diff --git "):
+            raise _unsupported(f"unrecognised line outside a diff section: {lines[index][:80]!r}")
+        change, index = _parse_file(lines, index)
+        changes.append(change)
+    return changes
 
 
 def validate_diff(unified_diff: str, *, policy: RepositoryEffectPolicy) -> None:
     """Raise `ToolFailure` on any refusal in section 7's list. Returns
     normally for a diff-shaped intent this policy allows."""
 
-    blocks = _split_diff_blocks(unified_diff)
-    if not blocks:
-        raise ToolFailure(
-            "diff-not-supported",
-            "the payload does not contain a unified diff (no 'diff --git' header)",
-        )
-    for block in blocks:
-        change = _parse_block(block)
+    for change in _parse_diff(unified_diff):
         touched = tuple(p for p in (change.old_path, change.new_path) if p is not None)
         if not touched:
             raise ToolFailure("diff-not-supported", "a diff section names no path")
@@ -294,7 +394,7 @@ def validate_diff(unified_diff: str, *, policy: RepositoryEffectPolicy) -> None:
                     "path-outside-repository",
                     f"path {path!r} is outside the repository",
                 )
-        if change.is_binary:
+        if change.is_binary:  # pragma: no cover - _parse_file raises first
             raise ToolFailure("binary-patch-refused", "binary patches are not accepted")
         if change.is_mode_change:
             raise ToolFailure("mode-change-refused", "file-mode changes are not accepted")
@@ -321,7 +421,8 @@ def validate_diff(unified_diff: str, *, policy: RepositoryEffectPolicy) -> None:
 # The intent record and its store.
 # ---------------------------------------------------------------------------
 
-_TERMINAL_STATES = frozenset({"proposed", "accepted", "rejected", "applied", "failed"})
+#: Every state an intent can be in (only the last three are terminal).
+_INTENT_STATES = frozenset({"proposed", "accepted", "rejected", "applied", "failed"})
 
 
 @dataclass(frozen=True)
@@ -335,26 +436,34 @@ class EffectIntent:
     rationale: str
     unified_diff: str
     state: str = "proposed"
+    #: Who moved it `proposed -> accepted` (or rejected it), as the trusted
+    #: side recorded it: `{kind: "operator", subject}` or `{kind: "policy",
+    #: policy_id, version, scope, config_digest}`. Never set by the edge.
+    acceptor: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
-        if self.state not in _TERMINAL_STATES:
+        if self.state not in _INTENT_STATES:
             raise ValueError(f"unknown effect intent state {self.state!r}")
 
 
 class IntentStore(Protocol):
     """Where proposed effect intents live. Durable implementations live with
     the lifecycle owner (ActionQ), not in the edge -- see the module
-    docstring. Shares the idempotency ledger's method shapes (section 5) so
-    one object plays both roles for its owner."""
+    docstring. Shares the idempotency ledger's `lookup` shape (section 5).
+
+    There is deliberately no transition method: `proposed -> accepted` is
+    the trusted side's (an operator or an opt-in policy, never the
+    proposer), so nothing the edge holds can accept an intent."""
 
     async def lookup(self, workspace_id: str, tool: str, key: str) -> StoredResult | None: ...
 
-    async def store(
-        self, workspace_id: str, tool: str, key: str, stored: StoredResult
-    ) -> StoredResult: ...
-
-    async def create(self, intent: EffectIntent) -> None:
-        """Persist a newly proposed intent. `intent.intent_id` is unique."""
+    async def create(
+        self, workspace_id: str, tool: str, key: str, stored: StoredResult, intent: EffectIntent
+    ) -> StoredResult:
+        """Atomically record the ledger row for (workspace, tool, key) and
+        `intent` -- or, if a row already exists, record neither and return
+        that row. First write wins (section 5): a racing duplicate never
+        leaves an orphan `proposed` intent behind."""
 
     async def get(self, intent_id: str, caller: RunBinding) -> EffectIntent:
         """The intent if it belongs to `caller`.
@@ -373,12 +482,9 @@ class UnavailableIntentStore:
     async def lookup(self, workspace_id: str, tool: str, key: str) -> StoredResult | None:
         raise ToolFailure("effects-unavailable", "the effect intent store is not available yet")
 
-    async def store(
-        self, workspace_id: str, tool: str, key: str, stored: StoredResult
+    async def create(
+        self, workspace_id: str, tool: str, key: str, stored: StoredResult, intent: EffectIntent
     ) -> StoredResult:
-        raise ToolFailure("effects-unavailable", "the effect intent store is not available yet")
-
-    async def create(self, intent: EffectIntent) -> None:
         raise ToolFailure("effects-unavailable", "the effect intent store is not available yet")
 
     async def get(self, intent_id: str, caller: RunBinding) -> EffectIntent:
@@ -399,12 +505,20 @@ class InMemoryIntentStore:
     async def lookup(self, workspace_id: str, tool: str, key: str) -> StoredResult | None:
         return await self._ledger.lookup(workspace_id, tool, key)
 
-    async def store(
-        self, workspace_id: str, tool: str, key: str, stored: StoredResult
+    async def create(
+        self, workspace_id: str, tool: str, key: str, stored: StoredResult, intent: EffectIntent
     ) -> StoredResult:
-        return await self._ledger.store(workspace_id, tool, key, stored)
+        # The ledger's store never suspends, so the row and the intent are
+        # written together on one event loop: the intent exists only if
+        # this call's row is the one that won.
+        winner = await self._ledger.store(workspace_id, tool, key, stored)
+        if winner is stored:
+            self._intents[intent.intent_id] = intent
+        return winner
 
-    async def create(self, intent: EffectIntent) -> None:
+    def seed(self, intent: EffectIntent) -> None:
+        """Test-only: place an intent directly (e.g. one bound elsewhere)."""
+
         self._intents[intent.intent_id] = intent
 
     async def get(self, intent_id: str, caller: RunBinding) -> EffectIntent:
@@ -413,7 +527,9 @@ class InMemoryIntentStore:
             raise ToolFailure("effect-not-found", _NOT_YOURS)
         return intent
 
-    def set_state(self, intent_id: str, state: str) -> None:
+    def set_state(
+        self, intent_id: str, state: str, acceptor: Mapping[str, Any] | None = None
+    ) -> None:
         """Test-only: simulate the reconciler reporting a settlement back.
 
         A real store's transition path is out of the edge's reach entirely
@@ -421,7 +537,7 @@ class InMemoryIntentStore:
         exists so `get_effect` tests can prove every reported state without
         one."""
 
-        self._intents[intent_id] = replace(self._intents[intent_id], state=state)
+        self._intents[intent_id] = replace(self._intents[intent_id], state=state, acceptor=acceptor)
 
 
 def _new_intent_id() -> str:
@@ -440,8 +556,9 @@ _PROPOSE_DEFINITION: dict[str, Any] = {
         "applied against base_commit, with a title and rationale. This "
         "tool never applies anything and never touches the repository "
         "itself -- it records a proposal and returns {intent_id, state: "
-        "'proposed'}. A trusted reconciler, not this tool and not this "
-        "caller, later applies the diff, signs the commit and opens a PR; "
+        "'proposed'}. Only a trusted-side operator or policy -- never this "
+        "caller and never any tool here -- can accept it; a trusted "
+        "reconciler then applies the diff, signs the commit and opens a PR; "
         "call get_effect with intent_id to see the outcome. Refused "
         "before any of that: binary patches, file-mode changes, symlinks, "
         "submodules, paths outside the repository, renames or deletes "
@@ -496,8 +613,9 @@ _GET_DEFINITION: dict[str, Any] = {
     "title": "Get an effect intent's state",
     "description": (
         "Reports one effect intent's current state: proposed, accepted, "
-        "rejected, applied or failed. Read-only: it does not change the "
-        "intent. An unknown intent_id, or one bound to a different caller, "
+        "rejected, applied or failed, plus who accepted or rejected it "
+        "(acceptor) once the trusted side has. Read-only: it does not "
+        "change the intent. An unknown intent_id, or one bound to a different caller, "
         "is a tool error with code effect-not-found (one code for both, so "
         "a caller cannot probe which ids exist)."
     ),
@@ -606,17 +724,25 @@ def _build(
             rationale=parsed["rationale"],
             unified_diff=parsed["unified_diff"],
         )
-        await intent_store.create(intent)
         result = {"intent_id": intent.intent_id, "state": intent.state}
-        winner = await intent_store.store(
-            binding.workspace_id, "propose_effect", parsed["idempotency_key"], StoredResult(digest, result)
+        winner = await intent_store.create(
+            binding.workspace_id,
+            "propose_effect",
+            parsed["idempotency_key"],
+            StoredResult(digest, result),
+            intent,
         )
-        return dict(winner.result)
+        # A racing writer with the same key won: replay its result, or
+        # refuse if it was for different arguments.
+        return dict(replay_or_conflict(winner, digest) or winner.result)
 
     async def get_effect(parsed: dict[str, Any], forwarded: "ForwardedIdentity") -> dict[str, Any]:
         binding = binding_for(forwarded)
         intent = await intent_store.get(parsed["intent_id"], binding)
-        return {"intent_id": intent.intent_id, "state": intent.state}
+        reported: dict[str, Any] = {"intent_id": intent.intent_id, "state": intent.state}
+        if intent.acceptor is not None:
+            reported["acceptor"] = dict(intent.acceptor)
+        return reported
 
     return ToolSet(
         name="effect",
@@ -628,6 +754,13 @@ def _build(
 
 
 def build_toolset(context: ToolsetContext) -> ToolSet | None:
+    """The propose bucket as composed in production.
+
+    Reads only `ENV_REPOSITORY_POLICY` from `context.env`. Any auto-accept
+    setting (e.g. `VUORO_MCP_EFFECT_AUTO_ACCEPT`) is ignored by
+    construction: auto-accept is a trusted-side config file read by the
+    reconciler (`vuoro_reconciler.acceptance`), never an edge setting."""
+
     return _build(
         intent_store=UnavailableIntentStore(),
         runs=context.runs,

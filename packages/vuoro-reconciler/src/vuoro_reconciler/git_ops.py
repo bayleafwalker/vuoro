@@ -10,6 +10,7 @@ import os
 import subprocess
 import tempfile
 
+from .intents import Acceptor
 from .signing import SigningKey, configure_signing
 
 __all__ = [
@@ -19,6 +20,9 @@ __all__ = [
     "commit_signed",
     "push_branch",
     "refuse_if_protected",
+    "remote_branch_tip",
+    "same_change",
+    "stage_all",
     "trailer",
     "try_apply_diff",
 ]
@@ -46,10 +50,12 @@ def checkout_at(clone_url: str, base_commit: str, dest: str) -> None:
 
     Raises `CheckoutFailed` for a clone failure or an unknown `base_commit`;
     either way, `dest` is left as git's own failed-clone state, never a
-    checkout at the wrong commit.
+    checkout at the wrong commit. The clone's `core.hooksPath` is
+    `/dev/null`, so no hook (the repository's, or one configured globally)
+    runs on checkout or commit.
     """
 
-    cloned = _run("clone", "--no-local", clone_url, dest)
+    cloned = _run("clone", "-c", "core.hooksPath=/dev/null", "--no-local", clone_url, dest)
     if cloned.returncode != 0:
         raise CheckoutFailed(f"git clone failed: {cloned.stderr.strip()}")
     checked_out = _run("-C", dest, "checkout", "--detach", base_commit)
@@ -82,8 +88,20 @@ def try_apply_diff(repo_path: str, unified_diff: str) -> None:
         os.unlink(patch_path)
 
 
-def trailer(run_id: str, intent_id: str) -> str:
-    return f"Vuoro-Run: {run_id}\nVuoro-Intent: {intent_id}"
+def trailer(run_id: str, intent_id: str, acceptor: Acceptor | None = None) -> str:
+    lines = [f"Vuoro-Run: {run_id}", f"Vuoro-Intent: {intent_id}"]
+    if acceptor is not None:
+        lines.append(f"Vuoro-Accepted-By: {acceptor.trailer_value()}")
+    return "\n".join(lines)
+
+
+def stage_all(repo_path: str) -> None:
+    """Stage the whole working tree, so the index is exactly what a commit
+    would record (and what `diff_policy.staged_changes` inspects)."""
+
+    added = _run("-C", repo_path, "add", "-A")
+    if added.returncode != 0:  # pragma: no cover - defensive
+        raise RuntimeError(f"git add failed: {added.stderr.strip()}")
 
 
 def commit_signed(
@@ -93,9 +111,11 @@ def commit_signed(
     rationale: str,
     run_id: str,
     intent_id: str,
+    acceptor: Acceptor,
     key: SigningKey,
 ) -> str:
-    """Stage everything, commit signed by `key` with the run/intent trailers,
+    """Stage everything, commit signed by `key` with the run/intent/acceptor
+    trailers,
     and return the new commit's sha. Raises if the signature cannot be
     produced (e.g. a missing key): no half-signed commit is left behind
     (git itself refuses to create the commit when `-S` fails)."""
@@ -104,12 +124,35 @@ def commit_signed(
     add = _run("-C", repo_path, "add", "-A", env=key.env)
     if add.returncode != 0:  # pragma: no cover - defensive
         raise RuntimeError(f"git add failed: {add.stderr.strip()}")
-    message = f"{title}\n\n{rationale}\n\n{trailer(run_id, intent_id)}\n"
-    committed = _run("-C", repo_path, "commit", "-S", "-m", message, env=key.env)
+    message = f"{title}\n\n{rationale}\n\n{trailer(run_id, intent_id, acceptor)}\n"
+    committed = _run(
+        "-C", repo_path, "commit", "--no-verify", "-S", "-m", message, env=key.env
+    )
     if committed.returncode != 0:
         raise RuntimeError(f"signed commit failed: {committed.stderr.strip()}")
     sha = _run("-C", repo_path, "rev-parse", "HEAD", env=key.env)
     return sha.stdout.strip()
+
+
+def remote_branch_tip(repo_path: str, branch: str) -> str | None:
+    """The commit `branch` pointed at on the clone's origin when it was
+    cloned, or `None` if it did not exist there."""
+
+    tip = _run("-C", repo_path, "rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{branch}^{{commit}}")
+    return tip.stdout.strip() if tip.returncode == 0 else None
+
+
+def same_change(repo_path: str, existing: str, candidate: str) -> bool:
+    """True if `existing` records the same change as `candidate`: the same
+    tree on the same parent(s). A re-run's freshly signed commit differs
+    from the first run's only in its timestamp and signature."""
+
+    def shape(ref: str) -> tuple[str, str]:
+        tree = _run("-C", repo_path, "rev-parse", f"{ref}^{{tree}}").stdout.strip()
+        parents = _run("-C", repo_path, "rev-list", "--parents", "-n", "1", ref).stdout.split()[1:]
+        return tree, " ".join(parents)
+
+    return shape(existing) == shape(candidate)
 
 
 def refuse_if_protected(branch: str, protected_branches: frozenset[str]) -> None:

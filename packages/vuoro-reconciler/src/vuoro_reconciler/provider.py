@@ -55,4 +55,8 @@ class ProviderClient(Protocol):
         """
 
     async def open_pull_request(self, request: PullRequest) -> PullRequestResult:
-        """Open a PR from `request.branch` into `request.base_branch`."""
+        """Open a PR from `request.branch` into `request.base_branch`.
+
+        Idempotent per branch: if a PR from `request.branch` is already
+        open, return it rather than opening a second one (a re-run after a
+        lost `report_applied` asks again)."""

@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 from fakes import FakeIntentSource, FakeProviderClient
 from vuoro_reconciler.git_ops import trailer
-from vuoro_reconciler.intents import EffectIntent
+from vuoro_reconciler.intents import EffectIntent, OperatorAcceptor
 from vuoro_reconciler.reconciler import Reconciler, ReconcilerConfig
 from vuoro_reconciler.signing import verify_commit
 
@@ -44,6 +44,9 @@ NON_APPLYING_DIFF = (
 )
 
 
+OPERATOR = OperatorAcceptor(subject="operator:alice")
+
+
 def _intent(bare_remote: Path, *, unified_diff: str, intent_id: str = "effect_test0001") -> EffectIntent:
     return EffectIntent(
         intent_id=intent_id,
@@ -53,6 +56,9 @@ def _intent(bare_remote: Path, *, unified_diff: str, intent_id: str = "effect_te
         title="Fix the typo",
         rationale="A short rationale.",
         unified_diff=unified_diff,
+        workspace_id="ws-1",
+        proposer_principal="cloud:proposer:0",
+        acceptor=OPERATOR,
     )
 
 
@@ -60,7 +66,7 @@ def test_a_diff_shaped_intent_becomes_a_signed_commit_with_trailers(
     bare_remote: Path, reconciler_signing_key
 ) -> None:
     intent = _intent(bare_remote, unified_diff=MODIFY_DIFF)
-    intent_source = FakeIntentSource(intents=[intent])
+    intent_source = FakeIntentSource(accepted=[intent])
     provider = FakeProviderClient(repositories={"repo-a": bare_remote})
     reconciler = Reconciler(
         intent_source=intent_source,
@@ -76,7 +82,12 @@ def test_a_diff_shaped_intent_becomes_a_signed_commit_with_trailers(
     assert outcome.state == "applied"
     assert outcome.commit_sha
     assert intent_source.applied == [
-        {"intent_id": intent.intent_id, "commit_sha": outcome.commit_sha, "pr_url": outcome.pr_url}
+        {
+            "intent_id": intent.intent_id,
+            "commit_sha": outcome.commit_sha,
+            "pr_url": outcome.pr_url,
+            "acceptor": OPERATOR,
+        }
     ]
     assert intent_source.failed == []
 
@@ -91,7 +102,8 @@ def test_a_diff_shaped_intent_becomes_a_signed_commit_with_trailers(
         text=True,
         check=True,
     ).stdout
-    assert trailer(intent.run_id, intent.intent_id) in message
+    assert trailer(intent.run_id, intent.intent_id, OPERATOR) in message
+    assert "Vuoro-Accepted-By: operator:operator:alice" in message
 
     # The PR was opened against the provider's default branch, never main itself.
     assert len(provider.pull_requests) == 1
@@ -109,7 +121,7 @@ def test_a_signature_forged_against_the_wrong_key_does_not_verify(
 
     intent = _intent(bare_remote, unified_diff=MODIFY_DIFF)
     reconciler = Reconciler(
-        intent_source=FakeIntentSource(intents=[intent]),
+        intent_source=FakeIntentSource(accepted=[intent]),
         provider=FakeProviderClient(repositories={"repo-a": bare_remote}),
         signing_key=reconciler_signing_key,
         config=ReconcilerConfig(repository_allowlist=frozenset({"repo-a"})),
@@ -122,7 +134,11 @@ def test_a_signature_forged_against_the_wrong_key_does_not_verify(
     from vuoro_reconciler.signing import SigningKey
 
     unrelated_key = SigningKey(
-        key_format="openpgp", signing_key="0" * 16, env={"GNUPGHOME": str(other_gnupghome)}
+        key_format="openpgp",
+        signing_key="0" * 16,
+        committer_name="Someone Else",
+        committer_email="else@vuoro.test",
+        env={"GNUPGHOME": str(other_gnupghome)},
     )
     assert verify_commit(str(bare_remote), commit_sha, unrelated_key) is False
 
@@ -136,7 +152,7 @@ def test_a_non_applying_diff_fails_without_a_commit(bare_remote: Path, reconcile
     ).stdout.strip()
 
     intent = _intent(bare_remote, unified_diff=NON_APPLYING_DIFF)
-    intent_source = FakeIntentSource(intents=[intent])
+    intent_source = FakeIntentSource(accepted=[intent])
     provider = FakeProviderClient(repositories={"repo-a": bare_remote})
     reconciler = Reconciler(
         intent_source=intent_source,
@@ -170,7 +186,7 @@ def test_a_repository_outside_the_allowlist_is_refused_before_any_clone(
     bare_remote: Path, reconciler_signing_key
 ) -> None:
     intent = _intent(bare_remote, unified_diff=MODIFY_DIFF)
-    intent_source = FakeIntentSource(intents=[intent])
+    intent_source = FakeIntentSource(accepted=[intent])
     provider = FakeProviderClient(repositories={"repo-a": bare_remote})
     reconciler = Reconciler(
         intent_source=intent_source,

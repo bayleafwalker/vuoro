@@ -418,7 +418,7 @@ def test_get_effect_refuses_an_intent_bound_to_another_caller(keys) -> None:
         rationale="r",
         unified_diff=modify_diff(),
     )
-    asyncio.run(store.create(intent))
+    store.seed(intent)
     client, _, _runs = _client(keys, intent_store=store)
     result = _call_with(client, keys, "get_effect", {"intent_id": intent.intent_id})
     _assert_error(result, "effect-not-found")
@@ -537,3 +537,214 @@ def test_load_repository_policies_parses_json() -> None:
 def test_load_repository_policies_rejects_malformed_configuration(raw) -> None:
     with pytest.raises(ValueError):
         _load_repository_policies({ENV_REPOSITORY_POLICY: raw})
+
+
+# -- TS-16: the edge proposes only; acceptance is never reachable from here ---------
+
+_TRANSITION_WORDS = ("accept", "approve", "reject", "transition", "apply", "execute", "settle")
+
+
+def test_the_edge_tool_list_has_no_accept_or_transition_tool(keys) -> None:
+    from vuoro_mcp_edge.composition import build_toolsets
+
+    context = ToolsetContext(
+        env={"VUORO_MCP_EFFECT_AUTO_ACCEPT": "1"},
+        work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"),
+        runs=UnavailableRunRegistry(),
+    )
+    toolsets = build_toolsets(context)
+    client = edge_client(keys[0], FakeShell(), toolsets=toolsets)
+    listed = client.post(MCP_PATH, headers=_auth(keys), json=rpc("tools/list")).json()["result"]
+    names = [tool["name"] for tool in listed["tools"]]
+    assert "propose_effect" in names
+    for name in names:
+        assert not any(word in name for word in _TRANSITION_WORDS), name
+    # Nor is there a way to reach one through the effect toolset's store.
+    assert not any(hasattr(effect_tools.IntentStore, name) for name in ("accept", "reject", "transition"))
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"state": "accepted"},
+        {"accepted": True},
+        {"acceptor": {"kind": "operator", "subject": "me"}},
+        {"auto_accept": True},
+    ],
+)
+def test_propose_effect_with_a_state_or_acceptance_argument_is_refused(keys, extra) -> None:
+    client, store, runs = _client(keys)
+    run_id = _register_run(runs)
+    result = _call_with(client, keys, "propose_effect", {**_args(run_id=run_id), **extra})
+    _assert_error(result, "invalid-arguments")
+    assert store._intents == {}
+
+
+def test_auto_accept_env_has_no_effect_on_the_edge(keys, monkeypatch) -> None:
+    """Auto-accept is a trusted-side config file only. Setting the env
+    changes neither the production toolset nor what propose_effect records
+    through it."""
+
+    on = {"VUORO_MCP_EFFECT_AUTO_ACCEPT": json.dumps({"version": 1, "policies": [{"id": "all", "enabled": True}]})}
+    for env in (on, {"VUORO_MCP_EFFECT_AUTO_ACCEPT": "true"}):
+        monkeypatch.setenv("VUORO_MCP_EFFECT_AUTO_ACCEPT", env["VUORO_MCP_EFFECT_AUTO_ACCEPT"])
+        # Production composition, with only the store and registry swapped
+        # for the reference ones so a proposal can actually be recorded.
+        store = InMemoryIntentStore()
+        monkeypatch.setattr(effect_tools, "UnavailableIntentStore", lambda: store)
+        runs = InMemoryRunRegistry()
+        context = ToolsetContext(env=env, work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"), runs=runs)
+        toolset = effect_tools.build_toolset(context)
+        baseline = effect_tools.build_toolset(
+            ToolsetContext(env={}, work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"), runs=runs)
+        )
+        assert [(t.name, t.definition) for t in toolset.tools] == [(t.name, t.definition) for t in baseline.tools]
+
+        client = edge_client(keys[0], FakeShell(), toolsets=(toolset,))
+        run_id = _register_run(runs)
+        proposed = _call_with(client, keys, "propose_effect", _args(run_id=run_id))
+        assert proposed["structuredContent"]["state"] == "proposed", proposed
+        intent_id = proposed["structuredContent"]["intent_id"]
+        assert store._intents[intent_id].state == "proposed"
+        assert store._intents[intent_id].acceptor is None
+        fetched = _call_with(client, keys, "get_effect", {"intent_id": intent_id})
+        assert fetched["structuredContent"] == {"intent_id": intent_id, "state": "proposed"}
+
+
+def test_get_effect_reports_the_trusted_side_acceptor(keys) -> None:
+    client, store, runs = _client(keys)
+    run_id = _register_run(runs)
+    intent_id = _call_with(client, keys, "propose_effect", _args(run_id=run_id))["structuredContent"]["intent_id"]
+    acceptor = {"kind": "policy", "policy_id": "docs-only", "version": 7, "scope": {}, "config_digest": "0" * 64}
+    store.set_state(intent_id, "accepted", acceptor=acceptor)
+    fetched = _call_with(client, keys, "get_effect", {"intent_id": intent_id})
+    assert fetched["structuredContent"] == {"intent_id": intent_id, "state": "accepted", "acceptor": acceptor}
+
+
+# -- diff grammar: nothing outside the recognised grammar reaches git apply ----------
+
+#: A valid block, then an old-style hunk git apply also applies.
+TRAILING_OLD_STYLE_HUNK = modify_diff() + (
+    "--- a/.github/workflows/ci.yml\n"
+    "+++ b/.github/workflows/ci.yml\n"
+    "@@ -0,0 +1 @@\n"
+    "+on: push\n"
+)
+
+#: An old-style patch before the first `diff --git` header.
+PREAMBLE_HUNK = (
+    "--- a/.github/workflows/ci.yml\n"
+    "+++ b/.github/workflows/ci.yml\n"
+    "@@ -0,0 +1 @@\n"
+    "+on: push\n"
+) + modify_diff()
+
+EXECUTABLE_NEW_FILE = (
+    "diff --git a/docs/run.sh b/docs/run.sh\n"
+    "new file mode 100755\n"
+    "index 0000000..1111111\n"
+    "--- /dev/null\n"
+    "+++ b/docs/run.sh\n"
+    "@@ -0,0 +1 @@\n"
+    "+echo hi\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("diff", "code"),
+    [
+        (TRAILING_OLD_STYLE_HUNK, "diff-not-supported"),
+        (PREAMBLE_HUNK, "diff-not-supported"),
+        ("free text preamble\n" + modify_diff(), "diff-not-supported"),
+        (modify_diff() + "trailing garbage\n", "diff-not-supported"),
+        (EXECUTABLE_NEW_FILE, "mode-change-refused"),
+        # A hunk longer than its header says: the extra line is not context.
+        (modify_diff() + "+one more\n", "diff-not-supported"),
+        # Header disagreeing with the ---/+++ paths.
+        (modify_diff().replace("+++ b/docs/readme.md", "+++ b/.github/workflows/ci.yml"), "diff-not-supported"),
+        (modify_diff("docs/.git/config"), "path-outside-repository"),
+    ],
+)
+def test_diffs_outside_the_grammar_are_refused(diff, code) -> None:
+    with pytest.raises(ToolFailure) as failure:
+        validate_diff(diff, policy=RepositoryEffectPolicy())
+    assert failure.value.code == code
+
+
+@pytest.mark.parametrize("diff", [TRAILING_OLD_STYLE_HUNK, PREAMBLE_HUNK, EXECUTABLE_NEW_FILE])
+def test_the_bypass_shapes_are_refused_over_the_wire(keys, diff) -> None:
+    client, store, runs = _client(keys)
+    run_id = _register_run(runs)
+    result = _call_with(client, keys, "propose_effect", _args(run_id=run_id, unified_diff=diff))
+    assert result["isError"] is True
+    assert store._intents == {}
+
+
+@pytest.mark.parametrize(
+    "diff",
+    [
+        modify_diff() + add_diff("docs/b.md"),
+        "diff --git a/docs/readme.md b/docs/readme.md\n--- a/docs/readme.md\n+++ b/docs/readme.md\n"
+        "@@ -1,3 +1,3 @@\n a\n-b\n+c\n\n\\ No newline at end of file\n",
+        "diff --git a/f b/f\n--- a/f\n+++ b/f\n@@ -1 +1 @@ section\n-x\n+y\n@@ -9,2 +9,2 @@\n-p\n+q\n r\n",
+    ],
+)
+def test_well_formed_multi_section_diffs_still_pass(diff) -> None:
+    validate_diff(diff, policy=RepositoryEffectPolicy())
+
+
+# -- idempotency under a race ----------------------------------------------------------
+
+
+class _YieldingStore(InMemoryIntentStore):
+    """Suspends in lookup so two proposals interleave exactly where a real
+    store's round trip would."""
+
+    async def lookup(self, workspace_id, tool, key):
+        found = await super().lookup(workspace_id, tool, key)
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        return found
+
+
+def test_a_concurrent_duplicate_propose_yields_exactly_one_intent() -> None:
+    from types import SimpleNamespace
+
+    store = _YieldingStore()
+    runs = InMemoryRunRegistry()
+    run_id = _register_run(runs)
+    toolset = effect_tools._build(intent_store=store, runs=runs, repository_policies={})
+    propose = next(spec for spec in toolset.tools if spec.name == "propose_effect")
+    forwarded = SimpleNamespace(
+        identity=SimpleNamespace(principal_id=PRINCIPAL_ID, workspace_id=WORKSPACE_ID), repo_id=REPO_ID
+    )
+    parsed = effect_tools._parse_propose(_args(run_id=run_id))
+
+    async def race():
+        return await asyncio.gather(propose.run(parsed, forwarded), propose.run(dict(parsed), forwarded))
+
+    first, second = asyncio.run(race())
+    assert first == second
+    assert list(store._intents) == [first["intent_id"]]
+
+
+def test_a_concurrent_conflicting_propose_is_refused_and_leaves_no_orphan() -> None:
+    from types import SimpleNamespace
+
+    store = _YieldingStore()
+    runs = InMemoryRunRegistry()
+    run_id = _register_run(runs)
+    toolset = effect_tools._build(intent_store=store, runs=runs, repository_policies={})
+    propose = next(spec for spec in toolset.tools if spec.name == "propose_effect")
+    forwarded = SimpleNamespace(
+        identity=SimpleNamespace(principal_id=PRINCIPAL_ID, workspace_id=WORKSPACE_ID), repo_id=REPO_ID
+    )
+    one = effect_tools._parse_propose(_args(run_id=run_id))
+    two = effect_tools._parse_propose(_args(run_id=run_id, title="Another title"))
+
+    async def race():
+        return await asyncio.gather(propose.run(one, forwarded), propose.run(two, forwarded), return_exceptions=True)
+
+    first, second = asyncio.run(race())
+    assert isinstance(second, ToolFailure) and second.code == "idempotency-conflict"
+    assert list(store._intents) == [first["intent_id"]]

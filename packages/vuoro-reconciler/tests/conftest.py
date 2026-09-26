@@ -50,7 +50,13 @@ def reconciler_signing_key(tmp_path: Path) -> SigningKey:
     key_id = next(
         line.split(":")[4] for line in listing.stdout.splitlines() if line.startswith("sec:")
     )
-    return SigningKey(key_format="openpgp", signing_key=key_id, env=env)
+    return SigningKey(
+        key_format="openpgp",
+        signing_key=key_id,
+        committer_name="Vuoro Reconciler",
+        committer_email="reconciler@vuoro.test",
+        env=env,
+    )
 
 
 @pytest.fixture

@@ -5,7 +5,9 @@ See the package README for what this does and does not do.
 
 from __future__ import annotations
 
-from .intents import EffectIntent, IntentSource
+from .acceptance import AcceptanceRefused, AutoAcceptConfig, OperatorAcceptance
+from .diff_policy import DiffPolicy
+from .intents import Acceptor, EffectIntent, IntentSource, OperatorAcceptor, PolicyAcceptor
 from .provider import ProviderClient, PullRequest, PullRequestResult
 from .reconciler import (
     DiffDoesNotApply,
@@ -17,10 +19,17 @@ from .reconciler import (
 from .signing import SigningKey
 
 __all__ = [
+    "AcceptanceRefused",
+    "Acceptor",
+    "AutoAcceptConfig",
     "DiffDoesNotApply",
+    "DiffPolicy",
     "EffectIntent",
     "IntentSource",
+    "OperatorAcceptance",
+    "OperatorAcceptor",
     "Outcome",
+    "PolicyAcceptor",
     "ProviderClient",
     "PullRequest",
     "PullRequestResult",

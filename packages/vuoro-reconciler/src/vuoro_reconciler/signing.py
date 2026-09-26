@@ -22,6 +22,10 @@ KeyFormat = Literal["openpgp", "ssh"]
 class SigningKey:
     """The reconciler's own signing identity.
 
+    `committer_name`/`committer_email` are the identity the reconciler
+    commits as; they are set in the checkout's own config, so a commit never
+    depends on (or picks up) an ambient global git identity.
+
     `signing_key` is a GPG key id/fingerprint for `key_format="openpgp"`,
     or a path to an SSH public key file for `key_format="ssh"`.
     `allowed_signers_file` is SSH-only: a `gpg.ssh.allowedSignersFile`-shaped
@@ -33,13 +37,18 @@ class SigningKey:
 
     key_format: KeyFormat
     signing_key: str
+    committer_name: str
+    committer_email: str
     allowed_signers_file: str | None = None
     env: Mapping[str, str] = field(default_factory=dict)
 
 
 def configure_signing(repo_path: str, key: SigningKey) -> None:
-    """Set the checkout's git config so `git commit -S` signs with `key`."""
+    """Set the checkout's git config so `git commit -S` commits as the
+    reconciler's identity and signs with `key`."""
 
+    _git(repo_path, "config", "user.name", key.committer_name, key=key)
+    _git(repo_path, "config", "user.email", key.committer_email, key=key)
     _git(repo_path, "config", "commit.gpgsign", "true", key=key)
     _git(repo_path, "config", "gpg.format", key.key_format, key=key)
     _git(repo_path, "config", "user.signingkey", key.signing_key, key=key)
