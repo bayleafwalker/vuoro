@@ -10,8 +10,9 @@ recorded here.
   the direct route, so a shell-only restart no longer resets the per-jti
   proofed-use cap (7): an assertion issued more than 2 s before the shell
   started is refused with 401 `identity-replayed` (edge: `-32003`) on
-  either route. A tool call whose shell calls span a shell restart is now
-  refused that way and must be re-minted. The assertion lifetime bound
+  either route. A tool call whose shell calls span a shell restart now fails
+  as a tool error carrying `identity-replayed` (the edge does not turn it
+  into `-32003`), and the client calls the tool again. The assertion lifetime bound
   (`exp - iat` at most 30 s, which the 50,000-entry replay cache is sized
   for) is a named constant and is tested to refuse long-lived assertions
   before they reach the cache. vuoro-mcp-edge tests: the ledger behaviour

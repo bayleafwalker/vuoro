@@ -399,7 +399,8 @@ class GatewayAssertionIdentityResolver:
                 # pod key (the emptyDir survives) could mint another cap's
                 # worth of uses.  The edge forwards assertions only while a
                 # tool call is running, so this refuses just a tool call that
-                # spans a shell restart, which fails anyway.
+                # spans a shell restart.  Checked before the proof, so a
+                # refusal does not spend its nonce.
                 self._refuse_before_replay_window(claims)
                 self._verify_edge_proof(request, proof, token)
                 if not self._replay_cache.claim(

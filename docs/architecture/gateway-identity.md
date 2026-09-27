@@ -130,9 +130,14 @@ The shell applies the assertion watermark on the proof route too, because the
 per-jti proofed-use count is also in memory: without it a shell-only restart
 would reset the count, and a leaked pod key could mint another 7 uses of a
 captured assertion. The cost is that a tool call whose shell calls span a
-shell restart is refused with `identity-replayed` (`-32003`), which the
-caller already treats as "re-mint and retry once"; such a call has lost its
-connection mid-way anyway. What remains is an assertion issued within two
+shell restart fails: the shell answers its next call 401 `identity-replayed`,
+and the edge returns that as a tool error (a read tool as `upstream-rejected`
+with `upstream_code` `identity-replayed`), not as JSON-RPC `-32003`, so the
+gateway's re-mint rule does not see it and the client calls the tool again
+under a new assertion. The same holds when the edge starts before the shell:
+an assertion minted more than two seconds before the shell started is refused
+on the proof route, but the pod receives traffic only once both containers
+are ready, so the gateway mints none that early. What remains is an assertion issued within two
 seconds of a restart that completed in under two seconds, which is shorter
 than process start-up. A new pod has new caches and a new proof key.
 

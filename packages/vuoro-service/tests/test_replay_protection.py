@@ -739,3 +739,16 @@ def test_a_long_lived_assertion_never_reaches_the_cache(tmp_path: Path) -> None:
     token = _token(private, iat=now, nbf=now - 1, exp=now + _MAX_ASSERTION_LIFETIME_SECONDS)
     resolver(_request(token))
     assert len(cache) == 1
+
+
+def test_the_watermark_is_checked_before_the_proof_nonce_is_spent(tmp_path: Path) -> None:
+    path, private = _key_file(tmp_path)
+    now = datetime.now(UTC).replace(microsecond=0).timestamp()
+    token = _token(private, iat=now - 3, nbf=now - 4, exp=now + 27)
+    proofs = EdgeProofVerifier(KEY)
+    proof = _proof(token)
+    restarted = _resolver(path, edge_proofs=proofs, replay_not_before=now)
+    with pytest.raises(IdentityReplayedError, match="replay window"):
+        restarted(_request(token, proof=proof, body=BODY))
+    # The refused call left the nonce unspent: the same proof still verifies.
+    _resolver(path, edge_proofs=proofs)(_request(token, proof=proof, body=BODY))
