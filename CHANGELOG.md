@@ -9,10 +9,11 @@ recorded here.
   sprintctl 0.8.0 (remote schema 17; its migration runs in each tenant's
   `vuoro-migrate` job on roll-out). The edge serves E2's record bucket
   (`register_run`, `append_evidence`, `write_session_note`; agentops#2466)
-  over the durable `SprintctlRecordStore`. Calls need the `work:evidence`
-  authority, which the hosted gateway grants only once it issues
-  `vuoro:evidence.record` (vuoro-cloud, a later generation); until then they
-  answer `authority-required`. E3's propose bucket (`propose_effect`, `get_effect`;
+  over the durable `SprintctlRecordStore`. They are listed, but not callable
+  through the hosted gateway until vuoro-cloud grants `vuoro:evidence.record`
+  and adds these tools to `MCP_TOOL_SCOPES` (until then the gateway answers
+  403 `insufficient_scope`); a call reaching the edge without `work:evidence`
+  answers `authority-required`. E3's propose bucket (`propose_effect`, `get_effect`;
   agentops#2467) lists nothing until a durable intent store exists; its
   trusted-side reconciler, `packages/vuoro-reconciler` 0.1.0, is not part of
   the service image. The shared toolset seam and E2/E3 contract (#129) are
