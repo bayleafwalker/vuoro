@@ -199,3 +199,49 @@ def test_a_current_completion_retains_nothing() -> None:
     lease = store.claim("run-1", "worker-a", ttl_seconds=10)
     store.complete(lease.lease_id, "worker-a", result="done")
     assert store.retained_outcomes("run-1") == ()
+
+
+def test_a_retry_after_the_holders_own_completion_retains_nothing() -> None:
+    store = LeaseStore(clock=FakeClock())
+    lease = store.claim("run-1", "worker-a", ttl_seconds=10)
+    store.complete(lease.lease_id, "worker-a", result="done")
+    with pytest.raises(LeaseNotCurrentError):
+        store.complete(lease.lease_id, "worker-a", result="done")
+    assert store.retained_outcomes("run-1") == ()
+
+
+def test_refusals_look_the_same_whether_or_not_anything_was_retained() -> None:
+    clock = FakeClock()
+    store = LeaseStore(clock=clock)
+    stale = store.claim("run-1", "worker-a", ttl_seconds=10)
+    clock.advance(11)
+    store.reclaim("run-1", "worker-b", ttl_seconds=10)
+    messages = []
+    for holder in ("worker-a", "worker-imposter"):
+        with pytest.raises(LeaseNotCurrentError) as refused:
+            store.complete(stale.lease_id, holder, result="x")
+        messages.append(str(refused.value))
+    assert messages[0] == messages[1]
+    assert len(store.retained_outcomes("run-1")) == 1
+
+
+def test_the_retained_result_is_a_copy() -> None:
+    clock = FakeClock()
+    store = LeaseStore(clock=clock)
+    lease = store.claim("run-1", "worker-a", ttl_seconds=10)
+    clock.advance(11)
+    result = {"diff": "a"}
+    with pytest.raises(LeaseNotCurrentError):
+        store.complete(lease.lease_id, "worker-a", result=result)
+    result["diff"] = "changed"
+    assert store.retained_outcomes("run-1")[0].result == {"diff": "a"}
+
+
+def test_a_stale_heartbeat_retains_nothing() -> None:
+    clock = FakeClock()
+    store = LeaseStore(clock=clock)
+    lease = store.claim("run-1", "worker-a", ttl_seconds=10)
+    clock.advance(11)
+    with pytest.raises(LeaseNotCurrentError):
+        store.heartbeat(lease.lease_id, "worker-a")
+    assert store.retained_outcomes("run-1") == ()

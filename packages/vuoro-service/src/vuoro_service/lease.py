@@ -23,6 +23,7 @@ in-memory, keyed by subject, with an injectable clock so tests do not sleep.
 from __future__ import annotations
 
 from collections.abc import Callable
+import copy
 from dataclasses import dataclass, replace
 import time
 import uuid
@@ -89,6 +90,9 @@ class LeaseStore:
         # to its own holder and retained (INV-L1).
         self._issued: dict[str, Lease] = {}
         self._retained: list[RetainedOutcome] = []
+        # Lease ids their own holder completed: a retried completion of
+        # settled work is not a late result and is not retained.
+        self._completed: set[str] = set()
 
     def _now(self) -> float:
         return self._clock()
@@ -177,13 +181,20 @@ class LeaseStore:
         holder's work.  It is not discarded either (INV-L1): when the
         lease id was issued to `holder`, the attempt and its `result` are
         retained as a non-settling outcome (:meth:`retained_outcomes`)
-        before the refusal is raised.
+        before the refusal is raised.  A retry of a completion that
+        already succeeded is refused the same way but retains nothing: the
+        work it reports was settled, not late.  The refusal never reveals
+        whether anything was retained.
         """
         now = self._now()
         current = self._current_for_lease_id(lease_id)
         if current is None:
             issued = self._issued.get(lease_id)
-            if issued is not None and issued.holder == holder:
+            if (
+                issued is not None
+                and issued.holder == holder
+                and lease_id not in self._completed
+            ):
                 self._retain(issued, result, "superseded", now)
             raise LeaseNotCurrentError(f"lease {lease_id!r} is not current")
         if current.holder != holder:
@@ -194,6 +205,7 @@ class LeaseStore:
             self._retain(current, result, "expired", now)
             raise LeaseNotCurrentError(f"lease {lease_id!r} has already expired")
         del self._by_subject[current.subject]
+        self._completed.add(lease_id)
 
     def _retain(self, lease: Lease, result: object, reason: str, now: float) -> None:
         self._retained.append(
@@ -201,7 +213,9 @@ class LeaseStore:
                 lease_id=lease.lease_id,
                 subject=lease.subject,
                 holder=lease.holder,
-                result=result,
+                # A copy: later changes by the caller must not rewrite
+                # the evidence.
+                result=copy.deepcopy(result),
                 reason=reason,
                 retained_at=now,
             )

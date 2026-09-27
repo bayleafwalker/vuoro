@@ -13,7 +13,9 @@ recorded here.
   (`RetainedOutcome`, `disposition="stale"`, `settlement_effect="none"`,
   read through `LeaseStore.retained_outcomes(subject)`) instead of being
   discarded. `complete` takes an optional keyword `result`. An unknown lease
-  id or another holder's completion still leaves nothing. The E2/E3 contract
+  id, another holder's completion, or a retry of a completion that already
+  succeeded still leaves nothing, and the refusal looks the same either
+  way. The retained result is a copy. The E2/E3 contract
   §6 records the sprintctl lease changes from agentops#2539 and #2540.
 
 - vuoro-mcp-edge: `/mcp` conforms to the published MCP 2026-07-28 schema
