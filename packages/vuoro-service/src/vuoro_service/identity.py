@@ -35,7 +35,22 @@ ALL_REPOS = "*"
 
 
 class IdentityResolutionError(ValueError):
-    pass
+    #: The invocation error code and HTTP status the shell answers with.
+    code = "identity-required"
+    http_status = 401
+
+
+class IdentityReplayedError(IdentityResolutionError):
+    """A one-use credential (assertion jti, edge proof) was presented again."""
+
+    code = "identity-replayed"
+
+
+class IdentityReplayCapacityError(IdentityResolutionError):
+    """Replay protection is at capacity; new credentials are refused."""
+
+    code = "identity-replay-capacity"
+    http_status = 503
 
 
 @dataclass(frozen=True)

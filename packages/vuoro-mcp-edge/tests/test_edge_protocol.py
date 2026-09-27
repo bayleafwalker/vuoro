@@ -56,20 +56,20 @@ def test_initialize_echoes_every_supported_version(client, auth, version) -> Non
 
 @pytest.mark.parametrize("version", LEGACY_VERSIONS)
 def test_legacy_session_initialize_then_initialized_then_tools_list(
-    client, auth, version
+    client, fresh_auth, version
 ) -> None:
     opened = client.post(
-        MCP_PATH, headers=auth, json=rpc("initialize", {"protocolVersion": version})
+        MCP_PATH, headers=fresh_auth(), json=rpc("initialize", {"protocolVersion": version})
     )
     assert opened.json()["result"]["protocolVersion"] == version
     initialized = client.post(
         MCP_PATH,
-        headers=auth,
+        headers=fresh_auth(),
         json={"jsonrpc": "2.0", "method": "notifications/initialized"},
     )
     assert initialized.status_code == 202
     assert initialized.content == b""
-    listed = client.post(MCP_PATH, headers=auth, json=rpc("tools/list"))
+    listed = client.post(MCP_PATH, headers=fresh_auth(), json=rpc("tools/list"))
     assert [tool["name"] for tool in listed.json()["result"]["tools"]] == list(TOOL_ORDER)
 
 

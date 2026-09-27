@@ -35,7 +35,26 @@ def test_mcp_serve_runs_the_edge_factory(monkeypatch) -> None:
     assert cli.main(["mcp-serve", "--port", "8081"]) == 0
     ((args, kwargs),) = calls
     assert args == ("vuoro_mcp_edge.composition:create_app_from_environment",)
-    assert kwargs == {"factory": True, "host": "127.0.0.1", "port": 8081}
+    assert kwargs == {"factory": True, "host": "127.0.0.1", "port": 8081, "workers": 1}
+
+
+@pytest.mark.parametrize("command", ["serve", "mcp-serve"])
+def test_each_server_runs_exactly_one_process(monkeypatch, command) -> None:
+    """Replay protection is an in-process cache (agentops#2519): a second
+    worker would be a second place to replay an assertion, so the worker
+    count is pinned and WEB_CONCURRENCY cannot raise it."""
+
+    import importlib.util
+
+    import uvicorn
+
+    calls: list[dict] = []
+    monkeypatch.setenv("WEB_CONCURRENCY", "4")
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: calls.append(k))
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name: object())
+    assert cli.main([command]) == 0
+    (kwargs,) = calls
+    assert kwargs["workers"] == 1
 
 
 def test_the_factory_string_resolves_to_the_edge_factory() -> None:

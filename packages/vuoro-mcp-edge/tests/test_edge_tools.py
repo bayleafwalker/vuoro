@@ -64,16 +64,16 @@ def test_list_returns_only_unblocked_items_verbatim_in_owner_order(keys, auth) -
     )
 
 
-def test_blocked_item_is_absent_from_list_but_describe_shows_it_blocked(keys, auth) -> None:
+def test_blocked_item_is_absent_from_list_but_describe_shows_it_blocked(keys, fresh_auth) -> None:
     shell = FakeShell(
         accepted(list_result(list_record(1), list_record(7, blocked=True))),
         accepted(item_result(item_record(7, blocked_by=[1])), "work.public.item-v1"),
     )
     client = edge_client(keys[0], shell)
-    listed = client.post(MCP_PATH, headers=auth, json=call("list_ready_work")).json()["result"]
+    listed = client.post(MCP_PATH, headers=fresh_auth(), json=call("list_ready_work")).json()["result"]
     assert [item["work_id"] for item in listed["structuredContent"]["items"]] == [1]
     described = client.post(
-        MCP_PATH, headers=auth, json=call("describe_work", {"work_id": 7})
+        MCP_PATH, headers=fresh_auth(), json=call("describe_work", {"work_id": 7})
     ).json()["result"]
     assert described["isError"] is False
     item = described["structuredContent"]["item"]
@@ -307,11 +307,11 @@ def test_second_stale_catalog_surfaces_as_a_tool_error(keys, auth) -> None:
     assert len(shell.invoke_requests) == 2
 
 
-def test_catalog_is_checked_once_across_calls_and_results_are_never_cached(keys, auth) -> None:
+def test_catalog_is_checked_once_across_calls_and_results_are_never_cached(keys, fresh_auth) -> None:
     shell = FakeShell(accepted(list_result(list_record(1))), accepted(list_result()))
     client = edge_client(keys[0], shell)
-    first = client.post(MCP_PATH, headers=auth, json=call("list_ready_work")).json()["result"]
-    second = client.post(MCP_PATH, headers=auth, json=call("list_ready_work")).json()["result"]
+    first = client.post(MCP_PATH, headers=fresh_auth(), json=call("list_ready_work")).json()["result"]
+    second = client.post(MCP_PATH, headers=fresh_auth(), json=call("list_ready_work")).json()["result"]
     assert len(first["structuredContent"]["items"]) == 1
     assert second["structuredContent"]["items"] == []
     assert len(shell.catalog_requests) == 1
@@ -349,16 +349,16 @@ def test_describe_work_returns_the_item_verbatim(keys, auth) -> None:
 
 
 def test_a_tool_without_a_scope_row_is_neither_listed_nor_callable(
-    keys, auth, monkeypatch
+    keys, fresh_auth, monkeypatch
 ) -> None:
     monkeypatch.delitem(server.TOOL_SCOPES, "describe_work")
     shell = FakeShell()
     client = edge_client(keys[0], shell)
     tools = client.post(
-        MCP_PATH, headers=auth, json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+        MCP_PATH, headers=fresh_auth(), json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
     ).json()["result"]["tools"]
     assert [tool["name"] for tool in tools] == ["list_ready_work"]
-    response = client.post(MCP_PATH, headers=auth, json=call("describe_work", {"work_id": 1}))
+    response = client.post(MCP_PATH, headers=fresh_auth(), json=call("describe_work", {"work_id": 1}))
     assert response.status_code == 200
     result = response.json()["result"]
     assert result["isError"] is True

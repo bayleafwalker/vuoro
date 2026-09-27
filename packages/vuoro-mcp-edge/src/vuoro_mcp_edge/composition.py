@@ -4,8 +4,11 @@
 mcp-serve` runs.  Configuration is the runtime shell's own gateway-assertion
 trust configuration (read through
 `vuoro_service.composition.load_gateway_assertion_resolver`, so both
-processes trust exactly the same key, issuer, audience, key id, workspace and
-project binding) plus the upstream base URL.
+processes trust exactly the same key, issuer, key id, workspace and project
+binding) plus the upstream base URL and the pod-local edge proof key
+(`VUORO_EDGE_PROOF_KEY_FILE`, shared with the shell; agentops#2519).  The
+edge's audience is `VUORO_EDGE_GATEWAY_ASSERTION_AUDIENCE`, defaulting to the
+shell's until the gateway mints a separate MCP audience.
 
 The process refuses to start if its environment carries a credential: a
 `vuo_pat_` workspace token in any variable, or any `*_DSN` variable.  It has
@@ -19,9 +22,14 @@ import os
 from collections.abc import Mapping
 
 from fastapi import FastAPI
-from vuoro_service.composition import CompositionError, load_gateway_assertion_resolver
+from vuoro_service.composition import (
+    CompositionError,
+    load_edge_proof_key,
+    load_gateway_assertion_resolver,
+)
 
 from . import claim_tools, effect_tools, record_tools
+from .edge_proof_auth import EdgeProofAuth
 from .runs import UnavailableRunRegistry
 from .server import create_edge_app
 from .toolsets import ToolSet, ToolsetContext
@@ -45,6 +53,7 @@ _REQUIRED: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("VUORO_WORKSPACE_ID", ()),
     ("VUORO_GATEWAY_PUBLIC_KEY_FILE", ()),
     ("VUORO_GATEWAY_ASSERTION_ISSUER", ()),
+    ("VUORO_EDGE_PROOF_KEY_FILE", ()),
 )
 
 
@@ -92,11 +101,18 @@ def create_app_from_environment(env: Mapping[str, str] | None = None) -> FastAPI
         if not any(env.get(candidate, "").strip() for candidate in (name, *aliases)):
             raise EdgeConfigurationError(f"{name} is required for the MCP edge")
     try:
-        resolver = load_gateway_assertion_resolver(env)
+        resolver = load_gateway_assertion_resolver(env, edge=True)
+        proof_auth = EdgeProofAuth(load_edge_proof_key(env))
     except CompositionError as error:
         raise EdgeConfigurationError(str(error)) from error
-    work_source = ShellWorkSource(base_url=_upstream_url(env), request_timeout=_timeout(env))
-    context = ToolsetContext(env=env, work_source=work_source, runs=record_tools.build_run_registry(env))
+    work_source = ShellWorkSource(
+        base_url=_upstream_url(env), request_timeout=_timeout(env), auth=proof_auth
+    )
+    context = ToolsetContext(
+        env=env,
+        work_source=work_source,
+        runs=record_tools.build_run_registry(env, auth=proof_auth),
+    )
     return create_edge_app(
         identity_resolver=resolver,
         work_source=work_source,

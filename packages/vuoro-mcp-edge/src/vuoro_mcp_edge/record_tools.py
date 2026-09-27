@@ -150,11 +150,13 @@ class RecordShellClient:
         base_url: str,
         timeout: float,
         transport: httpx.AsyncBaseTransport | None = None,
+        auth: httpx.Auth | None = None,
     ) -> None:
         self._client = httpx.AsyncClient(
             base_url=base_url.rstrip("/"),
             timeout=timeout,
             transport=transport,
+            auth=auth,
             headers={_PROTOCOL_HEADER: _CLIENT_PROTOCOL},
         )
 
@@ -237,8 +239,11 @@ class SprintctlRecordStore:
         base_url: str,
         timeout: float,
         transport: httpx.AsyncBaseTransport | None = None,
+        auth: httpx.Auth | None = None,
     ) -> None:
-        self._client = RecordShellClient(base_url=base_url, timeout=timeout, transport=transport)
+        self._client = RecordShellClient(
+            base_url=base_url, timeout=timeout, transport=transport, auth=auth
+        )
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -369,7 +374,9 @@ class SprintctlRecordStore:
         return _expect_mapping(result, OPERATION_SESSION_NOTE_WRITE)
 
 
-def build_run_registry(env: Mapping[str, str]) -> SprintctlRecordStore:
+def build_run_registry(
+    env: Mapping[str, str], *, auth: httpx.Auth | None = None
+) -> SprintctlRecordStore:
     """The durable RunRegistry composition.py's one line constructs.
 
     Reads the same upstream URL/timeout environment variables as
@@ -390,7 +397,7 @@ def build_run_registry(env: Mapping[str, str]) -> SprintctlRecordStore:
         timeout = _DEFAULT_UPSTREAM_TIMEOUT
     if not 0 < timeout <= 30:
         timeout = _DEFAULT_UPSTREAM_TIMEOUT
-    return SprintctlRecordStore(base_url=base_url, timeout=timeout)
+    return SprintctlRecordStore(base_url=base_url, timeout=timeout, auth=auth)
 
 
 # ---------------------------------------------------------------------------

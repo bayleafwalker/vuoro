@@ -21,7 +21,7 @@ uvicorn and never imports it itself.
 ```
 client --OAuth--> vuoro.cloud gateway --X-Vuoro-Identity + X-Request-Id--> POST /mcp (this server, :8081)
                                                                   |
-                               same headers, forwarded verbatim   v
+             same headers + a one-use X-Vuoro-Edge-Proof per call v
                                             POST http://127.0.0.1:8080/api/invoke/v1 (runtime shell)
                                                                   |
                                                                   v
@@ -36,11 +36,23 @@ client --OAuth--> vuoro.cloud gateway --X-Vuoro-Identity + X-Request-Id--> POST 
   `work:read`); a broader assertion is refused, not narrowed. A missing or
   invalid assertion gets HTTP 401 with JSON-RPC error `-32001`. The gateway
   owns the OAuth challenge, so this server sends no `WWW-Authenticate`.
+- **Each assertion is accepted once.** This server is the assertion's first
+  verifier and consumes its `jti` (agentops#2519): the same assertion again
+  gets HTTP 401 with JSON-RPC error `-32003`, and a full replay cache refuses
+  new assertions with HTTP 503 and `-32004`. The gateway mints a fresh
+  assertion per request. While this server's audience is the shell's, it
+  also requires the `client_id` and `grant_id` that only the gateway's OAuth
+  path mints, so a REST assertion cannot be replayed here. See `docs/architecture/gateway-identity.md`
+  ("Replay protection").
 - **No credential in this process.** No workspace token, no DSN, no signing
   key. The server refuses to start if any environment variable ends in `_DSN`
   or holds a `vuo_pat_` token.
 - **Upstream** is the shell's invoke API with the same assertion and request
-  id, `X-Vuoro-Client-Protocol: 1`, the invocation `request_id` set to that
+  id, a fresh `X-Vuoro-Edge-Proof` on every call (an HMAC under the pod-local
+  key over a nonce, the method, path, assertion and exact body; the shell
+  accepts each proof once, so one tool call can make several shell calls
+  with one assertion while a captured call cannot be replayed),
+  `X-Vuoro-Client-Protocol: 1`, the invocation `request_id` set to that
   request id, and `repo_id` set to the single repository in the assertion
   (zero is `workspace-unbound` and more than one is `workspace-ambiguous`,
   both tool errors). The catalog is checked once per process and refetched
@@ -103,7 +115,9 @@ processes trust exactly the same things.
 | `VUORO_WORKSPACE_ID` | yes | the workspace ULID the assertion must carry |
 | `VUORO_GATEWAY_PUBLIC_KEY_FILE` | yes | the gateway's Ed25519 public key, at the approved mount `/etc/vuoro/identity/gateway-public.pem` |
 | `VUORO_GATEWAY_ASSERTION_ISSUER` | yes | expected `iss` |
-| `VUORO_GATEWAY_ASSERTION_AUDIENCE` | no, default `vuoro-service` | expected `aud` |
+| `VUORO_GATEWAY_ASSERTION_AUDIENCE` | no, default `vuoro-service` | the shell's expected `aud` |
+| `VUORO_EDGE_GATEWAY_ASSERTION_AUDIENCE` | no, default the shell's audience | this server's expected `aud`; set it (in both containers) once the gateway mints a separate MCP audience |
+| `VUORO_EDGE_PROOF_KEY_FILE` | yes | must be `/run/vuoro/edge-proof/key`, on a memory-backed `emptyDir` mounted into both this container and the shell's (same UID); set it in both. The first process to start creates the 32-byte key |
 | `VUORO_GATEWAY_ASSERTION_KEY_ID` | no, default `gateway-2026-01` | expected `kid` |
 | `VUORO_PROJECT_BINDINGS_FILE` | yes in Cloud | must name the approved mount `/etc/vuoro/bindings/bindings.json`; the image's embedded default is not a hosted binding and is refused |
 | `VUORO_MCP_UPSTREAM_URL` | no, default `http://127.0.0.1:8080` | runtime shell base URL |

@@ -15,12 +15,18 @@ from importlib.metadata import PackageNotFoundError, distribution, version
 import json
 from pathlib import Path
 import re
+import time
 from typing import Any, Callable
 from urllib.parse import urlsplit
 
 from vuoro_service.app import ServiceSettings, create_app
 from vuoro_service.catalog import CatalogRegistry
 from vuoro_service.contracts import DomainCompatibility
+from vuoro_service.edge_proof import (
+    EdgeProofConfigurationError,
+    EdgeProofVerifier,
+    load_or_create_proof_key,
+)
 from vuoro_service.environment_record import load_environment_record
 from vuoro_service.gateway_identity import (
     GatewayAssertionConfigurationError,
@@ -47,6 +53,13 @@ _DEFAULT_PROJECT_BINDINGS_PATH = Path("/opt/vuoro/composition/project-bindings.j
 _CLOUD_PROJECT_BINDINGS_PATH = Path("/etc/vuoro/bindings/bindings.json")
 _CLOUD_BINDINGS_TRUST_ROOT = Path("/etc/vuoro")
 _CLOUD_GATEWAY_PUBLIC_KEY_PATH = Path("/etc/vuoro/identity/gateway-public.pem")
+#: The pod-local key the protocol edge and the shell share for edge proofs: a
+#: memory-backed emptyDir mounted into both containers, never a Secret.
+_EDGE_PROOF_KEY_PATH = Path("/run/vuoro/edge-proof/key")
+#: How far before this process started an assertion may have been issued and
+#: still be accepted on the direct route: the gateway's clock skew.  Anything
+#: older may have been accepted by a previous instance (agentops#2519).
+_REPLAY_WATERMARK_SKEW_SECONDS = 2
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 _RELEASE_SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]*$")
@@ -747,12 +760,67 @@ def _validate_identity_mode(
         )
 
 
+def _edge_proof_key(environ: Mapping[str, str]) -> bytes | None:
+    if environ.get("VUORO_EDGE_PROOF_KEY_FILE") is None:
+        return None
+    path = _runtime_path(
+        "VUORO_EDGE_PROOF_KEY_FILE",
+        environ,
+        default=_EDGE_PROOF_KEY_PATH,
+        mounted_path=_EDGE_PROOF_KEY_PATH,
+        mount_label="pod-local edge proof key mount",
+    )
+    try:
+        return load_or_create_proof_key(path)
+    except EdgeProofConfigurationError as error:
+        raise CompositionError("cannot configure the edge proof key") from error
+
+
+def load_edge_proof_key(environ: Mapping[str, str] | None = None) -> bytes:
+    """The pod's edge proof key, for the protocol edge (`vuoro_service.edge_proof`).
+
+    The edge requires it: without proofs, the shell would see each forwarded
+    assertion as a direct, one-use credential and refuse a tool call's second
+    upstream call as a replay.
+    """
+
+    import os
+
+    environ = os.environ if environ is None else environ
+    key = _edge_proof_key(environ)
+    if key is None:
+        raise CompositionError("the protocol edge requires VUORO_EDGE_PROOF_KEY_FILE")
+    return key
+
+
 def _gateway_assertion_resolver(
     environ: Mapping[str, str],
     *,
     environment_name: str,
     project_binding: ProjectBinding,
+    edge: bool = False,
 ) -> GatewayAssertionIdentityResolver:
+    started_at = time.time()
+    shell_audience = environ.get("VUORO_GATEWAY_ASSERTION_AUDIENCE", "vuoro-service")
+    edge_audience = environ.get("VUORO_EDGE_GATEWAY_ASSERTION_AUDIENCE")
+    if edge:
+        # The edge is the first verifier on its path: it expects the edge
+        # audience and accepts no edge proofs.  While that audience is the
+        # shell's too, it also requires the OAuth client and grant only the
+        # gateway's OAuth path mints, so a REST assertion the shell consumed
+        # cannot be replayed through the edge.
+        audience = shell_audience if edge_audience is None else edge_audience
+        require_oauth_grant = audience == shell_audience
+        edge_proofs = None
+    else:
+        audience = shell_audience
+        require_oauth_grant = False
+        proof_key = _edge_proof_key(environ)
+        edge_proofs = (
+            None
+            if proof_key is None
+            else EdgeProofVerifier(proof_key, not_before=started_at)
+        )
     gateway_key_path = _runtime_path(
         "VUORO_GATEWAY_PUBLIC_KEY_FILE",
         environ,
@@ -764,12 +832,16 @@ def _gateway_assertion_resolver(
         return GatewayAssertionIdentityResolver.from_file(
             gateway_key_path,
             issuer=_runtime_env("VUORO_GATEWAY_ASSERTION_ISSUER", environ),
-            audience=environ.get("VUORO_GATEWAY_ASSERTION_AUDIENCE", "vuoro-service"),
+            audience=audience,
             environment=environment_name,
             expected_workspace_id=_runtime_env("VUORO_WORKSPACE_ID", environ),
             allowed_repo_ids=frozenset(project_binding.repo_ids),
             key_id=environ.get("VUORO_GATEWAY_ASSERTION_KEY_ID", "gateway-2026-01"),
             trusted_root=_CLOUD_BINDINGS_TRUST_ROOT,
+            replay_not_before=started_at - _REPLAY_WATERMARK_SKEW_SECONDS,
+            edge_proofs=edge_proofs,
+            edge_audience=None if edge else edge_audience,
+            require_oauth_grant=require_oauth_grant,
         )
     except GatewayAssertionConfigurationError as error:
         raise CompositionError("cannot configure gateway assertion identity") from error
@@ -779,6 +851,7 @@ def load_gateway_assertion_resolver(
     environ: Mapping[str, str] | None = None,
     *,
     project_bindings_path: Path | None = None,
+    edge: bool = False,
 ) -> GatewayAssertionIdentityResolver:
     """Build the gateway assertion verifier exactly as the runtime shell does.
 
@@ -787,6 +860,10 @@ def load_gateway_assertion_resolver(
     project binding, read from the same variables, with the same refusals.
     It loads no DSN and no identity registry, and it refuses to start
     without gateway assertion identity mode configured.
+
+    `edge` builds the protocol edge's verifier: the first verifier on its
+    path, expecting ``VUORO_EDGE_GATEWAY_ASSERTION_AUDIENCE`` (default: the
+    shell's audience) and consuming each jti itself.
     """
 
     import os
@@ -823,6 +900,7 @@ def load_gateway_assertion_resolver(
         environ,
         environment_name=environment_name,
         project_binding=project_binding,
+        edge=edge,
     )
 
 
@@ -1110,6 +1188,7 @@ __all__ = [
     "RuntimeAdapterDescriptor",
     "create_composed_app",
     "load_development_identities",
+    "load_edge_proof_key",
     "load_gateway_assertion_resolver",
     "load_identities",
     "verify_adapter_artifacts",

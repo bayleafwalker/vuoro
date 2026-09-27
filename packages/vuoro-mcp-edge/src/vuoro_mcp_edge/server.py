@@ -10,9 +10,12 @@ forwards each request with a short-lived ``X-Vuoro-Identity`` assertion
 (Ed25519 JWT, ``aud`` ``vuoro-service``, 30 s lifetime) and ``X-Request-Id``.
 This server verifies that assertion with the runtime shell's own verifier
 and trust configuration (`vuoro_service.gateway_identity`), and a request
-without a valid one gets HTTP 401 with JSON-RPC error ``-32001``.  The
-process holds no credential: upstream calls forward the same assertion to
-the runtime shell on localhost, which verifies it again.
+without a valid one gets HTTP 401 with JSON-RPC error ``-32001``.  This
+server is the assertion's first verifier and consumes its ``jti``: the same
+assertion presented again gets HTTP 401 with ``-32003`` (agentops#2519).
+The process holds no credential: upstream calls forward the same assertion
+to the runtime shell on localhost, which verifies it again, each call
+carrying a one-use edge proof bound to its body (`edge_proof_auth.py`).
 
 Tools are table-driven: `TOOL_SCOPES` classifies every callable tool into a
 scope bucket, and `SCOPE_AUTHORITIES` names the authority each bucket
@@ -46,7 +49,12 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
-from vuoro_service.identity import Identity, IdentityResolutionError
+from vuoro_service.identity import (
+    Identity,
+    IdentityReplayCapacityError,
+    IdentityReplayedError,
+    IdentityResolutionError,
+)
 
 from .errors import WorkSourceUnavailable, client_error, is_not_found
 from .toolsets import BUCKET_AUTHORITIES, ToolFailure, ToolSet, merge_toolsets
@@ -107,6 +115,10 @@ _JSONRPC_PARSE_ERROR = -32700
 _JSONRPC_INVALID_REQUEST = -32600
 _JSONRPC_METHOD_NOT_FOUND = -32601
 _JSONRPC_UNAUTHORIZED = -32001
+#: The assertion verified but its jti was already used: a replay (agentops#2519).
+_JSONRPC_ASSERTION_REPLAYED = -32003
+#: Replay protection is at capacity and refuses new assertions (fail closed).
+_JSONRPC_REPLAY_CAPACITY = -32004
 _JSONRPC_HEADER_BODY_MISMATCH = -32020
 
 
@@ -325,11 +337,11 @@ def create_edge_app(
         lifespan=lifespan,
     )
 
-    async def _verify(request: Request) -> tuple[Identity, str, str] | None:
+    async def _verify(request: Request) -> tuple[Identity, str, str] | JSONResponse:
         assertion = request.headers.get("x-vuoro-identity")
         request_id = request.headers.get("x-request-id")
         if not assertion or not request_id:
-            return None
+            return _unauthorized()
         # The gateway assertion's request_id claim covers the transport
         # request here; the shell's verifier checks it against this state.
         request.state.vuoro_invocation_request_id = request_id
@@ -337,16 +349,47 @@ def create_edge_app(
             identity = identity_resolver(request)
             if inspect.isawaitable(identity):
                 identity = await identity
+        except IdentityReplayedError:
+            # This edge is the assertion's first verifier on the MCP path and
+            # consumed its jti; a second presentation is a replay.
+            LOGGER.warning("gateway assertion replay refused", extra={"request_id": request_id})
+            return _json(
+                _rpc_error(
+                    id_=None,
+                    code=_JSONRPC_ASSERTION_REPLAYED,
+                    message="the gateway identity assertion was already used",
+                ),
+                401,
+            )
+        except IdentityReplayCapacityError:
+            return _json(
+                _rpc_error(
+                    id_=None,
+                    code=_JSONRPC_REPLAY_CAPACITY,
+                    message="replay protection is at capacity; retry later",
+                ),
+                503,
+            )
         except IdentityResolutionError:
-            return None
+            return _unauthorized()
         if not isinstance(identity, Identity):
-            return None
+            return _unauthorized()
         # The gateway mints MCP assertions carrying only what this surface's
         # scope table can use.  A broader assertion was minted for something
         # else and is refused, not narrowed.
         if not identity.authorities or not identity.authorities <= _app_allowed_authorities():
-            return None
+            return _unauthorized()
         return identity, assertion, request_id
+
+    def _unauthorized() -> JSONResponse:
+        return _json(
+            _rpc_error(
+                id_=None,
+                code=_JSONRPC_UNAUTHORIZED,
+                message="a valid gateway identity assertion is required",
+            ),
+            401,
+        )
 
     def _header_body_mismatch(request: Request, body: dict[str, Any]) -> str | None:
         """A header that disagrees with its body counterpart when BOTH are
@@ -508,15 +551,8 @@ def create_edge_app(
     @app.post(MCP_PATH, include_in_schema=False)
     async def mcp_endpoint(request: Request) -> Response:
         verified = await _verify(request)
-        if verified is None:
-            return _json(
-                _rpc_error(
-                    id_=None,
-                    code=_JSONRPC_UNAUTHORIZED,
-                    message="a valid gateway identity assertion is required",
-                ),
-                401,
-            )
+        if isinstance(verified, Response):
+            return verified
         identity, assertion, request_id = verified
 
         header_version = request.headers.get("mcp-protocol-version")
