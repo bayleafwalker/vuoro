@@ -110,3 +110,33 @@ jobs:
           /tmp/vuoro-released-two-domain-wheel/bin/python \
             scripts/validate_released_catalog_composition.py
       - run: python -m json.tool vuoro.dispatch.json >/dev/null
+
+  service-image:
+    # The 0.1.76 release found the service image did not build: a workspace
+    # package (vuoro-evidence) was not installed from the local tree, so pip
+    # asked an index for a name nobody has registered. Build the image on
+    # every PR and check what it installed, not what the build log says.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v4
+      - name: Build the service image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          load: true
+          tags: vuoro-service:ci
+          cache-from: type=gha,scope=service-image
+          cache-to: type=gha,scope=service-image,mode=max
+      - name: Check installed provenance and composition attestation
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t names < <(python3 scripts/validate_service_image.py workspace-names)
+          docker run -i --rm --entrypoint python vuoro-service:ci \
+            - check "${names[@]}" < scripts/validate_service_image.py
+      - name: Check installed dependencies are consistent
+        run: docker run --rm --entrypoint python vuoro-service:ci -m pip check
+      - name: Check the image serves the MCP edge
+        run: docker run --rm vuoro-service:ci mcp-serve --help

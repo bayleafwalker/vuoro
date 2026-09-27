@@ -220,3 +220,76 @@ def test_python_release_order_contract_rejects_regressions(broken) -> None:
     workflow = PYTHON_WORKFLOW.read_text()
     with pytest.raises((AssertionError, ValueError)):
         _assert_python_release_order(broken(workflow))
+
+
+def _workspace_requirements() -> dict[str, set[str]]:
+    import re
+    import tomllib
+
+    def canonical(name: str) -> str:
+        return re.sub(r"[-_.]+", "-", name).lower()
+
+    projects = {}
+    for pyproject in (ROOT / "packages").glob("*/pyproject.toml"):
+        with pyproject.open("rb") as handle:
+            project = tomllib.load(handle)["project"]
+        projects[canonical(project["name"])] = {
+            canonical(re.split(r"[\s\[<>=!~;@(]", requirement, 1)[0])
+            for requirement in project.get("dependencies", [])
+        }
+    return {
+        name: requirements & projects.keys() for name, requirements in projects.items()
+    }
+
+
+def test_service_image_never_resolves_a_workspace_name_from_an_index() -> None:
+    """Every workspace package the image's local installs need is local too.
+
+    pip ignores `[tool.uv.sources] workspace = true`, so a workspace dependency
+    that is not itself passed as a local path is looked up on the index, where
+    the name is unregistered (0.1.76: vuoro-evidence) and could be claimed by
+    anyone. The shared wheels installed --no-deps from the verified adapter
+    wheelhouse are local files as well.
+    """
+    import re
+
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    # Only the paths passed to the resolving pip install count; a COPY alone
+    # puts the source in the image but pip still asks the index for the name.
+    resolving_install = dockerfile.split("RUN python -m pip install", 1)[1].split(
+        "&& python -m pip install", 1
+    )[0]
+    local = set(re.findall(r"\./packages/([A-Za-z0-9_.-]+)", resolving_install))
+    wheelhouse = {
+        name.replace("_", "-")
+        for name in re.findall(r"/opt/vuoro/adapters/([A-Za-z0-9_]+)-\*\.whl", dockerfile)
+    }
+    requirements = _workspace_requirements()
+    assert local, "the Dockerfile installs no local workspace package"
+    assert local <= requirements.keys(), local - requirements.keys()
+
+    needed, frontier = set(), set(local)
+    while frontier:
+        name = frontier.pop()
+        for dependency in requirements[name] - needed:
+            needed.add(dependency)
+            frontier.add(dependency)
+    from_index = needed - local - wheelhouse
+    assert not from_index, (
+        f"workspace packages {sorted(from_index)} would resolve from an index; "
+        "COPY them and pass their ./packages/ path in the same pip install"
+    )
+    for name in local:
+        assert f"COPY packages/{name} ./packages/{name}" in dockerfile
+
+
+def test_ci_builds_and_inspects_the_service_image() -> None:
+    workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+    job = workflow.split("\n  service-image:\n", 1)[1]
+    assert "uses: docker/build-push-action@v7" in job
+    assert "load: true" in job and "push: false" in job
+    assert "cache-from: type=gha" in job
+    assert "scripts/validate_service_image.py workspace-names" in job
+    assert "- check \"${names[@]}\" < scripts/validate_service_image.py" in job
+    assert "-m pip check" in job
+    assert "mcp-serve --help" in job
