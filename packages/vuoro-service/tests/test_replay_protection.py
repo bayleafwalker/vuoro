@@ -691,3 +691,64 @@ def test_the_edge_role_requires_an_oauth_grant_without_burning_the_jti(
             resolver(_request(_token(private, jti=jti, **claims)))
         assert excinfo.value.code == "identity-oauth-grant-required"
     resolver(_request(_token(private, jti=jti, client_id="c", grant_id="g")))
+
+
+# -- restart watermark and lifetime bound (agentops#2530) -------------------
+
+
+def test_a_shell_restart_does_not_reset_the_proofed_use_cap(tmp_path: Path) -> None:
+    """The use count is in memory: a restarted shell must not grant a captured
+    assertion another cap's worth of proofed uses."""
+
+    from vuoro_service.edge_proof import MAX_PROOFED_USES_PER_ASSERTION
+
+    path, private = _key_file(tmp_path)
+    now = datetime.now(UTC).replace(microsecond=0).timestamp()
+    token = _token(private, iat=now - 3, nbf=now - 4, exp=now + 27)
+    before = _proof_resolver(path, replay_not_before=now - 10)
+    for _ in range(MAX_PROOFED_USES_PER_ASSERTION):
+        before(_request(token, proof=_proof(token), body=BODY))
+    # The restarted shell: an empty cache and a later watermark.
+    after = _proof_resolver(path, replay_not_before=now)
+    with pytest.raises(IdentityReplayedError, match="replay window") as excinfo:
+        after(_request(token, proof=_proof(token), body=BODY))
+    assert excinfo.value.code == "identity-replayed"
+    # An assertion minted after the restart is served as usual.
+    fresh = _token(private, iat=now, nbf=now - 1)
+    after(_request(fresh, proof=_proof(fresh), body=BODY))
+
+
+def test_a_long_lived_assertion_never_reaches_the_cache(tmp_path: Path) -> None:
+    """The cache cap is sized for 30 s assertions; a longer one would pin its
+    slot for longer, so it is refused before the claim."""
+
+    from vuoro_service.gateway_identity import _MAX_ASSERTION_LIFETIME_SECONDS
+
+    assert _MAX_ASSERTION_LIFETIME_SECONDS == 30
+    path, private = _key_file(tmp_path)
+    cache = ReplayCache(max_entries=1)
+    resolver = _proof_resolver(path, replay_cache=cache)
+    now = datetime.now(UTC).replace(microsecond=0).timestamp()
+    for lifetime in (_MAX_ASSERTION_LIFETIME_SECONDS + 1, 3600):
+        token = _token(private, iat=now, nbf=now - 1, exp=now + lifetime)
+        with pytest.raises(IdentityResolutionError, match="lifetime"):
+            resolver(_request(token))
+        with pytest.raises(IdentityResolutionError, match="lifetime"):
+            resolver(_request(token, proof=_proof(token), body=BODY))
+    assert len(cache) == 0
+    token = _token(private, iat=now, nbf=now - 1, exp=now + _MAX_ASSERTION_LIFETIME_SECONDS)
+    resolver(_request(token))
+    assert len(cache) == 1
+
+
+def test_the_watermark_is_checked_before_the_proof_nonce_is_spent(tmp_path: Path) -> None:
+    path, private = _key_file(tmp_path)
+    now = datetime.now(UTC).replace(microsecond=0).timestamp()
+    token = _token(private, iat=now - 3, nbf=now - 4, exp=now + 27)
+    proofs = EdgeProofVerifier(KEY)
+    proof = _proof(token)
+    restarted = _resolver(path, edge_proofs=proofs, replay_not_before=now)
+    with pytest.raises(IdentityReplayedError, match="replay window"):
+        restarted(_request(token, proof=proof, body=BODY))
+    # The refused call left the nonce unspent: the same proof still verifies.
+    _resolver(path, edge_proofs=proofs)(_request(token, proof=proof, body=BODY))
