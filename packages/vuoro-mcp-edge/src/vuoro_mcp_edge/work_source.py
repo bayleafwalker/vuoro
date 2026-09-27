@@ -7,7 +7,8 @@ constraints, each load-bearing:
 * **No credential of its own.** No workspace token, no DSN, no signing key.
   Every upstream invocation carries the `X-Vuoro-Identity` assertion the
   gateway minted for the inbound MCP request, plus its `X-Request-Id`, and
-  the shell verifies both again.  The invocation's `request_id` *is* that
+  the shell verifies both again, together with a one-use edge proof bound
+  to that call's body (`edge_proof_auth.py`; agentops#2519).  The invocation's `request_id` *is* that
   request id, because the shell binds the signed `request_id` claim to the
   invocation envelope.
 * **No response cache.** Access is decided per caller: a cached answer would
@@ -92,11 +93,14 @@ class ShellWorkSource:
         base_url: str = DEFAULT_UPSTREAM_URL,
         request_timeout: float = 5.0,
         transport: httpx.AsyncBaseTransport | None = None,
+        auth: httpx.Auth | None = None,
     ) -> None:
+        # `auth` is the edge proof signer (`EdgeProofAuth`) in production.
         self._client = httpx.AsyncClient(
             base_url=base_url.rstrip("/"),
             timeout=request_timeout,
             transport=transport,
+            auth=auth,
             headers={_PROTOCOL_HEADER: CLIENT_PROTOCOL},
         )
         self._catalog_revision: str | None = None

@@ -6,6 +6,7 @@ from base64 import urlsafe_b64decode
 import binascii
 from collections.abc import Mapping
 from datetime import UTC, datetime
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -16,12 +17,25 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import Request
 
-from vuoro_service.identity import Identity, IdentityResolutionError
+from vuoro_service.edge_proof import (
+    PROOF_HEADER,
+    EdgeProofError,
+    EdgeProofReplayed,
+    EdgeProofVerifier,
+)
+from vuoro_service.identity import (
+    Identity,
+    IdentityReplayCapacityError,
+    IdentityReplayedError,
+    IdentityResolutionError,
+)
+from vuoro_service.replay import ReplayCache, ReplayCacheFull
 
 
 _ULID = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
 _REPO_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 _PRINCIPAL_SUBJECT = re.compile(r"^[A-Za-z0-9._-]+$")
+_JTI = re.compile(r"^[\x21-\x7e]{1,128}$")
 _NBF_CLOCK_SKEW_SECONDS = 2
 _REQUIRED_CLAIMS = (
     "actor",
@@ -43,6 +57,12 @@ _REQUIRED_CLAIMS = (
 
 class GatewayAssertionConfigurationError(ValueError):
     """The mounted gateway verification key or trust configuration is invalid."""
+
+
+class EdgeProofRequiredError(IdentityResolutionError):
+    """An MCP-minted assertion arrived at the shell without an edge proof."""
+
+    code = "identity-edge-proof-required"
 
 
 def _required_text(value: Any, field: str) -> str:
@@ -100,6 +120,29 @@ class GatewayAssertionIdentityResolver:
     owner of external token and workspace state; Vuoro verifies the signed
     actor, authority, repository, and request scope before its normal service
     authorization checks run.
+
+    Replay protection (agentops#2519).  A request is accepted on one of two
+    routes:
+
+    * **Direct** (no edge proof): this resolver is the assertion's first
+      verifier, so it consumes ``(subject, jti)`` in `replay_cache` and a
+      second presentation is `IdentityReplayedError`.  This is the gateway ->
+      shell path, and the MCP edge's own inbound path.
+    * **Edge proof** (only when `edge_proofs` is configured, i.e. in the
+      runtime shell of a pod that runs the MCP edge): the edge already
+      consumed the jti, and one tool call may reuse the assertion for several
+      shell calls, so the jti is not consumed again.  Instead each call must
+      carry a one-use, body-bound edge proof (`vuoro_service.edge_proof`).
+      The jti is then marked in `replay_cache`, so the same assertion can
+      no longer be used on the direct route.  The assertion's audience on
+      this route is `edge_audience`.
+
+    While the edge and the shell share one audience, a direct request whose
+    assertion carries ``client_id`` or ``grant_id`` (which only the gateway's
+    OAuth ``/mcp`` path mints) is refused when `edge_proofs` is configured:
+    an MCP assertion captured in the pod must not reach the shell without the
+    edge.  Once the gateway mints a separate MCP audience this rule is
+    unnecessary, and it switches off by itself.
     """
 
     def __init__(
@@ -112,6 +155,10 @@ class GatewayAssertionIdentityResolver:
         expected_workspace_id: str,
         allowed_repo_ids: frozenset[str],
         key_id: str,
+        replay_cache: ReplayCache | None = None,
+        replay_not_before: float | None = None,
+        edge_proofs: EdgeProofVerifier | None = None,
+        edge_audience: str | None = None,
     ) -> None:
         self._public_key = public_key
         self._issuer = issuer
@@ -120,6 +167,14 @@ class GatewayAssertionIdentityResolver:
         self._expected_workspace_id = expected_workspace_id
         self._allowed_repo_ids = allowed_repo_ids
         self._key_id = key_id
+        self._replay_cache = (
+            replay_cache if replay_cache is not None else ReplayCache(name="gateway-assertion")
+        )
+        # An assertion issued before this process started may have been
+        # accepted by a previous instance whose cache is gone.
+        self._replay_not_before = replay_not_before
+        self._edge_proofs = edge_proofs
+        self._edge_audience = edge_audience or audience
 
     @classmethod
     def from_file(
@@ -133,12 +188,19 @@ class GatewayAssertionIdentityResolver:
         allowed_repo_ids: frozenset[str],
         key_id: str = "gateway-2026-01",
         trusted_root: Path | None = None,
+        replay_cache: ReplayCache | None = None,
+        replay_not_before: float | None = None,
+        edge_proofs: EdgeProofVerifier | None = None,
+        edge_audience: str | None = None,
     ) -> "GatewayAssertionIdentityResolver":
         if (
             not issuer
             or issuer != issuer.strip()
             or not audience
             or audience != audience.strip()
+            or (edge_audience is not None and (
+                not edge_audience or edge_audience != edge_audience.strip()
+            ))
             or not environment
             or environment != environment.strip()
             or not key_id
@@ -176,6 +238,10 @@ class GatewayAssertionIdentityResolver:
             expected_workspace_id=expected_workspace_id,
             allowed_repo_ids=allowed_repo_ids,
             key_id=key_id,
+            replay_cache=replay_cache,
+            replay_not_before=replay_not_before,
+            edge_proofs=edge_proofs,
+            edge_audience=edge_audience,
         )
 
     def __call__(self, request: Request) -> Identity:
@@ -183,6 +249,8 @@ class GatewayAssertionIdentityResolver:
         request_id = _single_header(request, "x-request-id")
         if not token or not request_id:
             raise IdentityResolutionError("gateway identity assertion is required")
+        proof = _single_header(request, PROOF_HEADER) if self._edge_proofs else None
+        audience = self._edge_audience if proof is not None else self._audience
         header = _decode_unverified_header(token)
         if (
             header.get("typ") != "JWT"
@@ -201,7 +269,7 @@ class GatewayAssertionIdentityResolver:
                 token,
                 self._public_key,
                 algorithms=["EdDSA"],
-                audience=self._audience,
+                audience=audience,
                 issuer=self._issuer,
                 leeway=_NBF_CLOCK_SKEW_SECONDS,
                 options={"require": list(_REQUIRED_CLAIMS)},
@@ -248,13 +316,17 @@ class GatewayAssertionIdentityResolver:
         ):
             raise IdentityResolutionError("gateway identity assertion has invalid repo_ids")
         signed_request_id = _required_text(claims.get("request_id"), "request_id")
+        # The jti is the replay-protection key, and nothing else: it need not
+        # equal request_id (the gateway mints its own), but it is bounded so
+        # a cache entry cannot be made arbitrarily expensive.
         signed_jti = _required_text(claims.get("jti"), "jti")
+        if not _JTI.fullmatch(signed_jti):
+            raise IdentityResolutionError("gateway identity assertion has invalid jti")
         invocation_request_id = getattr(
             request.state, "vuoro_invocation_request_id", None
         )
         if (
             signed_request_id != request_id
-            or signed_jti != request_id
             or not isinstance(invocation_request_id, str)
             or signed_request_id != invocation_request_id
         ):
@@ -277,6 +349,40 @@ class GatewayAssertionIdentityResolver:
         # run handles bind to them.
         client_id = _optional_text(claims.get("client_id"), "client_id")
         grant_id = _optional_text(claims.get("grant_id"), "grant_id")
+        # Last, so only a fully verified assertion reaches the cache: a forged
+        # or malformed one can neither fill it nor burn someone else's jti.
+        replay_key = hashlib.sha256(
+            f"{subject}\x00{signed_jti}".encode("utf-8")
+        ).digest()
+        replay_expires_at = claims["exp"] + _NBF_CLOCK_SKEW_SECONDS
+        try:
+            if proof is not None:
+                self._verify_edge_proof(request, proof, token)
+                self._replay_cache.mark(replay_key, replay_expires_at)
+            else:
+                if (
+                    self._edge_proofs is not None
+                    and self._edge_audience == self._audience
+                    and (client_id is not None or grant_id is not None)
+                ):
+                    raise EdgeProofRequiredError(
+                        "an MCP gateway assertion is accepted here only through the MCP edge"
+                    )
+                if (
+                    self._replay_not_before is not None
+                    and claims["iat"] < self._replay_not_before
+                ):
+                    raise IdentityReplayedError(
+                        "gateway identity assertion predates this verifier's replay window"
+                    )
+                if not self._replay_cache.consume(replay_key, replay_expires_at):
+                    raise IdentityReplayedError(
+                        "gateway identity assertion was already used"
+                    )
+        except ReplayCacheFull as error:
+            raise IdentityReplayCapacityError(
+                "gateway identity replay protection is at capacity"
+            ) from error
         return Identity(
             actor=actor,
             environment=self._environment_name,
@@ -287,3 +393,19 @@ class GatewayAssertionIdentityResolver:
             client_id=client_id,
             grant_id=grant_id,
         )
+
+    def _verify_edge_proof(self, request: Request, proof: str, token: str) -> None:
+        assert self._edge_proofs is not None
+        body = getattr(request.state, "vuoro_invocation_body", None)
+        method = request.scope.get("method")
+        path = request.scope.get("path")
+        if not isinstance(body, bytes) or not isinstance(method, str) or not isinstance(path, str):
+            raise IdentityResolutionError("edge proof cannot be bound to this request")
+        try:
+            self._edge_proofs.verify(
+                proof, method=method, path=path, assertion=token, body=body
+            )
+        except EdgeProofReplayed as error:
+            raise IdentityReplayedError(str(error)) from error
+        except EdgeProofError as error:
+            raise IdentityResolutionError(str(error)) from error

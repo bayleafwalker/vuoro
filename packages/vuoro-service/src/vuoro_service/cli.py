@@ -47,6 +47,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             factory=True,
             host=args.host,
             port=args.port,
+            # One process: replay protection is per process, and uvicorn
+            # would otherwise take a worker count from WEB_CONCURRENCY.
+            workers=1,
         )
         return 0
     if args.command == "mcp-serve":
@@ -65,6 +68,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             factory=True,
             host=args.host,
             port=args.port,
+            workers=1,
         )
         return 0
     parser.print_help()

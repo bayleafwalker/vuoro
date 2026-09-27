@@ -5,6 +5,20 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service / vuoro-mcp-edge (unreleased): gateway assertions are accepted
+  once (agentops#2519). The first verifier (the shell for direct gateway
+  traffic, the MCP edge for `/mcp`) consumes `(subject, jti)` in a bounded,
+  expiring in-memory cache; a replay is 401 `identity-replayed` (edge:
+  JSON-RPC `-32003`), a full cache refuses new assertions with 503
+  `identity-replay-capacity` (edge: `-32004`). `jti` no longer has to equal
+  `request_id`. Edge -> shell calls carry a one-use, body-bound
+  `X-Vuoro-Edge-Proof` under a pod-local key, so multi-call tools keep working
+  and a captured call cannot be replayed. Deployment: both containers need a
+  memory-backed `emptyDir` at `/run/vuoro/edge-proof` and
+  `VUORO_EDGE_PROOF_KEY_FILE=/run/vuoro/edge-proof/key` (the edge refuses to
+  start without it). `VUORO_EDGE_GATEWAY_ASSERTION_AUDIENCE` is new and
+  optional. See `docs/architecture/gateway-identity.md`.
+
 - vuoro-service 0.1.76 / vuoro-mcp-edge 0.1.3: the work adapter is pinned to
   sprintctl 0.8.0 (remote schema 17; its migration runs in each tenant's
   `vuoro-migrate` job on roll-out). The edge serves E2's record bucket

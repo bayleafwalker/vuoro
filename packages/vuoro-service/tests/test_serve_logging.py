@@ -43,7 +43,7 @@ def test_serve_uses_only_host_port_and_factory_kwargs() -> None:
     tree = ast.parse(CLI_SOURCE_PATH.read_text(encoding="utf-8"))
     call = _find_uvicorn_run_call(tree)
     keyword_names = {keyword.arg for keyword in call.keywords}
-    assert keyword_names <= {"host", "port", "factory"}
+    assert keyword_names <= {"host", "port", "factory", "workers"}
     assert "log_config" not in keyword_names
     assert "access_log" not in keyword_names
 

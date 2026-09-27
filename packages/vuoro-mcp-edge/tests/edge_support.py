@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import secrets
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -43,7 +44,10 @@ def key_pair(tmp_path: Path) -> tuple[Path, Ed25519PrivateKey]:
 
 
 def resolver(
-    key_path: Path, *, allowed_repo_ids: frozenset[str] = frozenset({REPO_ID})
+    key_path: Path,
+    *,
+    allowed_repo_ids: frozenset[str] = frozenset({REPO_ID}),
+    **kwargs: Any,
 ) -> GatewayAssertionIdentityResolver:
     return GatewayAssertionIdentityResolver.from_file(
         key_path,
@@ -53,7 +57,18 @@ def resolver(
         expected_workspace_id=WORKSPACE_ID,
         allowed_repo_ids=allowed_repo_ids,
         key_id=KEY_ID,
+        **kwargs,
     )
+
+
+def fresh_jti() -> str:
+    """A jti no other assertion in the test run carries.
+
+    The gateway mints one per assertion, and the edge accepts each once
+    (agentops#2519), so a test that sends two requests mints two assertions.
+    """
+
+    return "jti-" + secrets.token_hex(12)
 
 
 def claims(**overrides: Any) -> dict[str, Any]:
@@ -69,7 +84,7 @@ def claims(**overrides: Any) -> dict[str, Any]:
         "authorities": ["work:read"],
         "repo_ids": [REPO_ID],
         "request_id": REQUEST_ID,
-        "jti": REQUEST_ID,
+        "jti": fresh_jti(),
         "iat": now,
         "nbf": now - 1,
         "exp": now + 30,

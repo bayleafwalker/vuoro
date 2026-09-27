@@ -150,7 +150,12 @@ def test_gateway_assertion_resolver_accepts_cloud_contract(tmp_path: Path) -> No
         {"authorities": []},
         {"repo_ids": ["repo-c"]},
         {"request_id": "01K44444444444444444444444", "jti": "01K44444444444444444444444"},
-        {"jti": "01K44444444444444444444444"},
+        # The jti need not equal request_id (agentops#2519), but it is the
+        # replay-cache key and so must be a bounded, printable token.
+        {"jti": ""},
+        {"jti": "has space"},
+        {"jti": "x" * 129},
+        {"jti": 7},
         {"iss": "other-cloud"},
         {"aud": "other-service"},
     ],
@@ -391,7 +396,9 @@ def test_a_reissued_actor_is_a_different_principal(tmp_path: Path) -> None:
     path, private = _key_file(tmp_path)
     resolver = _resolver(path)
     first = resolver(_request(_token(private, principal_epoch=0)))
-    reissued = resolver(_request(_token(private, principal_epoch=1)))
+    reissued = resolver(
+        _request(_token(private, principal_epoch=1, jti="01K55555555555555555555555"))
+    )
     assert first.actor == reissued.actor
     assert first.principal_id != reissued.principal_id
     assert first.principal_id == f"{CLOUD_ISSUER}:{USER_SUBJECT}:0"
@@ -436,7 +443,7 @@ def test_the_oauth_client_and_grant_are_read_when_asserted(tmp_path: Path) -> No
     assert identity.grant_id == "grant-1"
 
     # A workspace-token path asserts neither: absent, not invented.
-    identity = resolver(_request(_token(private)))
+    identity = resolver(_request(_token(private, jti="01K55555555555555555555555")))
     assert identity.client_id is None
     assert identity.grant_id is None
 

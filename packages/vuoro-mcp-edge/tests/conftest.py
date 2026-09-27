@@ -17,3 +17,10 @@ def auth(keys) -> dict[str, str]:
     """Headers carrying a valid gateway assertion for the default caller."""
 
     return identity_headers(assertion(keys[1]))
+
+
+@pytest.fixture
+def fresh_auth(keys):
+    """Mint headers carrying a new assertion per request, as the gateway does."""
+
+    return lambda **claims: identity_headers(assertion(keys[1], **claims))

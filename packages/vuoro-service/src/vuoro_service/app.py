@@ -362,6 +362,10 @@ def create_app(
         # immediately before identity resolution and is consumed by the
         # gateway-aware resolver; static local resolvers intentionally ignore it.
         request.state.vuoro_invocation_request_id = request_id
+        # The exact request body, for a resolver that verifies a body-bound
+        # edge proof (`vuoro_service.edge_proof`).  Starlette caches the bytes
+        # the envelope was parsed from, so this does not read the stream twice.
+        request.state.vuoro_invocation_body = await request.body()
         try:
             identity = identity_resolver(request)
             if inspect.isawaitable(identity):
@@ -372,9 +376,9 @@ def create_app(
                 operation=operation_name,
                 revision=revision,
                 status="rejected",
-                error_code="identity-required",
+                error_code=error.code,
                 error_message=str(error),
-                http_status=401,
+                http_status=error.http_status,
             )
         assert isinstance(identity, Identity)
         if identity.environment != settings.environment_name:

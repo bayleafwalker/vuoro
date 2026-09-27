@@ -17,6 +17,7 @@ from edge_support import (
     ISSUER,
     KEY_ID,
     REPO_ID,
+    REQUEST_ID,
     SUBJECT,
     WORKSPACE_ID,
     assertion,
@@ -69,12 +70,18 @@ def cloud_mounts(tmp_path: Path, keys, monkeypatch) -> dict[str, str]:
     # The shell's embedded bindings default, read at call time.
     monkeypatch.setattr(service_composition, "_DEFAULT_PROJECT_BINDINGS_PATH", bindings_path)
     monkeypatch.setattr(service_composition, "_CLOUD_GATEWAY_PUBLIC_KEY_PATH", key_path)
+    # The pod-local emptyDir both containers mount for the edge proof key.
+    proof_dir = tmp_path / "run-vuoro" / "edge-proof"
+    proof_dir.mkdir(parents=True)
+    proof_key_path = proof_dir / "key"
+    monkeypatch.setattr(service_composition, "_EDGE_PROOF_KEY_PATH", proof_key_path)
     return {
         "VUORO_ENVIRONMENT_NAME": ENVIRONMENT,
         "VUORO_WORKSPACE_ID": WORKSPACE_ID,
         "VUORO_GATEWAY_PUBLIC_KEY_FILE": str(key_path),
         "VUORO_GATEWAY_ASSERTION_ISSUER": ISSUER,
         "VUORO_GATEWAY_ASSERTION_KEY_ID": KEY_ID,
+        "VUORO_EDGE_PROOF_KEY_FILE": str(proof_key_path),
     }
 
 
@@ -226,6 +233,91 @@ def test_wrong_audience_configuration_rejects_the_gateway_assertion(cloud_mounts
         "/mcp", headers=auth, json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
     )
     assert response.status_code == 401
+
+
+def test_the_edge_audience_can_be_split_from_the_shell_audience(cloud_mounts, keys) -> None:
+    """agentops#2519: once the gateway mints a separate MCP audience, the
+    edge expects it and the shell-audience assertion is refused here."""
+
+    env = {**cloud_mounts, "VUORO_EDGE_GATEWAY_ASSERTION_AUDIENCE": "vuoro-mcp"}
+    client = TestClient(create_app_from_environment(env))
+    body = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+    shared = client.post("/mcp", headers=identity_headers(assertion(keys[1])), json=body)
+    assert shared.status_code == 401
+    split = client.post(
+        "/mcp", headers=identity_headers(assertion(keys[1], aud="vuoro-mcp")), json=body
+    )
+    assert split.status_code == 200, split.text
+
+
+def test_the_edge_consumes_each_assertion_once(cloud_mounts, auth) -> None:
+    client = TestClient(create_app_from_environment(cloud_mounts))
+    body = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+    assert client.post("/mcp", headers=auth, json=body).status_code == 200
+    again = client.post("/mcp", headers=auth, json=body)
+    assert again.status_code == 401
+    assert again.json()["error"]["code"] == -32003
+
+
+def test_missing_edge_proof_key_refuses_to_start(cloud_mounts) -> None:
+    """Without proofs the shell would refuse a tool call's second upstream
+    call as a replay; the edge does not start half-working."""
+
+    env = dict(cloud_mounts)
+    del env["VUORO_EDGE_PROOF_KEY_FILE"]
+    with pytest.raises(EdgeConfigurationError, match="VUORO_EDGE_PROOF_KEY_FILE"):
+        create_app_from_environment(env)
+
+
+def test_edge_proof_key_outside_its_mount_refuses_to_start(cloud_mounts, tmp_path) -> None:
+    env = {**cloud_mounts, "VUORO_EDGE_PROOF_KEY_FILE": str(tmp_path / "elsewhere")}
+    with pytest.raises(EdgeConfigurationError, match="edge proof key mount"):
+        create_app_from_environment(env)
+
+
+def test_edge_and_shell_share_one_created_proof_key(cloud_mounts) -> None:
+    key_path = Path(cloud_mounts["VUORO_EDGE_PROOF_KEY_FILE"])
+    assert not key_path.exists()
+    create_app_from_environment(cloud_mounts)
+    first = key_path.read_bytes()
+    assert service_composition.load_edge_proof_key(cloud_mounts) == first
+    create_app_from_environment(cloud_mounts)
+    assert key_path.read_bytes() == first
+
+
+def test_the_shell_verifier_from_the_same_environment_accepts_edge_proofs(
+    cloud_mounts, keys
+) -> None:
+    """The shell side of one pod's environment: its verifier accepts a proof
+    minted with the key the edge created, several times for one assertion,
+    and the MCP-minted assertion itself only through the edge."""
+
+    from starlette.requests import Request
+    from vuoro_service.edge_proof import PROOF_HEADER, mint_edge_proof
+    from vuoro_service.identity import IdentityResolutionError
+
+    create_app_from_environment(cloud_mounts)
+    key = Path(cloud_mounts["VUORO_EDGE_PROOF_KEY_FILE"]).read_bytes()
+    shell = service_composition.load_gateway_assertion_resolver(cloud_mounts)
+    token = assertion(keys[1], client_id="claude-connector", grant_id="grant-1")
+    body = b'{"request_id": "x"}'
+
+    def request(proof: str | None) -> Request:
+        headers = [(b"x-vuoro-identity", token.encode()), (b"x-request-id", REQUEST_ID.encode())]
+        if proof is not None:
+            headers.append((PROOF_HEADER.encode(), proof.encode()))
+        built = Request({"type": "http", "method": "POST", "path": "/api/invoke/v1", "headers": headers})
+        built.state.vuoro_invocation_request_id = REQUEST_ID
+        built.state.vuoro_invocation_body = body
+        return built
+
+    for _ in range(3):
+        proof = mint_edge_proof(
+            key, method="POST", path="/api/invoke/v1", assertion=token, body=body
+        )
+        assert shell(request(proof)).actor == "github:123"
+    with pytest.raises(IdentityResolutionError, match="only through the MCP edge"):
+        shell(request(None))
 
 
 def test_missing_gateway_key_refuses_to_start(cloud_mounts) -> None:
