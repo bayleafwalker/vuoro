@@ -5,7 +5,8 @@ recorded here.
 
 ## Unreleased
 
-- vuoro-service (unreleased): the work adapter is pinned to sprintctl 0.10.0
+- vuoro-service 0.1.78 / vuoro-mcp-edge 0.1.5: the work adapter is pinned to
+  sprintctl 0.10.0
   (56bfbc4, wheel sha256 `d8cc3515…4270`; remote schema stays 18, so no
   tenant migration). The 0.10.0 adapter catalog makes lease verification
   profiles requirement sets (`verification.profile` enum -> pattern,
@@ -16,9 +17,9 @@ recorded here.
   as a deprecated alias (work operations 62 -> 63). No Vuoro code calls
   the sprintctl lease operations yet: the claim toolset stays unserved and
   `vuoro:work.claim` is still reserved. The released-adapter validators
-  expect the 0.10.0 catalog.
+  expect the 0.10.0 catalog. (agentops#2539, agentops#2540, #148)
 
-- vuoro-service: `lease.py`'s in-memory `LeaseStore` conforms to INV-L1
+- vuoro-service 0.1.78: `lease.py`'s in-memory `LeaseStore` conforms to INV-L1
   (the operator's lease contract, agentops#2540). A late completion under an
   expired or superseded lease is still refused with `LeaseNotCurrentError`,
   but when it comes from the lease's own holder, it and its optional
@@ -30,8 +31,9 @@ recorded here.
   succeeded still leaves nothing, and the refusal looks the same either
   way. The retained result is a copy. The E2/E3 contract
   §6 records the sprintctl lease changes from agentops#2539 and #2540.
+  (agentops#2540, #147)
 
-- vuoro-mcp-edge: `/mcp` conforms to the published MCP 2026-07-28 schema
+- vuoro-mcp-edge 0.1.5: `/mcp` conforms to the published MCP 2026-07-28 schema
   where the `mcp-strict-client` job found it did not (agentops#2526). Wire
   changes: `ping` answers `{"resultType": "complete"}` (was `{}`); an error
   answered before the request id is known (parse error, batch, non-object
@@ -41,8 +43,9 @@ recorded here.
   `data.requested` and `data.supported` (was `-32600` without data), still
   HTTP 400. The strict-client job's known-deviation list is now empty and it
   checks assertion replay refusal and upstream edge proofs (#134).
+  (agentops#2526, #146)
 
-- vuoro-mcp-edge (breaking for `RunRegistry` implementers): run continuation
+- vuoro-mcp-edge 0.1.5 (breaking for `RunRegistry` implementers): run continuation
   across identities (TS-8 second route). `register` takes an optional
   `predecessor_run_id`. The registry refuses it with
   `predecessor-not-eligible` unless the predecessor shares the caller's
@@ -52,9 +55,9 @@ recorded here.
   inherits no authority: the predecessor's run still resolves only to its own
   binding. Neither is advertised against `SprintctlRecordStore` until sprintctl
   records predecessors, so the served tool list is unchanged. The E2/E3
-  contract §4 records the rules. (agentops#2525)
+  contract §4 records the rules. (agentops#2525, #145)
 
-- vuoro-service: replay hardening from the #134 review (agentops#2530). The
+- vuoro-service 0.1.78 / vuoro-mcp-edge 0.1.5: replay hardening from the #134 review (agentops#2530). The
   shell's startup watermark now applies to the edge-proof route as well as
   the direct route, so a shell-only restart no longer resets the per-jti
   proofed-use cap (7): an assertion issued more than 2 s before the shell
@@ -67,7 +70,7 @@ recorded here.
   before they reach the cache. vuoro-mcp-edge tests: the ledger behaviour
   test compares winners by value, says its gathered writers are not a race
   for the in-memory ledgers, and records that sprintctl's ledger key also
-  carries the repo. `IdempotencyLedger` is unchanged. (agentops#2530)
+  carries the repo. `IdempotencyLedger` is unchanged. (agentops#2530, #144)
 
 - vuoro-service 0.1.77 / vuoro-mcp-edge 0.1.4: the work adapter is pinned to
   sprintctl 0.9.0
