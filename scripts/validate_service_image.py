@@ -86,6 +86,8 @@ def _hash_pinned(origin: dict) -> bool:
         url.scheme == "https"
         and url.netloc == "github.com"
         and url.path.startswith(RELEASE_ASSET_PREFIX)
+        and ".." not in url.path.split("/")
+        and "%" not in url.path
         and bool(hashes.get("sha256"))
     )
 
