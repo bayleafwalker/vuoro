@@ -79,6 +79,23 @@
 - `resolve(run_id, caller)` returns the binding only to the exact same binding.
 - Anything else — unknown id, malformed id, expired run, or someone else's run — is `run-not-found`, with one message for all cases, so callers can't probe which ids exist.
 
+**Amendment (2026-09-27, agentops#2525): continuation across identities (TS-8 second route).**
+- Why: TS-8 needs a run continued on another harness, and resolving only to the exact same binding means no other identity can pick a run up. Resolving stays exact; continuation is a separate, explicit link made when the successor registers.
+- `register_run` takes an optional `predecessor_run_id`. The `RunRegistry` protocol's `register` gains the keyword `predecessor_run_id: str | None = None`; every implementation must accept it.
+- **Eligibility** (agentops#253 R4 decision 3). The successor's binding shares the predecessor's `workspace_id` AND repository, AND its assertion carries `work:read`. A different principal, OAuth client or grant is legitimate.
+  - The edge checks `work:read` before it calls the registry (`authority-required`).
+  - The registry checks workspace and repository, records the link, and otherwise refuses with `predecessor-not-eligible`. Unknown, malformed, other-workspace and other-repository ids share that one code and one message, as `run-not-found` does.
+  - The same idempotency key with a different `predecessor_run_id` is `idempotency-conflict`.
+- **Reading.** `read_predecessor_context(run_id)` is a read-bucket tool (`work:read`). `run_id` is the successor's own run, resolved to its exact binding. It returns the predecessor's session notes and evidence, and `predecessor_run_id`. It reads one hop only, and never through the predecessor's handle.
+- **Continuation transfers context, not authority.**
+  - `resolve` is unchanged, so the predecessor's run never resolves to the successor. The successor cannot write notes or evidence to it, or propose an effect against it.
+  - The successor's own run is bound to the successor's own binding. Every operation still needs the successor's own grant (`work:evidence`, `effect:propose`, …).
+- **Served only where the owner supports it.** A record store advertises `predecessor_run_id` and `read_predecessor_context` only when it sets `supports_continuation`.
+  - `InMemoryRunRegistry` implements the rules and is the reference.
+  - `SprintctlRecordStore` does not set it. The pinned sprintctl 0.9.0 cannot record a predecessor, and `work.run.resolve-v1`/`work.evidence.tail-v1` refuse every binding but the run's own. It also has no operation that lists a run's notes or evidence.
+  - Serving continuation needs a sprintctl release that records the link under these eligibility rules and reads a predecessor's notes and evidence through the successor's own run. vuoro-cloud also needs a `MCP_TOOL_SCOPES` row for `read_predecessor_context` (`vuoro:work.read`).
+- §6 (claims) is not changed by this amendment.
+
 **Implementations.**
 - The edge holds no credential and no DSN. E2's durable `RunRegistry` reaches the run and evidence owner through the runtime shell's invoke API, the same way `ShellWorkSource` reads work.
 - The run record is the Phase 1 RunManifest (vuoro `docs/plans/2026-09-19-agentic-pipeline-first-principles-rebuild.md`), stored where that plan puts it. E2 must not fork a second evidence chain.
