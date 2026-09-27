@@ -20,8 +20,9 @@ Two modes, both stdlib-only so the second can run in the slim image:
     * vuoro-service, vuoro-mcp-edge and vuoro-evidence are installed from
       their local source directories under /srv/vuoro/packages;
     * every installed distribution named like a workspace package came from
-      a local file (a directory or a wheel on disk) or a hash-pinned direct
-      URL (an adapter's `name @ https://...#sha256=` requirement), never from
+      a local file (a directory or a wheel on disk) or a hash-pinned release
+      asset of this repository (an adapter's `name @ https://github.com/
+      bayleafwalker/vuoro/releases/...#sha256=` requirement), never from
       an index. pip records a `direct_url.json` for both of those and none for
       an index resolution;
     * the installed-composition attestation the build wrote exists and
@@ -41,6 +42,7 @@ from urllib.parse import unquote, urlparse
 LOCAL_SOURCE_PACKAGES = ("vuoro-service", "vuoro-mcp-edge", "vuoro-evidence")
 SOURCE_ROOT = Path("/srv/vuoro/packages")
 ATTESTATION_SCHEMA = "vuoro-installed-composition/v1"
+RELEASE_ASSET_PREFIX = "/bayleafwalker/vuoro/releases/download/"
 
 
 def canonical(name: str) -> str:
@@ -74,9 +76,18 @@ def _local_path(origin: dict | None) -> Path | None:
 
 
 def _hash_pinned(origin: dict) -> bool:
+    # Only this repository's own release assets: the adapters pin shared
+    # wheels as `name @ https://github.com/bayleafwalker/vuoro/releases/...
+    # #sha256=...`, and pip records the hash only when the requirement
+    # carried one.
     url = urlparse(origin.get("url", ""))
     hashes = (origin.get("archive_info") or {}).get("hashes") or {}
-    return url.scheme == "https" and bool(hashes.get("sha256"))
+    return (
+        url.scheme == "https"
+        and url.netloc == "github.com"
+        and url.path.startswith(RELEASE_ASSET_PREFIX)
+        and bool(hashes.get("sha256"))
+    )
 
 
 def check(names: list[str]) -> list[str]:
