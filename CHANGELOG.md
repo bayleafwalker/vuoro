@@ -5,6 +5,17 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-mcp-edge: `/mcp` conforms to the published MCP 2026-07-28 schema
+  where the `mcp-strict-client` job found it did not (agentops#2526). Wire
+  changes: `ping` answers `{"resultType": "complete"}` (was `{}`); an error
+  answered before the request id is known (parse error, batch, non-object
+  body, invalid id, and the 401/400/413/415/503/405 refusals) omits `id`
+  instead of sending `"id": null`; a header/body mismatch (`-32020`) is
+  HTTP 400 (was 200); an unsupported `MCP-Protocol-Version` is `-32022` with
+  `data.requested` and `data.supported` (was `-32600` without data), still
+  HTTP 400. The strict-client job's known-deviation list is now empty and it
+  checks assertion replay refusal and upstream edge proofs (#134).
+
 - vuoro-mcp-edge (breaking for `RunRegistry` implementers): run continuation
   across identities (TS-8 second route). `register` takes an optional
   `predecessor_run_id`. The registry refuses it with
