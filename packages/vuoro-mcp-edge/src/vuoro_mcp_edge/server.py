@@ -212,7 +212,7 @@ def _with_envelope(
     # ("Unsupported result type"), and list results need cacheScope
     # "public" | "private".
     payload = dict(result)
-    payload["resultType"] = "complete"
+    payload["resultType"] = "tools-list-result"
     if ttl_ms is not None:
         payload["ttlMs"] = ttl_ms
     if cache_scope is not None:
