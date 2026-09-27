@@ -11,9 +11,12 @@ recorded here.
   expiring in-memory cache; a replay is 401 `identity-replayed` (edge:
   JSON-RPC `-32003`), a full cache refuses new assertions with 503
   `identity-replay-capacity` (edge: `-32004`). `jti` no longer has to equal
-  `request_id`. Edge -> shell calls carry a one-use, body-bound
-  `X-Vuoro-Edge-Proof` under a pod-local key, so multi-call tools keep working
-  and a captured call cannot be replayed. Deployment: both containers need a
+  `request_id`, and its format is not checked. Edge -> shell calls carry a
+  one-use, body-bound `X-Vuoro-Edge-Proof` under a pod-local key, so
+  multi-call tools keep working and a captured call cannot be replayed. The
+  shell records which route claimed each jti and refuses it on the other,
+  and accepts at most 7 proofed uses per assertion. While `/mcp` and the
+  shell share an audience, the edge requires `client_id` and `grant_id`. Deployment: both containers need a
   memory-backed `emptyDir` at `/run/vuoro/edge-proof` and
   `VUORO_EDGE_PROOF_KEY_FILE=/run/vuoro/edge-proof/key` (the edge refuses to
   start without it). `VUORO_EDGE_GATEWAY_ASSERTION_AUDIENCE` is new and

@@ -35,7 +35,12 @@ from vuoro_mcp_edge.work_source import ShellWorkSource
 from vuoro_service.app import ServiceSettings, create_app
 from vuoro_service.catalog import CatalogRegistry, OperationRejectedError
 from vuoro_service.contracts import DomainCompatibility, OperationDefinition
-from vuoro_service.edge_proof import PROOF_HEADER, EdgeProofVerifier
+from vuoro_service.edge_proof import (
+    MAX_PROOFED_USES_PER_ASSERTION,
+    PROOF_HEADER,
+    EdgeProofVerifier,
+    mint_edge_proof,
+)
 
 _SCHEMA = "https://json-schema.org/draft/2020-12/schema"
 AUTHORITIES = ["work:read", "work:evidence"]
@@ -171,7 +176,7 @@ class _Recording(httpx.AsyncBaseTransport):
 
 
 class _Stack:
-    def __init__(self, keys, *, proofs: bool = True) -> None:
+    def __init__(self, keys, *, proofs: bool = True, require_oauth_grant: bool = False) -> None:
         self.private = keys[1]
         self.sprintctl = sprintctl = _Sprintctl()
         registry = CatalogRegistry()
@@ -186,6 +191,7 @@ class _Stack:
         ):
             registry.register(_definition(name, authority, semantics), handler)
         key = secrets.token_bytes(32)
+        self.proof_key = key
         self.shell_verifier = _Counting(resolver(keys[0], edge_proofs=EdgeProofVerifier(key)))
         self.shell = create_app(
             settings=ServiceSettings(
@@ -212,7 +218,9 @@ class _Stack:
         toolset = record_tools.build_toolset(
             ToolsetContext(env={}, work_source=source, runs=store)
         )
-        self.edge_verifier = _Counting(resolver(keys[0]))
+        self.edge_verifier = _Counting(
+            resolver(keys[0], require_oauth_grant=require_oauth_grant)
+        )
         self.edge = create_edge_app(
             identity_resolver=self.edge_verifier, work_source=source, toolsets=(toolset,)
         )
@@ -383,3 +391,121 @@ def test_a_replay_is_refused_before_any_method_runs(keys, method) -> None:
     again = stack.client.post(MCP_PATH, headers=headers, json=body)
     assert again.status_code == 401
     assert again.json()["error"]["code"] == -32003
+
+
+# -- cross-process replay (review of bfb6718) ---------------------------------
+
+
+def _send_directly_to_the_shell(stack: _Stack, headers: dict[str, str]) -> httpx.Response:
+    """The REST path: the gateway sends the assertion straight to the shell,
+    which consumes its jti.  An attacker in the pod captures it on the way."""
+
+    envelope = {
+        "schema_version": "invocation/v1",
+        "request_id": headers["X-Request-Id"],
+        "operation": "work.public.list-v1",
+        "arguments": {},
+        "catalog_revision": None,
+        "basis_revision": None,
+        "idempotency_key": None,
+        "repo_id": "repo-a",
+    }
+    return TestClient(stack.shell).post(
+        "/api/invoke/v1",
+        headers={**headers, "X-Vuoro-Client-Protocol": "1"},
+        json=envelope,
+    )
+
+
+@pytest.mark.parametrize("require_oauth_grant", [False, True])
+def test_a_rest_assertion_consumed_by_the_shell_cannot_be_replayed_at_mcp(
+    keys, require_oauth_grant
+) -> None:
+    """The exploit from the review: a REST assertion (no client_id) consumed
+    directly by the shell, then replayed at /mcp, wrote a session note.
+
+    Both fixes close it on their own: the shell refuses on the proof route a
+    jti its direct route consumed (require_oauth_grant=False, as once the
+    audiences are split), and the edge refuses an assertion with no OAuth
+    grant while the audiences are shared (require_oauth_grant=True).
+    """
+
+    stack = _Stack(keys, require_oauth_grant=require_oauth_grant)
+    owner = dict(client_id="claude-connector", grant_id="grant-1") if require_oauth_grant else {}
+    registered, _ = stack.call("register_run", REGISTER_ARGUMENTS, headers=stack.headers(**owner))
+    assert registered["isError"] is False, registered
+    run_id = registered["structuredContent"]["run_id"]
+
+    rest = stack.headers()  # no client_id / grant_id: a workspace-token assertion
+    consumed = _send_directly_to_the_shell(stack, rest)
+    assert consumed.status_code == 200, consumed.text
+
+    response = stack.client.post(
+        MCP_PATH,
+        headers=rest,
+        json=call(
+            "write_session_note",
+            {"run_id": run_id, "note": "replayed", "idempotency_key": "note-key-0666"},
+        ),
+    )
+    if require_oauth_grant:
+        assert response.status_code == 401
+        assert response.json()["error"]["code"] == -32001
+    else:
+        result = response.json()["result"]
+        assert result["isError"] is True, result
+    assert stack.sprintctl.notes == []
+    assert "note" not in stack.sprintctl.calls
+
+
+def test_an_assertion_used_through_the_edge_cannot_then_go_direct(keys) -> None:
+    stack = _Stack(keys)
+    headers = stack.headers()
+    listed, _ = stack.call("list_ready_work", {}, headers=headers)
+    assert listed["isError"] is False
+    direct = _send_directly_to_the_shell(stack, headers)
+    assert direct.status_code == 401
+    assert direct.json()["error"]["code"] == "identity-replayed"
+
+
+def test_the_proofed_use_cap_matches_the_largest_tool_call() -> None:
+    """The shell's cap is computed from this package's code: append_evidence
+    makes one resolve plus CHAIN_ATTEMPTS rounds of tail + append."""
+
+    assert MAX_PROOFED_USES_PER_ASSERTION == 1 + 2 * record_tools.CHAIN_ATTEMPTS
+
+
+def test_the_flow_at_the_proofed_use_cap_passes_and_one_more_is_refused(keys) -> None:
+    stack = _Stack(keys)
+    registered, _ = stack.call("register_run", REGISTER_ARGUMENTS)
+    run_id = registered["structuredContent"]["run_id"]
+
+    # Exactly the cap: every append attempt conflicts, all 7 calls reach the
+    # owner, and the tool reports the conflict (not a refused identity).
+    headers = stack.headers()
+    stack.sprintctl.conflicts = record_tools.CHAIN_ATTEMPTS
+    exhausted, counts = stack.call(
+        "append_evidence", _append_arguments(run_id, "evidence-key-0100"), headers=headers
+    )
+    assert counts == (1, MAX_PROOFED_USES_PER_ASSERTION)
+    assert exhausted["structuredContent"]["error"]["code"] == "evidence-chain-conflict"
+    assert stack.sprintctl.calls.count("append") == record_tools.CHAIN_ATTEMPTS
+
+    # One more proofed use of the same assertion, with a freshly minted,
+    # otherwise valid proof (what a leaked pod key allows), is refused.
+    method, path, sent_headers, body = stack.transport.sent[-1]
+
+    key = stack.proof_key
+    extra = {
+        name: value
+        for name, value in sent_headers.items()
+        if name in ("x-vuoro-identity", "x-request-id", "x-vuoro-client-protocol", "content-type")
+    }
+    extra[PROOF_HEADER] = mint_edge_proof(
+        key, method=method, path=path, assertion=extra["x-vuoro-identity"], body=body
+    )
+    before = list(stack.sprintctl.calls)
+    refused = TestClient(stack.shell).post(path, headers=extra, content=body)
+    assert refused.status_code == 401
+    assert refused.json()["error"]["code"] == "identity-replayed"
+    assert stack.sprintctl.calls == before

@@ -805,11 +805,16 @@ def _gateway_assertion_resolver(
     edge_audience = environ.get("VUORO_EDGE_GATEWAY_ASSERTION_AUDIENCE")
     if edge:
         # The edge is the first verifier on its path: it expects the edge
-        # audience and accepts no edge proofs.
+        # audience and accepts no edge proofs.  While that audience is the
+        # shell's too, it also requires the OAuth client and grant only the
+        # gateway's OAuth path mints, so a REST assertion the shell consumed
+        # cannot be replayed through the edge.
         audience = shell_audience if edge_audience is None else edge_audience
+        require_oauth_grant = audience == shell_audience
         edge_proofs = None
     else:
         audience = shell_audience
+        require_oauth_grant = False
         proof_key = _edge_proof_key(environ)
         edge_proofs = (
             None
@@ -836,6 +841,7 @@ def _gateway_assertion_resolver(
             replay_not_before=started_at - _REPLAY_WATERMARK_SKEW_SECONDS,
             edge_proofs=edge_proofs,
             edge_audience=None if edge else edge_audience,
+            require_oauth_grant=require_oauth_grant,
         )
     except GatewayAssertionConfigurationError as error:
         raise CompositionError("cannot configure gateway assertion identity") from error

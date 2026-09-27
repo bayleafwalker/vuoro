@@ -41,7 +41,19 @@ class ReplayCacheFull(RuntimeError):
 
 
 class ReplayCache:
-    """One-use keys with per-entry expiry and a hard size cap."""
+    """Keys claimed by one route, a bounded number of times, until expiry.
+
+    `claim` is the one operation: a key is recorded with the route that first
+    claimed it, and later claims succeed only on the same route and only up
+    to that route's `max_uses`.  So a jti consumed on the direct route can
+    never be used through edge proofs, and one used through edge proofs can
+    never be used directly (agentops#2519).
+    """
+
+    #: Test hook, called between the lookup and the insert inside the lock.
+    #: A test sets it to a sleep to hold the race window open, so a missing
+    #: lock deterministically lets two claims through.  None in production.
+    _race_window: Callable[[], None] | None = None
 
     def __init__(
         self,
@@ -55,7 +67,8 @@ class ReplayCache:
         self._max_entries = max_entries
         self._name = name
         self._clock = clock
-        self._entries: dict[bytes, float] = {}
+        #: key -> [expires_at, route, uses]
+        self._entries: dict[bytes, list] = {}
         self._expiry: list[tuple[float, bytes]] = []
         self._lock = threading.Lock()
         self._refused_since_log = 0
@@ -71,7 +84,20 @@ class ReplayCache:
         return self._max_entries
 
     def consume(self, key: bytes, expires_at: float) -> bool:
-        """Record `key` until `expires_at`.  False if it is already recorded.
+        """Record `key` until `expires_at`, once.  False if already recorded."""
+
+        return self.claim(key, expires_at)
+
+    def claim(
+        self,
+        key: bytes,
+        expires_at: float,
+        *,
+        route: str = "direct",
+        max_uses: int = 1,
+    ) -> bool:
+        """Claim `key` for `route`.  False if another route holds it or this
+        route has used it `max_uses` times already.
 
         Raises `ReplayCacheFull` when a new key does not fit.
         """
@@ -79,30 +105,21 @@ class ReplayCache:
         with self._lock:
             now = self._clock()
             self._purge(now)
-            if key in self._entries:
+            entry = self._entries.get(key)
+            if self._race_window is not None:
+                self._race_window()
+            if entry is None:
+                self._insert(key, expires_at, now, route)
+                return True
+            if entry[1] != route or entry[2] >= max_uses:
                 return False
-            self._insert(key, expires_at, now)
+            entry[2] += 1
+            if expires_at > entry[0]:
+                entry[0] = expires_at
+                heapq.heappush(self._expiry, (expires_at, key))
             return True
 
-    def mark(self, key: bytes, expires_at: float) -> None:
-        """Record `key` whether or not it is already recorded.
-
-        For a verifier that accepts a credential through another route (an
-        edge proof) and must stop its direct use from then on.  Raises
-        `ReplayCacheFull` when a new key does not fit.
-        """
-
-        with self._lock:
-            now = self._clock()
-            self._purge(now)
-            existing = self._entries.get(key)
-            if existing is None:
-                self._insert(key, expires_at, now)
-            elif expires_at > existing:
-                self._entries[key] = expires_at
-                heapq.heappush(self._expiry, (expires_at, key))
-
-    def _insert(self, key: bytes, expires_at: float, now: float) -> None:
+    def _insert(self, key: bytes, expires_at: float, now: float, route: str) -> None:
         if len(self._entries) >= self._max_entries:
             self._refused_since_log += 1
             if (
@@ -120,7 +137,7 @@ class ReplayCache:
                 self._last_full_log = now
                 self._refused_since_log = 0
             raise ReplayCacheFull(f"{self._name} replay cache is full")
-        self._entries[key] = expires_at
+        self._entries[key] = [expires_at, route, 1]
         heapq.heappush(self._expiry, (expires_at, key))
 
     def _purge(self, now: float) -> None:
@@ -128,9 +145,10 @@ class ReplayCache:
         entries = self._entries
         while expiry and expiry[0][0] <= now:
             expires_at, key = heapq.heappop(expiry)
-            # A `mark` that extended an entry leaves its older heap row
+            # A claim that extended an entry leaves its older heap row
             # behind; only the row matching the live expiry removes it.
-            if entries.get(key) == expires_at:
+            entry = entries.get(key)
+            if entry is not None and entry[0] == expires_at:
                 del entries[key]
 
 

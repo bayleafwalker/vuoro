@@ -85,16 +85,16 @@ def cloud_mounts(tmp_path: Path, keys, monkeypatch) -> dict[str, str]:
     }
 
 
-def test_environment_builds_a_server_that_verifies_assertions(cloud_mounts, auth) -> None:
+def test_environment_builds_a_server_that_verifies_assertions(cloud_mounts, oauth_auth) -> None:
     client = TestClient(create_app_from_environment(cloud_mounts))
     assert client.post("/mcp", json=call("list_ready_work")).status_code == 401
     listed = client.post(
-        "/mcp", headers=auth, json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+        "/mcp", headers=oauth_auth, json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
     )
     assert listed.status_code == 200
 
 
-def test_environment_composition_wires_a_durable_record_bucket(cloud_mounts, auth) -> None:
+def test_environment_composition_wires_a_durable_record_bucket(cloud_mounts, oauth_auth) -> None:
     """composition.py's one line (``runs=record_tools.build_run_registry(env)``)
     must actually reach ``create_edge_app`` -- not just type-check -- so the
     record bucket's tools are discoverable, not silently absent the way they
@@ -103,7 +103,7 @@ def test_environment_composition_wires_a_durable_record_bucket(cloud_mounts, aut
 
     client = TestClient(create_app_from_environment(cloud_mounts))
     listed = client.post(
-        "/mcp", headers=auth, json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+        "/mcp", headers=oauth_auth, json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
     )
     assert listed.status_code == 200
     names = {tool["name"] for tool in listed.json()["result"]["tools"]}
@@ -250,11 +250,28 @@ def test_the_edge_audience_can_be_split_from_the_shell_audience(cloud_mounts, ke
     assert split.status_code == 200, split.text
 
 
-def test_the_edge_consumes_each_assertion_once(cloud_mounts, auth) -> None:
+def test_a_shared_audience_edge_refuses_an_assertion_without_an_oauth_grant(
+    cloud_mounts, keys
+) -> None:
+    """The edge's mirror of the shell's interim rule: while /mcp and the shell
+    share an audience, a REST (workspace-token) assertion is not accepted at
+    /mcp, so one the shell already consumed cannot be replayed through it."""
+
     client = TestClient(create_app_from_environment(cloud_mounts))
     body = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
-    assert client.post("/mcp", headers=auth, json=body).status_code == 200
-    again = client.post("/mcp", headers=auth, json=body)
+    for claims in ({}, {"client_id": "claude-connector"}, {"grant_id": "grant-1"}):
+        response = client.post(
+            "/mcp", headers=identity_headers(assertion(keys[1], **claims)), json=body
+        )
+        assert response.status_code == 401, claims
+        assert response.json()["error"]["code"] == -32001
+
+
+def test_the_edge_consumes_each_assertion_once(cloud_mounts, oauth_auth) -> None:
+    client = TestClient(create_app_from_environment(cloud_mounts))
+    body = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+    assert client.post("/mcp", headers=oauth_auth, json=body).status_code == 200
+    again = client.post("/mcp", headers=oauth_auth, json=body)
     assert again.status_code == 401
     assert again.json()["error"]["code"] == -32003
 

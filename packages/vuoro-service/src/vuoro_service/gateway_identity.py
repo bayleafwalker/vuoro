@@ -18,6 +18,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import Request
 
 from vuoro_service.edge_proof import (
+    MAX_PROOFED_USES_PER_ASSERTION,
     PROOF_HEADER,
     EdgeProofError,
     EdgeProofReplayed,
@@ -35,7 +36,13 @@ from vuoro_service.replay import ReplayCache, ReplayCacheFull
 _ULID = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
 _REPO_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 _PRINCIPAL_SUBJECT = re.compile(r"^[A-Za-z0-9._-]+$")
-_JTI = re.compile(r"^[\x21-\x7e]{1,128}$")
+#: The replay-cache key is a digest of (subject, jti), so the jti's format
+#: does not matter to replay protection.  While the gateway still copies the
+#: client's unvalidated X-Request-ID into it, anything it signs is accepted,
+#: up to what fits in a request header anyway.
+_JTI_MAX_LENGTH = 8192
+_ROUTE_DIRECT = "direct"
+_ROUTE_EDGE_PROOF = "edge-proof"
 _NBF_CLOCK_SKEW_SECONDS = 2
 _REQUIRED_CLAIMS = (
     "actor",
@@ -63,6 +70,12 @@ class EdgeProofRequiredError(IdentityResolutionError):
     """An MCP-minted assertion arrived at the shell without an edge proof."""
 
     code = "identity-edge-proof-required"
+
+
+class OAuthGrantRequiredError(IdentityResolutionError):
+    """An assertion without an OAuth client and grant arrived at the edge."""
+
+    code = "identity-oauth-grant-required"
 
 
 def _required_text(value: Any, field: str) -> str:
@@ -131,10 +144,9 @@ class GatewayAssertionIdentityResolver:
     * **Edge proof** (only when `edge_proofs` is configured, i.e. in the
       runtime shell of a pod that runs the MCP edge): the edge already
       consumed the jti, and one tool call may reuse the assertion for several
-      shell calls, so the jti is not consumed again.  Instead each call must
-      carry a one-use, body-bound edge proof (`vuoro_service.edge_proof`).
-      The jti is then marked in `replay_cache`, so the same assertion can
-      no longer be used on the direct route.  The assertion's audience on
+      shell calls, so the jti is claimed for this route (up to a cap)
+      rather than once.  Each call must also carry a one-use, body-bound
+      edge proof (`vuoro_service.edge_proof`).  The assertion's audience on
       this route is `edge_audience`.
 
     While the edge and the shell share one audience, a direct request whose
@@ -143,6 +155,15 @@ class GatewayAssertionIdentityResolver:
     an MCP assertion captured in the pod must not reach the shell without the
     edge.  Once the gateway mints a separate MCP audience this rule is
     unnecessary, and it switches off by itself.
+
+    The mirror rule on the edge (`require_oauth_grant`): while the audiences
+    are shared, the edge refuses an assertion without ``client_id`` and
+    ``grant_id``, so a REST assertion cannot be replayed at ``/mcp``.
+
+    The cache records which route claimed each jti.  A jti claimed directly
+    is refused on the edge proof route, one claimed through proofs is refused
+    directly, and the proof route accepts at most
+    `MAX_PROOFED_USES_PER_ASSERTION` uses of one jti.
     """
 
     def __init__(
@@ -159,6 +180,7 @@ class GatewayAssertionIdentityResolver:
         replay_not_before: float | None = None,
         edge_proofs: EdgeProofVerifier | None = None,
         edge_audience: str | None = None,
+        require_oauth_grant: bool = False,
     ) -> None:
         self._public_key = public_key
         self._issuer = issuer
@@ -175,6 +197,7 @@ class GatewayAssertionIdentityResolver:
         self._replay_not_before = replay_not_before
         self._edge_proofs = edge_proofs
         self._edge_audience = edge_audience or audience
+        self._require_oauth_grant = require_oauth_grant
 
     @classmethod
     def from_file(
@@ -192,6 +215,7 @@ class GatewayAssertionIdentityResolver:
         replay_not_before: float | None = None,
         edge_proofs: EdgeProofVerifier | None = None,
         edge_audience: str | None = None,
+        require_oauth_grant: bool = False,
     ) -> "GatewayAssertionIdentityResolver":
         if (
             not issuer
@@ -242,6 +266,7 @@ class GatewayAssertionIdentityResolver:
             replay_not_before=replay_not_before,
             edge_proofs=edge_proofs,
             edge_audience=edge_audience,
+            require_oauth_grant=require_oauth_grant,
         )
 
     def __call__(self, request: Request) -> Identity:
@@ -317,10 +342,10 @@ class GatewayAssertionIdentityResolver:
             raise IdentityResolutionError("gateway identity assertion has invalid repo_ids")
         signed_request_id = _required_text(claims.get("request_id"), "request_id")
         # The jti is the replay-protection key, and nothing else: it need not
-        # equal request_id (the gateway mints its own), but it is bounded so
-        # a cache entry cannot be made arbitrarily expensive.
+        # equal request_id (the gateway will mint its own), and its format is
+        # not checked, since the cache stores a fixed-size digest of it.
         signed_jti = _required_text(claims.get("jti"), "jti")
-        if not _JTI.fullmatch(signed_jti):
+        if len(signed_jti) > _JTI_MAX_LENGTH:
             raise IdentityResolutionError("gateway identity assertion has invalid jti")
         invocation_request_id = getattr(
             request.state, "vuoro_invocation_request_id", None
@@ -355,10 +380,23 @@ class GatewayAssertionIdentityResolver:
             f"{subject}\x00{signed_jti}".encode("utf-8")
         ).digest()
         replay_expires_at = claims["exp"] + _NBF_CLOCK_SKEW_SECONDS
+        if self._require_oauth_grant and (client_id is None or grant_id is None):
+            raise OAuthGrantRequiredError(
+                "gateway identity assertion carries no OAuth client and grant"
+            )
         try:
             if proof is not None:
                 self._verify_edge_proof(request, proof, token)
-                self._replay_cache.mark(replay_key, replay_expires_at)
+                if not self._replay_cache.claim(
+                    replay_key,
+                    replay_expires_at,
+                    route=_ROUTE_EDGE_PROOF,
+                    max_uses=MAX_PROOFED_USES_PER_ASSERTION,
+                ):
+                    raise IdentityReplayedError(
+                        "gateway identity assertion was already used directly, "
+                        "or more times than one tool call needs"
+                    )
             else:
                 if (
                     self._edge_proofs is not None
@@ -375,7 +413,9 @@ class GatewayAssertionIdentityResolver:
                     raise IdentityReplayedError(
                         "gateway identity assertion predates this verifier's replay window"
                     )
-                if not self._replay_cache.consume(replay_key, replay_expires_at):
+                if not self._replay_cache.claim(
+                    replay_key, replay_expires_at, route=_ROUTE_DIRECT
+                ):
                     raise IdentityReplayedError(
                         "gateway identity assertion was already used"
                     )

@@ -10,6 +10,7 @@ from pathlib import Path
 import secrets
 import sys
 import threading
+import time
 
 import httpx
 import jwt
@@ -107,23 +108,26 @@ def test_at_capacity_new_keys_are_refused_and_logged(caplog) -> None:
     assert records[0].replay_cache == "test-cache"
 
 
-def test_mark_records_a_key_without_refusing_a_repeat() -> None:
+def test_a_key_is_held_by_the_route_that_claimed_it() -> None:
     clock = _Clock()
     cache = ReplayCache(clock=clock)
-    cache.mark(b"k", clock.now + 10)
-    cache.mark(b"k", clock.now + 20)
-    assert cache.consume(b"k", clock.now + 20) is False
-    # The later expiry wins: still recorded after the first one passes.
+    assert cache.claim(b"direct", clock.now + 10, route="direct")
+    assert not cache.claim(b"direct", clock.now + 10, route="edge-proof", max_uses=7)
+    assert cache.claim(b"proofed", clock.now + 10, route="edge-proof", max_uses=3)
+    assert not cache.claim(b"proofed", clock.now + 10, route="direct")
+    assert cache.claim(b"proofed", clock.now + 20, route="edge-proof", max_uses=3)
+    assert cache.claim(b"proofed", clock.now + 20, route="edge-proof", max_uses=3)
+    assert not cache.claim(b"proofed", clock.now + 20, route="edge-proof", max_uses=3)
+    # The later expiry wins: still held after the first one passes.
     clock.now += 15
-    assert cache.consume(b"k", clock.now + 20) is False
+    assert not cache.claim(b"proofed", clock.now + 20, route="direct")
     clock.now += 10
-    assert cache.consume(b"k", clock.now + 20) is True
+    assert cache.claim(b"proofed", clock.now + 20, route="direct")
 
 
 @pytest.fixture
 def frequent_thread_switches():
-    """Switch threads every microsecond, so a check-then-insert race that a
-    missing lock would allow actually happens within the test."""
+    """Switch threads often, so concurrent resolver calls interleave."""
 
     previous = sys.getswitchinterval()
     sys.setswitchinterval(1e-6)
@@ -133,20 +137,23 @@ def frequent_thread_switches():
         sys.setswitchinterval(previous)
 
 
-def test_a_concurrent_duplicate_is_accepted_exactly_once(frequent_thread_switches) -> None:
-    workers = 16
+def test_a_concurrent_duplicate_is_accepted_exactly_once() -> None:
+    """Deterministic: the race-window hook sleeps between the lookup and the
+    insert, so without the lock every thread passes the lookup before any
+    inserts, and more than one is accepted every time."""
+
+    workers = 8
+    cache = ReplayCache()
+    cache._race_window = lambda: time.sleep(0.02)
+    barrier = threading.Barrier(workers)
+
+    def attempt(_: int) -> bool:
+        barrier.wait()
+        return cache.consume(b"same", 2**40)
+
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        for round_ in range(200):
-            cache = ReplayCache()
-            barrier = threading.Barrier(workers)
-            key = round_.to_bytes(2, "big")
-
-            def attempt(_: int) -> bool:
-                barrier.wait()
-                return cache.consume(key, 2**40)
-
-            results = list(pool.map(attempt, range(workers)))
-            assert results.count(True) == 1, f"round {round_}: {results.count(True)} accepted"
+        results = list(pool.map(attempt, range(workers)))
+    assert results.count(True) == 1, f"{results.count(True)} accepted"
 
 
 # -- the gateway assertion resolver --------------------------------------
@@ -641,3 +648,46 @@ def test_the_shell_answers_capacity_with_503(tmp_path: Path) -> None:
     response = client.post(INVOKE_PATH, headers=_headers(_token(private)), json=_envelope())
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "identity-replay-capacity"
+
+
+# -- routes and the proofed-use cap (review of bfb6718) ----------------------
+
+
+def test_a_jti_consumed_directly_is_refused_on_the_proof_route(tmp_path: Path) -> None:
+    """The cross-process replay: the shell consumed a REST assertion directly;
+    the edge (a separate cache) accepts it and forwards it with valid proofs."""
+
+    path, private = _key_file(tmp_path)
+    resolver = _proof_resolver(path)
+    token = _token(private)
+    resolver(_request(token))
+    with pytest.raises(IdentityReplayedError, match="already used directly"):
+        resolver(_request(token, proof=_proof(token), body=BODY))
+
+
+def test_proofed_uses_are_capped_at_the_largest_tool_call(tmp_path: Path) -> None:
+    from vuoro_service.edge_proof import MAX_PROOFED_USES_PER_ASSERTION
+
+    path, private = _key_file(tmp_path)
+    resolver = _proof_resolver(path)
+    token = _token(private)
+    for _ in range(MAX_PROOFED_USES_PER_ASSERTION):
+        resolver(_request(token, proof=_proof(token), body=BODY))
+    with pytest.raises(IdentityReplayedError, match="more times than one tool call needs"):
+        resolver(_request(token, proof=_proof(token), body=BODY))
+    # A fresh assertion for the next tool call starts its own count.
+    other = _token(private)
+    resolver(_request(other, proof=_proof(other), body=BODY))
+
+
+def test_the_edge_role_requires_an_oauth_grant_without_burning_the_jti(
+    tmp_path: Path,
+) -> None:
+    path, private = _key_file(tmp_path)
+    resolver = _resolver(path, require_oauth_grant=True)
+    jti = "jti-" + secrets.token_hex(8)
+    for claims in ({}, {"client_id": "c"}, {"grant_id": "g"}):
+        with pytest.raises(IdentityResolutionError, match="OAuth") as excinfo:
+            resolver(_request(_token(private, jti=jti, **claims)))
+        assert excinfo.value.code == "identity-oauth-grant-required"
+    resolver(_request(_token(private, jti=jti, client_id="c", grant_id="g")))

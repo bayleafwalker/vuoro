@@ -48,6 +48,16 @@ PROOF_TTL_MS = 10_000
 #: Edge and shell share one node clock; this only absorbs rounding.
 _PROOF_CLOCK_SKEW_MS = 1_000
 KEY_BYTES = 32
+#: The most shell calls one legitimate MCP tool call makes with its one
+#: assertion, and so the most edge proofs the shell accepts for it.  Computed
+#: from the edge's code (vuoro_mcp_edge): ``append_evidence`` is the largest,
+#: one ``work.run.resolve-v1`` then up to ``CHAIN_ATTEMPTS`` (3) rounds of
+#: ``tail`` + ``append``, so 1 + 2 x 3 = 7.  ``write_session_note`` makes 2,
+#: ``register_run`` / ``list_ready_work`` / ``describe_work`` 1 (a
+#: ``stale-catalog`` retry costs nothing here: the shell answers it before
+#: identity resolution).  The edge's tests fail if this drifts from its code.
+#: A leaked pod key therefore mints at most this many uses per assertion.
+MAX_PROOFED_USES_PER_ASSERTION = 7
 _NONCE_BYTES = 16
 _MAC_BYTES = 32
 _DOMAIN = b"vuoro-edge-proof/v1"
@@ -244,6 +254,7 @@ class EdgeProofVerifier:
 
 __all__ = [
     "KEY_BYTES",
+    "MAX_PROOFED_USES_PER_ASSERTION",
     "PROOF_HEADER",
     "PROOF_TTL_MS",
     "EdgeProofConfigurationError",

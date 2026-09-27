@@ -40,7 +40,9 @@ client --OAuth--> vuoro.cloud gateway --X-Vuoro-Identity + X-Request-Id--> POST 
   verifier and consumes its `jti` (agentops#2519): the same assertion again
   gets HTTP 401 with JSON-RPC error `-32003`, and a full replay cache refuses
   new assertions with HTTP 503 and `-32004`. The gateway mints a fresh
-  assertion per request. See `docs/architecture/gateway-identity.md`
+  assertion per request. While this server's audience is the shell's, it
+  also requires the `client_id` and `grant_id` that only the gateway's OAuth
+  path mints, so a REST assertion cannot be replayed here. See `docs/architecture/gateway-identity.md`
   ("Replay protection").
 - **No credential in this process.** No workspace token, no DSN, no signing
   key. The server refuses to start if any environment variable ends in `_DSN`

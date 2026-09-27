@@ -150,11 +150,11 @@ def test_gateway_assertion_resolver_accepts_cloud_contract(tmp_path: Path) -> No
         {"authorities": []},
         {"repo_ids": ["repo-c"]},
         {"request_id": "01K44444444444444444444444", "jti": "01K44444444444444444444444"},
-        # The jti need not equal request_id (agentops#2519), but it is the
-        # replay-cache key and so must be a bounded, printable token.
+        # The jti need not equal request_id (agentops#2519), and its format is
+        # not checked, but it must be a non-empty string of sane length.
         {"jti": ""},
-        {"jti": "has space"},
-        {"jti": "x" * 129},
+        {"jti": " padded "},
+        {"jti": "x" * 8193},
         {"jti": 7},
         {"iss": "other-cloud"},
         {"aud": "other-service"},
@@ -456,3 +456,25 @@ def test_a_malformed_client_or_grant_is_refused_not_dropped(
     key_path, private = _key_file(tmp_path)
     with pytest.raises(IdentityResolutionError, match=field):
         _resolver(key_path)(_request(_token(private, **{field: value})))
+
+
+@pytest.mark.parametrize(
+    "request_id",
+    ["r" * 200, "client chosen id", "01K3-with/odd:chars;and=more"],
+)
+def test_any_client_chosen_request_id_the_gateway_signs_is_accepted(
+    tmp_path: Path, request_id: str
+) -> None:
+    """Until the gateway mints its own jti (vuoro-cloud #135) it copies the
+    client's unvalidated X-Request-ID into both request_id and jti.  Replay
+    protection keys on a digest, so it must not refuse any of them."""
+
+    path, private = _key_file(tmp_path)
+    resolver = _resolver(path)
+    token = _token(private, request_id=request_id, jti=request_id)
+    identity = resolver(
+        _request(token, request_id=request_id, invocation_request_id=request_id)
+    )
+    assert identity.actor == "github:123"
+    with pytest.raises(IdentityResolutionError, match="already used"):
+        resolver(_request(token, request_id=request_id, invocation_request_id=request_id))

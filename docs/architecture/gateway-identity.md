@@ -26,9 +26,11 @@ with `typ=JWT`, `alg=EdDSA`, that key id, the configured issuer and audience,
 required `sub`/`actor`, `workspace_id`, non-empty
 deduplicated authorities and repository IDs, `request_id`, `jti`, `iat`,
 `nbf`, and `exp`. `sub` equals `actor`; `request_id` equals the single
-`X-Request-ID` and the parsed invocation envelope's `request_id`; `jti` is a
-printable token of at most 128 characters that need not equal `request_id`
-(see "Replay protection"); the
+`X-Request-ID` and the parsed invocation envelope's `request_id`; `jti` is
+any non-empty string of at most 8,192 characters and need not equal
+`request_id` (see "Replay protection"). Its format is not checked: the
+replay cache keys on a digest of it, and until the gateway mints its own jti
+it carries the client's unvalidated `X-Request-ID`; the
 workspace ID equals `VUORO_WORKSPACE_ID`; and every asserted repository is in
 the mounted binding. Cloud issues `nbf=iat-2` and a maximum 30-second lifetime;
 Vuoro permits at most that two-second `nbf` skew, accepts a 30-second
@@ -78,9 +80,19 @@ issue/expiry time (10 s), the method, the path, SHA-256 of the forwarded
 assertion and SHA-256 of the exact body, under a per-pod key. The shell still
 verifies the assertion's gateway signature (the key cannot mint or widen an
 identity), verifies the proof, and accepts each nonce once. A captured proof
-cannot be replayed, carry another body or vouch for another assertion. After
-a proof is accepted, the assertion's jti is also recorded in the shell's own
-cache, so the assertion can no longer be used on the direct route.
+cannot be replayed, carry another body or vouch for another assertion.
+
+The shell's cache records which route claimed each jti. A jti claimed on the
+direct route is refused on the proof route, and one claimed through proofs is
+refused on the direct route, so an assertion is never accepted by both the
+edge and the shell as a first verifier. The proof route accepts at most 7
+uses of one jti (`MAX_PROOFED_USES_PER_ASSERTION`): the most shell calls one
+legitimate tool call makes, which is `append_evidence` with one resolve plus
+`CHAIN_ATTEMPTS` (3) rounds of tail and append. `write_session_note` makes 2,
+the other tools 1, and a `stale-catalog` retry costs nothing because the
+shell answers it before identity resolution. The edge's tests fail if the
+number drifts from its code. So a leaked pod key can mint at most 7 uses of
+an assertion it has captured, not unlimited ones.
 
 The proof key is 32 random bytes at exactly `/run/vuoro/edge-proof/key`
 (`VUORO_EDGE_PROOF_KEY_FILE`), a memory-backed `emptyDir` mounted into both
@@ -93,10 +105,14 @@ While the edge and the shell share one audience, a shell configured for edge
 proofs refuses a direct assertion that carries `client_id` or `grant_id`
 (which only the gateway's OAuth `/mcp` path mints) with 401
 `identity-edge-proof-required`, so an MCP assertion captured in the pod cannot
-reach the shell without the edge. `VUORO_EDGE_GATEWAY_ASSERTION_AUDIENCE`
+reach the shell without the edge. The edge applies the mirror rule: while its
+audience is the shell's, it refuses an assertion that lacks `client_id` or
+`grant_id` (401, JSON-RPC `-32001`), so a REST assertion cannot be replayed
+at `/mcp`. Either rule, or the route record above, closes that replay on its
+own. `VUORO_EDGE_GATEWAY_ASSERTION_AUDIENCE`
 sets the edge's audience (default: the shell's). When it differs, the edge
 expects it, the shell accepts it only with an edge proof, and the interim
-`client_id` rule switches off.
+`client_id` rules on both sides switch off.
 
 **Restarts.** The caches live in process memory, and a restart empties them.
 The TTL argument alone ("assertions expire in 30 s and a restart takes
@@ -128,4 +144,9 @@ start-up. A new pod has new caches and a new proof key.
   than by the `client_id` rule;
 - render the `/run/vuoro/edge-proof` memory-backed `emptyDir` into both
   containers and set `VUORO_EDGE_PROOF_KEY_FILE` in both.
+
+Rollout order: the key mount (vuoro-cloud #136), then this runtime on every
+tenant, then the gateway-minted jti (vuoro-cloud #135), then the separate MCP
+audience. Without the key mount the edge refuses to start, so a wrong order
+stalls the rollout rather than causing an outage.
 
