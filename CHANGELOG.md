@@ -5,6 +5,19 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service (unreleased): the work adapter is pinned to sprintctl 0.10.0
+  (56bfbc4, wheel sha256 `d8cc3515…4270`; remote schema stays 18, so no
+  tenant migration). The 0.10.0 adapter catalog makes lease verification
+  profiles requirement sets (`verification.profile` enum -> pattern,
+  `requirements` required, agentops#2539) and adopts the operator's lease
+  contract (600 s authority TTL, the `ttl_seconds` acquire input removed,
+  120 s heartbeat, derived generation, `claim-superseded`, agentops#2540).
+  It adds `work.lease.report-outcome-v1` and keeps `work.lease.complete-v1`
+  as a deprecated alias (work operations 62 -> 63). No Vuoro code calls
+  the sprintctl lease operations yet: the claim toolset stays unserved and
+  `vuoro:work.claim` is still reserved. The released-adapter validators
+  expect the 0.10.0 catalog.
+
 - vuoro-service: `lease.py`'s in-memory `LeaseStore` conforms to INV-L1
   (the operator's lease contract, agentops#2540). A late completion under an
   expired or superseded lease is still refused with `LeaseNotCurrentError`,

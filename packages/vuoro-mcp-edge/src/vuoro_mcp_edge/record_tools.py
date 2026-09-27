@@ -42,7 +42,7 @@ Design notes (for reviewers; see the E2 final report for the full reasoning):
   successor's own run resolves only to the successor's binding, and the
   predecessor's run never resolves to it.  A store advertises both only
   when it sets `supports_continuation`; `SprintctlRecordStore` does not,
-  because the pinned sprintctl (0.9.0) neither records a predecessor nor
+  because the pinned sprintctl (0.10.0) neither records a predecessor nor
   reads notes or evidence back, so the tools are not advertised against it.
 """
 
