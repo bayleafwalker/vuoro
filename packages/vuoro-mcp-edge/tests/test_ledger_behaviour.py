@@ -134,3 +134,13 @@ def test_eight_concurrent_writers_of_one_key_agree_on_one_winner(ledger) -> None
     winners = _run(scenario())
     assert len({id(w) for w in winners}) == 1
     assert _run(ledger.lookup("w", "p", "t", "key-race-1")) == winners[0]
+
+
+def test_parts_that_would_collide_if_joined_stay_distinct(ledger) -> None:
+    """Guards a durable ledger that concatenates its key parts."""
+
+    async def scenario():
+        await ledger.store("w|x", "p", "t", "key-0001", _row(1))
+        return await ledger.lookup("w", "x|p", "t", "key-0001")
+
+    assert _run(scenario()) is None

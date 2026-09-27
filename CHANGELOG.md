@@ -22,8 +22,8 @@ recorded here.
   workspace package `vuoro-evidence` from the repository instead of
   resolving it from an index. (#129, #131, #130, #132)
 
-- vuoro-mcp-edge: the shared `IdempotencyLedger` protocol takes
-  `(workspace_id, principal_id, tool, key)`; `InMemoryIdempotencyLedger` and
+- vuoro-mcp-edge (breaking for ledger implementers): the shared
+  `IdempotencyLedger` protocol takes `(workspace_id, principal_id, tool, key)`; `InMemoryIdempotencyLedger` and
   the effect intent store use it directly (the intent store no longer folds
   the principal into the workspace argument), and one behaviour test covers
   every ledger. The E2/E3 contract records the claim lease owner's decisions

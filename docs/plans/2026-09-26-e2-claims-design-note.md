@@ -1,6 +1,6 @@
 # E2 claims design note: what the durable lease owner must provide (2026-09-26)
 
-**Resolved 2026-09-27 (agentops#2520).** The owner is a new `work_lease` table in sprintctl 0.9.0 (schema 18), separate from the advisory reservation. The decisions, operation names and edge rules are in the shared contract's section 6 amendment (`2026-09-26-e2-e3-shared-contract.md`). Point 5 below (the `RunRegistry` forwarded-assertion gap) was already closed by the #129 seam amendment.
+**Resolved 2026-09-27 (agentops#2520).** The owner is a new `work_lease` table in sprintctl 0.9.0 (schema 18), separate from the advisory reservation. The decisions, operation names and edge rules are in the shared contract's section 6 amendment (`2026-09-26-e2-e3-shared-contract.md`). Point 5 below (the `RunRegistry` forwarded-assertion gap) was already closed by the #131 contract amendment (`RunRegistry` takes the forwarded identity).
 
 **Status.** Deferred by E2 (agentops#2466), per the shared contract's own
 sanctioned fallback (`docs/plans/2026-09-26-e2-e3-shared-contract.md` section
