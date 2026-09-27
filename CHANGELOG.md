@@ -5,6 +5,15 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service (unreleased): the work adapter is pinned to sprintctl 0.9.0
+  (711ccb2, wheel sha256 `9ad68e09…2e7a`; remote schema 18, adding the
+  exclusive durable work lease and outcome reports, agentops#2520). The
+  0.9.0 adapter refuses a schema-17 tenant until that tenant's
+  `vuoro-migrate` job has run the 17 -> 18 migration on roll-out. The adapter
+  registers four new `work.lease.*-v1` operations. The claim toolset stays
+  unserved: `vuoro:work.claim` is still reserved and `claim_tools` still
+  lists nothing.
+
 - vuoro-service / vuoro-mcp-edge (unreleased): gateway assertions are accepted
   once (agentops#2519). The first verifier (the shell for direct gateway
   traffic, the MCP edge for `/mcp`) consumes `(subject, jti)` in a bounded,
