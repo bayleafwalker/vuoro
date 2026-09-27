@@ -5,16 +5,17 @@ recorded here.
 
 ## Unreleased
 
-- vuoro-service (unreleased): the work adapter is pinned to sprintctl 0.9.0
+- vuoro-service 0.1.77 / vuoro-mcp-edge 0.1.4: the work adapter is pinned to
+  sprintctl 0.9.0
   (711ccb2, wheel sha256 `9ad68e09…2e7a`; remote schema 18, adding the
   exclusive durable work lease and outcome reports, agentops#2520). The
   0.9.0 adapter refuses a schema-17 tenant until that tenant's
   `vuoro-migrate` job has run the 17 -> 18 migration on roll-out. The adapter
   registers four new `work.lease.*-v1` operations. The claim toolset stays
   unserved: `vuoro:work.claim` is still reserved and `claim_tools` still
-  lists nothing.
+  lists nothing. (agentops#2520, #142)
 
-- vuoro-service / vuoro-mcp-edge (unreleased): gateway assertions are accepted
+- vuoro-service 0.1.77 / vuoro-mcp-edge 0.1.4: gateway assertions are accepted
   once (agentops#2519). The first verifier (the shell for direct gateway
   traffic, the MCP edge for `/mcp`) consumes `(subject, jti)` in a bounded,
   expiring in-memory cache; a replay is 401 `identity-replayed` (edge:
@@ -25,11 +26,21 @@ recorded here.
   multi-call tools keep working and a captured call cannot be replayed. The
   shell records which route claimed each jti and refuses it on the other,
   and accepts at most 7 proofed uses per assertion. While `/mcp` and the
-  shell share an audience, the edge requires `client_id` and `grant_id`. Deployment: both containers need a
+  shell share an audience, the edge requires `client_id` and `grant_id`.
+  Deployment: both containers need a
   memory-backed `emptyDir` at `/run/vuoro/edge-proof` and
   `VUORO_EDGE_PROOF_KEY_FILE=/run/vuoro/edge-proof/key` (the edge refuses to
   start without it). `VUORO_EDGE_GATEWAY_ASSERTION_AUDIENCE` is new and
-  optional. See `docs/architecture/gateway-identity.md`.
+  optional. See `docs/architecture/gateway-identity.md`. (agentops#2519, #134)
+
+- vuoro-mcp-edge 0.1.4 (breaking for ledger implementers): the shared
+  `IdempotencyLedger` protocol takes `(workspace_id, principal_id, tool, key)`;
+  `InMemoryIdempotencyLedger` and the effect intent store use it directly (the
+  intent store no longer folds the principal into the workspace argument), and
+  one behaviour test covers every ledger. The E2/E3 contract records the claim
+  lease owner's decisions (sprintctl 0.9.0 `work.lease.*-v1`); the claim
+  toolset stays unserved until every tenant runtime serves it and
+  `vuoro:work.claim` is granted. (agentops#2520, #141)
 
 - vuoro-service 0.1.76 / vuoro-mcp-edge 0.1.3: the work adapter is pinned to
   sprintctl 0.8.0 (remote schema 17; its migration runs in each tenant's
@@ -47,14 +58,6 @@ recorded here.
   keyed by (workspace, principal, tool, key). The image now installs the
   workspace package `vuoro-evidence` from the repository instead of
   resolving it from an index. (#129, #131, #130, #132)
-
-- vuoro-mcp-edge (breaking for ledger implementers): the shared
-  `IdempotencyLedger` protocol takes `(workspace_id, principal_id, tool, key)`; `InMemoryIdempotencyLedger` and
-  the effect intent store use it directly (the intent store no longer folds
-  the principal into the workspace argument), and one behaviour test covers
-  every ledger. The E2/E3 contract records the claim lease owner's decisions
-  (sprintctl 0.9.0 `work.lease.*-v1`); the claim toolset itself follows
-  vuoro#134. (agentops#2520)
 
 - vuoro-client 0.1.1: authenticate `GET /api/meta/v1/handshake` and
   `GET /api/catalog/v1` whenever the profile has a credential (hosted
