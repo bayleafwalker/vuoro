@@ -39,6 +39,14 @@ recorded here.
   workspace package `vuoro-evidence` from the repository instead of
   resolving it from an index. (#129, #131, #130, #132)
 
+- vuoro-mcp-edge (breaking for ledger implementers): the shared
+  `IdempotencyLedger` protocol takes `(workspace_id, principal_id, tool, key)`; `InMemoryIdempotencyLedger` and
+  the effect intent store use it directly (the intent store no longer folds
+  the principal into the workspace argument), and one behaviour test covers
+  every ledger. The E2/E3 contract records the claim lease owner's decisions
+  (sprintctl 0.9.0 `work.lease.*-v1`); the claim toolset itself follows
+  vuoro#134. (agentops#2520)
+
 - vuoro-client 0.1.1: authenticate `GET /api/meta/v1/handshake` and
   `GET /api/catalog/v1` whenever the profile has a credential (hosted
   vuoro.cloud answered 401 to served sprintctl), and send a named

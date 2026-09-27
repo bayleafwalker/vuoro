@@ -1,8 +1,8 @@
 """Idempotency for write-class tools (E2 and E3 share these rules).
 
 Every write-class tool takes a required `idempotency_key` argument.  The
-ledger is keyed by (workspace, tool, key) and stores the digest of the
-request's other arguments together with the first result:
+ledger is keyed by (workspace, principal, tool, key) and stores the digest
+of the request's other arguments together with the first result:
 
 - same key, same digest  -> the stored result, and no second effect;
 - same key, other digest -> `ToolFailure("idempotency-conflict", ...)`.
@@ -11,9 +11,16 @@ The digest is sha256 over canonical JSON (sorted keys, no whitespace, UTF-8)
 of the arguments without `idempotency_key`, prefixed by the tool name, so the
 same key reused on another tool never collides.
 
+The principal is part of the key (contract section 5, amended 2026-09-26;
+protocol changed by agentops#2520): two principals in one workspace never
+share a key space, so one cannot replay another's stored result or probe
+which keys exist.
+
 Durable ledgers live with the record owner that performs the write (E2: the
-run/evidence owner; E3: the intent store), not in the edge.
-`InMemoryIdempotencyLedger` is the reference behaviour for tests.
+run/evidence owner; E2b: the lease owner; E3: the intent store), not in the
+edge.  `InMemoryIdempotencyLedger` is the reference behaviour for tests, and
+every implementation passes the same behaviour test
+(tests/test_ledger_behaviour.py).
 """
 
 from __future__ import annotations
@@ -80,11 +87,13 @@ class StoredResult:
 
 
 class IdempotencyLedger(Protocol):
-    async def lookup(self, workspace_id: str, tool: str, key: str) -> StoredResult | None:
-        """The stored result for this key, if any."""
+    async def lookup(
+        self, workspace_id: str, principal_id: str, tool: str, key: str
+    ) -> StoredResult | None:
+        """The stored result for this principal's key, if any."""
 
     async def store(
-        self, workspace_id: str, tool: str, key: str, stored: StoredResult
+        self, workspace_id: str, principal_id: str, tool: str, key: str, stored: StoredResult
     ) -> StoredResult:
         """Record the first result atomically; if another writer won the race,
         return theirs (the caller must then compare digests)."""
@@ -107,12 +116,14 @@ class InMemoryIdempotencyLedger:
     """Reference behaviour for tests.  Not durable; never deploy it."""
 
     def __init__(self) -> None:
-        self._rows: dict[tuple[str, str, str], StoredResult] = {}
+        self._rows: dict[tuple[str, str, str, str], StoredResult] = {}
 
-    async def lookup(self, workspace_id: str, tool: str, key: str) -> StoredResult | None:
-        return self._rows.get((workspace_id, tool, key))
+    async def lookup(
+        self, workspace_id: str, principal_id: str, tool: str, key: str
+    ) -> StoredResult | None:
+        return self._rows.get((workspace_id, principal_id, tool, key))
 
     async def store(
-        self, workspace_id: str, tool: str, key: str, stored: StoredResult
+        self, workspace_id: str, principal_id: str, tool: str, key: str, stored: StoredResult
     ) -> StoredResult:
-        return self._rows.setdefault((workspace_id, tool, key), stored)
+        return self._rows.setdefault((workspace_id, principal_id, tool, key), stored)

@@ -272,16 +272,16 @@ def test_idempotency_replays_same_request_and_refuses_a_changed_one() -> None:
 
     async def scenario() -> None:
         digest = request_digest("t", {"a": 1})
-        assert replay_or_conflict(await ledger.lookup("w", "t", "key-0001"), digest) is None
-        stored = await ledger.store("w", "t", "key-0001", StoredResult(digest, {"ok": 1}))
-        racer = await ledger.store("w", "t", "key-0001", StoredResult("other", {"ok": 2}))
+        assert replay_or_conflict(await ledger.lookup("w", "p", "t", "key-0001"), digest) is None
+        stored = await ledger.store("w", "p", "t", "key-0001", StoredResult(digest, {"ok": 1}))
+        racer = await ledger.store("w", "p", "t", "key-0001", StoredResult("other", {"ok": 2}))
         assert racer == stored
-        found = await ledger.lookup("w", "t", "key-0001")
+        found = await ledger.lookup("w", "p", "t", "key-0001")
         assert replay_or_conflict(found, digest) == {"ok": 1}
         with pytest.raises(ToolFailure) as conflict:
             replay_or_conflict(found, request_digest("t", {"a": 2}))
         assert conflict.value.code == "idempotency-conflict"
-        assert await ledger.lookup("w2", "t", "key-0001") is None
+        assert await ledger.lookup("w2", "p", "t", "key-0001") is None
 
     asyncio.run(scenario())
 
