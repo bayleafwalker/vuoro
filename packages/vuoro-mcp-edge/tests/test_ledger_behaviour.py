@@ -10,9 +10,10 @@ module runs the same checks against every implementation the edge has:
   `create`), which writes the intent only when its row wins.
 
 A durable ledger joins by adding a factory to `LEDGERS`.  The lease owner's
-ledger (sprintctl `work_idempotency_ledger`, keyed the same way) is proved on
-the sprintctl side against real PostgreSQL; the edge's claim toolset adds its
-client-side view here when it lands.
+ledger (sprintctl `work_idempotency_ledger`) is not this protocol: its key
+also carries the repo, (repo, workspace, principal, tool, key).  It is proved
+on the sprintctl side against real PostgreSQL; the edge's claim toolset adds
+its client-side view here when it lands.
 """
 
 from __future__ import annotations
@@ -125,14 +126,25 @@ def test_workspace_principal_and_tool_each_scope_the_key(ledger, other) -> None:
     assert _run(ledger.lookup("w", "p", "t", "key-0001")) == _row(1)
 
 
-def test_eight_concurrent_writers_of_one_key_agree_on_one_winner(ledger) -> None:
+def test_eight_gathered_writers_of_one_key_agree_on_one_winner(ledger) -> None:
+    """First write wins across eight `store` calls on one event loop.
+
+    This is not a race test for the in-memory ledgers: neither awaits between
+    its lookup and its insert, so `gather` runs them one after another.  It
+    exercises an interleaving only for a ledger that yields inside `store`,
+    and says nothing about writers in separate processes, which a durable
+    ledger proves against its own database.  Winners are compared by value,
+    so a ledger that rebuilds the row it read back passes.
+    """
+
     async def scenario():
         return await asyncio.gather(
             *(ledger.store("w", "p", "t", "key-race-1", _row(i)) for i in range(8))
         )
 
     winners = _run(scenario())
-    assert len({id(w) for w in winners}) == 1
+    assert winners[0] in [_row(i) for i in range(8)]
+    assert all(w == winners[0] for w in winners)
     assert _run(ledger.lookup("w", "p", "t", "key-race-1")) == winners[0]
 
 

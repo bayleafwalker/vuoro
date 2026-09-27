@@ -33,6 +33,17 @@ Design notes (for reviewers; see the E2 final report for the full reasoning):
   `test_default_composition_ships_no_write_tools` requires), and builds the
   three tools only once composition.py's one line has wired in a durable
   registry.
+* Continuation (agentops#2525, shared contract section 4): `register_run`
+  may name a `predecessor_run_id`, and `read_predecessor_context` (bucket
+  "read") returns that predecessor's session notes and evidence to the
+  successor.  The successor must carry `work:read` and share the
+  predecessor's workspace and repository; its principal, client and grant
+  may differ.  Continuation transfers context, not authority: the
+  successor's own run resolves only to the successor's binding, and the
+  predecessor's run never resolves to it.  A store advertises both only
+  when it sets `supports_continuation`; `SprintctlRecordStore` does not,
+  because the pinned sprintctl (0.9.0) neither records a predecessor nor
+  reads notes or evidence back, so the tools are not advertised against it.
 """
 
 from __future__ import annotations
@@ -75,6 +86,17 @@ _NOT_YOURS = "no run with that id belongs to the caller"
 _UNKNOWN_OPERATION = "unknown-operation"
 RECORD_OWNER_INCOMPATIBLE = "record-owner-incompatible"
 REQUIRED_SPRINTCTL = "0.8.0"
+
+#: The authority a successor must carry to name a predecessor and to read
+#: its context (agentops#253 R4 decision 3).
+CONTINUATION_AUTHORITY = "work:read"
+
+_READ_ONLY_ANNOTATIONS: dict[str, bool] = {
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "idempotentHint": True,
+    "openWorldHint": False,
+}
 
 #: sprintctl's refusal of an append whose chain link is no longer the tail.
 CHAIN_CONFLICT = "evidence-chain-conflict"
@@ -233,6 +255,10 @@ class SprintctlRecordStore:
     room for.
     """
 
+    #: The pinned owner has no operation that records a run's predecessor
+    #: or reads its notes and evidence back, so continuation is not served.
+    supports_continuation = False
+
     def __init__(
         self,
         *,
@@ -255,7 +281,15 @@ class SprintctlRecordStore:
         idempotency_key: str,
         forwarded: ForwardedIdentity,
         manifest: Mapping[str, Any],
+        predecessor_run_id: str | None = None,
     ) -> str:
+        if predecessor_run_id is not None:
+            # Never dropped silently: a run registered without the link it
+            # asked for would read as a fresh run.
+            raise ToolFailure(
+                RECORD_OWNER_INCOMPATIBLE,
+                "the runtime's work adapter cannot record a run's predecessor",
+            )
         arguments = {
             "harness_id": manifest["harness_id"],
             "harness_build": manifest["harness_build"],
@@ -317,6 +351,14 @@ class SprintctlRecordStore:
             # remote answer unconditionally.
             raise ToolFailure("run-not-found", _NOT_YOURS)
         return binding
+
+    async def read_predecessor_context(
+        self, run_id: str, *, forwarded: ForwardedIdentity
+    ) -> dict[str, Any]:
+        raise ToolFailure(
+            RECORD_OWNER_INCOMPATIBLE,
+            "the runtime's work adapter cannot read a predecessor's notes and evidence",
+        )
 
     async def evidence_tail(
         self, run_id: str, *, forwarded: ForwardedIdentity
@@ -431,6 +473,17 @@ _OBSERVED_PROFILE_INPUT_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 
+_PREDECESSOR_RUN_ID_SCHEMA: dict[str, Any] = {
+    "type": "string",
+    "pattern": RUN_ID.pattern,
+    "description": (
+        "The run this one continues. Needs work:read, and the predecessor must "
+        "be in your workspace and repository; it may belong to another "
+        "principal, client or grant. Continuation transfers context, not "
+        "authority."
+    ),
+}
+
 _REGISTER_RUN_DEFINITION: dict[str, Any] = {
     "name": "register_run",
     "title": "Register a run",
@@ -510,21 +563,51 @@ def _require_str(arguments: Mapping[str, Any], field: str) -> str:
     return value
 
 
-def _parse_register_run(arguments: dict[str, Any]) -> dict[str, Any]:
+def _register_run_definition(*, continuation: bool) -> dict[str, Any]:
+    if not continuation:
+        return _REGISTER_RUN_DEFINITION
+    definition = dict(_REGISTER_RUN_DEFINITION)
+    definition["description"] = definition["description"] + (
+        " predecessor_run_id (optional) links this run to the run it "
+        "continues, whose session notes and evidence read_predecessor_context "
+        "then returns; it grants nothing the predecessor could do. An "
+        "ineligible predecessor is a tool error with code "
+        "predecessor-not-eligible."
+    )
+    schema = dict(definition["inputSchema"])
+    schema["properties"] = {
+        **schema["properties"], "predecessor_run_id": _PREDECESSOR_RUN_ID_SCHEMA,
+    }
+    definition["inputSchema"] = schema
+    return definition
+
+
+def _parse_register_run(
+    arguments: dict[str, Any], *, continuation: bool = False
+) -> dict[str, Any]:
     parsed = {
         field: _require_str(arguments, field)
         for field in ("harness_id", "harness_build", "model_id", "recipe_id")
     }
     parsed["observed_profile"] = _parse_observed_profile(arguments.get("observed_profile"))
     parsed["idempotency_key"] = require_key(arguments)
-    unexpected = set(arguments) - {
+    accepted = {
         "harness_id", "harness_build", "model_id", "recipe_id",
         "observed_profile", "idempotency_key",
     }
+    if continuation:
+        accepted.add("predecessor_run_id")
+    unexpected = set(arguments) - accepted
     if unexpected:
         raise ToolFailure(
             "invalid-arguments", f"register_run does not accept: {', '.join(sorted(unexpected))}"
         )
+    predecessor_run_id = arguments.get("predecessor_run_id")
+    if predecessor_run_id is not None and (
+        not isinstance(predecessor_run_id, str) or not RUN_ID.fullmatch(predecessor_run_id)
+    ):
+        raise ToolFailure("invalid-arguments", "predecessor_run_id must be a run_<ULID> handle")
+    parsed["predecessor_run_id"] = predecessor_run_id
     return parsed
 
 
@@ -764,6 +847,61 @@ def _parse_write_session_note(arguments: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# ---------------------------------------------------------------------------
+# read_predecessor_context
+# ---------------------------------------------------------------------------
+
+_READ_PREDECESSOR_CONTEXT_DEFINITION: dict[str, Any] = {
+    "name": "read_predecessor_context",
+    "title": "Read a predecessor run's context",
+    "description": (
+        "Returns the session notes and evidence of the run that run_id "
+        "continues (its predecessor_run_id from register_run), so a "
+        "successor -- possibly another harness, principal or grant -- picks "
+        "up where it stopped. run_id is your own run; an unknown or someone "
+        "else's run_id is a tool error with code run-not-found. A run with "
+        "no predecessor returns predecessor_run_id null and empty lists. "
+        "Read-only: it grants nothing the predecessor could do, and the "
+        "predecessor's run_id stays unusable for your writes."
+    ),
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "run_id": {
+                "type": "string",
+                "pattern": RUN_ID.pattern,
+                "description": "Your own run_id, registered with predecessor_run_id.",
+            },
+        },
+        "required": ["run_id"],
+        "additionalProperties": False,
+    },
+    "annotations": _READ_ONLY_ANNOTATIONS,
+}
+
+
+def _parse_read_predecessor_context(arguments: dict[str, Any]) -> dict[str, Any]:
+    unexpected = set(arguments) - {"run_id"}
+    if unexpected:
+        raise ToolFailure(
+            "invalid-arguments",
+            f"read_predecessor_context does not accept: {', '.join(sorted(unexpected))}",
+        )
+    run_id = arguments.get("run_id")
+    if not isinstance(run_id, str) or not RUN_ID.fullmatch(run_id):
+        raise ToolFailure("invalid-arguments", "run_id must be a run_<ULID> handle")
+    return {"run_id": run_id}
+
+
+def _require_continuation_authority(forwarded: ForwardedIdentity) -> None:
+    identity = forwarded.identity
+    if identity is None or CONTINUATION_AUTHORITY not in identity.authorities:
+        raise ToolFailure(
+            "authority-required",
+            f"continuing a run needs the {CONTINUATION_AUTHORITY} authority",
+        )
+
+
 def build_toolset(context: ToolsetContext) -> ToolSet | None:
     store = context.runs
     if isinstance(store, UnavailableRunRegistry):
@@ -772,11 +910,14 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
         # bucket has nothing it could serve durably, so it advertises
         # nothing rather than tools that would fail every call.
         return None
+    continuation = bool(getattr(store, "supports_continuation", False))
 
     async def _run_register_run(
         parsed: dict[str, Any], forwarded: ForwardedIdentity
     ) -> dict[str, Any]:
         binding = binding_for(forwarded)
+        if parsed["predecessor_run_id"] is not None:
+            _require_continuation_authority(forwarded)
         run_id = await store.register(
             binding,
             idempotency_key=parsed["idempotency_key"],
@@ -788,6 +929,7 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
                 "recipe_id": parsed["recipe_id"],
                 "observed_profile": parsed["observed_profile"],
             },
+            predecessor_run_id=parsed["predecessor_run_id"],
         )
         return {"run_id": run_id}
 
@@ -849,14 +991,46 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
             idempotency_key=parsed["idempotency_key"],
         )
 
+    async def _run_read_predecessor_context(
+        parsed: dict[str, Any], forwarded: ForwardedIdentity
+    ) -> dict[str, Any]:
+        # The bucket already demands work:read; checked again here so the
+        # rule holds wherever this handler is reached from.
+        _require_continuation_authority(forwarded)
+        binding = binding_for(forwarded)
+        # The caller's own run, by its exact binding: the successor reads
+        # through its own handle, never by presenting the predecessor's.
+        await store.resolve(parsed["run_id"], binding, forwarded=forwarded)
+        continued = await store.read_predecessor_context(parsed["run_id"], forwarded=forwarded)
+        return {
+            "run_id": parsed["run_id"],
+            "predecessor_run_id": continued.get("predecessor_run_id"),
+            "session_notes": list(continued.get("session_notes") or []),
+            "evidence": list(continued.get("evidence") or []),
+        }
+
+    continuation_tools: tuple[ToolSpec, ...] = ()
+    if continuation:
+        continuation_tools = (
+            ToolSpec(
+                name="read_predecessor_context",
+                bucket="read",
+                definition=_READ_PREDECESSOR_CONTEXT_DEFINITION,
+                parse=_parse_read_predecessor_context,
+                run=_run_read_predecessor_context,
+            ),
+        )
+
     return ToolSet(
         name="record",
         tools=(
             ToolSpec(
                 name="register_run",
                 bucket="record",
-                definition=_REGISTER_RUN_DEFINITION,
-                parse=_parse_register_run,
+                definition=_register_run_definition(continuation=continuation),
+                parse=lambda arguments: _parse_register_run(
+                    arguments, continuation=continuation
+                ),
                 run=_run_register_run,
             ),
             ToolSpec(
@@ -873,5 +1047,6 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
                 parse=_parse_write_session_note,
                 run=_run_write_session_note,
             ),
+            *continuation_tools,
         ),
     )

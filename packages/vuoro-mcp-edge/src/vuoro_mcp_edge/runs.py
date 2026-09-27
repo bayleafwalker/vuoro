@@ -19,6 +19,15 @@ keyword, and `register` takes the run's `manifest`.  The durable registry
 reaches the run owner through the runtime shell with the caller's own
 assertion, so it cannot answer without it; a registry reached only through
 this protocol must be callable exactly as a toolset calls it.
+
+Contract amendment (2026-09-27, shared contract section 4, agentops#2525):
+`register` takes an optional `predecessor_run_id`.  A run may name the run it
+continues; the registry records the link and refuses it with
+`predecessor-not-eligible` unless the predecessor shares the new run's
+workspace AND repository (the edge checks `work:read` before it asks).  The
+principal, OAuth client and grant may differ: continuation transfers
+context, not authority.  `resolve` is unchanged -- a run still resolves only
+to its exact binding, so a successor can never act on its predecessor's run.
 """
 
 from __future__ import annotations
@@ -37,11 +46,16 @@ if TYPE_CHECKING:
 __all__ = [
     "RUN_ID",
     "InMemoryRunRegistry",
+    "PREDECESSOR_NOT_ELIGIBLE",
     "RunBinding",
     "RunRegistry",
     "UnavailableRunRegistry",
     "binding_for",
 ]
+
+#: The one refusal for a `predecessor_run_id` the caller may not continue:
+#: unknown, malformed, or in another workspace or repository alike.
+PREDECESSOR_NOT_ELIGIBLE = "predecessor-not-eligible"
 
 #: `run_` + 26 Crockford base32 characters (a ULID body).
 RUN_ID = re.compile(r"^run_[0-9A-HJKMNP-TV-Z]{26}$")
@@ -95,6 +109,7 @@ class RunRegistry(Protocol):
         idempotency_key: str,
         forwarded: ForwardedIdentity,
         manifest: Mapping[str, Any],
+        predecessor_run_id: str | None = None,
     ) -> str:
         """Mint a run for `binding`; the same key for the same binding returns
         the same `run_id`.
@@ -102,6 +117,15 @@ class RunRegistry(Protocol):
         `manifest` holds the RunManifest fields the run record carries:
         `harness_id`, `harness_build`, `model_id`, `recipe_id` and
         `observed_profile`.
+
+        `predecessor_run_id`, when given, names the run this one continues.
+        The registry records the link, and refuses with
+        `ToolFailure("predecessor-not-eligible", ...)` unless the predecessor
+        exists and is bound to `binding`'s workspace and repository: one code
+        and one message for every refusal, as for `resolve`.  The caller's
+        principal, client and grant may differ from the predecessor's.  The
+        same key with a different `predecessor_run_id` is
+        `idempotency-conflict`.
         """
 
     async def resolve(
@@ -126,6 +150,7 @@ class UnavailableRunRegistry:
         idempotency_key: str,
         forwarded: ForwardedIdentity,
         manifest: Mapping[str, Any],
+        predecessor_run_id: str | None = None,
     ) -> str:
         raise ToolFailure("runs-unavailable", "run handles are not available yet")
 
@@ -137,6 +162,7 @@ class UnavailableRunRegistry:
 
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _NOT_YOURS = "no run with that id belongs to the caller"
+_NOT_CONTINUABLE = "no run with that id can be continued by the caller"
 
 
 class InMemoryRunRegistry:
@@ -145,6 +171,7 @@ class InMemoryRunRegistry:
     def __init__(self) -> None:
         self._runs: dict[str, RunBinding] = {}
         self._by_key: dict[tuple[RunBinding, str], str] = {}
+        self._predecessors: dict[str, str | None] = {}
 
     async def register(
         self,
@@ -153,13 +180,31 @@ class InMemoryRunRegistry:
         idempotency_key: str,
         forwarded: ForwardedIdentity,
         manifest: Mapping[str, Any],
+        predecessor_run_id: str | None = None,
     ) -> str:
         existing = self._by_key.get((binding, idempotency_key))
         if existing is not None:
+            if self._predecessors[existing] != predecessor_run_id:
+                raise ToolFailure(
+                    "idempotency-conflict",
+                    "that idempotency key already registered a run with another predecessor",
+                )
             return existing
+        if predecessor_run_id is not None:
+            predecessor = (
+                self._runs.get(predecessor_run_id)
+                if RUN_ID.fullmatch(predecessor_run_id)
+                else None
+            )
+            if predecessor is None or (predecessor.workspace_id, predecessor.repo_id) != (
+                binding.workspace_id,
+                binding.repo_id,
+            ):
+                raise ToolFailure(PREDECESSOR_NOT_ELIGIBLE, _NOT_CONTINUABLE)
         run_id = "run_" + "".join(secrets.choice(_CROCKFORD) for _ in range(26))
         self._runs[run_id] = binding
         self._by_key[(binding, idempotency_key)] = run_id
+        self._predecessors[run_id] = predecessor_run_id
         return run_id
 
     async def resolve(
@@ -169,3 +214,9 @@ class InMemoryRunRegistry:
         if owner is None or owner != caller:
             raise ToolFailure("run-not-found", _NOT_YOURS)
         return owner
+
+    def predecessor_of(self, run_id: str) -> str | None:
+        """The recorded predecessor of `run_id` (reference helper, not part of
+        the protocol: callers resolve `run_id` to their own binding first)."""
+
+        return self._predecessors.get(run_id)

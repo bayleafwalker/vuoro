@@ -44,6 +44,11 @@ _JTI_MAX_LENGTH = 8192
 _ROUTE_DIRECT = "direct"
 _ROUTE_EDGE_PROOF = "edge-proof"
 _NBF_CLOCK_SKEW_SECONDS = 2
+#: The longest `exp - iat` accepted.  The replay cache holds each jti until
+#: `exp` plus skew, and its 50,000-entry cap (`replay.DEFAULT_MAX_ENTRIES`)
+#: is sized for this lifetime: a gateway minting longer-lived assertions
+#: would pin cache slots for longer and exhaust it.
+_MAX_ASSERTION_LIFETIME_SECONDS = 30
 _REQUIRED_CLAIMS = (
     "actor",
     "aud",
@@ -367,7 +372,10 @@ class GatewayAssertionIdentityResolver:
             or claims["iat"] - claims["nbf"] > _NBF_CLOCK_SKEW_SECONDS
         ):
             raise IdentityResolutionError("gateway identity nbf skew is invalid")
-        if claims["exp"] <= claims["iat"] or claims["exp"] - claims["iat"] > 30:
+        if (
+            claims["exp"] <= claims["iat"]
+            or claims["exp"] - claims["iat"] > _MAX_ASSERTION_LIFETIME_SECONDS
+        ):
             raise IdentityResolutionError("gateway identity assertion lifetime is invalid")
         # Optional: only an OAuth-minted assertion (the `/mcp` path) carries
         # them.  When present they must be well-formed, never silently dropped:
@@ -386,6 +394,14 @@ class GatewayAssertionIdentityResolver:
             )
         try:
             if proof is not None:
+                # The per-jti use count is in memory too: without the
+                # watermark a shell-only restart would reset it, and a leaked
+                # pod key (the emptyDir survives) could mint another cap's
+                # worth of uses.  The edge forwards assertions only while a
+                # tool call is running, so this refuses just a tool call that
+                # spans a shell restart.  Checked before the proof, so a
+                # refusal does not spend its nonce.
+                self._refuse_before_replay_window(claims)
                 self._verify_edge_proof(request, proof, token)
                 if not self._replay_cache.claim(
                     replay_key,
@@ -406,13 +422,7 @@ class GatewayAssertionIdentityResolver:
                     raise EdgeProofRequiredError(
                         "an MCP gateway assertion is accepted here only through the MCP edge"
                     )
-                if (
-                    self._replay_not_before is not None
-                    and claims["iat"] < self._replay_not_before
-                ):
-                    raise IdentityReplayedError(
-                        "gateway identity assertion predates this verifier's replay window"
-                    )
+                self._refuse_before_replay_window(claims)
                 if not self._replay_cache.claim(
                     replay_key, replay_expires_at, route=_ROUTE_DIRECT
                 ):
@@ -433,6 +443,12 @@ class GatewayAssertionIdentityResolver:
             client_id=client_id,
             grant_id=grant_id,
         )
+
+    def _refuse_before_replay_window(self, claims: Mapping[str, Any]) -> None:
+        if self._replay_not_before is not None and claims["iat"] < self._replay_not_before:
+            raise IdentityReplayedError(
+                "gateway identity assertion predates this verifier's replay window"
+            )
 
     def _verify_edge_proof(self, request: Request, proof: str, token: str) -> None:
         assert self._edge_proofs is not None
