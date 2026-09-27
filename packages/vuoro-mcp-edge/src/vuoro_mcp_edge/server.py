@@ -24,13 +24,17 @@ requires.  A tool without a row cannot be listed or called.
 JSON-RPC errors travel as HTTP 200 with an error body; tool failures
 (including bad arguments and unknown tools) are tool results with
 ``isError: true``.  HTTP status carries only transport-level refusals: 401
-(assertion), 400 (unsupported ``MCP-Protocol-Version``), 413 (body over
-64 KiB), 415 (not JSON), 405 (GET/DELETE), 202 (notifications and responses).
+(assertion), 400 (unsupported ``MCP-Protocol-Version``, ``-32022``, and a
+header/body mismatch, ``-32020``, as the 2026-07-28 schema requires), 413
+(body over 64 KiB), 415 (not JSON), 405 (GET/DELETE), 202 (notifications and
+responses).  An error answered before the request id is known (or when it is
+not a string or integer) omits ``id``: 2026-07-28 types it ``string |
+integer`` and makes it optional, so ``"id": null`` is outside the schema.
 
 Protocol handling (edge plan section 4): ``405`` on GET and DELETE,
 header-to-body agreement on ``MCP-Protocol-Version``, ``Mcp-Method`` and
 ``Mcp-Name`` (mismatch is ``-32020``), ``server/discover``, ``resultType:
-"complete"`` on every result, ``ttlMs``/``cacheScope`` (``"private"``) on list
+"complete"`` on every result (``ping`` included), ``ttlMs``/``cacheScope`` (``"private"``) on list
 and read results, and a fixed
 tool order.  Both protocol eras work: legacy clients open with
 ``initialize`` / ``notifications/initialized``; clients on the 2026-07-28
@@ -120,6 +124,7 @@ _JSONRPC_ASSERTION_REPLAYED = -32003
 #: Replay protection is at capacity and refuses new assertions (fail closed).
 _JSONRPC_REPLAY_CAPACITY = -32004
 _JSONRPC_HEADER_BODY_MISMATCH = -32020
+_JSONRPC_UNSUPPORTED_PROTOCOL_VERSION = -32022
 
 
 # ---------------------------------------------------------------------------
@@ -209,8 +214,19 @@ def _rpc_result(*, id_: Any, result: dict[str, Any]) -> dict[str, Any]:
     return {"jsonrpc": "2.0", "id": id_, "result": result}
 
 
-def _rpc_error(*, id_: Any, code: int, message: str) -> dict[str, Any]:
-    return {"jsonrpc": "2.0", "id": id_, "error": {"code": code, "message": message}}
+def _rpc_error(
+    *, id_: Any, code: int, message: str, data: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    # 2026-07-28 makes an error's id optional and types it string | integer:
+    # an id that is unknown or not a valid RequestId is omitted, never null.
+    error: dict[str, Any] = {"code": code, "message": message}
+    if data is not None:
+        error["data"] = data
+    payload: dict[str, Any] = {"jsonrpc": "2.0"}
+    if _is_request_id(id_):
+        payload["id"] = id_
+    payload["error"] = error
+    return payload
 
 
 def _with_envelope(
@@ -258,6 +274,10 @@ class _ToolFailure(Exception):
 
 def _is_int(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _is_request_id(value: Any) -> bool:
+    return isinstance(value, str) or _is_int(value)
 
 
 def _is_json_content_type(value: str | None) -> bool:
@@ -544,9 +564,10 @@ def create_edge_app(
     def _json(payload: dict[str, Any], status_code: int = 200) -> JSONResponse:
         return JSONResponse(payload, status_code=status_code)
 
-    def _rpc_fail(id_: Any, code: int, message: str) -> JSONResponse:
-        # JSON-RPC errors travel as HTTP 200 with an error body.
-        return _json(_rpc_error(id_=id_, code=code, message=message))
+    def _rpc_fail(id_: Any, code: int, message: str, status_code: int = 200) -> JSONResponse:
+        # JSON-RPC errors travel as HTTP 200 with an error body, except those
+        # the 2026-07-28 schema gives an HTTP status of their own.
+        return _json(_rpc_error(id_=id_, code=code, message=message), status_code)
 
     @app.post(MCP_PATH, include_in_schema=False)
     async def mcp_endpoint(request: Request) -> Response:
@@ -560,8 +581,12 @@ def create_edge_app(
             return _json(
                 _rpc_error(
                     id_=None,
-                    code=_JSONRPC_INVALID_REQUEST,
+                    code=_JSONRPC_UNSUPPORTED_PROTOCOL_VERSION,
                     message="unsupported MCP-Protocol-Version",
+                    data={
+                        "requested": header_version,
+                        "supported": sorted(SUPPORTED_PROTOCOL_VERSIONS),
+                    },
                 ),
                 400,
             )
@@ -614,11 +639,12 @@ def create_edge_app(
             # A notification (including notifications/initialized): no body,
             # and nothing is executed on its behalf.
             return Response(status_code=202)
-        if rpc_id is None or isinstance(rpc_id, bool) or not isinstance(rpc_id, (str, int)):
+        if not _is_request_id(rpc_id):
             return _rpc_fail(None, _JSONRPC_INVALID_REQUEST, "id must be a string or integer")
         mismatch = _header_body_mismatch(request, body)
         if mismatch is not None:
-            return _rpc_fail(rpc_id, _JSONRPC_HEADER_BODY_MISMATCH, mismatch)
+            # HeaderMismatchError: the HTTP status MUST be 400.
+            return _rpc_fail(rpc_id, _JSONRPC_HEADER_BODY_MISMATCH, mismatch, 400)
         params = body.get("params")
         params = params if isinstance(params, dict) else {}
         server_info = {"name": SERVER_NAME, "version": __version__}
@@ -644,7 +670,8 @@ def create_edge_app(
             return _json(_rpc_result(id_=rpc_id, result=result))
 
         if method == "ping":
-            return _json(_rpc_result(id_=rpc_id, result={}))
+            # EmptyResult is a Result: 2026-07-28 requires resultType.
+            return _json(_rpc_result(id_=rpc_id, result=_with_envelope({})))
 
         if method == "server/discover":
             result = _with_envelope(

@@ -26,11 +26,11 @@ upstream.  vuoro-cloud's D-044 tests run at the gateway
 (``docs/evidence/2026-09-25-d044-live-isolation.md``); this is the equivalent
 at the containerised edge, reimplemented here rather than checked out.
 
-Any deviation fails the run, except the few listed in `KNOWN_DEVIATIONS`,
-which are server behaviours that differ from the published schema today and
-are tracked for a fix.  Those are strict in the other direction too: a known
-deviation that is no longer observed fails the run until it is removed from
-the list, so the list cannot go stale.
+Any deviation fails the run, except those listed in `KNOWN_DEVIATIONS`
+(empty since agentops#2526), which would be server behaviours that differ
+from the published schema and are tracked for a fix.  Those are strict in
+the other direction too: a known deviation that is no longer observed fails
+the run until it is removed from the list, so the list cannot go stale.
 
 Subcommands::
 
@@ -94,53 +94,23 @@ class KnownDeviation:
 
 #: Server behaviours that differ from the pinned schema today, by check id.
 #: Each is observed on every run; one that stops being observed fails the
-#: run so this list is edited in the same change that fixes it.  The fixes
-#: belong in vuoro_mcp_edge/server.py (held by vuoro#134 while this job
-#: landed).
-KNOWN_DEVIATIONS: dict[str, KnownDeviation] = {
-    "ping.envelope": KnownDeviation(
-        "ping answers {} with no resultType; EmptyResult is Result, which "
-        "requires resultType in 2026-07-28",
-        frozenset({"JSONRPCResultResponse: result: 'resultType' is a required property"}),
-    ),
-    "error.id-null": KnownDeviation(
-        "errors the server returns before it has read the request id (parse "
-        "error, batch, and the pre-parse 401/400 refusals) carry \"id\": null; "
-        "the 2026-07-28 schema makes id optional and string|integer (omit it). "
-        "A null id where the server did read the id is not excused",
-        frozenset({ID_NULL}),
-    ),
-    "header-mismatch.http-status": KnownDeviation(
-        "a header/body mismatch (-32020) is answered HTTP 200; "
-        "HeaderMismatchError says the HTTP status MUST be 400",
-        frozenset({"HTTP 200, expected 400"}),
-    ),
-    "unsupported-version.error": KnownDeviation(
-        "an unsupported MCP-Protocol-Version is -32600 without data; "
-        "UnsupportedProtocolVersionError is -32022 with data.requested and "
-        "data.supported (unsupported-version.observed-shape pins the -32600 "
-        "answer while this lasts)",
-        frozenset(
-            {
-                "UnsupportedProtocolVersionError: error: 'data' is a required property",
-                "UnsupportedProtocolVersionError: error/code: -32022 was expected",
-                "error.code is -32600, expected -32022",
-            }
-        ),
-    ),
-}
+#: run so this list is edited in the same change that fixes it.  Empty since
+#: agentops#2526 fixed the four the job landed with (ping without
+#: resultType, "id": null on errors, -32020 over HTTP 200, and -32600 for an
+#: unsupported version): a new deviation is fixed in
+#: vuoro_mcp_edge/server.py, not listed here.
+KNOWN_DEVIATIONS: dict[str, KnownDeviation] = {}
 
 # ---------------------------------------------------------------------------
 # Edge proof / replay protection (vuoro#134, agentops#2519)
 # ---------------------------------------------------------------------------
-#: The one switch #134 needs here.  With #134 merged the edge consumes each
-#: assertion's jti (a second presentation is HTTP 401, -32003) and signs every
-#: upstream call with an X-Vuoro-Edge-Proof; set this to True in the change
-#: that merges #134 (or right after) so both become checked properly.  The
-#: container wiring #134 requires (VUORO_EDGE_PROOF_KEY_FILE on a writable
-#: tmpfs) is already in scripts/mcp_strict_client.sh, and every assertion
-#: minted below already carries a fresh jti plus client_id and grant_id.
-ENFORCE_EDGE_PROOF_AND_REPLAY = False
+#: #134 is merged: the edge consumes each assertion's jti (a second
+#: presentation is HTTP 401, -32003) and signs every upstream call with an
+#: X-Vuoro-Edge-Proof, and both are checked.  The container wiring #134
+#: requires (VUORO_EDGE_PROOF_KEY_FILE on a writable tmpfs) is in
+#: scripts/mcp_strict_client.sh, and every assertion minted below carries a
+#: fresh jti plus client_id and grant_id.
+ENFORCE_EDGE_PROOF_AND_REPLAY = True
 JSONRPC_ASSERTION_REPLAYED = -32003
 
 # ---------------------------------------------------------------------------
@@ -613,10 +583,10 @@ class Checks:
 
         `rpc_id` is the id the request carried (None when it has none, e.g.
         invalid JSON or a batch).  `pre_parse` marks a refusal the server
-        makes before reading the body (401, unsupported version): there, as
-        for an id-less request, "id": null is the tracked error.id-null
-        deviation.  Anywhere else a null id is a failure of this check, and
-        any non-null id must equal `rpc_id`."""
+        makes before reading the body (401, unsupported version), where it
+        may omit the id.  A null id is always a failure (2026-07-28 types id
+        string | integer and makes it optional), a present id must equal
+        `rpc_id`, and where the server read the request it must echo it."""
 
         body, problems = _json_body(response)
         status_problems = (
@@ -627,18 +597,15 @@ class Checks:
         else:
             self.report.record(status_check_id, f"{label} HTTP status", status_problems)
         if isinstance(body, dict):
-            if "id" in body and body["id"] is None:
-                if rpc_id is None or pre_parse:
-                    # The tracked deviation, under its own check id; validate
-                    # the rest of the body without it.
-                    self.report.record("error.id-null", f"{label} id", [ID_NULL])
-                    body = {k: v for k, v in body.items() if k != "id"}
-                else:
-                    problems.append(f"id is null, expected {rpc_id!r} (the server read the request)")
-            elif "id" in body and rpc_id is not None and body["id"] != rpc_id:
-                problems.append(f"id is {body['id']!r}, expected {rpc_id!r}")
-            elif "id" in body and rpc_id is None:
-                problems.append(f"id is {body['id']!r} for a request without one")
+            if "id" in body:
+                if body["id"] is None:
+                    problems.append(ID_NULL)
+                elif rpc_id is None:
+                    problems.append(f"id is {body['id']!r} for a request without one")
+                elif body["id"] != rpc_id:
+                    problems.append(f"id is {body['id']!r}, expected {rpc_id!r}")
+            elif rpc_id is not None and not pre_parse:
+                problems.append(f"id is missing, expected {rpc_id!r} (the server read the request)")
             problems += self.schema.errors(wrapper, body)
             if "result" in body:
                 problems.append("an error response carries a result")
@@ -764,16 +731,12 @@ class Checks:
             status_check_id="unsupported-version.http-status",
             wrapper="UnsupportedProtocolVersionError",
         )
-        error = (seen or {}).get("error")
-        if not isinstance(error, dict) or error.get("code") != -32022:
-            # While the known deviation lasts, the answer must be exactly the
-            # observed one: a well-formed -32600 error response.
-            observed = {k: v for k, v in (seen or {}).items() if k != "id" or v is not None}
-            problems = self.schema.errors("JSONRPCErrorResponse", observed)
-            if not isinstance(error, dict) or error.get("code") != -32600:
-                problems.append(f"error is {error!r}, expected -32022 or the known -32600")
-            self.report.record("unsupported-version.observed-shape",
-                               "unsupported MCP-Protocol-Version answered as the known -32600", problems)
+        data = ((seen or {}).get("error") or {}).get("data") or {}
+        self.report.record(
+            "unsupported-version.data", "unsupported MCP-Protocol-Version names the versions",
+            [] if data.get("requested") == "2099-01-01" and PROTOCOL_VERSION in data.get("supported", [])
+            else [f"error.data is {data!r}, expected requested 2099-01-01 and {PROTOCOL_VERSION} supported"],
+        )
         rpc_id, response = client.request("tools/list", authenticated=False)
         self.error("error.unauthenticated", "no gateway assertion", response,
                    http_status=401, code=-32001, definition="Error", rpc_id=rpc_id, pre_parse=True)
@@ -789,8 +752,8 @@ class Checks:
         self.ping(rpc_id, response)
 
     def ping(self, rpc_id: int, response: httpx.Response) -> None:
-        """ping: EmptyResult (Result) requires resultType.  Transport, id and
-        everything but the tracked missing resultType are checked apart."""
+        """ping: EmptyResult (Result) requires resultType.  Transport and id
+        are recorded apart from the envelope, so each fails under its name."""
 
         body, problems = _json_body(response)
         if response.status_code != 200:
@@ -802,9 +765,7 @@ class Checks:
             if "error" in body:
                 problems.append(f"an error response to ping: {body['error']!r}")
             envelope = self.schema.errors("JSONRPCResultResponse", body)
-            result = body.get("result")
-            if isinstance(result, dict) and "resultType" in result:
-                envelope += result_value_errors(result)
+            envelope += result_value_errors(body.get("result"))
         else:
             problems.append("body is not a JSON-RPC object")
         self.report.record("ping.transport", "ping answered 200 with its id", problems)

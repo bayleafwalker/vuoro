@@ -121,12 +121,28 @@ def test_tool_errors_need_is_error_code_and_message() -> None:
     assert client.tool_error_errors({**good, "structuredContent": {}}, "item-not-found")
 
 
+def test_no_deviation_is_excused_and_edge_proof_is_enforced() -> None:
+    # agentops#2526 fixed the four the job landed with; #134 is merged.
+    assert client.KNOWN_DEVIATIONS == {}
+    assert client.ENFORCE_EDGE_PROOF_AND_REPLAY is True
+
+
+@pytest.fixture
+def sample_known(monkeypatch):
+    """The Report mechanism, exercised with a stand-in allow-list."""
+    monkeypatch.setattr(
+        client,
+        "KNOWN_DEVIATIONS",
+        {"ping.envelope": client.KnownDeviation("sample", frozenset({"sample problem"}))},
+    )
+
+
 def _observe_all_known(report) -> None:
     for check_id, known in client.KNOWN_DEVIATIONS.items():
         report.record(check_id, "known", sorted(known.messages))
 
 
-def test_report_fails_on_new_deviations_and_on_stale_known_ones(capsys) -> None:
+def test_report_fails_on_new_deviations_and_on_stale_known_ones(capsys, sample_known) -> None:
     report = client.Report()
     _observe_all_known(report)
     report.record("tools-list", "tools/list", [])
@@ -142,7 +158,7 @@ def test_report_fails_on_new_deviations_and_on_stale_known_ones(capsys) -> None:
     assert "no longer observed" in capsys.readouterr().out
 
 
-def test_a_known_check_id_excuses_only_its_exact_messages() -> None:
+def test_a_known_check_id_excuses_only_its_exact_messages(sample_known) -> None:
     report = client.Report()
     _observe_all_known(report)
     report.record("ping.envelope", "ping", ["JSONRPCResultResponse: id: None is not of type 'string'"])
@@ -152,10 +168,9 @@ def test_a_known_check_id_excuses_only_its_exact_messages() -> None:
 
 def test_every_known_deviation_names_a_check_the_client_runs() -> None:
     source = SCRIPT.read_text(encoding="utf-8")
-    body = source.split("KNOWN_DEVIATIONS: dict[str, KnownDeviation] = {", 1)[1].split("\n}\n", 1)[1]
+    body = source.split("\nENFORCE_EDGE_PROOF_AND_REPLAY = ", 1)[1]
     for check_id in client.KNOWN_DEVIATIONS:
-        assert f'"{check_id}"' in body or check_id == "error.id-null", f"{check_id} is never recorded"
-    assert '"error.id-null"' in body
+        assert f'"{check_id}"' in body, f"{check_id} is never recorded"
 
 
 def _response(status: int, body) -> httpx.Response:
@@ -171,20 +186,33 @@ def _failed(report) -> list[str]:
     return sorted({check_id for check_id, _ in report.failures})
 
 
-def test_a_null_id_is_excused_only_where_the_server_could_not_read_it(schema) -> None:
-    error = {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "invalid JSON"}}
+def test_a_null_id_fails_everywhere_and_an_omitted_one_only_where_read(schema) -> None:
+    error = {"jsonrpc": "2.0", "error": {"code": -32700, "message": "invalid JSON"}}
     checks, report = _checks(schema)
     checks.error("error.parse", "parse", _response(200, error), http_status=200,
                  code=-32700, definition="ParseError")
-    assert _failed(report) == [] and "error.id-null" in report.observed_known
+    assert _failed(report) == []
 
-    # The server read id 7 (method not found) but answered null: a failure.
-    error = {"jsonrpc": "2.0", "id": None, "error": {"code": -32601, "message": "nope"}}
     checks, report = _checks(schema)
-    checks.error("error.method-not-found", "unknown method", _response(200, error),
-                 http_status=200, code=-32601, definition="MethodNotFoundError", rpc_id=7)
-    assert _failed(report) == ["error.method-not-found"]
-    assert "error.id-null" not in report.observed_known
+    checks.error("error.parse", "parse", _response(200, {**error, "id": None}), http_status=200,
+                 code=-32700, definition="ParseError")
+    assert _failed(report) == ["error.parse"]
+    assert any(client.ID_NULL in message for _, message in report.failures)
+
+    checks, report = _checks(schema)
+    checks.error("error.unauthenticated", "401", _response(401, {**error, "id": None}),
+                 http_status=401, code=-32700, definition="Error", rpc_id=3, pre_parse=True)
+    assert _failed(report) == ["error.unauthenticated"]
+
+    # The server read id 7 (method not found): null or omitted is a failure.
+    for body in (
+        {"jsonrpc": "2.0", "id": None, "error": {"code": -32601, "message": "nope"}},
+        {"jsonrpc": "2.0", "error": {"code": -32601, "message": "nope"}},
+    ):
+        checks, report = _checks(schema)
+        checks.error("error.method-not-found", "unknown method", _response(200, body),
+                     http_status=200, code=-32601, definition="MethodNotFoundError", rpc_id=7)
+        assert _failed(report) == ["error.method-not-found"]
 
 
 def test_a_wrong_non_null_id_fails_even_on_a_pre_parse_refusal(schema) -> None:
@@ -195,17 +223,21 @@ def test_a_wrong_non_null_id_fails_even_on_a_pre_parse_refusal(schema) -> None:
     assert _failed(report) == ["error.unauthenticated"]
 
 
-def test_ping_failing_transport_is_not_masked_by_the_known_deviation(schema) -> None:
+def test_ping_transport_and_envelope_fail_under_their_own_names(schema) -> None:
     checks, report = _checks(schema)
-    checks.ping(5, _response(200, {"jsonrpc": "2.0", "id": 5, "result": {}}))
-    assert _failed(report) == [] and "ping.envelope" in report.observed_known
+    checks.ping(5, _response(200, {"jsonrpc": "2.0", "id": 5, "result": {"resultType": "complete"}}))
+    assert _failed(report) == []
 
     checks, report = _checks(schema)
-    checks.ping(5, _response(500, {"jsonrpc": "2.0", "id": 5, "result": {}}))
+    checks.ping(5, _response(200, {"jsonrpc": "2.0", "id": 5, "result": {}}))
+    assert _failed(report) == ["ping.envelope"]
+
+    checks, report = _checks(schema)
+    checks.ping(5, _response(500, {"jsonrpc": "2.0", "id": 5, "result": {"resultType": "complete"}}))
     assert _failed(report) == ["ping.transport"]
 
     checks, report = _checks(schema)
-    checks.ping(5, _response(200, {"jsonrpc": "2.0", "id": 6, "result": {}}))
+    checks.ping(5, _response(200, {"jsonrpc": "2.0", "id": 6, "result": {"resultType": "complete"}}))
     assert _failed(report) == ["ping.transport"]
 
     checks, report = _checks(schema)
@@ -225,11 +257,20 @@ def test_unsupported_version_body_problems_are_not_masked(schema) -> None:
         )
         return seen, report
 
-    # Today's answer: only the tracked messages.
-    _, report = run({"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "unsupported"}})
+    good = {
+        "jsonrpc": "2.0",
+        "error": {
+            "code": -32022,
+            "message": "unsupported MCP-Protocol-Version",
+            "data": {"requested": "2099-01-01", "supported": ["2026-07-28"]},
+        },
+    }
+    _, report = run(good)
     assert _failed(report) == []
-    # A missing message is not one of them.
-    _, report = run({"jsonrpc": "2.0", "id": None, "error": {"code": -32600}})
+    # The pre-#2526 answer: -32600 without data.
+    _, report = run({"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "unsupported"}})
+    assert _failed(report) == ["unsupported-version.error"]
+    _, report = run({**good, "error": {k: v for k, v in good["error"].items() if k != "data"}})
     assert _failed(report) == ["unsupported-version.error"]
 
 

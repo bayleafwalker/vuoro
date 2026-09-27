@@ -88,12 +88,16 @@ are tool errors too (`invalid-params`, `unknown-tool`).
 ## Protocol
 
 One stateless endpoint, `POST /mcp`, answering plain JSON. JSON-RPC errors
-(`-32700`, `-32600` for a missing/wrong `jsonrpc` or a batch, `-32601`, `-32020`)
-are HTTP 200 with an error body; `ping` returns `{}`. A request without an `id`
+(`-32700`, `-32600` for a missing/wrong `jsonrpc` or a batch, `-32601`)
+are HTTP 200 with an error body; `ping` returns `{"resultType": "complete"}`.
+An error answered before the request `id` is known (or when it is not a
+string or integer) omits `id` rather than sending `null`, as the 2026-07-28
+schema requires. A request without an `id`
 is a notification and a body with no `method` is a client response: both get
 202 with no body. HTTP status is used only for 401 (assertion), 400
-(unsupported `MCP-Protocol-Version` header), 413 (body over 64 KiB), 415
-(Content-Type not JSON) and 405 (`GET`, `DELETE`). There is no SSE and no
+(unsupported `MCP-Protocol-Version` header: `-32022` with `data.requested`
+and `data.supported`; header/body mismatch: `-32020`), 413 (body over
+64 KiB), 415 (Content-Type not JSON) and 405 (`GET`, `DELETE`). There is no SSE and no
 `Mcp-Session-Id`. Tools carry a `title` and read-only `annotations`. Both
 protocol eras work: `initialize` (echoing 2024-11-05, 2025-03-26, 2025-06-18
 or 2025-11-25, otherwise

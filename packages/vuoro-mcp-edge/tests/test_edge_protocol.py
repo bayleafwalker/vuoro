@@ -89,11 +89,23 @@ def test_every_supported_version_is_accepted_as_a_header(client, auth, version) 
 
 
 def test_unsupported_protocol_version_header_is_http_400(client, auth) -> None:
+    """UnsupportedProtocolVersionError (2026-07-28): HTTP 400, -32022, and
+    data naming what was requested and what the client may retry with."""
     response = client.post(
         MCP_PATH, headers={**auth, "MCP-Protocol-Version": "2023-01-01"}, json=rpc("tools/list")
     )
     assert response.status_code == 400
-    assert response.json()["error"]["code"] == -32600
+    assert response.json() == {
+        "jsonrpc": "2.0",
+        "error": {
+            "code": -32022,
+            "message": "unsupported MCP-Protocol-Version",
+            "data": {
+                "requested": "2023-01-01",
+                "supported": sorted([*LEGACY_VERSIONS, CURRENT_VERSION]),
+            },
+        },
+    }
 
 
 def test_current_era_discover_without_any_handshake(client, auth) -> None:
@@ -175,8 +187,10 @@ def test_describe_work_takes_an_integer_work_id(client, auth) -> None:
     ],
 )
 def test_header_body_mismatch_is_32020(client, auth, headers, body, fragment) -> None:
+    # HeaderMismatchError: "the response status code MUST be 400".
     response = client.post(MCP_PATH, headers={**auth, **headers}, json=body)
-    assert response.status_code == 200
+    assert response.status_code == 400
+    assert response.json()["id"] == body["id"]
     error = response.json()["error"]
     assert error["code"] == -32020
     assert fragment in error["message"]
@@ -199,9 +213,10 @@ def test_unknown_method_is_32601_over_http_200(client, auth) -> None:
 
 
 def test_ping_returns_an_empty_result(client, auth) -> None:
+    # EmptyResult is a Result, which requires resultType in 2026-07-28.
     response = client.post(MCP_PATH, headers=auth, json=rpc("ping"))
     assert response.status_code == 200
-    assert response.json() == {"jsonrpc": "2.0", "id": 1, "result": {}}
+    assert response.json() == {"jsonrpc": "2.0", "id": 1, "result": {"resultType": "complete"}}
 
 
 def test_invalid_json_is_parse_error_over_http_200(client, auth) -> None:
@@ -210,6 +225,43 @@ def test_invalid_json_is_parse_error_over_http_200(client, auth) -> None:
     )
     assert response.status_code == 200
     assert response.json()["error"]["code"] == -32700
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        b"{not json",
+        b'[{"jsonrpc":"2.0","id":1,"method":"tools/list"}]',
+        b'"tools/list"',
+        b'{"jsonrpc":"2.0","id":null,"method":"tools/list"}',
+        b'{"jsonrpc":"2.0","id":true,"method":"tools/list"}',
+        b'{"jsonrpc":"2.0","id":[1],"method":"tools/list"}',
+        b'{"jsonrpc":"1.0","id":{"x":1},"method":"tools/list"}',
+    ],
+)
+def test_an_error_without_a_usable_request_id_omits_id(client, auth, content) -> None:
+    """2026-07-28 types an error's id string | integer and makes it optional:
+    where the server has no valid id to echo, it omits id, never null."""
+    response = client.post(
+        MCP_PATH, headers={**auth, "content-type": "application/json"}, content=content
+    )
+    assert response.status_code == 200
+    assert "id" not in response.json()
+    assert response.json()["error"]["code"] in (-32700, -32600)
+
+
+def test_a_wrong_jsonrpc_version_still_echoes_a_valid_id(client, auth) -> None:
+    response = client.post(MCP_PATH, headers=auth, json={**rpc("tools/list"), "jsonrpc": "1.0"})
+    assert response.json()["id"] == 1
+
+
+def test_pre_parse_refusals_omit_id(keys, auth) -> None:
+    client = edge_client(keys[0], FakeShell())
+    unauthenticated = client.post(MCP_PATH, json=rpc("tools/list"))
+    assert unauthenticated.status_code == 401
+    assert "id" not in unauthenticated.json()
+    for method in (client.get, client.delete):
+        assert "id" not in method(MCP_PATH).json()
 
 
 def test_batch_is_invalid_request_over_http_200(client, auth) -> None:
