@@ -7,6 +7,7 @@ from vuoro_service.lease import (
     LeaseHolderMismatchError,
     LeaseNotCurrentError,
     LeaseStore,
+    RetainedOutcome,
 )
 
 
@@ -137,3 +138,110 @@ def test_heartbeat_one_tick_past_ttl_boundary_fails() -> None:
     clock.advance(10.0001)
     with pytest.raises(LeaseNotCurrentError):
         store.heartbeat(lease.lease_id, "worker-a")
+
+
+# INV-L1 (agentops#2540): a lease grants authority, not ownership of the
+# result.  A late completion is refused and settles nothing, but its result
+# is retained as evidence instead of being discarded.
+
+
+def test_a_superseded_holders_late_result_is_retained_but_settles_nothing() -> None:
+    clock = FakeClock()
+    store = LeaseStore(clock=clock)
+    stale = store.claim("run-1", "worker-a", ttl_seconds=10)
+    clock.advance(11)
+    live = store.reclaim("run-1", "worker-b", ttl_seconds=10)
+    with pytest.raises(LeaseNotCurrentError):
+        store.complete(stale.lease_id, "worker-a", result={"diff": "a's work"})
+    assert store.retained_outcomes("run-1") == (
+        RetainedOutcome(
+            lease_id=stale.lease_id, subject="run-1", holder="worker-a",
+            result={"diff": "a's work"}, reason="superseded", retained_at=clock.now,
+        ),
+    )
+    (kept,) = store.retained_outcomes("run-1")
+    assert (kept.disposition, kept.settlement_effect) == ("stale", "none")
+    # worker-b's lease is untouched and still settles its own work.
+    assert store.is_expired("run-1") is False
+    store.complete(live.lease_id, "worker-b", result={"diff": "b's work"})
+    assert store.is_expired("run-1") is None
+    assert len(store.retained_outcomes("run-1")) == 1
+
+
+def test_an_expired_holders_result_is_retained_and_the_lease_stays() -> None:
+    clock = FakeClock()
+    store = LeaseStore(clock=clock)
+    lease = store.claim("run-1", "worker-a", ttl_seconds=10)
+    clock.advance(11)
+    with pytest.raises(LeaseNotCurrentError):
+        store.complete(lease.lease_id, "worker-a", result="late")
+    (kept,) = store.retained_outcomes("run-1")
+    assert (kept.lease_id, kept.reason, kept.result) == (lease.lease_id, "expired", "late")
+    # Nothing was settled: the subject still has its (expired) lease.
+    assert store.is_expired("run-1") is True
+
+
+def test_a_strangers_or_unknown_completion_retains_nothing() -> None:
+    clock = FakeClock()
+    store = LeaseStore(clock=clock)
+    stale = store.claim("run-1", "worker-a", ttl_seconds=10)
+    clock.advance(11)
+    store.reclaim("run-1", "worker-b", ttl_seconds=10)
+    with pytest.raises(LeaseNotCurrentError):
+        store.complete(stale.lease_id, "worker-imposter", result="x")
+    with pytest.raises(LeaseNotCurrentError):
+        store.complete("does-not-exist", "worker-a", result="x")
+    assert store.retained_outcomes("run-1") == ()
+
+
+def test_a_current_completion_retains_nothing() -> None:
+    store = LeaseStore(clock=FakeClock())
+    lease = store.claim("run-1", "worker-a", ttl_seconds=10)
+    store.complete(lease.lease_id, "worker-a", result="done")
+    assert store.retained_outcomes("run-1") == ()
+
+
+def test_a_retry_after_the_holders_own_completion_retains_nothing() -> None:
+    store = LeaseStore(clock=FakeClock())
+    lease = store.claim("run-1", "worker-a", ttl_seconds=10)
+    store.complete(lease.lease_id, "worker-a", result="done")
+    with pytest.raises(LeaseNotCurrentError):
+        store.complete(lease.lease_id, "worker-a", result="done")
+    assert store.retained_outcomes("run-1") == ()
+
+
+def test_refusals_look_the_same_whether_or_not_anything_was_retained() -> None:
+    clock = FakeClock()
+    store = LeaseStore(clock=clock)
+    stale = store.claim("run-1", "worker-a", ttl_seconds=10)
+    clock.advance(11)
+    store.reclaim("run-1", "worker-b", ttl_seconds=10)
+    messages = []
+    for holder in ("worker-a", "worker-imposter"):
+        with pytest.raises(LeaseNotCurrentError) as refused:
+            store.complete(stale.lease_id, holder, result="x")
+        messages.append(str(refused.value))
+    assert messages[0] == messages[1]
+    assert len(store.retained_outcomes("run-1")) == 1
+
+
+def test_the_retained_result_is_a_copy() -> None:
+    clock = FakeClock()
+    store = LeaseStore(clock=clock)
+    lease = store.claim("run-1", "worker-a", ttl_seconds=10)
+    clock.advance(11)
+    result = {"diff": "a"}
+    with pytest.raises(LeaseNotCurrentError):
+        store.complete(lease.lease_id, "worker-a", result=result)
+    result["diff"] = "changed"
+    assert store.retained_outcomes("run-1")[0].result == {"diff": "a"}
+
+
+def test_a_stale_heartbeat_retains_nothing() -> None:
+    clock = FakeClock()
+    store = LeaseStore(clock=clock)
+    lease = store.claim("run-1", "worker-a", ttl_seconds=10)
+    clock.advance(11)
+    with pytest.raises(LeaseNotCurrentError):
+        store.heartbeat(lease.lease_id, "worker-a")
+    assert store.retained_outcomes("run-1") == ()

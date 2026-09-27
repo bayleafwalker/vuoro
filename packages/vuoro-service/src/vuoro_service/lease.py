@@ -7,6 +7,14 @@ permanently dead -- a heartbeat or completion replayed against it must fail,
 even if it arrives holding the correct former-holder identity, because
 `lease_id` identity (not `holder` identity alone) is what "current" means.
 
+A lease grants authority, not ownership of the result (INV-L1, the
+operator's lease contract in agentops docs/plans/2026-09-27-backlog-ideation.md
+R4, agentops#2540): a completion submitted under an expired or superseded
+lease never settles, but its result is retained as evidence
+(`disposition="stale"`, `settlement_effect="none"`) rather than discarded.
+Only the lease's own holder's result is retained; an unknown lease id or
+another holder's completion leaves nothing.
+
 This is new surface with no existing consumer (see
 docs/plans/2026-09-20-e0-hardening-status-and-design.md): the store is
 in-memory, keyed by subject, with an injectable clock so tests do not sleep.
@@ -15,6 +23,7 @@ in-memory, keyed by subject, with an injectable clock so tests do not sleep.
 from __future__ import annotations
 
 from collections.abc import Callable
+import copy
 from dataclasses import dataclass, replace
 import time
 import uuid
@@ -56,12 +65,34 @@ class Lease:
         return now > self.last_heartbeat_at + self.ttl_seconds
 
 
+@dataclass(frozen=True)
+class RetainedOutcome:
+    """A completion refused because its lease was no longer current, kept
+    as evidence (INV-L1).  It settled nothing."""
+
+    lease_id: str
+    subject: str
+    holder: str
+    result: object
+    reason: str  # "expired" or "superseded"
+    retained_at: float
+    disposition: str = "stale"
+    settlement_effect: str = "none"
+
+
 class LeaseStore:
     """In-memory lease store. One active lease per subject at a time."""
 
     def __init__(self, *, clock: Callable[[], float] = time.monotonic) -> None:
         self._clock = clock
         self._by_subject: dict[str, Lease] = {}
+        # Every lease ever issued, so a late completion can be attributed
+        # to its own holder and retained (INV-L1).
+        self._issued: dict[str, Lease] = {}
+        self._retained: list[RetainedOutcome] = []
+        # Lease ids their own holder completed: a retried completion of
+        # settled work is not a late result and is not retained.
+        self._completed: set[str] = set()
 
     def _now(self) -> float:
         return self._clock()
@@ -84,6 +115,7 @@ class LeaseStore:
             last_heartbeat_at=now,
         )
         self._by_subject[subject] = lease
+        self._issued[lease.lease_id] = lease
         return lease
 
     # Alias matching claim_work-style vocabulary used elsewhere in the
@@ -110,6 +142,7 @@ class LeaseStore:
             last_heartbeat_at=now,
         )
         self._by_subject[subject] = lease
+        self._issued[lease.lease_id] = lease
         return lease
 
     def _current_for_lease_id(self, lease_id: str) -> Lease | None:
@@ -138,26 +171,59 @@ class LeaseStore:
         self._by_subject[current.subject] = renewed
         return renewed
 
-    def complete(self, lease_id: str, holder: str) -> None:
+    def complete(self, lease_id: str, holder: str, *, result: object = None) -> None:
         """Release the lease as successfully completed by its holder.
 
         A completion replayed against a lease id that is no longer current
         -- because it expired and was reclaimed, or never existed -- must
         fail exactly like an unknown lease, not silently no-op: a stale
         holder's late completion must never be mistaken for the new
-        holder's work.
+        holder's work.  It is not discarded either (INV-L1): when the
+        lease id was issued to `holder`, the attempt and its `result` are
+        retained as a non-settling outcome (:meth:`retained_outcomes`)
+        before the refusal is raised.  A retry of a completion that
+        already succeeded is refused the same way but retains nothing: the
+        work it reports was settled, not late.  The refusal never reveals
+        whether anything was retained.
         """
         now = self._now()
         current = self._current_for_lease_id(lease_id)
         if current is None:
+            issued = self._issued.get(lease_id)
+            if (
+                issued is not None
+                and issued.holder == holder
+                and lease_id not in self._completed
+            ):
+                self._retain(issued, result, "superseded", now)
             raise LeaseNotCurrentError(f"lease {lease_id!r} is not current")
         if current.holder != holder:
             raise LeaseHolderMismatchError(
                 f"holder {holder!r} does not match lease {lease_id!r}"
             )
         if current.is_expired(now=now):
+            self._retain(current, result, "expired", now)
             raise LeaseNotCurrentError(f"lease {lease_id!r} has already expired")
         del self._by_subject[current.subject]
+        self._completed.add(lease_id)
+
+    def _retain(self, lease: Lease, result: object, reason: str, now: float) -> None:
+        self._retained.append(
+            RetainedOutcome(
+                lease_id=lease.lease_id,
+                subject=lease.subject,
+                holder=lease.holder,
+                # A copy: later changes by the caller must not rewrite
+                # the evidence.
+                result=copy.deepcopy(result),
+                reason=reason,
+                retained_at=now,
+            )
+        )
+
+    def retained_outcomes(self, subject: str) -> tuple[RetainedOutcome, ...]:
+        """The non-settling outcomes kept for `subject`, oldest first."""
+        return tuple(o for o in self._retained if o.subject == subject)
 
     def is_expired(self, subject: str) -> bool | None:
         """`True`/`False` for a known subject's current lease, `None` if
