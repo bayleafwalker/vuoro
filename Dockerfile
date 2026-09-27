@@ -17,13 +17,16 @@ RUN python /usr/local/bin/fetch-pinned-adapters /opt/vuoro/composition/adapter-p
 COPY README.md pyproject.toml uv.lock ./
 COPY packages/vuoro-service ./packages/vuoro-service
 COPY packages/vuoro-mcp-edge ./packages/vuoro-mcp-edge
+COPY packages/vuoro-evidence ./packages/vuoro-evidence
 # A build log showing the right wheels being fetched is not evidence of what
 # ended up installed, so verify it and keep the result in the image.
-# vuoro-mcp-edge is installed beside vuoro-service in one resolution so its
-# vuoro-service dependency is satisfied by the local package, never an index;
+# vuoro-mcp-edge is installed beside vuoro-service and vuoro-evidence in one
+# resolution so its workspace dependencies are satisfied by the local
+# packages, never an index (neither name is published; resolving them from
+# an index would install whatever someone else registered under that name);
 # it serves `vuoro-service mcp-serve --port 8081` from the same image.
 RUN python -m pip install --no-cache-dir "psycopg[binary]>=3.2,<4" "click>=8.1" \
-        ./packages/vuoro-service ./packages/vuoro-mcp-edge \
+        ./packages/vuoro-service ./packages/vuoro-evidence ./packages/vuoro-mcp-edge \
     && python -m pip install --no-cache-dir \
         /opt/vuoro/adapters/auditctl-*.whl \
         /opt/vuoro/adapters/sprintctl-*.whl \

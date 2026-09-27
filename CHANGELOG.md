@@ -7,14 +7,19 @@ recorded here.
 
 - vuoro-service 0.1.76 / vuoro-mcp-edge 0.1.3: the work adapter is pinned to
   sprintctl 0.8.0 (remote schema 17; its migration runs in each tenant's
-  `vuoro-migrate` job on roll-out). The edge gains E2's record bucket
-  (`register_run`, `append_evidence`, `write_session_note`; agentops#2466),
-  listed only with a durable run registry. E3's propose bucket
-  (`propose_effect`, `get_effect`; agentops#2467) lists nothing until a
-  durable intent store exists; its trusted-side reconciler,
-  `packages/vuoro-reconciler` 0.1.0, is not part of the service image. The
-  E2/E3 contract amends `RunRegistry` (forwarded identity) and keys
-  idempotency by (workspace, principal, tool, key). (#131, #130, #132)
+  `vuoro-migrate` job on roll-out). The edge serves E2's record bucket
+  (`register_run`, `append_evidence`, `write_session_note`; agentops#2466)
+  over the durable `SprintctlRecordStore`. Calls need the `work:evidence`
+  authority, which the hosted gateway grants only once it issues
+  `vuoro:evidence.record` (vuoro-cloud, a later generation); until then they
+  answer `authority-required`. E3's propose bucket (`propose_effect`, `get_effect`;
+  agentops#2467) lists nothing until a durable intent store exists; its
+  trusted-side reconciler, `packages/vuoro-reconciler` 0.1.0, is not part of
+  the service image. The shared toolset seam and E2/E3 contract (#129) are
+  amended: `RunRegistry` takes the forwarded identity, and idempotency is
+  keyed by (workspace, principal, tool, key). The image now installs the
+  workspace package `vuoro-evidence` from the repository instead of
+  resolving it from an index. (#129, #131, #130, #132)
 
 - vuoro-client 0.1.1: authenticate `GET /api/meta/v1/handshake` and
   `GET /api/catalog/v1` whenever the profile has a credential (hosted
