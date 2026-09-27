@@ -140,3 +140,30 @@ jobs:
         run: docker run --rm --entrypoint python vuoro-service:ci -m pip check
       - name: Check the image serves the MCP edge
         run: docker run --rm vuoro-service:ci mcp-serve --help
+
+  mcp-strict-client:
+    # The resultType/cacheScope regression reached production because
+    # claude.ai is a lenient MCP client and Claude Code a strict one.  Run a
+    # strict 2026-07-28 client (every response checked against the pinned
+    # published schema and the value rules strict clients enforce) and the
+    # D-044 two-workspace isolation test against `mcp-serve` from the
+    # service image, on every PR.  A separate job from service-image so the
+    # failure has its own name; it rebuilds from the same gha cache, in
+    # parallel, and writes nothing back to it.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.3.2
+        with:
+          python-version: "3.12"
+      - uses: docker/setup-buildx-action@v4
+      - name: Build the service image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          load: true
+          tags: vuoro-service:ci
+          cache-from: type=gha,scope=service-image
+      - name: Strict MCP 2026-07-28 client and D-044 isolation against mcp-serve
+        run: scripts/mcp_strict_client.sh vuoro-service:ci
