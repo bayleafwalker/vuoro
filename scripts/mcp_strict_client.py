@@ -79,28 +79,54 @@ SCHEMA_SHA256 = "ef70b61f99b6d2e5e3b46863822eab08dff6a45bedc7a08914e0e5b133f4020
 RESULT_TYPES = frozenset({"complete", "input_required", "task"})
 CACHE_SCOPES = frozenset({"public", "private"})
 
+ID_NULL = '"id": null in an error response'
+
+
+@dataclass(frozen=True)
+class KnownDeviation:
+    """A tracked server deviation: why, and the exact problem messages it
+    produces.  Only those messages are excused, and only under this check
+    id; any other problem from the same check still fails the run."""
+
+    note: str
+    messages: frozenset[str]
+
+
 #: Server behaviours that differ from the pinned schema today, by check id.
 #: Each is observed on every run; one that stops being observed fails the
 #: run so this list is edited in the same change that fixes it.  The fixes
 #: belong in vuoro_mcp_edge/server.py (held by vuoro#134 while this job
 #: landed).
-KNOWN_DEVIATIONS: dict[str, str] = {
-    "ping.envelope": (
+KNOWN_DEVIATIONS: dict[str, KnownDeviation] = {
+    "ping.envelope": KnownDeviation(
         "ping answers {} with no resultType; EmptyResult is Result, which "
-        "requires resultType in 2026-07-28"
+        "requires resultType in 2026-07-28",
+        frozenset({"JSONRPCResultResponse: result: 'resultType' is a required property"}),
     ),
-    "error.id-null": (
-        "error responses whose request id is unknown carry \"id\": null; the "
-        "2026-07-28 schema makes id optional and string|integer (omit it)"
+    "error.id-null": KnownDeviation(
+        "errors the server returns before it has read the request id (parse "
+        "error, batch, and the pre-parse 401/400 refusals) carry \"id\": null; "
+        "the 2026-07-28 schema makes id optional and string|integer (omit it). "
+        "A null id where the server did read the id is not excused",
+        frozenset({ID_NULL}),
     ),
-    "header-mismatch.http-status": (
+    "header-mismatch.http-status": KnownDeviation(
         "a header/body mismatch (-32020) is answered HTTP 200; "
-        "HeaderMismatchError says the HTTP status MUST be 400"
+        "HeaderMismatchError says the HTTP status MUST be 400",
+        frozenset({"HTTP 200, expected 400"}),
     ),
-    "unsupported-version.error": (
+    "unsupported-version.error": KnownDeviation(
         "an unsupported MCP-Protocol-Version is -32600 without data; "
         "UnsupportedProtocolVersionError is -32022 with data.requested and "
-        "data.supported"
+        "data.supported (unsupported-version.observed-shape pins the -32600 "
+        "answer while this lasts)",
+        frozenset(
+            {
+                "UnsupportedProtocolVersionError: error: 'data' is a required property",
+                "UnsupportedProtocolVersionError: error/code: -32022 was expected",
+                "error.code is -32600, expected -32022",
+            }
+        ),
     ),
 }
 
@@ -205,14 +231,15 @@ def setup(state: Path) -> None:
     signer = state / "signer"
     signer.mkdir(mode=0o700, exist_ok=True)
     key_file = signer / "private.pem"
-    key_file.write_bytes(
-        private.private_bytes(
-            serialization.Encoding.PEM,
-            serialization.PrivateFormat.PKCS8,
-            serialization.NoEncryption(),
+    descriptor = os.open(key_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "wb") as handle:
+        handle.write(
+            private.private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption(),
+            )
         )
-    )
-    key_file.chmod(0o600)
     public_pem = private.public_key().public_bytes(
         serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
     )
@@ -367,21 +394,24 @@ class Report:
             self.passed.append(f"{check_id}: {label}")
             print(f"PASS  {check_id}: {label}")
             return True
-        if check_id in KNOWN_DEVIATIONS:
-            self.observed_known.setdefault(check_id, []).extend(problems)
+        known = KNOWN_DEVIATIONS.get(check_id)
+        excused = [p for p in problems if known is not None and p in known.messages]
+        unexpected = [p for p in problems if p not in excused]
+        if excused:
+            self.observed_known.setdefault(check_id, []).extend(excused)
             print(f"KNOWN {check_id}: {label}")
-            for problem in problems:
+            for problem in excused:
                 print(f"        {problem}")
-            return False
-        for problem in problems:
-            self.failures.append((check_id, f"{label}: {problem}"))
-        print(f"FAIL  {check_id}: {label}")
-        for problem in problems:
-            print(f"        {problem}")
+        if unexpected:
+            for problem in unexpected:
+                self.failures.append((check_id, f"{label}: {problem}"))
+            print(f"FAIL  {check_id}: {label}")
+            for problem in unexpected:
+                print(f"        {problem}")
         return False
 
-    def finish(self, *, known_expected: bool = True) -> int:
-        stale = sorted(set(KNOWN_DEVIATIONS) - set(self.observed_known)) if known_expected else []
+    def finish(self) -> int:
+        stale = sorted(set(KNOWN_DEVIATIONS) - set(self.observed_known))
         for check_id in stale:
             self.failures.append(
                 (
@@ -572,13 +602,21 @@ class Checks:
         code: int,
         definition: str | None,
         rpc_id: Any = None,
+        pre_parse: bool = False,
         status_check_id: str | None = None,
         wrapper: str = "JSONRPCErrorResponse",
-    ) -> None:
+    ) -> dict[str, Any] | None:
         """An MCP error response.  `definition` is the pinned schema's
         definition for the error object (e.g. MethodNotFoundError), or None
         for an implementation-defined code; `wrapper` is the response
-        definition when the schema defines the whole response."""
+        definition when the schema defines the whole response.
+
+        `rpc_id` is the id the request carried (None when it has none, e.g.
+        invalid JSON or a batch).  `pre_parse` marks a refusal the server
+        makes before reading the body (401, unsupported version): there, as
+        for an id-less request, "id": null is the tracked error.id-null
+        deviation.  Anywhere else a null id is a failure of this check, and
+        any non-null id must equal `rpc_id`."""
 
         body, problems = _json_body(response)
         status_problems = (
@@ -590,11 +628,17 @@ class Checks:
             self.report.record(status_check_id, f"{label} HTTP status", status_problems)
         if isinstance(body, dict):
             if "id" in body and body["id"] is None:
-                # Recorded under its own id; validate the rest without it.
-                self.report.record("error.id-null", f"{label} id", ['"id": null in an error response'])
-                body = {k: v for k, v in body.items() if k != "id"}
-            elif rpc_id is not None and body.get("id") != rpc_id:
-                problems.append(f"id is {body.get('id')!r}, expected {rpc_id!r}")
+                if rpc_id is None or pre_parse:
+                    # The tracked deviation, under its own check id; validate
+                    # the rest of the body without it.
+                    self.report.record("error.id-null", f"{label} id", [ID_NULL])
+                    body = {k: v for k, v in body.items() if k != "id"}
+                else:
+                    problems.append(f"id is null, expected {rpc_id!r} (the server read the request)")
+            elif "id" in body and rpc_id is not None and body["id"] != rpc_id:
+                problems.append(f"id is {body['id']!r}, expected {rpc_id!r}")
+            elif "id" in body and rpc_id is None:
+                problems.append(f"id is {body['id']!r} for a request without one")
             problems += self.schema.errors(wrapper, body)
             if "result" in body:
                 problems.append("an error response carries a result")
@@ -607,6 +651,7 @@ class Checks:
         elif body is not None:
             problems.append("body is not a JSON-RPC object")
         self.report.record(check_id, label, problems)
+        return body if isinstance(body, dict) else None
 
     # -- conformance ----------------------------------------------------------
 
@@ -713,27 +758,57 @@ class Checks:
         )
         headers = client.headers("tools/list", extra={"MCP-Protocol-Version": "2099-01-01"})
         response = client.raw(json.dumps({"jsonrpc": "2.0", "id": 42, "method": "tools/list"}).encode(), headers)
-        self.error(
+        seen = self.error(
             "unsupported-version.error", "unsupported MCP-Protocol-Version",
-            response, http_status=400, code=-32022, definition=None,
+            response, http_status=400, code=-32022, definition=None, rpc_id=42, pre_parse=True,
             status_check_id="unsupported-version.http-status",
             wrapper="UnsupportedProtocolVersionError",
         )
+        error = (seen or {}).get("error")
+        if not isinstance(error, dict) or error.get("code") != -32022:
+            # While the known deviation lasts, the answer must be exactly the
+            # observed one: a well-formed -32600 error response.
+            observed = {k: v for k, v in (seen or {}).items() if k != "id" or v is not None}
+            problems = self.schema.errors("JSONRPCErrorResponse", observed)
+            if not isinstance(error, dict) or error.get("code") != -32600:
+                problems.append(f"error is {error!r}, expected -32022 or the known -32600")
+            self.report.record("unsupported-version.observed-shape",
+                               "unsupported MCP-Protocol-Version answered as the known -32600", problems)
         rpc_id, response = client.request("tools/list", authenticated=False)
         self.error("error.unauthenticated", "no gateway assertion", response,
-                   http_status=401, code=-32001, definition="Error")
+                   http_status=401, code=-32001, definition="Error", rpc_id=rpc_id, pre_parse=True)
         if ENFORCE_EDGE_PROOF_AND_REPLAY:
             token = client.signer.mint(ws)
-            client.request("tools/list", token=token)
-            _, response = client.request("tools/list", token=token)
+            self.result("replay.first-use", "an assertion's first presentation",
+                        client.request("tools/list", token=token), "ListToolsResultResponse")
+            rpc_id, response = client.request("tools/list", token=token)
             self.error("replay.refused", "the same assertion presented twice", response,
-                       http_status=401, code=JSONRPC_ASSERTION_REPLAYED, definition="Error")
-        # ping: EmptyResult (Result) requires resultType.
+                       http_status=401, code=JSONRPC_ASSERTION_REPLAYED, definition="Error",
+                       rpc_id=rpc_id, pre_parse=True)
         rpc_id, response = client.request("ping")
+        self.ping(rpc_id, response)
+
+    def ping(self, rpc_id: int, response: httpx.Response) -> None:
+        """ping: EmptyResult (Result) requires resultType.  Transport, id and
+        everything but the tracked missing resultType are checked apart."""
+
         body, problems = _json_body(response)
+        if response.status_code != 200:
+            problems.append(f"HTTP {response.status_code}, expected 200")
+        envelope: list[str] = []
         if isinstance(body, dict):
-            problems += self.schema.errors("JSONRPCResultResponse", body)
-        self.report.record("ping.envelope", "ping", problems)
+            if body.get("id") != rpc_id:
+                problems.append(f"id is {body.get('id')!r}, expected {rpc_id!r}")
+            if "error" in body:
+                problems.append(f"an error response to ping: {body['error']!r}")
+            envelope = self.schema.errors("JSONRPCResultResponse", body)
+            result = body.get("result")
+            if isinstance(result, dict) and "resultType" in result:
+                envelope += result_value_errors(result)
+        else:
+            problems.append("body is not a JSON-RPC object")
+        self.report.record("ping.transport", "ping answered 200 with its id", problems)
+        self.report.record("ping.envelope", "ping", envelope)
 
     # -- D-044 isolation ------------------------------------------------------
 
@@ -773,10 +848,11 @@ class Checks:
                 ("tools/call", {"name": "list_ready_work"}),
                 ("tools/call", {"name": "describe_work", "arguments": {"work_id": 1}}),
             ):
-                _, response = edge.request(method, params, token=edge.signer.mint(token_ws))
+                rpc_id, response = edge.request(method, params, token=edge.signer.mint(token_ws))
                 label = f"{source.upper()}'s assertion at {target.upper()}'s edge: {method} {(params or {}).get('name', '')}".rstrip()
                 self.error(f"isolation.cross-edge-{source}{target}", label, response,
-                           http_status=401, code=-32001, definition="Error")
+                           http_status=401, code=-32001, definition="Error",
+                           rpc_id=rpc_id, pre_parse=True)
 
         a, b = clients["a"], clients["b"]
         forged = [
@@ -789,9 +865,10 @@ class Checks:
              a.signer.mint(a.ws, authorities=["work:read", "work:admin"])),
         ]
         for label, token in forged:
-            _, response = a.request("tools/call", {"name": "list_ready_work"}, token=token)
+            rpc_id, response = a.request("tools/call", {"name": "list_ready_work"}, token=token)
             self.error("isolation.forged", f"edge A refuses an {label}", response,
-                       http_status=401, code=-32001, definition="Error")
+                       http_status=401, code=-32001, definition="Error",
+                       rpc_id=rpc_id, pre_parse=True)
 
         # Routing hints in headers change nothing: the edge serves its own
         # workspace, from the assertion's repository only.

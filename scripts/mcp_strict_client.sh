@@ -25,10 +25,12 @@ EDGE_PORT_B="${MCP_STRICT_EDGE_PORT_B:-18182}"
 STUB_PORT_A="${MCP_STRICT_STUB_PORT_A:-18191}"
 STUB_PORT_B="${MCP_STRICT_STUB_PORT_B:-18192}"
 
+# Exact versions, the ones uv.lock resolves for the workspace, so the
+# strict client's own behaviour cannot drift between runs.
 client() {
   uv run --no-project --quiet \
-    --with 'httpx>=0.27,<1' --with 'jsonschema>=4.23,<5' \
-    --with 'pyjwt[crypto]>=2.10,<3' \
+    --with 'httpx==0.28.1' --with 'jsonschema==4.26.0' \
+    --with 'pyjwt==2.13.0' --with 'cryptography==50.0.0' \
     python "$ROOT/scripts/mcp_strict_client.py" "$@"
 }
 

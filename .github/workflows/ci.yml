@@ -151,6 +151,7 @@ jobs:
     # failure has its own name; it rebuilds from the same gha cache, in
     # parallel, and writes nothing back to it.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v8.3.2
