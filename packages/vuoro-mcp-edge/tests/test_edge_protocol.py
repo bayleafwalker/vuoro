@@ -264,6 +264,22 @@ def test_pre_parse_refusals_omit_id(keys, auth) -> None:
         assert "id" not in method(MCP_PATH).json()
 
 
+@pytest.mark.parametrize(
+    ("headers", "content", "status"),
+    [
+        ({"content-type": "application/json"}, b'{"jsonrpc":"2.0","id":1,"method":"ping",'
+         b'"params":{"pad":"' + b"x" * (64 * 1024) + b'"}}', 413),
+        ({"content-type": "text/plain"}, b'{"jsonrpc":"2.0","id":1,"method":"ping"}', 415),
+    ],
+)
+def test_size_and_content_type_refusals_omit_id(client, auth, headers, content, status) -> None:
+    # Refused before the body is parsed: even a valid id in it is not echoed.
+    response = client.post(MCP_PATH, headers={**auth, **headers}, content=content)
+    assert response.status_code == status
+    assert "id" not in response.json()
+    assert response.json()["error"]["code"] == -32600
+
+
 def test_batch_is_invalid_request_over_http_200(client, auth) -> None:
     response = client.post(MCP_PATH, headers=auth, json=[rpc("tools/list")])
     assert response.status_code == 200
