@@ -30,8 +30,9 @@ import time
 
 LOGGER = logging.getLogger(__name__)
 
-#: 32 s (a 30 s assertion plus 2 s skew) at 1,500 requests per second per
-#: process.  Keys are fixed-size digests, so this bounds memory at a few MiB.
+#: 32 s (a 30 s assertion, the most the gateway identity resolver accepts,
+#: plus 2 s skew) at 1,500 requests per second per process.  Keys are
+#: fixed-size digests, so this bounds memory at a few MiB.
 DEFAULT_MAX_ENTRIES = 50_000
 _FULL_LOG_INTERVAL_SECONDS = 60.0
 

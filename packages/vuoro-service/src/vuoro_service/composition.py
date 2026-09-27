@@ -57,7 +57,7 @@ _CLOUD_GATEWAY_PUBLIC_KEY_PATH = Path("/etc/vuoro/identity/gateway-public.pem")
 #: memory-backed emptyDir mounted into both containers, never a Secret.
 _EDGE_PROOF_KEY_PATH = Path("/run/vuoro/edge-proof/key")
 #: How far before this process started an assertion may have been issued and
-#: still be accepted on the direct route: the gateway's clock skew.  Anything
+#: still be accepted, on either route: the gateway's clock skew.  Anything
 #: older may have been accepted by a previous instance (agentops#2519).
 _REPLAY_WATERMARK_SKEW_SECONDS = 2
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
