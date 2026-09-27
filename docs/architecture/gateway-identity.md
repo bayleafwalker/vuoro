@@ -53,8 +53,10 @@ Each gateway assertion is accepted once (agentops#2519). The first verifier of
 an assertion consumes `(subject, jti)` in a bounded in-memory cache; a second
 presentation is refused with 401 `identity-replayed` (the MCP edge answers 401
 with JSON-RPC error `-32003`). Entries expire at `exp` plus the two-second
-skew. The cache holds at most 50,000 unexpired entries per process; at that
-cap it refuses new assertions (503 `identity-replay-capacity`, JSON-RPC
+skew. An assertion whose `exp - iat` exceeds 30 s is refused, so a
+misconfigured gateway cannot pin cache entries for longer than the cap is
+sized for. The cache holds at most 50,000 unexpired entries per process; at
+that cap it refuses new assertions (503 `identity-replay-capacity`, JSON-RPC
 `-32004` at the edge) rather than evicting an unexpired entry, and logs the
 refusal, at most once a minute. Only a fully verified assertion reaches the
 cache, so a forged or malformed one can neither fill it nor spend another
@@ -121,12 +123,18 @@ restarting a container starts at 10 s or less, start-up takes seconds, and
 an `emptyDir` (so the proof key) survives it, which is well inside the 32 s an
 assertion can be accepted for.
 So each verifier also refuses what a previous instance might have accepted:
-the direct route refuses an assertion issued more than the two-second skew
-before the process built its verifier, and the shell refuses an edge proof
-minted before it started (the edge and the shell share the node clock, so no
-skew applies). What remains is an assertion issued within two seconds of a
-restart that completed in under two seconds, which is shorter than process
-start-up. A new pod has new caches and a new proof key.
+it refuses an assertion issued more than the two-second skew before the
+process built its verifier, and the shell refuses an edge proof minted before
+it started (the edge and the shell share the node clock, so no skew applies).
+The shell applies the assertion watermark on the proof route too, because the
+per-jti proofed-use count is also in memory: without it a shell-only restart
+would reset the count, and a leaked pod key could mint another 7 uses of a
+captured assertion. The cost is that a tool call whose shell calls span a
+shell restart is refused with `identity-replayed` (`-32003`), which the
+caller already treats as "re-mint and retry once"; such a call has lost its
+connection mid-way anyway. What remains is an assertion issued within two
+seconds of a restart that completed in under two seconds, which is shorter
+than process start-up. A new pod has new caches and a new proof key.
 
 **Gateway follow-up (vuoro-cloud).** Correctness here does not depend on
 `jti == request_id`, but the gateway must:

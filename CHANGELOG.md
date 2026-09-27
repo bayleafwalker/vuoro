@@ -5,6 +5,20 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service: replay hardening from the #134 review (agentops#2530). The
+  shell's startup watermark now applies to the edge-proof route as well as
+  the direct route, so a shell-only restart no longer resets the per-jti
+  proofed-use cap (7): an assertion issued more than 2 s before the shell
+  started is refused with 401 `identity-replayed` (edge: `-32003`) on
+  either route. A tool call whose shell calls span a shell restart is now
+  refused that way and must be re-minted. The assertion lifetime bound
+  (`exp - iat` at most 30 s, which the 50,000-entry replay cache is sized
+  for) is a named constant and is tested to refuse long-lived assertions
+  before they reach the cache. vuoro-mcp-edge tests: the ledger behaviour
+  test compares winners by value, says its gathered writers are not a race
+  for the in-memory ledgers, and records that sprintctl's ledger key also
+  carries the repo. `IdempotencyLedger` is unchanged. (agentops#2530)
+
 - vuoro-service 0.1.77 / vuoro-mcp-edge 0.1.4: the work adapter is pinned to
   sprintctl 0.9.0
   (711ccb2, wheel sha256 `9ad68e09…2e7a`; remote schema 18, adding the
