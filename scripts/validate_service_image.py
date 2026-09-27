@@ -130,7 +130,8 @@ def check(names: list[str]) -> list[str]:
             )
         elif _local_path(origin) is None and not _hash_pinned(origin):
             failures.append(
-                f"{name}: workspace package from an unpinned remote URL "
+                f"{name}: workspace package from a remote URL that is not a "
+                "hash-pinned release asset of this repository "
                 f"(direct_url: {origin!r})"
             )
 
