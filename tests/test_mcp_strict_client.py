@@ -274,6 +274,23 @@ def test_unsupported_version_body_problems_are_not_masked(schema) -> None:
     assert _failed(report) == ["unsupported-version.error"]
 
 
+@pytest.mark.parametrize(
+    "body",
+    [
+        None,
+        {"error": "unsupported"},
+        {"error": {"code": -32022, "data": ["2026-07-28"]}},
+        {"error": {"code": -32022, "data": {"requested": "2099-01-01", "supported": None}}},
+        {"error": {"code": -32022, "data": {"requested": "2099-01-01", "supported": ["2025-06-18"]}}},
+        {"error": {"code": -32022, "data": {"requested": "2023-01-01", "supported": ["2026-07-28"]}}},
+    ],
+)
+def test_unsupported_version_data_must_name_both_versions(body) -> None:
+    assert client.unsupported_version_data_errors(body, "2099-01-01")
+    good = {"error": {"code": -32022, "data": {"requested": "2099-01-01", "supported": ["2026-07-28"]}}}
+    assert client.unsupported_version_data_errors(good, "2099-01-01") == []
+
+
 def test_setup_writes_an_ephemeral_signer_and_readable_mounts(tmp_path) -> None:
     client.setup(tmp_path)
     private = tmp_path / "signer" / "private.pem"

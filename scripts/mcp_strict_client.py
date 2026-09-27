@@ -327,6 +327,22 @@ def result_value_errors(result: Any, *, expect_result_type: str = "complete") ->
     return problems
 
 
+def unsupported_version_data_errors(body: Any, requested: str) -> list[str]:
+    """-32022's data names the version asked for and offers this one."""
+
+    error = body.get("error") if isinstance(body, dict) else None
+    data = error.get("data") if isinstance(error, dict) else None
+    supported = data.get("supported") if isinstance(data, dict) else None
+    if (
+        isinstance(data, dict)
+        and data.get("requested") == requested
+        and isinstance(supported, list)
+        and PROTOCOL_VERSION in supported
+    ):
+        return []
+    return [f"error.data is {data!r}, expected requested {requested} and {PROTOCOL_VERSION} supported"]
+
+
 def tool_error_errors(result: Any, code: str) -> list[str]:
     """A vuoro tool error: isError true, structuredContent.error {code, message}."""
 
@@ -731,12 +747,8 @@ class Checks:
             status_check_id="unsupported-version.http-status",
             wrapper="UnsupportedProtocolVersionError",
         )
-        data = ((seen or {}).get("error") or {}).get("data") or {}
-        self.report.record(
-            "unsupported-version.data", "unsupported MCP-Protocol-Version names the versions",
-            [] if data.get("requested") == "2099-01-01" and PROTOCOL_VERSION in data.get("supported", [])
-            else [f"error.data is {data!r}, expected requested 2099-01-01 and {PROTOCOL_VERSION} supported"],
-        )
+        self.report.record("unsupported-version.data", "unsupported MCP-Protocol-Version names the versions",
+                           unsupported_version_data_errors(seen, "2099-01-01"))
         rpc_id, response = client.request("tools/list", authenticated=False)
         self.error("error.unauthenticated", "no gateway assertion", response,
                    http_status=401, code=-32001, definition="Error", rpc_id=rpc_id, pre_parse=True)
