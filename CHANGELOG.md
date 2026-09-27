@@ -5,6 +5,17 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service: `lease.py`'s in-memory `LeaseStore` conforms to INV-L1
+  (the operator's lease contract, agentops#2540). A late completion under an
+  expired or superseded lease is still refused with `LeaseNotCurrentError`,
+  but when it comes from the lease's own holder, it and its optional
+  `result` are now retained as a non-settling outcome
+  (`RetainedOutcome`, `disposition="stale"`, `settlement_effect="none"`,
+  read through `LeaseStore.retained_outcomes(subject)`) instead of being
+  discarded. `complete` takes an optional keyword `result`. An unknown lease
+  id or another holder's completion still leaves nothing. The E2/E3 contract
+  §6 records the sprintctl lease changes from agentops#2539 and #2540.
+
 - vuoro-mcp-edge: `/mcp` conforms to the published MCP 2026-07-28 schema
   where the `mcp-strict-client` job found it did not (agentops#2526). Wire
   changes: `ping` answers `{"resultType": "complete"}` (was `{}`); an error
