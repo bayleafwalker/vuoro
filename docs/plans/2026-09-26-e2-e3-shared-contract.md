@@ -100,7 +100,12 @@
 **Amendment (2026-09-26): the ledger key includes the principal.**
 - Why: with a key of only (workspace, tool, key), two principals in one workspace share a key space. One principal could replay another's stored result by reusing their key. It could also probe which keys exist, because a different digest returns `idempotency-conflict` instead of a fresh write. Keying by principal removes both.
 - This matches E2's ledger in sprintctl (sprintctl#97), which keys on (workspace, principal, tool, key).
-- `idempotency.py`'s `IdempotencyLedger` protocol and `InMemoryIdempotencyLedger` still take `workspace_id` only. Until a follow-up changes that shared protocol, a ledger built on it must fold the principal into what it stores and looks up.
+- ~~`idempotency.py`'s `IdempotencyLedger` protocol and `InMemoryIdempotencyLedger` still take `workspace_id` only.~~ Superseded by the amendment below.
+
+**Amendment (2026-09-27, agentops#2520): the shared protocol takes the principal.**
+- `IdempotencyLedger.lookup(workspace_id, principal_id, tool, key)` and `store(workspace_id, principal_id, tool, key, stored)`. `InMemoryIdempotencyLedger` keys its rows the same way. No ledger folds the principal into another argument any more; the intent store passes it straight through.
+- One behaviour test, `packages/vuoro-mcp-edge/tests/test_ledger_behaviour.py`, runs against every ledger the edge has: the in-memory reference and the intent store's ledger path. A new ledger joins by adding a factory there. The lease owner's ledger is sprintctl's `work_idempotency_ledger` (sprintctl#97), keyed (repo, workspace, principal, tool, key) and proved against PostgreSQL on the sprintctl side.
+- `heartbeat` takes no `idempotency_key`. Refreshing a lease has no effect that a retry could double, and the owner refuses a heartbeat on a dead lease whatever the key would say. It is the one write tool exempt from the first bullet of this section.
 
 ## 6. Claims (E2)
 
@@ -119,6 +124,38 @@
 - The advisory `reserve_work` is a separately named operation and is not part of E2.
 
 **If the durable owner can't be built inside E2's branch,** E2 keeps `vuoro:work.claim` known but not granted. It ships run and evidence recording only, plus a short design note naming exactly what the lease owner must provide.
+
+**Amendment (2026-09-27, agentops#2520): the durable lease owner and its decisions.**
+
+The owner is sprintctl 0.9.0 (remote schema 18). It uses a new `work_lease` table, not the advisory reservation: reservations report overlap and never refuse, and a lease must refuse. The table is keyed by work item, and at most one lease per item is active. Reservations stay advisory and separate, and neither refuses the other. This answers the open question in `2026-09-26-e2-claims-design-note.md`.
+
+| Edge tool | sprintctl operation | Authority |
+|---|---|---|
+| `claim_work` | `work.lease.acquire-v1` (`item_id`, `run_id`, optional `ttl_seconds`, `idempotency_key`) | `work:claim` |
+| `heartbeat` | `work.lease.heartbeat-v1` (`lease_id`, `run_id`) | `work:claim` |
+| `complete_work` | `work.lease.complete-v1` (`lease_id`, `run_id`, `outcome`, `summary`, `payload`, `checks`, `idempotency_key`) | `work:claim` |
+| (a read for evidence views) | `work.lease.read-v1` (`item_id`) | `work:read` |
+
+The retired `work.claim.*` operation names stay retired.
+
+Decisions (the #2520 checklist; the reasoning is in sprintctl#98):
+1. **Expiry is evaluated by the owner, when someone calls.** At claim, heartbeat and completion, sprintctl compares `heartbeat_at + ttl_seconds` with its own database clock. Nothing sweeps, and the edge never schedules, expires or retries (TS-1). The TTL is 300 s by default. `SPRINTCTL_LEASE_TTL_SECONDS` sets it per runtime, which is per workspace because each tenant runtime serves one workspace. A claim may ask for 30 to 3600 s. As `lease.py` specifies, an expired lease can neither heartbeat nor complete, even if nobody took it over.
+2. **Takeover is a claim of a stale lease.** A fresh lease is `lease-held`. There is no separate operator-reassignment operation yet. The record: the old lease becomes `superseded` and names `superseded_by`, the new one names `takeover_of`, and a `lease.taken-over` item event names the previous principal, run, last heartbeat and TTL.
+3. **Stale completion is `lease-superseded` (409).** An expired lease nobody took gives `lease-expired`; a settled or released one gives `lease-ended`. The outcome report is committed before the refusal, so the late payload stays on the item as a `rejected` report, visible through `work.lease.read-v1` and the `lease.outcome-reported` event. A report on someone else's lease is `lease-not-found` and stores nothing.
+4. **`complete_work` reports; the owner settles.** A succeeded report settles only if it satisfies the verification profile configured on the item's current release (`verification_profile`, default `checked`; `evidence_obligations` name the required checks). The settlement is an `accept` decision attributed to `sprintctl:lease-settlement`, whose rationale reads "accepted under verification profile <profile>" and which cites the report's payload digest. Profiles recognised: `self-reported`, `checked`, `role-separated`, `identity-separated`, `human-authorized`. The last three wait (`awaiting-verification`) for their verifier's decision. A failed outcome is `recorded` and releases the lease. The edge relays the report and the owner's answer; it never settles.
+5. **Resume by the same principal: yes.** Re-presenting a claim with the same binding and key re-evaluates it rather than replaying the stored answer. If the lease is fresh, the caller gets the same lease with a refreshed heartbeat. If its own lease expired and nobody took it over, the caller reclaims it under a new lease id. If the lease was taken over, the caller gets `lease-superseded`. The run id is the same, and there is one settlement.
+6. **Ledger protocol.** `(workspace_id, principal_id, tool, key)`, per the section 5 amendment above. `claim_work` and `complete_work` use the owner's ledger.
+7. **No `parked` lease state.** A worker hitting a recorded denial writes it as evidence on its run (M3-7's `rate_limit_event`) and stops heartbeating, and its lease goes stale and becomes available for takeover. Parking is an observation, not a lease state.
+
+Error codes the edge passes through unchanged: `lease-held`, `lease-superseded`, `lease-expired`, `lease-ended`, `lease-not-found`, `work-not-found`, `work-settled`, `work-blocked`, `work-not-active`, `maintenance-active`, `verification-unsatisfied`, `run-not-found`, `idempotency-conflict`.
+
+**The edge's `claim_tools.py`** is built against these operations after vuoro#134 (agentops#2519 replay protection) merges, because #134 changes the same edge paths. Its rules:
+- it resolves the caller's `run_id` first, the same way `record_tools.py` does;
+- it forwards the caller's assertion and holds no credential;
+- it lists nothing without a durable backend;
+- it runs `lease.py`'s contract cases (expiry with heartbeat, a dead superseded id, a holder mismatch, a replayed completion on a dead lease) against both the in-memory `LeaseStore` and the durable operations.
+
+`vuoro:work.claim` is granted only after every tenant runtime serves those tools.
 
 ## 7. Effect intents (E3)
 

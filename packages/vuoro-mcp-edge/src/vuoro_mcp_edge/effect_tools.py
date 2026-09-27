@@ -566,16 +566,10 @@ class InMemoryIntentStore:
         self._ledger = InMemoryIdempotencyLedger()
         self._intents: dict[str, EffectIntent] = {}
 
-    @staticmethod
-    def _scope(workspace_id: str, principal_id: str) -> str:
-        # The shared ledger protocol still takes a workspace only; fold the
-        # principal in unambiguously (contract section 5 amendment).
-        return json.dumps([workspace_id, principal_id], separators=(",", ":"))
-
     async def lookup(
         self, workspace_id: str, principal_id: str, tool: str, key: str
     ) -> StoredResult | None:
-        return await self._ledger.lookup(self._scope(workspace_id, principal_id), tool, key)
+        return await self._ledger.lookup(workspace_id, principal_id, tool, key)
 
     async def create(
         self,
@@ -589,9 +583,7 @@ class InMemoryIntentStore:
         # The ledger's store never suspends, so the row and the intent are
         # written together on one event loop: the intent exists only if
         # this call's row is the one that won.
-        winner = await self._ledger.store(
-            self._scope(workspace_id, principal_id), tool, key, stored
-        )
+        winner = await self._ledger.store(workspace_id, principal_id, tool, key, stored)
         if winner is stored:
             self._intents[intent.intent_id] = intent
         return winner
