@@ -27,9 +27,10 @@ ActionQ's served catalog does not yet publish that operation (see
 `13-REPO-OWNERSHIP-AND-CHANGE-MATRIX.md`'s actionq row: "connector-safe
 claim and lease operations... idempotent outcome reporting" are still
 required changes, not shipped ones), so -- exactly like `UnavailableRunRegistry`
-before E2 -- `build_toolset` composes `UnavailableIntentStore` today and
-`propose_effect`/`get_effect` fail closed with `effects-unavailable` until a
-durable store is wired in at composition. `InMemoryIntentStore` is the
+before E2 -- `build_toolset` lists no tools today: `_production_intent_store()`
+returns None until a durable store is wired in at composition, so production
+never advertises tools that would fail every call. `UnavailableIntentStore`
+remains the fail-closed store for callers that compose one explicitly. `InMemoryIntentStore` is the
 reference behaviour this module's own tests use; a real `ShellIntentStore`
 lands with ActionQ's operation, the same way E2 wires its `RunRegistry`.
 
