@@ -5,6 +5,18 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-mcp-edge (breaking for `RunRegistry` implementers): run continuation
+  across identities (TS-8 second route). `register` takes an optional
+  `predecessor_run_id`. The registry refuses it with
+  `predecessor-not-eligible` unless the predecessor shares the caller's
+  workspace and repository. The edge first requires `work:read`. The new
+  read-bucket tool `read_predecessor_context` returns the predecessor's
+  session notes and evidence through the successor's own run. The successor
+  inherits no authority: the predecessor's run still resolves only to its own
+  binding. Neither is advertised against `SprintctlRecordStore` until sprintctl
+  records predecessors, so the served tool list is unchanged. The E2/E3
+  contract §4 records the rules. (agentops#2525)
+
 - vuoro-service 0.1.77 / vuoro-mcp-edge 0.1.4: the work adapter is pinned to
   sprintctl 0.9.0
   (711ccb2, wheel sha256 `9ad68e09…2e7a`; remote schema 18, adding the
