@@ -30,7 +30,7 @@ on:
 PROMPT=docs/routines/e1-review.md
 BLOB=$(git rev-parse HEAD:$PROMPT)
 DIGEST=$(sha256sum "$PROMPT" | cut -d' ' -f1)
-SLOT=$(date -u +%Y%m%dT%H)
+STARTED=$(date -u +%Y%m%dT%H%M%SZ)   # take once, reuse everywhere below
 claude --version   # harness_build; if the command is unavailable, use "unavailable"
 ```
 
@@ -43,7 +43,7 @@ Call `mcp__Vuoro__register_run` with:
   "model_id": "<the model id this session runs as>",
   "recipe_id": "bayleafwalker/vuoro:docs/routines/e1-review.md@<BLOB>",
   "observed_profile": {"instruction_digest": "sha256:<DIGEST>", "skill_digests": []},
-  "idempotency_key": "routine.e1-review.<SLOT>"
+  "idempotency_key": "routine.e1-review.<STARTED>"
 }
 ```
 
@@ -79,12 +79,16 @@ For each finding `Fn`, call `mcp__Vuoro__append_evidence` with:
   "run_id": "<run_id>",
   "kind": "finding",
   "ref": "docs/evidence/<YYYY-MM-DD>-e1-review-routine.md#Fn",
-  "digest": "sha256:<sha256 of the finding's one-paragraph text, exactly as written in the report>",
+  "digest": "sha256:<sha256 of the finding paragraph>",
   "collector": "e1-review",
   "validity": {"basis": "until_inputs_change", "valid_from": "<now, ISO 8601 UTC>"},
   "idempotency_key": "<RUN_KEY>.f<n>"
 }
 ```
+
+The finding paragraph's bytes are the paragraph under `### Fn` in the report,
+UTF-8, with no heading and no trailing newline, for example
+`printf '%s' "$TEXT" | sha256sum`. Write that exact text into the report.
 
 ### 5. Write the report and record it
 
@@ -118,7 +122,7 @@ Do not change the report file after this call.
 
 ### 6. Open the PR
 
-Create a fresh branch `routine/e1-review-<SLOT>`. Commit only the report file,
+Create a fresh branch `routine/e1-review-<STARTED>`. Commit only the report file,
 push the branch, and run `gh pr create --base main` with:
 
 - title: `E1 review Routine: <verdict> (<YYYY-MM-DD>)`;
@@ -129,8 +133,10 @@ push the branch, and run `gh pr create --base main` with:
   Vuoro-Run: <run_id>
   ```
 
-  If the run was not registered, the last line is
-  `Vuoro-Run: unavailable (<reason>)`.
+  If `register_run` failed, the last line is
+  `Vuoro-Run: unavailable (<reason>)`. If the run was registered but a later
+  record call failed, keep the real `run_id` and name the failure in the
+  report.
 
 Open the PR in every case, including a "no" verdict and a run whose record
 tools failed.
