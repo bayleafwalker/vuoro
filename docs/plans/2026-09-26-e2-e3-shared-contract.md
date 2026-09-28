@@ -28,7 +28,7 @@
 |---|---|---|---|---|
 | `vuoro:work.read` | `work:read` | `read` | `list_ready_work`, `describe_work` | live |
 | `vuoro:evidence.record` | `work:evidence` | `record` | `register_run`, `append_evidence`, `write_session_note` | E2 |
-| `vuoro:work.claim` | `work:claim` | `coordinate` | `claim_work`, `heartbeat`, `complete_work` | E2 |
+| `vuoro:work.claim` | `work:claim` | `coordinate` | `claim_work`, `heartbeat`, `report_outcome` (was `complete_work`; §6 agentops#2540 amendment) | E2 |
 | `vuoro:effect.propose` | `effect:propose` | `propose` | `propose_effect`, `get_effect` | E3 |
 | `vuoro:effect.apply` | none | none | none | refused forever |
 
@@ -136,7 +136,7 @@
 
 **What it lacks.** The store is in memory only, so it is not the durable owner.
 
-**E2 builds** `claim_work`, `heartbeat` and `complete_work` on a durable implementation of that same contract.
+**E2 builds** `claim_work`, `heartbeat` and `report_outcome` (named `complete_work` before the agentops#2540 amendment) on a durable implementation of that same contract.
 - The owner must respect `13-REPO-OWNERSHIP-AND-CHANGE-MATRIX.md`: sprintctl owns work semantics. So the durable lease is either sprintctl's claim machinery exposed as a public work contract, or a durable `LeaseStore` behind the shell that sprintctl's item state defers to.
 - It is validated by `lease.py`'s contract tests, parametrized over both implementations.
 - The (handle, auth_context) pair is validated as a whole: the lease holder is the run's `RunBinding`, not just the token.
@@ -152,10 +152,12 @@ If sprintctl#98 changes in review, this section is re-checked against its merged
 
 | Edge tool | sprintctl operation | Authority |
 |---|---|---|
-| `claim_work` | `work.lease.acquire-v1` (`item_id`, `run_id`, `idempotency_key`; optional `ttl_seconds`) | `work:claim` |
+| `claim_work` | `work.lease.acquire-v1` (`item_id`, `run_id`, `idempotency_key`; `ttl_seconds` is refused from sprintctl 0.10.0, agentops#2540) | `work:claim` |
 | `heartbeat` | `work.lease.heartbeat-v1` (`lease_id`, `run_id`) | `work:claim` |
-| `complete_work` | `work.lease.complete-v1` (`lease_id`, `run_id`, `outcome`, `idempotency_key`; optional `summary`, `payload`, `checks`) | `work:claim` |
+| `report_outcome` | `work.lease.report-outcome-v1` (`lease_id`, `run_id`, `outcome`, `idempotency_key`; optional `summary`, `payload`, `checks`) | `work:claim` |
 | none for now (§2 is unchanged) | `work.lease.read-v1` (`item_id`): leases and outcome reports, for evidence views | `work:read` |
+
+`work.lease.complete-v1` is the deprecated alias of `work.lease.report-outcome-v1` from sprintctl 0.10.0 (same input, result and ledger tool). The edge never calls it.
 
 The retired `work.claim.*` operation names stay retired.
 
@@ -171,7 +173,7 @@ Decisions (the #2520 checklist; the reasoning is in sprintctl#98). TS-1 is agent
    - `verification-unsatisfied` (422); the others are 409.
 
    The lease checks come first, for either outcome, so a failed report on a dead lease is `rejected` too. `work-blocked` applies only to a succeeded outcome. A report on someone else's lease is `lease-not-found` (404) and stores nothing.
-4. **`complete_work` reports; the owner settles.** A succeeded report settles only if it meets the verification bar.
+4. **`report_outcome` reports; the owner settles.** A succeeded report settles only if it meets the verification bar.
    - **Where the bar comes from.** The acceptance contracts of the item's releases at its current revision: `verification_profile`, default `checked`; `evidence_obligations` are the required checks. The bar in force when the lease was taken is pinned on the lease, and the pinned and current bars both apply, so no later reservation can lower it. From the sprintctl release after 0.9.0 (agentops#2539), a profile is a set of requirements, not a rank: `self-reported` needs nothing, `checked` needs `checks`, `role-separated` needs `checks` and `verifier-role`, `identity-separated` needs `checks` and `verifier-identity`, and `human-authorized` needs `human-authorization`. Bars combine by the union of their requirements and required checks, not strictest-wins, and a combined bar that no single profile names is reported as the names joined by `+` (for example `checked+human-authorized`) with its `requirements` listed.
    - **Which profiles settle.** `self-reported` settles on success. `checked` needs at least one reported check, all of them passed, and every required check present. From agentops#2539, a failed check or a missing required check rejects the report under every profile, `self-reported` included.
    - **Which profiles are refused.** From agentops#2539, sprintctl refuses `role-separated`, `identity-separated` and `human-authorized` when a contract is written, because only `checks` can be evaluated from the holder's own report and no decision path checks a verifier role, a verifier identity or a human yet. It also refuses `self-reported` together with `evidence_obligations`, and any unknown profile name. They do not wait for a verifier. A contract stored under 0.9.0 that names one of the three, or a malformed stored value (which counts as `human-authorized`), fails closed: the item cannot be leased (`verification-unsupported`). A lease already pinned under one by 0.9.0 leaves its report `awaiting-verification`, and nobody can claim the item until a decision lands (`work-awaiting-verification`). An `accept` still closes the item. That decision is stamped on the report, and an `accept` never marks such a report `settled`: it becomes `rejected` with `decided-accept-unverified`. Under 0.9.0 these three profiles waited (`awaiting-verification`), and any `accept` settled them without checking the verifier.
@@ -190,9 +192,9 @@ Decisions (the #2520 checklist; the reasoning is in sprintctl#98). TS-1 is agent
      - a lease taken over is `lease-superseded`;
      - a settled or released lease comes back unchanged.
    - The run stays the same throughout, and at most one settlement is recorded.
-6. **Ledger protocol.** `(workspace_id, principal_id, tool, key)`, per the section 5 amendment above. `claim_work` and `complete_work` use the owner's ledger.
+6. **Ledger protocol.** `(workspace_id, principal_id, tool, key)`, per the section 5 amendment above. `claim_work` and `report_outcome` use the owner's ledger.
 7. **No `parked` lease state.** TS-1's E4 clause says: on a rate-limit denial, "records the `rate_limit_event` as evidence, releases the lease, parks the claim".
-   - **What the worker does.** It calls `complete_work` with `outcome: failed` and the denial in the payload (and on its run, as M3-7's `rate_limit_event`).
+   - **What the worker does.** It calls `report_outcome` with `outcome: failed` and the denial in the payload (and on its run, as M3-7's `rate_limit_event`).
    - **What the owner does.** It keeps the report and releases the lease (`recorded`). The item stays active for the next claim, by any family the harness chooses.
    - **What "parked" means.** It is that recorded report, an observation, not a lease state and not something the owner later resumes.
    - **A worker that cannot call.** Its lease simply goes stale.
@@ -214,7 +216,7 @@ Error codes the edge passes through unchanged: `lease-held`, `lease-superseded`,
 - **Timing (semantics 1).** The TTL is authority configuration: 600 s by default, set by `SPRINTCTL_LEASE_TTL_SECONDS` (clamped to 30-3600; a malformed value falls back to 600 s, not 300 s as in Decision 1). A claim can no longer name `ttl_seconds`, and doing so is `invalid-arguments`. Every lease advertises `heartbeat_interval_seconds`, a fifth of its TTL (120 s by default).
 - **Takeover (semantics 2).** The takeover event is `work.claim.taken-over`. It names `previous_claim_id`, `previous_principal`, `previous_generation`, `previous_last_heartbeat`, `new_claim_id`, `new_principal` and `reason: stale-lease`. Each lease carries a `generation`: its position among the item's leases, starting at 1. A claim is a lease, and `claim_id` is the `lease_id`.
 - **Stale completion (semantics 3).** `lease-superseded` becomes `claim-superseded`, the published kebab-case form of the contract's `CLAIM_SUPERSEDED`. The rejection carries `details: {claim_id, current_generation, reported_generation}` wherever the service's rejection type can carry details. The released vuoro-service (0.1.77) cannot yet, so until it can, the generations appear in the message and in `work.lease.read-v1`. A report under a stale lease that nobody took over is still refused (`lease-expired`) and retained, because INV-L1 names stale leases too. Its holder reactivates the claim (semantics 5) and reports again.
-- **Report outcome (semantics 4).** `work.lease.report-outcome-v1` is the operation. `work.lease.complete-v1` remains as its deprecated alias, with the same input, result and ledger. Results gain `settlement_effect` (`settled`, `lease-released`, `awaiting-verification` or `none`). The edge tool becomes `report_outcome`.
+- **Report outcome (semantics 4).** `work.lease.report-outcome-v1` is the operation. `work.lease.complete-v1` remains as its deprecated alias, with the same input, result and ledger. Results gain `settlement_effect` (`settled`, `lease-released`, `awaiting-verification` or `none`). The edge tool becomes `report_outcome`. The edge calls `work.lease.report-outcome-v1`, never the alias (vuoro-mcp-edge `claim_tools.py`, agentops#2520).
 - **Same-principal restart (semantics 5).** Re-presenting the same claim (same binding, key and arguments) against one's own stale lease that nobody took over reactivates the same lease in place, with the same id and generation. It does not reclaim under a new id. Re-presenting a claim that was taken over is `claim-superseded`. A new key from the same binding releases the holder's old stale lease (`replaced-by-holder`) and does not supersede it.
 - **`lease.py` (INV-L1).** The in-memory reference store retains a refused late completion from the lease's own holder as a non-settling outcome (`disposition="stale"`, `settlement_effect="none"`, `LeaseStore.retained_outcomes`) instead of discarding it. In the error mapping above, `claim-superseded` replaces `lease-superseded` (in `LeaseNotCurrentError` and in the pass-through list), and the pass-through list gains `work-awaiting-verification` and `verification-unsupported` (agentops#2539). A retried completion of a lease its holder already completed is refused the same way and retains nothing.
 - **Catalog pins.** These changes and the agentops#2539 profile schema (`verification.profile` becomes a pattern and `requirements` becomes required) change the work adapter's catalog digest. The release-pin PR must re-pin `scripts/validate_released_work_adapter.py` `_EXPECTED_WORK_METADATA_SHA256` and `scripts/validate_released_catalog_composition.py` `EXPECTED_REVISION`.

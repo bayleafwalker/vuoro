@@ -291,3 +291,101 @@ def test_idempotency_key_shape_is_enforced(key: Any) -> None:
     with pytest.raises(ToolFailure) as refused:
         require_key({} if key is None else {"idempotency_key": key})
     assert refused.value.code == "invalid-arguments"
+
+
+# ---------------------------------------------------------------------------
+# tools/list and server/discover show only what the caller can call
+# ---------------------------------------------------------------------------
+
+
+def _bucket_toolset(bucket: str, tool: str) -> ToolSet:
+    def parse(arguments: dict[str, Any]) -> dict[str, Any]:
+        if arguments:
+            raise ToolFailure("invalid-arguments", "takes no arguments")
+        return arguments
+
+    async def run(parsed: dict[str, Any], forwarded: Any) -> dict[str, Any]:
+        return {"bucket": bucket}
+
+    definition = {
+        "name": tool,
+        "title": tool,
+        "description": "Test tool.",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "annotations": WRITE_ANNOTATIONS,
+    }
+    return ToolSet(name=f"{bucket}-test", tools=(ToolSpec(tool, bucket, definition, parse, run),))
+
+
+_BUCKET_TOOLSETS = (
+    _bucket_toolset("record", "record_tool"),
+    _bucket_toolset("coordinate", "coordinate_tool"),
+    _bucket_toolset("propose", "propose_tool"),
+)
+
+
+@pytest.mark.parametrize("method", ["tools/list", "server/discover"])
+@pytest.mark.parametrize(
+    ("authorities", "expected"),
+    [
+        (["work:read"], list(TOOL_ORDER)),
+        (["work:evidence"], ["record_tool"]),
+        (["work:claim"], ["coordinate_tool"]),
+        (["effect:propose"], ["propose_tool"]),
+        (["work:read", "work:claim"], [*TOOL_ORDER, "coordinate_tool"]),
+        (
+            ["work:read", "work:evidence", "work:claim", "effect:propose"],
+            [*TOOL_ORDER, "record_tool", "coordinate_tool", "propose_tool"],
+        ),
+    ],
+)
+def test_listing_is_filtered_by_the_callers_authorities(
+    keys, method: str, authorities: list[str], expected: list[str]
+) -> None:
+    client = edge_client(keys[0], FakeShell(), toolsets=_BUCKET_TOOLSETS)
+    response = client.post(
+        MCP_PATH,
+        headers=identity_headers(assertion(keys[1], authorities=authorities)),
+        json=rpc(method),
+    )
+    assert response.status_code == 200
+    result = response.json()["result"]
+    assert result["resultType"] == "complete"
+    assert [tool["name"] for tool in result["tools"]] == expected
+
+
+def test_listing_with_one_write_toolset(keys) -> None:
+    # The door refuses an assertion with no authority, or with one no
+    # registered tool uses, so every admitted caller lists at least one tool;
+    # the filter only narrows the list to the buckets it can call.
+    only_claim = edge_client(keys[0], FakeShell(), toolsets=(_BUCKET_TOOLSETS[1],))
+    token = assertion(keys[1], authorities=["work:read"])
+    result = only_claim.post(
+        MCP_PATH, headers=identity_headers(token), json=rpc("tools/list")
+    ).json()["result"]
+    assert [tool["name"] for tool in result["tools"]] == list(TOOL_ORDER)
+    token = assertion(keys[1], authorities=["work:claim"])
+    result = only_claim.post(
+        MCP_PATH, headers=identity_headers(token), json=rpc("tools/list")
+    ).json()["result"]
+    assert [tool["name"] for tool in result["tools"]] == ["coordinate_tool"]
+
+
+def test_authority_is_checked_before_arguments(keys) -> None:
+    client = edge_client(keys[0], FakeShell(), toolsets=_BUCKET_TOOLSETS)
+    token = assertion(keys[1], authorities=["work:read"])
+    result = client.post(
+        MCP_PATH,
+        headers=identity_headers(token),
+        json=call("coordinate_tool", {"unexpected": 1}),
+    ).json()["result"]
+    assert result["isError"] is True
+    assert result["structuredContent"]["error"]["code"] == "authority-required"
+    # A built-in read tool too: bad arguments from a caller without work:read.
+    token = assertion(keys[1], authorities=["work:claim"])
+    result = client.post(
+        MCP_PATH,
+        headers=identity_headers(token),
+        json=call("describe_work", {"work_id": "not-an-int"}),
+    ).json()["result"]
+    assert result["structuredContent"]["error"]["code"] == "authority-required"

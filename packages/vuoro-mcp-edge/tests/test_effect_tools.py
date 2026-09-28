@@ -456,9 +456,13 @@ def test_effect_tools_need_the_propose_authority(keys) -> None:
 
 def test_effect_tools_follow_the_builtins_in_order(keys) -> None:
     client, _, _runs = _client(keys)
-    listed = client.post(MCP_PATH, headers=_auth(keys), json=rpc("tools/list")).json()["result"]
+    both = identity_headers(assertion(keys[1], authorities=["work:read", EFFECT_AUTHORITY]))
+    listed = client.post(MCP_PATH, headers=both, json=rpc("tools/list")).json()["result"]
     names = [tool["name"] for tool in listed["tools"]]
     assert names == [*TOOL_ORDER, "propose_effect", "get_effect"]
+    # A caller with effect:propose alone sees only the propose bucket.
+    alone = client.post(MCP_PATH, headers=_auth(keys), json=rpc("tools/list")).json()["result"]
+    assert [tool["name"] for tool in alone["tools"]] == ["propose_effect", "get_effect"]
     for tool in listed["tools"]:
         if tool["name"] == "propose_effect":
             assert tool["annotations"]["idempotentHint"] is True
