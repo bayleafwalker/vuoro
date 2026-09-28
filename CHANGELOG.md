@@ -25,8 +25,13 @@ recorded here.
   because vuoro-service's `OperationRejectedError` has no details). The tools
   are listed wherever the durable record store is composed; they stay
   uncallable through the gateway until vuoro-cloud grants `vuoro:work.claim`
-  and adds their `MCP_TOOL_SCOPES` rows. The version bump to 0.1.6 is left to
-  the release PR.
+  and adds their `MCP_TOOL_SCOPES` rows. The edge and the tenant runtime must
+  be pinned together: these tools need a runtime whose work adapter is
+  sprintctl 0.10.0 or later. `tools/list` and `server/discover` now list only
+  the tools whose bucket authority the caller's assertion carries (built-in
+  read tools and every toolset alike), and `tools/call` checks that authority
+  before it validates arguments. The version bump to 0.1.6 is left to the
+  release PR.
 
 - vuoro-service 0.1.78 / vuoro-mcp-edge 0.1.5: the work adapter is pinned to
   sprintctl 0.10.0
