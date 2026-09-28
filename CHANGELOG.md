@@ -5,7 +5,8 @@ recorded here.
 
 ## Unreleased
 
-- vuoro-mcp-edge (unreleased): the coordinate bucket ships (agentops#2520, E2b).
+- vuoro-service 0.1.79 / vuoro-mcp-edge 0.1.6: the coordinate bucket ships
+  (agentops#2520, E2b).
   `claim_tools.build_toolset` now serves `claim_work`, `heartbeat` and
   `report_outcome` (bucket `coordinate`, authority `work:claim`) over
   sprintctl 0.10.0's durable lease: `work.lease.acquire-v1`,
@@ -30,8 +31,10 @@ recorded here.
   sprintctl 0.10.0 or later. `tools/list` and `server/discover` now list only
   the tools whose bucket authority the caller's assertion carries (built-in
   read tools and every toolset alike), and `tools/call` checks that authority
-  before it validates arguments. The version bump to 0.1.6 is left to the
-  release PR.
+  before it validates arguments. vuoro-service 0.1.79 carries no service
+  code change; it bumps because vuoro-mcp-edge ships in the vuoro-service
+  image, so the tenant runtime image pins edge 0.1.6 with the 0.10.0 work
+  adapter (remote schema stays 18). (agentops#2520, #150)
 
 - vuoro-service 0.1.78 / vuoro-mcp-edge 0.1.5: the work adapter is pinned to
   sprintctl 0.10.0
