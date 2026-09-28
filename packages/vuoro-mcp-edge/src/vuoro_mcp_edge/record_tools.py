@@ -274,6 +274,17 @@ class SprintctlRecordStore:
     async def aclose(self) -> None:
         await self._client.aclose()
 
+    @property
+    def shell_client(self) -> RecordShellClient:
+        """The runtime-shell client this store calls through.
+
+        `claim_tools` reaches the lease operations over this same client (the
+        same upstream, the same edge-proof signer), so the coordinate bucket
+        holds no second connection and no credential of its own.
+        """
+
+        return self._client
+
     async def register(
         self,
         binding: RunBinding,

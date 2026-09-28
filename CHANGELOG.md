@@ -5,6 +5,29 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-mcp-edge (unreleased): the coordinate bucket ships (agentops#2520, E2b).
+  `claim_tools.build_toolset` now serves `claim_work`, `heartbeat` and
+  `report_outcome` (bucket `coordinate`, authority `work:claim`) over
+  sprintctl 0.10.0's durable lease: `work.lease.acquire-v1`,
+  `work.lease.heartbeat-v1` and `work.lease.report-outcome-v1` (never the
+  deprecated `work.lease.complete-v1` alias). The outcome tool is
+  `report_outcome`, not `complete_work`, per the contract's agentops#2540
+  amendment. Each tool resolves the caller's run first, then makes exactly one
+  owner call through the record store's shell client
+  (`SprintctlRecordStore.shell_client`, new) with the caller's assertion; the
+  edge holds no lease state and never schedules, expires or retries.
+  `claim_work` refuses `ttl_seconds` (`invalid-arguments`), and a same-key
+  retry is re-evaluated by the owner (`resumed: true`), not replayed.
+  `heartbeat` takes no `idempotency_key`. A lease without
+  `heartbeat_interval_seconds`, or an adapter without the operations, is
+  `claim-owner-incompatible`. Owner refusal codes and messages pass through
+  unchanged (`claim-superseded` carries its generations in the message only,
+  because vuoro-service's `OperationRejectedError` has no details). The tools
+  are listed wherever the durable record store is composed; they stay
+  uncallable through the gateway until vuoro-cloud grants `vuoro:work.claim`
+  and adds their `MCP_TOOL_SCOPES` rows. The version bump to 0.1.6 is left to
+  the release PR.
+
 - vuoro-service 0.1.78 / vuoro-mcp-edge 0.1.5: the work adapter is pinned to
   sprintctl 0.10.0
   (56bfbc4, wheel sha256 `d8cc3515…4270`; remote schema stays 18, so no

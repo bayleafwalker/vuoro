@@ -108,6 +108,9 @@ def test_environment_composition_wires_a_durable_record_bucket(cloud_mounts, oau
     assert listed.status_code == 200
     names = {tool["name"] for tool in listed.json()["result"]["tools"]}
     assert {"register_run", "append_evidence", "write_session_note"} <= names
+    # The coordinate bucket rides on the same durable store's shell client
+    # (agentops#2520).
+    assert {"claim_work", "heartbeat", "report_outcome"} <= names
 
 
 RUN_ID = "run_" + "0" * 24 + "AA"
