@@ -329,10 +329,18 @@ def create_edge_app(
             if name in toolset_specs or (name in TOOL_SCOPES and name in _TOOL_DEFS)
         ]
 
-    def _app_tool_list_payload() -> list[dict[str, Any]]:
+    def _app_tool_list_payload(identity: Identity) -> list[dict[str, Any]]:
+        """The callable tools the caller's authorities can call, in tool order.
+
+        A tool whose bucket authority the assertion lacks is not listed (it
+        would only answer authority-required); a caller with none of them
+        gets an empty list, which is still a valid tools result.
+        """
+
         return [
             dict(toolset_specs[name].definition) if name in toolset_specs else _TOOL_DEFS[name]
             for name in _app_callable_tools()
+            if _bucket_authority(_tool_bucket(name) or "") in identity.authorities
         ]
 
     def _app_allowed_authorities() -> frozenset[str]:
@@ -512,6 +520,15 @@ def create_edge_app(
             arguments = {}
         if not isinstance(arguments, dict):
             raise _invalid_params("arguments must be an object")
+        # Authority before argument validation: a caller without the bucket's
+        # authority learns nothing about the tool's arguments.
+        scope = _tool_bucket(name) or ""
+        authority = _bucket_authority(scope)
+        if authority is None or authority not in identity.authorities:
+            raise _ToolFailure(
+                "authority-required",
+                f"the caller's assertion lacks the {scope} scope authority",
+            )
         if name in toolset_specs:
             spec = toolset_specs[name]
             try:
@@ -522,13 +539,6 @@ def create_edge_app(
         else:
             parse, run = tools[name]
             parsed = parse(arguments)
-        scope = _tool_bucket(name) or ""
-        authority = _bucket_authority(scope)
-        if authority is None or authority not in identity.authorities:
-            raise _ToolFailure(
-                "authority-required",
-                f"the caller's assertion lacks the {scope} scope authority",
-            )
         forwarded = _forwarded(identity, assertion, request_id)
         try:
             structured = await run(parsed, forwarded)
@@ -680,7 +690,7 @@ def create_edge_app(
                     "supportedVersions": sorted(SUPPORTED_PROTOCOL_VERSIONS),
                     "capabilities": capabilities,
                     "serverInfo": server_info,
-                    "tools": _app_tool_list_payload(),
+                    "tools": _app_tool_list_payload(identity),
                 },
                 ttl_ms=0,
                 cache_scope="private",
@@ -689,7 +699,7 @@ def create_edge_app(
 
         if method == "tools/list":
             result = _with_envelope(
-                {"tools": _app_tool_list_payload()},
+                {"tools": _app_tool_list_payload(identity)},
                 ttl_ms=0,
                 cache_scope="private",
             )
