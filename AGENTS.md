@@ -35,6 +35,8 @@ Run targeted package tests first, then the repository boundary gate:
 uv sync --all-packages --all-extras
 uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests
 uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests
+uv run --package vuoro-mcp-edge --extra test pytest packages/vuoro-mcp-edge/tests
+uv run --package vuoro-reconciler --extra test pytest packages/vuoro-reconciler/tests
 uv build --package vuoro-client --wheel --out-dir dist/vuoro-client
 uv build --package vuoro-service --wheel --out-dir dist/vuoro-service
 uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime
