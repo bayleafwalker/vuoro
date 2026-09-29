@@ -46,6 +46,7 @@ The script exits non-zero if any expectation fails, and writes
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import base64
 import contextlib
 import hashlib
@@ -1446,6 +1447,12 @@ def main(argv: list[str] | None = None) -> int:
         missing = [flag for flag in ("token_a", "token_b", "pat_file") if not getattr(args, flag)]
         if missing:
             parser.error("live mode needs " + ", ".join("--" + m.replace("_", "-") for m in missing))
+        # Cleanup closes the disposable sprint with the owner's own contracts
+        # (`close_sprint`). Without the pinned wheel that step fails only at
+        # the very end, after the grants and PAT have been spent.
+        if importlib.util.find_spec("sprintctl") is None:
+            parser.error("live mode needs the pinned sprintctl wheel to close its sprint;"
+                         " install it as in the packet README's 'Re-running' section")
     return args.func(args)
 
 

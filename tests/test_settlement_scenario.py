@@ -124,3 +124,22 @@ def test_check_details_never_carry_foreign_ids(tmp_path: Path, capsys) -> None:
     assert all(foreign not in set(_ints(detail)) for detail in details)
     assert FOREIGN_TITLE not in transcript.path.read_text()
     assert str(foreign) not in capsys.readouterr().out
+
+
+def test_live_mode_refuses_to_start_without_the_sprintctl_wheel(tmp_path, monkeypatch, capsys):
+    """Live cleanup closes the sprint with sprintctl's contracts; fail before spending credentials."""
+
+    import pytest
+
+    module = _load()
+    for name in ("a.json", "b.json", "pat"):
+        (tmp_path / name).write_text("{}")
+    argv = ["run", "--mode", "live", "--token-a", str(tmp_path / "a.json"),
+            "--token-b", str(tmp_path / "b.json"), "--pat-file", str(tmp_path / "pat")]
+    real_find_spec = module.importlib.util.find_spec
+    monkeypatch.setattr(module.importlib.util, "find_spec",
+                        lambda name, *a: None if name == "sprintctl" else real_find_spec(name, *a))
+    with pytest.raises(SystemExit) as refused:
+        module.main(argv)
+    assert refused.value.code == 2
+    assert "pinned sprintctl wheel" in capsys.readouterr().err
