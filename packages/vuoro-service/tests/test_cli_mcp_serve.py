@@ -60,6 +60,10 @@ def test_each_server_runs_exactly_one_process(monkeypatch, command) -> None:
 def test_the_factory_string_resolves_to_the_edge_factory() -> None:
     """What uvicorn will import at run time, imported the same way."""
 
+    import pytest
+
+    # vuoro-mcp-edge is not a dependency of the service test extra.
+    pytest.importorskip("vuoro_mcp_edge")
     from uvicorn.importer import import_from_string
 
     factory = import_from_string(cli.MCP_APP_FACTORY)
