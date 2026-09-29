@@ -12,6 +12,8 @@
 
 **The live cleanup failure.** The last expectation, "cleanup: the disposable sprint is closed", failed with `ModuleNotFoundError: sprintctl`. `close_sprint` builds the `sprint.close` command with sprintctl's own contracts, and the workstation venv had not installed the pinned wheel. This is a harness environment gap, not a finding about the product. The sprint was closed afterwards with the harness's own `close_sprint`, using the same PAT, once the wheel was installed. Live mode now refuses to start without the wheel (`tests/test_settlement_scenario.py::test_live_mode_refuses_to_start_without_the_sprintctl_wheel`). After the run, both grants and the PAT were revoked: `revoked_at` is 2026-09-29T09:29:16Z. The transcripts passed the mandatory review in step 4: they contain no secret patterns, and the only work items in them are the run's own four.
 
+With `live/` merged, the item's definition of done is met, and the landing page may cite the scenario, pointing at both runs.
+
 ## What runs
 
 The harness starts two callers, **A** and **B**, each as its own OS process. Each caller has its own lease binding: principal, workspace, OAuth client `claude-connector` and grant. They use only the public MCP tools: `register_run`, `claim_work`, `heartbeat`, `report_outcome` and `list_ready_work`. Because each caller is a separate process, "A is killed" is a real `SIGKILL` of A's process, not a skipped call.
@@ -139,7 +141,7 @@ The run should end with `GREEN: evidence in …/live`. Cleanup withdraws Y and c
 
 - **Only the run's items.** No work item other than the run's own may appear. `omitted_foreign_items` counts are expected.
 - **No secrets.** `grep -n -i -E 'bearer|vuo_pat|vuo_rt|eyJ' live/transcript.*` must print nothing.
-- **Identifiers are acceptable.** `principal_id` (the operator's control-plane user id), grant and run ids are fine to publish. If they are not, stop and do not commit.
+- **Identifiers are acceptable.** `principal_id` (the operator's control-plane user id), the `github:<numeric id>` actor (already public through the GitHub API), and grant and run ids are fine to publish. If they are not, stop and do not commit.
 
 **5. Revoke everything.** Do this even if the run failed. In the same browser console:
 
