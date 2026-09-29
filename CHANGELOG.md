@@ -5,6 +5,13 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service 0.1.80 was released from the 0.1.72 hotfix line
+  (`maint/vuoro-service-0.1.72`, vuoro#154), not from main: it repins the
+  deployed line's work adapter to sprintctl 0.7.5 (sprintctl#2110, served
+  runtime connection recovery) for vuoro-shared, which stays on work schema
+  16. The tag `vuoro-service-v0.1.80` is taken, so main's next vuoro-service
+  release is 0.1.81.
+
 - vuoro-service 0.1.79 / vuoro-mcp-edge 0.1.6: the coordinate bucket ships
   (agentops#2520, E2b).
   `claim_tools.build_toolset` now serves `claim_work`, `heartbeat` and
