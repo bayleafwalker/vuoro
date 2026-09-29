@@ -84,3 +84,43 @@ def test_private_files_are_0600_from_creation(tmp_path: Path) -> None:
     assert stat.S_IMODE(target.stat().st_mode) == 0o600
     assert json.loads(target.read_text()) == {"refresh_token": "y"}
     assert [path.name for path in tmp_path.iterdir()] == ["grant.json"]
+
+
+def _ints(value):
+    if isinstance(value, bool):
+        return
+    if isinstance(value, int):
+        yield value
+    elif isinstance(value, dict):
+        for entry in value.values():
+            yield from _ints(entry)
+    elif isinstance(value, list):
+        for entry in value:
+            yield from _ints(entry)
+
+
+def test_check_details_never_carry_foreign_ids(tmp_path: Path, capsys) -> None:
+    """A seeded foreign item (999) must not reach any expectation detail.
+
+    The review of vuoro#152 found readiness checks recording the full
+    `list_ready_work` id list (for example [1, 3, 4, 5]) in their detail.
+    """
+
+    transcript = scenario.Transcript(tmp_path / "t.jsonl")
+    run_items = frozenset({1, 2, 3})
+    expect = scenario.Expectations(
+        transcript, scope=lambda detail: scenario.scope_detail(detail, run_items)
+    )
+    foreign = 999
+    expect.check("takeover", "ready ids", True, [1, foreign, 3])
+    expect.check("takeover", "ready ids, failing", False, [foreign, 2])
+    expect.check("takeover", "listing", True,
+                 {"items": [{"work_id": foreign, "title": FOREIGN_TITLE}, {"work_id": 2}]})
+    expect.check("takeover", "no detail", True, None)
+    entries = transcript.read()
+    details = [entry["detail"] for entry in entries]
+    assert details[0] == {"run_items": [1, 3], "omitted_foreign_items": 1}
+    assert details[1] == {"run_items": [2], "omitted_foreign_items": 1}
+    assert all(foreign not in set(_ints(detail)) for detail in details)
+    assert FOREIGN_TITLE not in transcript.path.read_text()
+    assert str(foreign) not in capsys.readouterr().out

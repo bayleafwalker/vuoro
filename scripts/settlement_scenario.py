@@ -289,6 +289,24 @@ def scope_to_run_items(value: Any, run_items: frozenset[int]) -> Any:
     return value
 
 
+def scope_detail(detail: Any, run_items: frozenset[int]) -> Any:
+    """An expectation's detail as the transcript may keep it.
+
+    A bare list of work ids (a readiness listing reduced to ids) keeps only
+    the run's own ids and a count of the rest; anything else goes through
+    `scope_to_run_items`.
+    """
+
+    if (
+        isinstance(detail, list)
+        and detail
+        and all(isinstance(entry, int) and not isinstance(entry, bool) for entry in detail)
+    ):
+        kept = [entry for entry in detail if entry in run_items]
+        return {"run_items": kept, "omitted_foreign_items": len(detail) - len(kept)}
+    return scope_to_run_items(detail, run_items)
+
+
 class ToolError(Exception):
     def __init__(self, code: str, message: str, content: Any) -> None:
         super().__init__(f"{code}: {message}")
@@ -768,8 +786,12 @@ def start_local_stack(pg_url: str, key_dir: Path, ttl: int) -> LocalStack:
 class Expectations:
     transcript: Transcript
     results: list[dict[str, Any]] = field(default_factory=list)
+    #: Applied to every detail before it is written or printed, so a check
+    #: cannot carry items the listing scope already kept out.
+    scope: Callable[[Any], Any] = lambda detail: detail
 
     def check(self, case: str, name: str, ok: bool, detail: Any = None) -> bool:
+        detail = self.scope(detail)
         entry = {"case": case, "expectation": name, "ok": bool(ok), "detail": detail}
         self.results.append(entry)
         self.transcript.write({"kind": "expectation", **entry})
@@ -807,7 +829,10 @@ class Scenario:
         self.ttl = ttl
         self.stamp = stamp
         self.transcript = reader.transcript
-        self.expect = Expectations(self.transcript)
+        self.expect = Expectations(
+            self.transcript,
+            scope=lambda detail: scope_detail(detail, frozenset(self.created_items)),
+        )
         self.build = _harness_build()
         self.digest = script_digest()
         self.created_items: list[int] = []
