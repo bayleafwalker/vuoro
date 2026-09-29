@@ -144,8 +144,10 @@
     "commands": {
       "vuoro.client.tests": "uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests",
       "vuoro.service.tests": "uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests",
-      "vuoro.boundaries": "uv build --package vuoro-client --wheel --out-dir dist/vuoro-client && uv build --package vuoro-service --wheel --out-dir dist/vuoro-service && uv run pytest tests/test_distribution_boundaries.py",
-      "vuoro.suite": "uv run pytest"
+      "vuoro.mcp-edge.tests": "uv run --package vuoro-mcp-edge --extra test pytest packages/vuoro-mcp-edge/tests",
+      "vuoro.reconciler.tests": "uv run --package vuoro-reconciler --extra test pytest packages/vuoro-reconciler/tests",
+      "vuoro.boundaries": "uv build --package vuoro-client --wheel --out-dir dist/vuoro-client && uv build --package vuoro-service --wheel --out-dir dist/vuoro-service && uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime && uv build --package vuoro-adapter-kit --wheel --out-dir dist/vuoro-adapter-kit && uv run pytest tests/test_distribution_boundaries.py",
+      "vuoro.suite": "uv sync --all-packages --all-extras && uv build --package vuoro-client --wheel --out-dir dist/vuoro-client && uv build --package vuoro-service --wheel --out-dir dist/vuoro-service && uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime && uv build --package vuoro-adapter-kit --wheel --out-dir dist/vuoro-adapter-kit && uv run pytest"
     },
     "protected_paths": [
       "deploy/**",
@@ -168,17 +170,22 @@
       "The current devbox hybrid dispatcher is one bounded patch-worker implementation, not the portable execution contract. Vuoro does not own Sprintctl plan semantics, Actionq claims or leases, runner harness internals, candidate publication, or Auditctl findings.",
       "Portable runner envelopes carry no claim tokens or provider credentials. Candidate Git bundles, receipts, integration topology, and disposable-runner isolation are governed by docs/architecture/portable-execution.md and owner-repository acceptance evidence.",
       "Worker packets carry no VUORO_ or database credentials; every registered command runs against the repository's own fixtures.",
-      "Every registered command must be self-contained in a fresh exact-commit worktree: the coordinator runs it cold before inference, and a command depending on artifacts from an earlier step fails that gate. vuoro.boundaries therefore builds both wheels itself rather than assuming dist/ is populated."
+      "Every registered command must be self-contained in a fresh exact-commit worktree: the coordinator runs it cold before inference, and a command depending on artifacts from an earlier step fails that gate. vuoro.boundaries therefore builds all four wheels itself rather than assuming dist/ is populated, and vuoro.suite syncs every workspace package and builds the wheels before running the whole suite, as CI does."
     ]
   },
   "verification": {
     "command_families": ["unit", "architecture", "docs", "full-suite"],
     "targeted_first": true,
     "commands": [
+      "uv sync --all-packages --all-extras",
       "uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests",
       "uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests",
+      "uv run --package vuoro-mcp-edge --extra test pytest packages/vuoro-mcp-edge/tests",
+      "uv run --package vuoro-reconciler --extra test pytest packages/vuoro-reconciler/tests",
       "uv build --package vuoro-client --wheel --out-dir dist/vuoro-client",
       "uv build --package vuoro-service --wheel --out-dir dist/vuoro-service",
+      "uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime",
+      "uv build --package vuoro-adapter-kit --wheel --out-dir dist/vuoro-adapter-kit",
       "uv run pytest",
       "python /projects/dev/agentops/scripts/validate_verification_artifacts.py --root ."
     ]
