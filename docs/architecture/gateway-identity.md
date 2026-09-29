@@ -141,25 +141,31 @@ are ready, so the gateway mints none that early. What remains is an assertion is
 seconds of a restart that completed in under two seconds, which is shorter
 than process start-up. A new pod has new caches and a new proof key.
 
-**Gateway follow-up (vuoro-cloud).** Correctness here does not depend on
-`jti == request_id`, but the gateway must:
+**Gateway side (vuoro-cloud).** Correctness here does not depend on
+`jti == request_id`. The gateway half of agentops#2519 lives in vuoro-cloud.
+Delivered there:
 
-- mint `jti` itself, unique per assertion (for example a ULID or 128 random
-  bits), instead of deriving it from the client's `X-Request-ID`. Today a
-  client that reuses its request id gets two assertions with one jti, and the
-  second is refused as a replay. Keep `request_id` equal to `X-Request-ID`;
-- mint a fresh assertion for every forwarded request, retries included, and
-  treat 401 `identity-replayed` / `-32003` as "re-mint and retry once", never
+- the pod-local `/run/vuoro/edge-proof` memory-backed `emptyDir`, mounted
+  into both containers with `VUORO_EDGE_PROOF_KEY_FILE` set in both
+  (vuoro-cloud #136, merged);
+- a gateway-minted `jti`, 128 random bits base64url per assertion, instead
+  of the client's `X-Request-ID`; `request_id` keeps the client's value for
+  correlation only (vuoro-cloud #135, merged). A client that reuses its
+  request id no longer gets two assertions with one jti.
+
+Still to do in vuoro-cloud:
+
+- treat 401 `identity-replayed` / `-32003` as "re-mint and retry once", never
   as a reason to resend the same assertion;
 - mint `/mcp` assertions with their own audience (for example `vuoro-mcp`,
   rendered to the runtime as `VUORO_EDGE_GATEWAY_ASSERTION_AUDIENCE`), so
   the shell refuses an MCP assertion on the direct route by audience rather
-  than by the `client_id` rule;
-- render the `/run/vuoro/edge-proof` memory-backed `emptyDir` into both
-  containers and set `VUORO_EDGE_PROOF_KEY_FILE` in both.
+  than by the `client_id` rule.
 
-Rollout order: the key mount (vuoro-cloud #136), then this runtime on every
-tenant, then the gateway-minted jti (vuoro-cloud #135), then the separate MCP
-audience. Without the key mount the edge refuses to start, so a wrong order
-stalls the rollout rather than causing an outage.
+Rollout order: the key mount (#136), then this runtime on every tenant, then
+the gateway-minted jti (#135), then the separate MCP audience. The first three
+have shipped; vuoro-cloud #135 requires every tenant on a runtime that accepts
+an independent jti (vuoro-service 0.1.77 or later). Without the key mount the
+edge refuses to start, so a wrong order stalls the rollout rather than causing
+an outage.
 
