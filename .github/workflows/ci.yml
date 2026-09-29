@@ -161,7 +161,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: m1-4-settlement-scenario
-          path: _artifacts/m1-4-settlement-scenario
+          # Only the packet: never the worker state (the gateway key is
+          # generated outside this directory as well).
+          path: |
+            _artifacts/m1-4-settlement-scenario/transcript.*
+            !_artifacts/m1-4-settlement-scenario/state/
 
   service-image:
     # The 0.1.76 release found the service image did not build: a workspace

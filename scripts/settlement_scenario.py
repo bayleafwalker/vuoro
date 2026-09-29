@@ -56,6 +56,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.parse
@@ -99,6 +100,22 @@ def _principal_ulid(subject: str) -> str:
 
 def now_iso() -> str:
     return datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def write_private(path: Path, text: str) -> None:
+    """Write `text` to `path` as a 0600 file, atomically, never wider.
+
+    The temporary file is created 0600 by os.open (no umask window and no
+    chmod after the fact) and renamed over `path`.
+    """
+
+    tmp = path.with_name(path.name + ".tmp")
+    with contextlib.suppress(FileNotFoundError):
+        tmp.unlink()
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(text)
+    os.replace(tmp, path)
 
 
 def script_digest() -> str:
@@ -215,10 +232,7 @@ def oauth_headers(token_file: Path, secret_file: Path) -> Callable[[], dict[str,
                 refresh_token=body.get("refresh_token", state["refresh_token"]),
                 expires_at=time.time() + int(body.get("expires_in", 900)),
             )
-            tmp = token_file.with_suffix(".tmp")
-            tmp.write_text(json.dumps(state))
-            tmp.chmod(0o600)
-            tmp.replace(token_file)
+            write_private(token_file, json.dumps(state))
         return {"Authorization": f"Bearer {state['access_token']}"}
 
     return headers
@@ -234,6 +248,47 @@ def bearer_file_headers(path: Path) -> Callable[[], dict[str, str]]:
 # ---------------------------------------------------------------------------
 
 
+def _is_work_item(value: Any) -> bool:
+    return isinstance(value, dict) and (
+        "work_id" in value or ("id" in value and "title" in value)
+    )
+
+
+def scope_to_run_items(value: Any, run_items: frozenset[int]) -> Any:
+    """What the transcript may keep of an answer: only the run's own items.
+
+    Listings (`list_ready_work`, `next-work` and anything else that returns
+    work items) carry every item the caller can see.  On a live workspace
+    those are real, unrelated items, and the transcript is committed to a
+    public repository, so every list of work items is cut down to the items
+    this run created; how many were dropped is kept as a count, never their
+    ids or titles.  The expectations are evaluated on the owner's full
+    answer, not on this copy.
+    """
+
+    if isinstance(value, dict):
+        scoped: dict[str, Any] = {}
+        omitted: dict[str, int] = {}
+        for key, item in value.items():
+            if isinstance(item, list) and item and all(_is_work_item(entry) for entry in item):
+                kept = [
+                    scope_to_run_items(entry, run_items)
+                    for entry in item
+                    if entry.get("work_id", entry.get("id")) in run_items
+                ]
+                if len(kept) != len(item):
+                    omitted[key] = len(item) - len(kept)
+                scoped[key] = kept
+            else:
+                scoped[key] = scope_to_run_items(item, run_items)
+        if omitted:
+            scoped["omitted_foreign_items"] = omitted
+        return scoped
+    if isinstance(value, list):
+        return [scope_to_run_items(entry, run_items) for entry in value]
+    return value
+
+
 class ToolError(Exception):
     def __init__(self, code: str, message: str, content: Any) -> None:
         super().__init__(f"{code}: {message}")
@@ -245,8 +300,15 @@ class McpCaller:
     """One caller on the public MCP route."""
 
     def __init__(
-        self, name: str, url: str, headers: Callable[[], dict[str, str]], transcript: Transcript
+        self,
+        name: str,
+        url: str,
+        headers: Callable[[], dict[str, str]],
+        transcript: Transcript,
+        *,
+        scope: Callable[[Any], Any] = lambda value: value,
     ) -> None:
+        self.scope = scope
         self.name = name
         self.url = url
         self.headers = headers
@@ -313,7 +375,7 @@ class McpCaller:
                 "tool": tool,
                 "arguments": arguments,
                 "is_error": is_error,
-                "result": content,
+                "result": self.scope(content),
                 "note": note,
             }
         )
@@ -345,7 +407,9 @@ class AuthorityReader:
         transcript: Transcript,
         *,
         send_catalog_revision: bool,
+        scope: Callable[[Any], Any] = lambda value: value,
     ) -> None:
+        self.scope = scope
         self.base_url = base_url.rstrip("/")
         self.repo_id = repo_id
         self.headers = headers
@@ -369,6 +433,7 @@ class AuthorityReader:
         record: bool = True,
         note: str = "",
         idempotency_key: str | None = None,
+        basis_revision: str | None = None,
     ) -> dict[str, Any]:
         headers = self.headers()
         request_id = headers.get("X-Request-Id") or f"m14-{uuid.uuid4()}"
@@ -384,6 +449,8 @@ class AuthorityReader:
             body["catalog_revision"] = self.catalog_revision
         if idempotency_key:
             body["idempotency_key"] = idempotency_key
+        if basis_revision:
+            body["basis_revision"] = basis_revision
         response = self.client.post(
             f"{self.base_url}/api/invoke/v1",
             json=body,
@@ -397,7 +464,7 @@ class AuthorityReader:
                     "operation": operation,
                     "arguments": arguments,
                     "status": envelope.get("status"),
-                    "result": envelope.get("result"),
+                    "result": self.scope(envelope.get("result")),
                     "error": envelope.get("error"),
                     "note": note,
                 }
@@ -477,7 +544,8 @@ def worker_main(args: argparse.Namespace) -> int:
         run_id = register()
         answer = claim(run_id)
         lease = answer["lease"]
-        state.update(run_id=run_id, lease_id=lease["lease_id"], heartbeats=0)
+        state.update(run_id=run_id, lease_id=lease["lease_id"],
+                     generation=lease.get("generation"), heartbeats=0)
         save()
         interval = min(float(lease["heartbeat_interval_seconds"]), float(args.heartbeat_every))
         while True:  # until the orchestrator kills this process
@@ -487,9 +555,13 @@ def worker_main(args: argparse.Namespace) -> int:
             save()
 
     if args.action == "late-report":
-        with contextlib.suppress(ToolError):
+        try:
             caller.call("heartbeat", {"lease_id": state["lease_id"], "run_id": state["run_id"]},
                         note="the killed caller comes back and heartbeats its old lease")
+        except ToolError as error:
+            state["late_heartbeat_code"] = error.code
+        else:
+            state["late_heartbeat_code"] = None
         try:
             report(state["run_id"], state["lease_id"], state["report_key"])
         except ToolError as error:
@@ -511,7 +583,7 @@ def worker_main(args: argparse.Namespace) -> int:
         save()
         return 0
 
-    if args.action == "take-over-and-report":
+    if args.action == "early-claim":
         run_id = register()
         state["run_id"] = run_id
         try:
@@ -600,7 +672,7 @@ class LocalStack:
             server.join(timeout=10)
 
 
-def start_local_stack(pg_url: str, workdir: Path, ttl: int) -> LocalStack:
+def start_local_stack(pg_url: str, key_dir: Path, ttl: int) -> LocalStack:
     os.environ["SPRINTCTL_LEASE_TTL_SECONDS"] = str(ttl)
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -619,16 +691,16 @@ def start_local_stack(pg_url: str, workdir: Path, ttl: int) -> LocalStack:
     from vuoro_service.gateway_identity import GatewayAssertionIdentityResolver
 
     private = Ed25519PrivateKey.generate()
-    key_file = workdir / "gateway-private.pem"
-    key_file.write_bytes(
+    key_file = key_dir / "gateway-private.pem"
+    write_private(
+        key_file,
         private.private_bytes(
             serialization.Encoding.PEM,
             serialization.PrivateFormat.PKCS8,
             serialization.NoEncryption(),
-        )
+        ).decode(),
     )
-    key_file.chmod(0o600)
-    public_file = workdir / "gateway-public.pem"
+    public_file = key_dir / "gateway-public.pem"
     public_file.write_bytes(
         private.public_key().public_bytes(
             serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
@@ -739,6 +811,12 @@ class Scenario:
         self.build = _harness_build()
         self.digest = script_digest()
         self.created_items: list[int] = []
+        self.sprint: dict[str, Any] | None = None
+        self.ids: dict[str, int] = {}
+        reader.scope = self.scope
+
+    def scope(self, value: Any) -> Any:
+        return scope_to_run_items(value, frozenset(self.created_items))
 
     # -- helpers ------------------------------------------------------------
 
@@ -814,7 +892,8 @@ class Scenario:
         raise RuntimeError("lease never went stale")
 
     def public_ready(self, caller: str, note: str) -> list[int]:
-        mcp = McpCaller(caller, self.mcp_url, self.callers[caller].headers, self.transcript)
+        mcp = McpCaller(caller, self.mcp_url, self.callers[caller].headers, self.transcript,
+                        scope=self.scope)
         mcp.initialize()
         result = mcp.call("list_ready_work", {}, note=note)
         return [item["work_id"] for item in result.get("items", [])]
@@ -830,7 +909,9 @@ class Scenario:
              "goal": "agentops#2524 settlement-scenario markers; disposable, not real work",
              "status": "active"},
         )["sprint"]
-        ids: dict[str, int] = {"sprint": sprint["id"]}
+        self.sprint = sprint
+        ids = self.ids
+        ids["sprint"] = sprint["id"]
         for key, title in (
             ("X", f"{label} X: leased item -- disposable, not real work"),
             ("Y", f"{label} Y: depends on X -- disposable, not real work"),
@@ -860,18 +941,21 @@ class Scenario:
         self.mark(case, "A registers a run, claims X and heartbeats; then A is killed")
         a_state = self.state_file(case, "A", x)
         a = self.kill_after_heartbeat("A", a_state)
-        check("A holds generation 1 of X's lease", bool(a.get("lease_id")), a.get("lease_id"))
+        check("A holds generation 1 of X's lease",
+              bool(a.get("lease_id")) and a.get("generation") == 1,
+              {"lease_id": a.get("lease_id"), "generation": a.get("generation")})
 
         self.mark(case, "B registers a run and claims X while A's lease is still fresh")
         b_state = self.state_file(case, "B", x)
-        b = self.run_worker("B", b_state, "take-over-and-report")
+        b = self.run_worker("B", b_state, "early-claim")
         check("B's claim is refused lease-held while A's lease is fresh",
               b.get("early_claim_code") == "lease-held", b.get("early_claim_code"))
 
         self.wait_until_stale(x, case)
 
         self.mark(case, "B claims X again: the owner takes A's stale lease over")
-        b_caller = McpCaller("B", self.mcp_url, self.callers["B"].headers, self.transcript)
+        b_caller = McpCaller("B", self.mcp_url, self.callers["B"].headers, self.transcript,
+                             scope=self.scope)
         b_caller.initialize()
         b_state_data = json.loads(b_state.read_text())
         takeover_key = b_state_data["claim_key"] + "-2"
@@ -890,6 +974,9 @@ class Scenario:
         a_late = self.run_worker("A", a_state, "late-report")
         check("A's late report_outcome is refused claim-superseded",
               a_late.get("late_report_code") == "claim-superseded", a_late.get("late_report_code"))
+        check("A's late heartbeat is refused claim-superseded",
+              a_late.get("late_heartbeat_code") == "claim-superseded",
+              a_late.get("late_heartbeat_code"))
 
         lease_read = self.reader.invoke("work.lease.read-v1", {"item_id": x},
                                         note="after A's late report: A's payload is on X")
@@ -929,15 +1016,18 @@ class Scenario:
         accepted = [d for d in rows if d.get("kind") == "accept"]
         check("exactly one accept decision on X", len(rows) == 1 and len(accepted) == 1, rows)
         check('the decision reads "accepted under verification profile checked"',
-              bool(accepted) and "accepted under verification profile checked"
-              in (accepted[0].get("rationale") or ""), accepted)
+              bool(accepted) and (accepted[0].get("rationale") or "").startswith(
+                  "accepted under verification profile checked:"), accepted)
         check("the decision is the authority's (sprintctl:lease-settlement)",
               bool(accepted) and accepted[0].get("actor") == "sprintctl:lease-settlement", accepted)
         final = self.reader.invoke("work.lease.read-v1", {"item_id": x},
                                    note="X's leases and reports after settlement")
-        check("X's verification bar is the named profile checked",
-              json.dumps(final.get("verification", {})).find('"checked"') >= 0
-              or json.dumps(final).find('"profile": "checked"') >= 0, final.get("verification"))
+        b_lease = next((lease for lease in final.get("leases", [])
+                        if lease.get("lease_id") == lease_b["lease_id"]), {})
+        check("X's verification bar and B's pinned bar are the named profile checked",
+              (final.get("verification") or {}).get("profile") == "checked"
+              and (b_lease.get("verification") or {}).get("profile") == "checked",
+              {"item": final.get("verification"), "lease": b_lease.get("verification")})
         item = self.reader.invoke("work.read.item", {"item_id": x}, note="X after settlement")
         check("X is done", (item.get("item") or {}).get("status") == "done", item.get("item"))
         ready = self.reader.ready_ids(sprint, note="after settlement")
@@ -985,8 +1075,9 @@ class Scenario:
                   and lease.get("takeover_of") is None and lease.get("superseded_by") is None,
                   lease)
 
-    def cleanup(self, ids: dict[str, int]) -> None:
-        self.mark("cleanup", "withdraw every disposable item the run did not settle")
+    def cleanup(self) -> None:
+        self.mark("cleanup", "withdraw every disposable item the run did not settle, "
+                  "then close the disposable sprint")
         for item_id in self.created_items:
             try:
                 state = self.reader.invoke("work.read.item-decisions", {"item_id": item_id},
@@ -999,8 +1090,57 @@ class Scenario:
                      "rationale": "agentops#2524 disposable scenario item; withdrawn after the run"},
                     idempotency_key=f"m14-{self.stamp}-withdraw-{item_id}",
                 )
-            except Exception as error:  # cleanup must not hide the scenario's result
-                print(f"   cleanup of item {item_id} failed: {error}")
+            except Exception as error:  # recorded, and the rest still runs
+                self.expect.check("cleanup", f"disposable item {item_id} is withdrawn",
+                                  False, repr(error))
+        if self.sprint is not None:
+            try:
+                self.close_sprint(self.sprint)
+                closed = self.reader.invoke("work.read.sprint", {"sprint_id": self.sprint["id"]},
+                                            note="the disposable sprint after cleanup")
+                status = (closed.get("sprint") or closed).get("status")
+                self.expect.check("cleanup", "the disposable sprint is closed",
+                                  status == "closed", status)
+            except Exception as error:
+                self.expect.check("cleanup", "the disposable sprint is closed", False, repr(error))
+
+    def close_sprint(self, sprint: dict[str, Any]) -> None:
+        """Close the run's sprint through the owner's `sprint.close` command.
+
+        The served surface has no sprint-status operation; closing is an
+        authority command (`work.lifecycle.arbitrate`), built with the
+        owner's own contracts, as vuoro-cloud's restore drill retires items.
+        A served owner does not pin the command's repository UUID
+        (sprintctl `authority.py`), so a name-derived one is used.
+        """
+
+        import dataclasses
+
+        from sprintctl import contracts, outbox
+
+        actor = self.reader.invoke("work.identity.current", {}, record=False)["actor"]
+        event_id = str(uuid.uuid4())
+        aggregate_uuid = sprint["aggregate_uuid"]
+        command = contracts.AuthorityCommand(
+            event_id=event_id, record_type="sprint.close", schema_version="1",
+            actor=actor, authored_at=now_iso(),
+            refs={"repo_id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"sprintctl-repo:{self.reader.repo_id}")),
+                  "aggregate_type": "sprint", "aggregate_uuid": aggregate_uuid,
+                  "aggregate_id": int(sprint["id"])},
+            payload={}, basis_revision=f"sprint:{aggregate_uuid}@status:active",
+            correlation_id=event_id,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            conn = outbox.open_outbox(Path(tmp) / "outbox.db")
+            record = dataclasses.asdict(outbox.append_authority_command(conn, command))
+            conn.close()
+        result = self.reader.invoke(
+            "work.lifecycle.arbitrate", {"record": record}, idempotency_key=event_id,
+            basis_revision=record["basis_revision"],
+            note="close the disposable sprint",
+        )
+        if result.get("outcome") not in (None, "accepted", "applied"):
+            raise RuntimeError(f"sprint.close: {result}")
 
 
 def _harness_build() -> str:
@@ -1090,7 +1230,11 @@ def run_main(args: argparse.Namespace) -> int:
     with contextlib.ExitStack() as stack_ctx:
         if args.mode == "local":
             pg_url = stack_ctx.enter_context(postgres(args.pg_url))
-            stack = start_local_stack(pg_url, work, args.ttl)
+            # The local gateway key lives outside --out, so no upload or
+            # commit of the evidence directory can carry it, even on a crash.
+            key_dir = Path(stack_ctx.enter_context(
+                tempfile.TemporaryDirectory(prefix="m14-gateway-")))
+            stack = start_local_stack(pg_url, key_dir, args.ttl)
             stack_ctx.callback(stack.stop)
             ttl = float(args.ttl)
             mcp_url = stack.mcp_url
@@ -1132,9 +1276,10 @@ def run_main(args: argparse.Namespace) -> int:
             scenario.expect.check("setup", f"{name} is offered claim_work, heartbeat and "
                                   "report_outcome", {"claim_work", "heartbeat", "report_outcome"}
                                   <= set(tools), tools)
-        ids = scenario.setup()
+        ids = scenario.ids
         cases = args.cases.split(",")
         try:
+            scenario.setup()
             if "takeover" in cases:
                 scenario.takeover(ids)
             if "restart" in cases:
@@ -1144,7 +1289,7 @@ def run_main(args: argparse.Namespace) -> int:
         except Exception as error:  # a crash is a red run, with the transcript kept
             scenario.expect.check("run", "the scenario ran to completion", False, repr(error))
         finally:
-            scenario.cleanup(ids)
+            scenario.cleanup()
 
     entries = transcript.read()
     meta = {"mode": args.mode, "stamp": stamp, "ttl": ttl, "mcp_url": mcp_url,
@@ -1212,15 +1357,22 @@ def oauth_login_main(args: argparse.Namespace) -> int:
     response.raise_for_status()
     body = response.json()
     token = Path(args.token).expanduser()
-    token.parent.mkdir(parents=True, exist_ok=True)
-    token.touch(mode=0o600)
-    token.write_text(json.dumps({
+    token.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
+    if not runtime_dir or not token.resolve().is_relative_to(Path(runtime_dir).resolve()):
+        print("warning: the token file is not under $XDG_RUNTIME_DIR (tmpfs); refresh "
+              "rewrites it, and a disk filesystem may keep earlier versions")
+    claims = json.loads(base64.urlsafe_b64decode(
+        body["access_token"].split(".")[1] + "=" * (-len(body["access_token"].split(".")[1]) % 4)))
+    write_private(token, json.dumps({
         "access_token": body["access_token"], "refresh_token": body["refresh_token"],
         "expires_at": time.time() + int(body.get("expires_in", 900)),
         "token_endpoint": meta["token_endpoint"], "resource": resource,
-        "scope": body.get("scope"),
+        "scope": body.get("scope"), "grant_id": claims.get("grant_id"),
+        "workspace_id": claims.get("workspace_id"),
     }))
-    print(f"wrote {token} (scope: {body.get('scope')})")
+    print(f"wrote {token} (scope: {body.get('scope')}; grant_id {claims.get('grant_id')}; "
+          f"workspace_id {claims.get('workspace_id')}) -- revoke this grant after the run")
     return 0
 
 
