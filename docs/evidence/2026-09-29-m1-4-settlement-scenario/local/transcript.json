@@ -1,0 +1,2957 @@
+{
+  "entries": [
+    {
+      "at": "2026-09-29T05:52:03.003Z",
+      "harness_build": "git:afb701b5ce7cd58a5f4966f2a025ab09f05d770c",
+      "kind": "meta",
+      "mcp_url": "http://127.0.0.1:58121/mcp",
+      "mode": "local",
+      "script_digest": "sha256:b9dafc7a285c9053377bb5c48c97a610d61b6b9258bec0263b4c0aada9986c8d",
+      "ttl": 30.0
+    },
+    {
+      "at": "2026-09-29T05:52:03.010Z",
+      "case": "setup",
+      "detail": [
+        "list_ready_work",
+        "describe_work",
+        "register_run",
+        "append_evidence",
+        "write_session_note",
+        "claim_work",
+        "heartbeat",
+        "report_outcome"
+      ],
+      "expectation": "A is offered claim_work, heartbeat and report_outcome",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "at": "2026-09-29T05:52:03.017Z",
+      "case": "setup",
+      "detail": [
+        "list_ready_work",
+        "describe_work",
+        "register_run",
+        "append_evidence",
+        "write_session_note",
+        "claim_work",
+        "heartbeat",
+        "report_outcome"
+      ],
+      "expectation": "B is offered claim_work, heartbeat and report_outcome",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "at": "2026-09-29T05:52:03.017Z",
+      "case": "setup",
+      "kind": "step",
+      "step": "create a labelled disposable sprint and items"
+    },
+    {
+      "arguments": {
+        "goal": "agentops#2524 settlement-scenario markers; disposable, not real work",
+        "name": "m1-4-scenario-20260929T055142Z",
+        "status": "active"
+      },
+      "at": "2026-09-29T05:52:03.034Z",
+      "error": null,
+      "kind": "authority",
+      "note": "",
+      "operation": "work.sprint.create",
+      "result": {
+        "repo_id": "vuoro",
+        "sprint": {
+          "aggregate_uuid": "6a9ac79a-8967-4191-97ba-ea5025f70d95",
+          "created_at": "2026-09-29T05:52:03.020665Z",
+          "end_date": null,
+          "goal": "agentops#2524 settlement-scenario markers; disposable, not real work",
+          "id": 1,
+          "kind": "active_sprint",
+          "name": "m1-4-scenario-20260929T055142Z",
+          "repo_id": "vuoro",
+          "start_date": null,
+          "status": "active"
+        }
+      },
+      "status": "accepted"
+    },
+    {
+      "arguments": {
+        "description": "agentops#2524 M1-4 scenario marker item; disposable, not real work.",
+        "sprint_id": 1,
+        "title": "M1-4 scenario 20260929T055142Z X: leased item -- disposable, not real work",
+        "track_name": "m1-4-scenario"
+      },
+      "at": "2026-09-29T05:52:03.059Z",
+      "error": null,
+      "kind": "authority",
+      "note": "",
+      "operation": "work.item.create",
+      "result": {
+        "item": {
+          "aggregate_uuid": "b14cc033-09a5-4823-bc38-0697e0a93a4d",
+          "assignee": null,
+          "created_at": "2026-09-29T05:52:03.045558Z",
+          "description": "agentops#2524 M1-4 scenario marker item; disposable, not real work.",
+          "id": 1,
+          "legacy": false,
+          "priority": null,
+          "repo_id": "vuoro",
+          "resolution": null,
+          "sprint_id": 1,
+          "status": "pending",
+          "terminal_decision_id": null,
+          "title": "M1-4 scenario 20260929T055142Z X: leased item -- disposable, not real work",
+          "track_id": 1,
+          "updated_at": "2026-09-29T05:52:03.045558Z"
+        },
+        "track_name": "m1-4-scenario"
+      },
+      "status": "accepted"
+    },
+    {
+      "arguments": {
+        "description": "agentops#2524 M1-4 scenario marker item; disposable, not real work.",
+        "sprint_id": 1,
+        "title": "M1-4 scenario 20260929T055142Z Y: depends on X -- disposable, not real work",
+        "track_name": "m1-4-scenario"
+      },
+      "at": "2026-09-29T05:52:03.071Z",
+      "error": null,
+      "kind": "authority",
+      "note": "",
+      "operation": "work.item.create",
+      "result": {
+        "item": {
+          "aggregate_uuid": "c6bd4d41-8740-4219-8703-13cb338ebd13",
+          "assignee": null,
+          "created_at": "2026-09-29T05:52:03.061550Z",
+          "description": "agentops#2524 M1-4 scenario marker item; disposable, not real work.",
+          "id": 2,
+          "legacy": false,
+          "priority": null,
+          "repo_id": "vuoro",
+          "resolution": null,
+          "sprint_id": 1,
+          "status": "pending",
+          "terminal_decision_id": null,
+          "title": "M1-4 scenario 20260929T055142Z Y: depends on X -- disposable, not real work",
+          "track_id": 1,
+          "updated_at": "2026-09-29T05:52:03.061550Z"
+        },
+        "track_name": "m1-4-scenario"
+      },
+      "status": "accepted"
+    },
+    {
+      "arguments": {
+        "description": "agentops#2524 M1-4 scenario marker item; disposable, not real work.",
+        "sprint_id": 1,
+        "title": "M1-4 scenario 20260929T055142Z R: restart case -- disposable, not real work",
+        "track_name": "m1-4-scenario"
+      },
+      "at": "2026-09-29T05:52:03.083Z",
+      "error": null,
+      "kind": "authority",
+      "note": "",
+      "operation": "work.item.create",
+      "result": {
+        "item": {
+          "aggregate_uuid": "7f2b98c2-28b0-4e76-8dc6-4fdfeb99f5af",
+          "assignee": null,
+          "created_at": "2026-09-29T05:52:03.074191Z",
+          "description": "agentops#2524 M1-4 scenario marker item; disposable, not real work.",
+          "id": 3,
+          "legacy": false,
+          "priority": null,
+          "repo_id": "vuoro",
+          "resolution": null,
+          "sprint_id": 1,
+          "status": "pending",
+          "terminal_decision_id": null,
+          "title": "M1-4 scenario 20260929T055142Z R: restart case -- disposable, not real work",
+          "track_id": 1,
+          "updated_at": "2026-09-29T05:52:03.074191Z"
+        },
+        "track_name": "m1-4-scenario"
+      },
+      "status": "accepted"
+    },
+    {
+      "arguments": {
+        "description": "agentops#2524 M1-4 scenario marker item; disposable, not real work.",
+        "sprint_id": 1,
+        "title": "M1-4 scenario 20260929T055142Z S: stale-restart case -- disposable, not real work",
+        "track_name": "m1-4-scenario"
+      },
+      "at": "2026-09-29T05:52:03.096Z",
+      "error": null,
+      "kind": "authority",
+      "note": "",
+      "operation": "work.item.create",
+      "result": {
+        "item": {
+          "aggregate_uuid": "a461c340-3e2d-4320-9a84-db7a28dca354",
+          "assignee": null,
+          "created_at": "2026-09-29T05:52:03.086540Z",
+          "description": "agentops#2524 M1-4 scenario marker item; disposable, not real work.",
+          "id": 4,
+          "legacy": false,
+          "priority": null,
+          "repo_id": "vuoro",
+          "resolution": null,
+          "sprint_id": 1,
+          "status": "pending",
+          "terminal_decision_id": null,
+          "title": "M1-4 scenario 20260929T055142Z S: stale-restart case -- disposable, not real work",
+          "track_id": 1,
+          "updated_at": "2026-09-29T05:52:03.086540Z"
+        },
+        "track_name": "m1-4-scenario"
+      },
+      "status": "accepted"
+    },
+    {
+      "arguments": {
+        "blocked_item_id": 2,
+        "item_id": 1
+      },
+      "at": "2026-09-29T05:52:03.108Z",
+      "error": null,
+      "kind": "authority",
+      "note": "Y is blocked by X",
+      "operation": "work.item.dep.add",
+      "result": {
+        "dep_id": 1,
+        "item_id": 1,
+        "repo_id": "vuoro"
+      },
+      "status": "accepted"
+    },
+    {
+      "arguments": {
+        "sprint_id": 1
+      },
+      "at": "2026-09-29T05:52:03.112Z",
+      "error": null,
+      "kind": "authority",
+      "note": "before any claim",
+      "operation": "work.read.next-work",
+      "result": {
+        "dispatch_admissible": "admissible",
+        "dispatch_reason": "ready-items-available",
+        "graph_ready": true,
+        "ready_items": [
+          {
+            "aggregate_uuid": "b14cc033-09a5-4823-bc38-0697e0a93a4d",
+            "assignee": null,
+            "blockers_resolved": 0,
+            "created_at": "2026-09-29T05:52:03.045558Z",
+            "description": "agentops#2524 M1-4 scenario marker item; disposable, not real work.",
+            "effective_priority": null,
+            "id": 1,
+            "legacy": false,
+            "priority": null,
+            "repo_id": "vuoro",
+            "resolution": null,
+            "sprint_id": 1,
+            "status": "pending",
+            "terminal_decision_id": null,
+            "title": "M1-4 scenario 20260929T055142Z X: leased item -- disposable, not real work",
+            "track_id": 1,
+            "track_name": "m1-4-scenario",
+            "unresolved_blockers": 0,
+            "updated_at": "2026-09-29T05:52:03.045558Z"
+          },
+          {
+            "aggregate_uuid": "7f2b98c2-28b0-4e76-8dc6-4fdfeb99f5af",
+            "assignee": null,
+            "blockers_resolved": 0,
+            "created_at": "2026-09-29T05:52:03.074191Z",
+            "description": "agentops#2524 M1-4 scenario marker item; disposable, not real work.",
+            "effective_priority": null,
+            "id": 3,
+            "legacy": false,
+            "priority": null,
+            "repo_id": "vuoro",
+            "resolution": null,
+            "sprint_id": 1,
+            "status": "pending",
+            "terminal_decision_id": null,
+            "title": "M1-4 scenario 20260929T055142Z R: restart case -- disposable, not real work",
+            "track_id": 1,
+            "track_name": "m1-4-scenario",
+            "unresolved_blockers": 0,
+            "updated_at": "2026-09-29T05:52:03.074191Z"
+          },
+          {
+            "aggregate_uuid": "a461c340-3e2d-4320-9a84-db7a28dca354",
+            "assignee": null,
+            "blockers_resolved": 0,
+            "created_at": "2026-09-29T05:52:03.086540Z",
+            "description": "agentops#2524 M1-4 scenario marker item; disposable, not real work.",
+            "effective_priority": null,
+            "id": 4,
+            "legacy": false,
+            "priority": null,
+            "repo_id": "vuoro",
+            "resolution": null,
+            "sprint_id": 1,
+            "status": "pending",
+            "terminal_decision_id": null,
+            "title": "M1-4 scenario 20260929T055142Z S: stale-restart case -- disposable, not real work",
+            "track_id": 1,
+            "track_name": "m1-4-scenario",
+            "unresolved_blockers": 0,
+            "updated_at": "2026-09-29T05:52:03.086540Z"
+          }
+        ],
+        "repo_id": "vuoro",
+        "sprint": {
+          "aggregate_uuid": "6a9ac79a-8967-4191-97ba-ea5025f70d95",
+          "created_at": "2026-09-29T05:52:03.020665Z",
+          "end_date": null,
+          "goal": "agentops#2524 settlement-scenario markers; disposable, not real work",
+          "id": 1,
+          "kind": "active_sprint",
+          "name": "m1-4-scenario-20260929T055142Z",
+          "repo_id": "vuoro",
+          "start_date": null,
+          "status": "active"
+        }
+      },
+      "status": "accepted"
+    },
+    {
+      "at": "2026-09-29T05:52:03.112Z",
+      "case": "takeover",
+      "detail": [
+        1,
+        3,
+        4
+      ],
+      "expectation": "X is ready and Y is not before anything happens",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "at": "2026-09-29T05:52:03.112Z",
+      "case": "takeover",
+      "kind": "step",
+      "step": "A registers a run, claims X and heartbeats; then A is killed"
+    },
+    {
+      "action": "claim-and-heartbeat",
+      "at": "2026-09-29T05:52:03.206Z",
+      "caller": "A",
+      "event": "started",
+      "kind": "process",
+      "pid": 410543
+    },
+    {
+      "arguments": {
+        "harness_build": "git:afb701b5ce7cd58a5f4966f2a025ab09f05d770c",
+        "harness_id": "vuoro-m1-4-scenario",
+        "idempotency_key": "m14-20260929T055142Z-takeover-A-run",
+        "model_id": "none:scripted-caller",
+        "observed_profile": {
+          "instruction_digest": "sha256:b9dafc7a285c9053377bb5c48c97a610d61b6b9258bec0263b4c0aada9986c8d",
+          "skill_digests": []
+        },
+        "recipe_id": "m1-4-settlement-scenario/v1"
+      },
+      "at": "2026-09-29T05:52:03.235Z",
+      "caller": "A",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "run_id": "run_TB8RWGS5RAJ9R1VQYB2JRGQTHG"
+      },
+      "tool": "register_run"
+    },
+    {
+      "arguments": {
+        "idempotency_key": "m14-20260929T055142Z-takeover-A-claim",
+        "item_id": 1,
+        "run_id": "run_TB8RWGS5RAJ9R1VQYB2JRGQTHG"
+      },
+      "at": "2026-09-29T05:52:03.255Z",
+      "caller": "A",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "lease": {
+          "acquired_at": "2026-09-29T05:52:03.244205Z",
+          "end_reason": null,
+          "ended_at": null,
+          "expires_at": "2026-09-29T05:52:33.244205Z",
+          "generation": 1,
+          "heartbeat_at": "2026-09-29T05:52:03.244205Z",
+          "heartbeat_interval_seconds": 6,
+          "item_id": 1,
+          "lease_id": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+          "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+          "run_id": "run_TB8RWGS5RAJ9R1VQYB2JRGQTHG",
+          "state": "active",
+          "superseded_by": null,
+          "takeover_of": null,
+          "ttl_seconds": 30,
+          "verification": {
+            "profile": "checked",
+            "required_checks": [],
+            "requirements": [
+              "checks"
+            ]
+          },
+          "workspace_id": "01M14SCENAR10000000000000W"
+        },
+        "repo_id": "vuoro",
+        "resumed": false,
+        "took_over": null
+      },
+      "tool": "claim_work"
+    },
+    {
+      "arguments": {
+        "lease_id": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+        "run_id": "run_TB8RWGS5RAJ9R1VQYB2JRGQTHG"
+      },
+      "at": "2026-09-29T05:52:09.277Z",
+      "caller": "A",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "lease": {
+          "acquired_at": "2026-09-29T05:52:03.244205Z",
+          "end_reason": null,
+          "ended_at": null,
+          "expires_at": "2026-09-29T05:52:39.265551Z",
+          "generation": 1,
+          "heartbeat_at": "2026-09-29T05:52:09.265551Z",
+          "heartbeat_interval_seconds": 6,
+          "item_id": 1,
+          "lease_id": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+          "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+          "run_id": "run_TB8RWGS5RAJ9R1VQYB2JRGQTHG",
+          "state": "active",
+          "superseded_by": null,
+          "takeover_of": null,
+          "ttl_seconds": 30,
+          "verification": {
+            "profile": "checked",
+            "required_checks": [],
+            "requirements": [
+              "checks"
+            ]
+          },
+          "workspace_id": "01M14SCENAR10000000000000W"
+        },
+        "repo_id": "vuoro"
+      },
+      "tool": "heartbeat"
+    },
+    {
+      "at": "2026-09-29T05:52:09.318Z",
+      "caller": "A",
+      "event": "killed",
+      "kind": "process",
+      "pid": 410543,
+      "returncode": -9,
+      "signal": "SIGKILL"
+    },
+    {
+      "at": "2026-09-29T05:52:09.318Z",
+      "case": "takeover",
+      "detail": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+      "expectation": "A holds generation 1 of X's lease",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "at": "2026-09-29T05:52:09.318Z",
+      "case": "takeover",
+      "kind": "step",
+      "step": "B registers a run and claims X while A's lease is still fresh"
+    },
+    {
+      "action": "take-over-and-report",
+      "at": "2026-09-29T05:52:09.419Z",
+      "caller": "B",
+      "event": "started",
+      "kind": "process",
+      "pid": 410966
+    },
+    {
+      "arguments": {
+        "harness_build": "git:afb701b5ce7cd58a5f4966f2a025ab09f05d770c",
+        "harness_id": "vuoro-m1-4-scenario",
+        "idempotency_key": "m14-20260929T055142Z-takeover-B-run",
+        "model_id": "none:scripted-caller",
+        "observed_profile": {
+          "instruction_digest": "sha256:b9dafc7a285c9053377bb5c48c97a610d61b6b9258bec0263b4c0aada9986c8d",
+          "skill_digests": []
+        },
+        "recipe_id": "m1-4-settlement-scenario/v1"
+      },
+      "at": "2026-09-29T05:52:09.435Z",
+      "caller": "B",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "run_id": "run_NVX50405EFM22513R8HR8ME8W7"
+      },
+      "tool": "register_run"
+    },
+    {
+      "arguments": {
+        "idempotency_key": "m14-20260929T055142Z-takeover-B-claim",
+        "item_id": 1,
+        "run_id": "run_NVX50405EFM22513R8HR8ME8W7"
+      },
+      "at": "2026-09-29T05:52:09.443Z",
+      "caller": "B",
+      "is_error": true,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "error": {
+          "code": "lease-held",
+          "message": "item #1 is leased; its lease becomes stale at 2026-09-29T05:52:39.265551Z unless its holder heartbeats"
+        }
+      },
+      "tool": "claim_work"
+    },
+    {
+      "at": "2026-09-29T05:52:09.482Z",
+      "case": "takeover",
+      "detail": "lease-held",
+      "expectation": "B's claim is refused lease-held while A's lease is fresh",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "at": "2026-09-29T05:52:09.482Z",
+      "case": "takeover",
+      "kind": "step",
+      "step": "wait for the owner to see the lease on item 1 as stale"
+    },
+    {
+      "arguments": {
+        "item_id": 1
+      },
+      "at": "2026-09-29T05:52:39.559Z",
+      "error": null,
+      "kind": "authority",
+      "note": "the owner now evaluates the killed caller's lease as stale",
+      "operation": "work.lease.read-v1",
+      "result": {
+        "current_lease": {
+          "acquired_at": "2026-09-29T05:52:03.244205Z",
+          "end_reason": null,
+          "ended_at": null,
+          "expires_at": "2026-09-29T05:52:39.265551Z",
+          "generation": 1,
+          "heartbeat_at": "2026-09-29T05:52:09.265551Z",
+          "heartbeat_interval_seconds": 6,
+          "item_id": 1,
+          "lease_id": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+          "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+          "run_id": "run_TB8RWGS5RAJ9R1VQYB2JRGQTHG",
+          "stale": true,
+          "state": "active",
+          "superseded_by": null,
+          "takeover_of": null,
+          "ttl_seconds": 30,
+          "verification": {
+            "profile": "checked",
+            "required_checks": [],
+            "requirements": [
+              "checks"
+            ]
+          },
+          "workspace_id": "01M14SCENAR10000000000000W"
+        },
+        "evaluated_at": "2026-09-29T05:52:39.558467Z",
+        "item_id": 1,
+        "leases": [
+          {
+            "acquired_at": "2026-09-29T05:52:03.244205Z",
+            "end_reason": null,
+            "ended_at": null,
+            "expires_at": "2026-09-29T05:52:39.265551Z",
+            "generation": 1,
+            "heartbeat_at": "2026-09-29T05:52:09.265551Z",
+            "heartbeat_interval_seconds": 6,
+            "item_id": 1,
+            "lease_id": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+            "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+            "run_id": "run_TB8RWGS5RAJ9R1VQYB2JRGQTHG",
+            "state": "active",
+            "superseded_by": null,
+            "takeover_of": null,
+            "ttl_seconds": 30,
+            "verification": {
+              "profile": "checked",
+              "required_checks": [],
+              "requirements": [
+                "checks"
+              ]
+            },
+            "workspace_id": "01M14SCENAR10000000000000W"
+          }
+        ],
+        "outcome_reports": [],
+        "repo_id": "vuoro",
+        "verification": {
+          "profile": "checked",
+          "required_checks": [],
+          "requirements": [
+            "checks"
+          ]
+        }
+      },
+      "status": "accepted"
+    },
+    {
+      "at": "2026-09-29T05:52:39.559Z",
+      "case": "takeover",
+      "kind": "step",
+      "step": "B claims X again: the owner takes A's stale lease over"
+    },
+    {
+      "arguments": {
+        "idempotency_key": "m14-20260929T055142Z-takeover-B-claim-2",
+        "item_id": 1,
+        "run_id": "run_NVX50405EFM22513R8HR8ME8W7"
+      },
+      "at": "2026-09-29T05:52:39.582Z",
+      "caller": "B",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "lease": {
+          "acquired_at": "2026-09-29T05:52:39.572482Z",
+          "end_reason": null,
+          "ended_at": null,
+          "expires_at": "2026-09-29T05:53:09.572482Z",
+          "generation": 2,
+          "heartbeat_at": "2026-09-29T05:52:39.572482Z",
+          "heartbeat_interval_seconds": 6,
+          "item_id": 1,
+          "lease_id": "lease_C6A5K52GXR3BYMH9A1SM4Y36B1",
+          "principal_id": "vuoro-cloud-control:01M14C5FQS06CJF1Z9KYY506HA:0",
+          "run_id": "run_NVX50405EFM22513R8HR8ME8W7",
+          "state": "active",
+          "superseded_by": null,
+          "takeover_of": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+          "ttl_seconds": 30,
+          "verification": {
+            "profile": "checked",
+            "required_checks": [],
+            "requirements": [
+              "checks"
+            ]
+          },
+          "workspace_id": "01M14SCENAR10000000000000W"
+        },
+        "repo_id": "vuoro",
+        "resumed": false,
+        "took_over": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D"
+      },
+      "tool": "claim_work"
+    },
+    {
+      "at": "2026-09-29T05:52:39.582Z",
+      "case": "takeover",
+      "detail": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+      "expectation": "B's claim takes A's lease over (took_over names A's lease)",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "at": "2026-09-29T05:52:39.582Z",
+      "case": "takeover",
+      "detail": 2,
+      "expectation": "B's lease is generation 2",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "arguments": {
+        "lease_id": "lease_C6A5K52GXR3BYMH9A1SM4Y36B1",
+        "run_id": "run_NVX50405EFM22513R8HR8ME8W7"
+      },
+      "at": "2026-09-29T05:52:39.602Z",
+      "caller": "B",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "lease": {
+          "acquired_at": "2026-09-29T05:52:39.572482Z",
+          "end_reason": null,
+          "ended_at": null,
+          "expires_at": "2026-09-29T05:53:09.590415Z",
+          "generation": 2,
+          "heartbeat_at": "2026-09-29T05:52:39.590415Z",
+          "heartbeat_interval_seconds": 6,
+          "item_id": 1,
+          "lease_id": "lease_C6A5K52GXR3BYMH9A1SM4Y36B1",
+          "principal_id": "vuoro-cloud-control:01M14C5FQS06CJF1Z9KYY506HA:0",
+          "run_id": "run_NVX50405EFM22513R8HR8ME8W7",
+          "state": "active",
+          "superseded_by": null,
+          "takeover_of": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+          "ttl_seconds": 30,
+          "verification": {
+            "profile": "checked",
+            "required_checks": [],
+            "requirements": [
+              "checks"
+            ]
+          },
+          "workspace_id": "01M14SCENAR10000000000000W"
+        },
+        "repo_id": "vuoro"
+      },
+      "tool": "heartbeat"
+    },
+    {
+      "at": "2026-09-29T05:52:39.602Z",
+      "case": "takeover",
+      "kind": "step",
+      "step": "A comes back (new process, same grant) and reports its late result"
+    },
+    {
+      "action": "late-report",
+      "at": "2026-09-29T05:52:39.698Z",
+      "caller": "A",
+      "event": "started",
+      "kind": "process",
+      "pid": 412196
+    },
+    {
+      "arguments": {
+        "lease_id": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+        "run_id": "run_TB8RWGS5RAJ9R1VQYB2JRGQTHG"
+      },
+      "at": "2026-09-29T05:52:39.707Z",
+      "caller": "A",
+      "is_error": true,
+      "kind": "tool-call",
+      "note": "the killed caller comes back and heartbeats its old lease",
+      "result": {
+        "error": {
+          "code": "claim-superseded",
+          "message": "claim lease_M6TG7XZFHKT4CB6BFA0HJXQS1D (generation 1) was taken over by lease lease_C6A5K52GXR3BYMH9A1SM4Y36B1; the item's claim generation is now 2"
+        }
+      },
+      "tool": "heartbeat"
+    },
+    {
+      "arguments": {
+        "checks": [
+          {
+            "name": "scenario-check",
+            "ref": "m1-4-settlement-scenario/v1#A",
+            "status": "passed"
+          }
+        ],
+        "idempotency_key": "m14-20260929T055142Z-takeover-A-report",
+        "lease_id": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+        "outcome": "succeeded",
+        "payload": {
+          "caller": "A",
+          "result": "m14-20260929T055142Z-takeover-A-payload"
+        },
+        "run_id": "run_TB8RWGS5RAJ9R1VQYB2JRGQTHG",
+        "summary": "A: scenario work on item 1 finished"
+      },
+      "at": "2026-09-29T05:52:39.728Z",
+      "caller": "A",
+      "is_error": true,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "error": {
+          "code": "claim-superseded",
+          "message": "claim lease_M6TG7XZFHKT4CB6BFA0HJXQS1D (generation 1) was taken over by lease lease_C6A5K52GXR3BYMH9A1SM4Y36B1; the item's claim generation is now 2; the outcome was retained as evidence (report outcome_CATVR36W8F1PA1H7JY43VHNN8A) and nothing was settled"
+        }
+      },
+      "tool": "report_outcome"
+    },
+    {
+      "at": "2026-09-29T05:52:39.765Z",
+      "case": "takeover",
+      "detail": "claim-superseded",
+      "expectation": "A's late report_outcome is refused claim-superseded",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "arguments": {
+        "item_id": 1
+      },
+      "at": "2026-09-29T05:52:39.771Z",
+      "error": null,
+      "kind": "authority",
+      "note": "after A's late report: A's payload is on X",
+      "operation": "work.lease.read-v1",
+      "result": {
+        "current_lease": {
+          "acquired_at": "2026-09-29T05:52:39.572482Z",
+          "end_reason": null,
+          "ended_at": null,
+          "expires_at": "2026-09-29T05:53:09.590415Z",
+          "generation": 2,
+          "heartbeat_at": "2026-09-29T05:52:39.590415Z",
+          "heartbeat_interval_seconds": 6,
+          "item_id": 1,
+          "lease_id": "lease_C6A5K52GXR3BYMH9A1SM4Y36B1",
+          "principal_id": "vuoro-cloud-control:01M14C5FQS06CJF1Z9KYY506HA:0",
+          "run_id": "run_NVX50405EFM22513R8HR8ME8W7",
+          "stale": false,
+          "state": "active",
+          "superseded_by": null,
+          "takeover_of": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+          "ttl_seconds": 30,
+          "verification": {
+            "profile": "checked",
+            "required_checks": [],
+            "requirements": [
+              "checks"
+            ]
+          },
+          "workspace_id": "01M14SCENAR10000000000000W"
+        },
+        "evaluated_at": "2026-09-29T05:52:39.769505Z",
+        "item_id": 1,
+        "leases": [
+          {
+            "acquired_at": "2026-09-29T05:52:03.244205Z",
+            "end_reason": "taken-over",
+            "ended_at": "2026-09-29T05:52:39.572482Z",
+            "expires_at": "2026-09-29T05:52:39.265551Z",
+            "generation": 1,
+            "heartbeat_at": "2026-09-29T05:52:09.265551Z",
+            "heartbeat_interval_seconds": 6,
+            "item_id": 1,
+            "lease_id": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+            "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+            "run_id": "run_TB8RWGS5RAJ9R1VQYB2JRGQTHG",
+            "state": "superseded",
+            "superseded_by": "lease_C6A5K52GXR3BYMH9A1SM4Y36B1",
+            "takeover_of": null,
+            "ttl_seconds": 30,
+            "verification": {
+              "profile": "checked",
+              "required_checks": [],
+              "requirements": [
+                "checks"
+              ]
+            },
+            "workspace_id": "01M14SCENAR10000000000000W"
+          },
+          {
+            "acquired_at": "2026-09-29T05:52:39.572482Z",
+            "end_reason": null,
+            "ended_at": null,
+            "expires_at": "2026-09-29T05:53:09.590415Z",
+            "generation": 2,
+            "heartbeat_at": "2026-09-29T05:52:39.590415Z",
+            "heartbeat_interval_seconds": 6,
+            "item_id": 1,
+            "lease_id": "lease_C6A5K52GXR3BYMH9A1SM4Y36B1",
+            "principal_id": "vuoro-cloud-control:01M14C5FQS06CJF1Z9KYY506HA:0",
+            "run_id": "run_NVX50405EFM22513R8HR8ME8W7",
+            "state": "active",
+            "superseded_by": null,
+            "takeover_of": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+            "ttl_seconds": 30,
+            "verification": {
+              "profile": "checked",
+              "required_checks": [],
+              "requirements": [
+                "checks"
+              ]
+            },
+            "workspace_id": "01M14SCENAR10000000000000W"
+          }
+        ],
+        "outcome_reports": [
+          {
+            "checks": [
+              {
+                "name": "scenario-check",
+                "ref": "m1-4-settlement-scenario/v1#A",
+                "status": "passed"
+              }
+            ],
+            "created_at": "2026-09-29T05:52:39.713811Z",
+            "decision_id": null,
+            "disposition": "rejected",
+            "item_id": 1,
+            "lease_id": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+            "outcome": "succeeded",
+            "payload": {
+              "caller": "A",
+              "result": "m14-20260929T055142Z-takeover-A-payload"
+            },
+            "payload_digest": "516539f9d4de27e574e42fbfb348420506609b982d62c9dcf25363f211c8faa8",
+            "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+            "reason_code": "claim-superseded",
+            "report_id": "outcome_CATVR36W8F1PA1H7JY43VHNN8A",
+            "run_id": "run_TB8RWGS5RAJ9R1VQYB2JRGQTHG",
+            "summary": "A: scenario work on item 1 finished",
+            "verification_profile": "checked"
+          }
+        ],
+        "repo_id": "vuoro",
+        "verification": {
+          "profile": "checked",
+          "required_checks": [],
+          "requirements": [
+            "checks"
+          ]
+        }
+      },
+      "status": "accepted"
+    },
+    {
+      "at": "2026-09-29T05:52:39.771Z",
+      "case": "takeover",
+      "detail": [
+        {
+          "checks": [
+            {
+              "name": "scenario-check",
+              "ref": "m1-4-settlement-scenario/v1#A",
+              "status": "passed"
+            }
+          ],
+          "created_at": "2026-09-29T05:52:39.713811Z",
+          "decision_id": null,
+          "disposition": "rejected",
+          "item_id": 1,
+          "lease_id": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+          "outcome": "succeeded",
+          "payload": {
+            "caller": "A",
+            "result": "m14-20260929T055142Z-takeover-A-payload"
+          },
+          "payload_digest": "516539f9d4de27e574e42fbfb348420506609b982d62c9dcf25363f211c8faa8",
+          "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+          "reason_code": "claim-superseded",
+          "report_id": "outcome_CATVR36W8F1PA1H7JY43VHNN8A",
+          "run_id": "run_TB8RWGS5RAJ9R1VQYB2JRGQTHG",
+          "summary": "A: scenario work on item 1 finished",
+          "verification_profile": "checked"
+        }
+      ],
+      "expectation": "A's refused report is retained on X with its payload",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "at": "2026-09-29T05:52:39.771Z",
+      "case": "takeover",
+      "detail": [
+        {
+          "acquired_at": "2026-09-29T05:52:03.244205Z",
+          "end_reason": "taken-over",
+          "ended_at": "2026-09-29T05:52:39.572482Z",
+          "expires_at": "2026-09-29T05:52:39.265551Z",
+          "generation": 1,
+          "heartbeat_at": "2026-09-29T05:52:09.265551Z",
+          "heartbeat_interval_seconds": 6,
+          "item_id": 1,
+          "lease_id": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+          "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+          "run_id": "run_TB8RWGS5RAJ9R1VQYB2JRGQTHG",
+          "state": "superseded",
+          "superseded_by": "lease_C6A5K52GXR3BYMH9A1SM4Y36B1",
+          "takeover_of": null,
+          "ttl_seconds": 30,
+          "verification": {
+            "profile": "checked",
+            "required_checks": [],
+            "requirements": [
+              "checks"
+            ]
+          },
+          "workspace_id": "01M14SCENAR10000000000000W"
+        },
+        {
+          "acquired_at": "2026-09-29T05:52:39.572482Z",
+          "end_reason": null,
+          "ended_at": null,
+          "expires_at": "2026-09-29T05:53:09.590415Z",
+          "generation": 2,
+          "heartbeat_at": "2026-09-29T05:52:39.590415Z",
+          "heartbeat_interval_seconds": 6,
+          "item_id": 1,
+          "lease_id": "lease_C6A5K52GXR3BYMH9A1SM4Y36B1",
+          "principal_id": "vuoro-cloud-control:01M14C5FQS06CJF1Z9KYY506HA:0",
+          "run_id": "run_NVX50405EFM22513R8HR8ME8W7",
+          "state": "active",
+          "superseded_by": null,
+          "takeover_of": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+          "ttl_seconds": 30,
+          "verification": {
+            "profile": "checked",
+            "required_checks": [],
+            "requirements": [
+              "checks"
+            ]
+          },
+          "workspace_id": "01M14SCENAR10000000000000W"
+        }
+      ],
+      "expectation": "the owner's lease records name the takeover both ways",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "at": "2026-09-29T05:52:39.771Z",
+      "case": "takeover",
+      "detail": [
+        {
+          "checks": [
+            {
+              "name": "scenario-check",
+              "ref": "m1-4-settlement-scenario/v1#A",
+              "status": "passed"
+            }
+          ],
+          "created_at": "2026-09-29T05:52:39.713811Z",
+          "decision_id": null,
+          "disposition": "rejected",
+          "item_id": 1,
+          "lease_id": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+          "outcome": "succeeded",
+          "payload": {
+            "caller": "A",
+            "result": "m14-20260929T055142Z-takeover-A-payload"
+          },
+          "payload_digest": "516539f9d4de27e574e42fbfb348420506609b982d62c9dcf25363f211c8faa8",
+          "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+          "reason_code": "claim-superseded",
+          "report_id": "outcome_CATVR36W8F1PA1H7JY43VHNN8A",
+          "run_id": "run_TB8RWGS5RAJ9R1VQYB2JRGQTHG",
+          "summary": "A: scenario work on item 1 finished",
+          "verification_profile": "checked"
+        }
+      ],
+      "expectation": "the retained report is disposition rejected, reason claim-superseded",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "arguments": {
+        "sprint_id": 1
+      },
+      "at": "2026-09-29T05:52:39.774Z",
+      "error": null,
+      "kind": "authority",
+      "note": "after A's rejected report, before B reports",
+      "operation": "work.read.next-work",
+      "result": {
+        "dispatch_admissible": "admissible",
+        "dispatch_reason": "ready-items-available",
+        "graph_ready": true,
+        "ready_items": [
+          {
+            "aggregate_uuid": "7f2b98c2-28b0-4e76-8dc6-4fdfeb99f5af",
+            "assignee": null,
+            "blockers_resolved": 0,
+            "created_at": "2026-09-29T05:52:03.074191Z",
+            "description": "agentops#2524 M1-4 scenario marker item; disposable, not real work.",
+            "effective_priority": null,
+            "id": 3,
+            "legacy": false,
+            "priority": null,
+            "repo_id": "vuoro",
+            "resolution": null,
+            "sprint_id": 1,
+            "status": "pending",
+            "terminal_decision_id": null,
+            "title": "M1-4 scenario 20260929T055142Z R: restart case -- disposable, not real work",
+            "track_id": 1,
+            "track_name": "m1-4-scenario",
+            "unresolved_blockers": 0,
+            "updated_at": "2026-09-29T05:52:03.074191Z"
+          },
+          {
+            "aggregate_uuid": "a461c340-3e2d-4320-9a84-db7a28dca354",
+            "assignee": null,
+            "blockers_resolved": 0,
+            "created_at": "2026-09-29T05:52:03.086540Z",
+            "description": "agentops#2524 M1-4 scenario marker item; disposable, not real work.",
+            "effective_priority": null,
+            "id": 4,
+            "legacy": false,
+            "priority": null,
+            "repo_id": "vuoro",
+            "resolution": null,
+            "sprint_id": 1,
+            "status": "pending",
+            "terminal_decision_id": null,
+            "title": "M1-4 scenario 20260929T055142Z S: stale-restart case -- disposable, not real work",
+            "track_id": 1,
+            "track_name": "m1-4-scenario",
+            "unresolved_blockers": 0,
+            "updated_at": "2026-09-29T05:52:03.086540Z"
+          }
+        ],
+        "repo_id": "vuoro",
+        "sprint": {
+          "aggregate_uuid": "6a9ac79a-8967-4191-97ba-ea5025f70d95",
+          "created_at": "2026-09-29T05:52:03.020665Z",
+          "end_date": null,
+          "goal": "agentops#2524 settlement-scenario markers; disposable, not real work",
+          "id": 1,
+          "kind": "active_sprint",
+          "name": "m1-4-scenario-20260929T055142Z",
+          "repo_id": "vuoro",
+          "start_date": null,
+          "status": "active"
+        }
+      },
+      "status": "accepted"
+    },
+    {
+      "at": "2026-09-29T05:52:39.774Z",
+      "case": "takeover",
+      "detail": [
+        3,
+        4
+      ],
+      "expectation": "Y is not in next-work ready_items before settlement",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "arguments": {},
+      "at": "2026-09-29T05:52:39.793Z",
+      "caller": "B",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "before settlement",
+      "result": {
+        "as_of": "2026-09-29T05:52:39.791390Z",
+        "authority": "sprintctl",
+        "items": [
+          {
+            "blocked": false,
+            "priority": null,
+            "status": "pending",
+            "title": "M1-4 scenario 20260929T055142Z R: restart case -- disposable, not real work",
+            "updated_at": "2026-09-29T05:52:03.074191Z",
+            "work_id": 3
+          },
+          {
+            "blocked": false,
+            "priority": null,
+            "status": "pending",
+            "title": "M1-4 scenario 20260929T055142Z S: stale-restart case -- disposable, not real work",
+            "updated_at": "2026-09-29T05:52:03.086540Z",
+            "work_id": 4
+          }
+        ]
+      },
+      "tool": "list_ready_work"
+    },
+    {
+      "at": "2026-09-29T05:52:39.793Z",
+      "case": "takeover",
+      "detail": [
+        3,
+        4
+      ],
+      "expectation": "Y is not in list_ready_work before settlement",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "at": "2026-09-29T05:52:39.793Z",
+      "case": "takeover",
+      "kind": "step",
+      "step": "B reports its result under the default verification profile"
+    },
+    {
+      "arguments": {
+        "checks": [
+          {
+            "name": "scenario-check",
+            "ref": "m1-4-settlement-scenario/v1#B",
+            "status": "passed"
+          }
+        ],
+        "idempotency_key": "m14-20260929T055142Z-takeover-B-report",
+        "lease_id": "lease_C6A5K52GXR3BYMH9A1SM4Y36B1",
+        "outcome": "succeeded",
+        "payload": {
+          "caller": "B",
+          "result": "m14-20260929T055142Z-takeover-B-payload"
+        },
+        "run_id": "run_NVX50405EFM22513R8HR8ME8W7",
+        "summary": "B: scenario work on item 1 finished"
+      },
+      "at": "2026-09-29T05:52:39.814Z",
+      "caller": "B",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "repo_id": "vuoro",
+        "report": {
+          "checks": [
+            {
+              "name": "scenario-check",
+              "ref": "m1-4-settlement-scenario/v1#B",
+              "status": "passed"
+            }
+          ],
+          "created_at": "2026-09-29T05:52:39.799895Z",
+          "decision_id": 1,
+          "disposition": "settled",
+          "item_id": 1,
+          "lease_id": "lease_C6A5K52GXR3BYMH9A1SM4Y36B1",
+          "outcome": "succeeded",
+          "payload": {
+            "caller": "B",
+            "result": "m14-20260929T055142Z-takeover-B-payload"
+          },
+          "payload_digest": "1e57fe40f97218f86a0652744dbb4972b55de270513343b9cb198e72b4d9a940",
+          "principal_id": "vuoro-cloud-control:01M14C5FQS06CJF1Z9KYY506HA:0",
+          "reason_code": null,
+          "report_id": "outcome_PY9BHCKKJMA0ARQJJJD1SQF5A4",
+          "run_id": "run_NVX50405EFM22513R8HR8ME8W7",
+          "summary": "B: scenario work on item 1 finished",
+          "verification_profile": "checked"
+        },
+        "settled": true,
+        "settlement_effect": "settled"
+      },
+      "tool": "report_outcome"
+    },
+    {
+      "at": "2026-09-29T05:52:39.814Z",
+      "case": "takeover",
+      "detail": "settled",
+      "expectation": "B's report settles X (settlement_effect settled)",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "arguments": {
+        "item_id": 1
+      },
+      "at": "2026-09-29T05:52:39.818Z",
+      "error": null,
+      "kind": "authority",
+      "note": "the authority's decision on X",
+      "operation": "work.read.item-decisions",
+      "result": {
+        "decisions": [
+          {
+            "actor": "sprintctl:lease-settlement",
+            "created_at": "2026-09-29T05:52:39.799895Z",
+            "evidence_digests": [
+              "1e57fe40f97218f86a0652744dbb4972b55de270513343b9cb198e72b4d9a940"
+            ],
+            "id": 1,
+            "kind": "accept",
+            "legacy_source": null,
+            "rationale": "accepted under verification profile checked: lease lease_C6A5K52GXR3BYMH9A1SM4Y36B1 held by vuoro-cloud-control:01M14C5FQS06CJF1Z9KYY506HA:0 (run run_NVX50405EFM22513R8HR8ME8W7) reported success; checks passed: scenario-check",
+            "release_digest": null,
+            "repo_id": "vuoro",
+            "sprint_id": null,
+            "superseded_by_item_id": null,
+            "work_item_id": 1
+          }
+        ],
+        "item_id": 1,
+        "repo_id": "vuoro",
+        "resolution": "accepted",
+        "status": "done",
+        "terminal_decision_id": 1
+      },
+      "status": "accepted"
+    },
+    {
+      "at": "2026-09-29T05:52:39.818Z",
+      "case": "takeover",
+      "detail": [
+        {
+          "actor": "sprintctl:lease-settlement",
+          "created_at": "2026-09-29T05:52:39.799895Z",
+          "evidence_digests": [
+            "1e57fe40f97218f86a0652744dbb4972b55de270513343b9cb198e72b4d9a940"
+          ],
+          "id": 1,
+          "kind": "accept",
+          "legacy_source": null,
+          "rationale": "accepted under verification profile checked: lease lease_C6A5K52GXR3BYMH9A1SM4Y36B1 held by vuoro-cloud-control:01M14C5FQS06CJF1Z9KYY506HA:0 (run run_NVX50405EFM22513R8HR8ME8W7) reported success; checks passed: scenario-check",
+          "release_digest": null,
+          "repo_id": "vuoro",
+          "sprint_id": null,
+          "superseded_by_item_id": null,
+          "work_item_id": 1
+        }
+      ],
+      "expectation": "exactly one accept decision on X",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "at": "2026-09-29T05:52:39.818Z",
+      "case": "takeover",
+      "detail": [
+        {
+          "actor": "sprintctl:lease-settlement",
+          "created_at": "2026-09-29T05:52:39.799895Z",
+          "evidence_digests": [
+            "1e57fe40f97218f86a0652744dbb4972b55de270513343b9cb198e72b4d9a940"
+          ],
+          "id": 1,
+          "kind": "accept",
+          "legacy_source": null,
+          "rationale": "accepted under verification profile checked: lease lease_C6A5K52GXR3BYMH9A1SM4Y36B1 held by vuoro-cloud-control:01M14C5FQS06CJF1Z9KYY506HA:0 (run run_NVX50405EFM22513R8HR8ME8W7) reported success; checks passed: scenario-check",
+          "release_digest": null,
+          "repo_id": "vuoro",
+          "sprint_id": null,
+          "superseded_by_item_id": null,
+          "work_item_id": 1
+        }
+      ],
+      "expectation": "the decision reads \"accepted under verification profile checked\"",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "at": "2026-09-29T05:52:39.818Z",
+      "case": "takeover",
+      "detail": [
+        {
+          "actor": "sprintctl:lease-settlement",
+          "created_at": "2026-09-29T05:52:39.799895Z",
+          "evidence_digests": [
+            "1e57fe40f97218f86a0652744dbb4972b55de270513343b9cb198e72b4d9a940"
+          ],
+          "id": 1,
+          "kind": "accept",
+          "legacy_source": null,
+          "rationale": "accepted under verification profile checked: lease lease_C6A5K52GXR3BYMH9A1SM4Y36B1 held by vuoro-cloud-control:01M14C5FQS06CJF1Z9KYY506HA:0 (run run_NVX50405EFM22513R8HR8ME8W7) reported success; checks passed: scenario-check",
+          "release_digest": null,
+          "repo_id": "vuoro",
+          "sprint_id": null,
+          "superseded_by_item_id": null,
+          "work_item_id": 1
+        }
+      ],
+      "expectation": "the decision is the authority's (sprintctl:lease-settlement)",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "arguments": {
+        "item_id": 1
+      },
+      "at": "2026-09-29T05:52:39.823Z",
+      "error": null,
+      "kind": "authority",
+      "note": "X's leases and reports after settlement",
+      "operation": "work.lease.read-v1",
+      "result": {
+        "current_lease": null,
+        "evaluated_at": "2026-09-29T05:52:39.821862Z",
+        "item_id": 1,
+        "leases": [
+          {
+            "acquired_at": "2026-09-29T05:52:03.244205Z",
+            "end_reason": "taken-over",
+            "ended_at": "2026-09-29T05:52:39.572482Z",
+            "expires_at": "2026-09-29T05:52:39.265551Z",
+            "generation": 1,
+            "heartbeat_at": "2026-09-29T05:52:09.265551Z",
+            "heartbeat_interval_seconds": 6,
+            "item_id": 1,
+            "lease_id": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+            "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+            "run_id": "run_TB8RWGS5RAJ9R1VQYB2JRGQTHG",
+            "state": "superseded",
+            "superseded_by": "lease_C6A5K52GXR3BYMH9A1SM4Y36B1",
+            "takeover_of": null,
+            "ttl_seconds": 30,
+            "verification": {
+              "profile": "checked",
+              "required_checks": [],
+              "requirements": [
+                "checks"
+              ]
+            },
+            "workspace_id": "01M14SCENAR10000000000000W"
+          },
+          {
+            "acquired_at": "2026-09-29T05:52:39.572482Z",
+            "end_reason": "settled",
+            "ended_at": "2026-09-29T05:52:39.800965Z",
+            "expires_at": "2026-09-29T05:53:09.590415Z",
+            "generation": 2,
+            "heartbeat_at": "2026-09-29T05:52:39.590415Z",
+            "heartbeat_interval_seconds": 6,
+            "item_id": 1,
+            "lease_id": "lease_C6A5K52GXR3BYMH9A1SM4Y36B1",
+            "principal_id": "vuoro-cloud-control:01M14C5FQS06CJF1Z9KYY506HA:0",
+            "run_id": "run_NVX50405EFM22513R8HR8ME8W7",
+            "state": "settled",
+            "superseded_by": null,
+            "takeover_of": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+            "ttl_seconds": 30,
+            "verification": {
+              "profile": "checked",
+              "required_checks": [],
+              "requirements": [
+                "checks"
+              ]
+            },
+            "workspace_id": "01M14SCENAR10000000000000W"
+          }
+        ],
+        "outcome_reports": [
+          {
+            "checks": [
+              {
+                "name": "scenario-check",
+                "ref": "m1-4-settlement-scenario/v1#A",
+                "status": "passed"
+              }
+            ],
+            "created_at": "2026-09-29T05:52:39.713811Z",
+            "decision_id": null,
+            "disposition": "rejected",
+            "item_id": 1,
+            "lease_id": "lease_M6TG7XZFHKT4CB6BFA0HJXQS1D",
+            "outcome": "succeeded",
+            "payload": {
+              "caller": "A",
+              "result": "m14-20260929T055142Z-takeover-A-payload"
+            },
+            "payload_digest": "516539f9d4de27e574e42fbfb348420506609b982d62c9dcf25363f211c8faa8",
+            "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+            "reason_code": "claim-superseded",
+            "report_id": "outcome_CATVR36W8F1PA1H7JY43VHNN8A",
+            "run_id": "run_TB8RWGS5RAJ9R1VQYB2JRGQTHG",
+            "summary": "A: scenario work on item 1 finished",
+            "verification_profile": "checked"
+          },
+          {
+            "checks": [
+              {
+                "name": "scenario-check",
+                "ref": "m1-4-settlement-scenario/v1#B",
+                "status": "passed"
+              }
+            ],
+            "created_at": "2026-09-29T05:52:39.799895Z",
+            "decision_id": 1,
+            "disposition": "settled",
+            "item_id": 1,
+            "lease_id": "lease_C6A5K52GXR3BYMH9A1SM4Y36B1",
+            "outcome": "succeeded",
+            "payload": {
+              "caller": "B",
+              "result": "m14-20260929T055142Z-takeover-B-payload"
+            },
+            "payload_digest": "1e57fe40f97218f86a0652744dbb4972b55de270513343b9cb198e72b4d9a940",
+            "principal_id": "vuoro-cloud-control:01M14C5FQS06CJF1Z9KYY506HA:0",
+            "reason_code": null,
+            "report_id": "outcome_PY9BHCKKJMA0ARQJJJD1SQF5A4",
+            "run_id": "run_NVX50405EFM22513R8HR8ME8W7",
+            "summary": "B: scenario work on item 1 finished",
+            "verification_profile": "checked"
+          }
+        ],
+        "repo_id": "vuoro",
+        "verification": {
+          "profile": "checked",
+          "required_checks": [],
+          "requirements": [
+            "checks"
+          ]
+        }
+      },
+      "status": "accepted"
+    },
+    {
+      "at": "2026-09-29T05:52:39.823Z",
+      "case": "takeover",
+      "detail": {
+        "profile": "checked",
+        "required_checks": [],
+        "requirements": [
+          "checks"
+        ]
+      },
+      "expectation": "X's verification bar is the named profile checked",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "arguments": {
+        "item_id": 1
+      },
+      "at": "2026-09-29T05:52:39.826Z",
+      "error": null,
+      "kind": "authority",
+      "note": "X after settlement",
+      "operation": "work.read.item",
+      "result": {
+        "active_reservations": [],
+        "deps": {
+          "blocked_by": [],
+          "blocks": [
+            {
+              "blocked_item_id": 2,
+              "created_at": "2026-09-29T05:52:03.098509Z",
+              "id": 1,
+              "item_id": 1,
+              "waiting_status": "pending",
+              "waiting_title": "M1-4 scenario 20260929T055142Z Y: depends on X -- disposable, not real work"
+            }
+          ]
+        },
+        "events": [
+          {
+            "actor": "github:1001",
+            "created_at": "2026-09-29T05:52:03.242474Z",
+            "event_type": "lease.acquired",
+            "id": 1,
+            "payload": "{\"run_id\": \"run_TB8RWGS5RAJ9R1VQYB2JRGQTHG\", \"lease_id\": \"lease_M6TG7XZFHKT4CB6BFA0HJXQS1D\", \"replaces\": null, \"generation\": 1, \"takeover_of\": null, \"ttl_seconds\": 30, \"principal_id\": \"vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0\", \"previous_status\": \"pending\"}",
+            "repo_id": "vuoro",
+            "source_type": "system",
+            "sprint_id": 1,
+            "work_item_id": 1
+          },
+          {
+            "actor": "github:1002",
+            "created_at": "2026-09-29T05:52:39.571184Z",
+            "event_type": "lease.acquired",
+            "id": 3,
+            "payload": "{\"run_id\": \"run_NVX50405EFM22513R8HR8ME8W7\", \"lease_id\": \"lease_C6A5K52GXR3BYMH9A1SM4Y36B1\", \"replaces\": null, \"generation\": 2, \"takeover_of\": \"lease_M6TG7XZFHKT4CB6BFA0HJXQS1D\", \"ttl_seconds\": 30, \"principal_id\": \"vuoro-cloud-control:01M14C5FQS06CJF1Z9KYY506HA:0\", \"previous_status\": \"active\"}",
+            "repo_id": "vuoro",
+            "source_type": "system",
+            "sprint_id": 1,
+            "work_item_id": 1
+          },
+          {
+            "actor": "github:1002",
+            "created_at": "2026-09-29T05:52:39.571184Z",
+            "event_type": "work.claim.taken-over",
+            "id": 2,
+            "payload": "{\"reason\": \"stale-lease\", \"new_claim_id\": \"lease_C6A5K52GXR3BYMH9A1SM4Y36B1\", \"new_principal\": \"vuoro-cloud-control:01M14C5FQS06CJF1Z9KYY506HA:0\", \"previous_claim_id\": \"lease_M6TG7XZFHKT4CB6BFA0HJXQS1D\", \"previous_principal\": \"vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0\", \"previous_generation\": 1, \"previous_last_heartbeat\": \"2026-09-29T05:52:09.265551Z\"}",
+            "repo_id": "vuoro",
+            "source_type": "system",
+            "sprint_id": 1,
+            "work_item_id": 1
+          },
+          {
+            "actor": "github:1001",
+            "created_at": "2026-09-29T05:52:39.713811Z",
+            "event_type": "lease.outcome-reported",
+            "id": 4,
+            "payload": "{\"run_id\": \"run_TB8RWGS5RAJ9R1VQYB2JRGQTHG\", \"outcome\": \"succeeded\", \"lease_id\": \"lease_M6TG7XZFHKT4CB6BFA0HJXQS1D\", \"report_id\": \"outcome_CATVR36W8F1PA1H7JY43VHNN8A\", \"decision_id\": null, \"disposition\": \"rejected\", \"reason_code\": \"claim-superseded\", \"payload_digest\": \"516539f9d4de27e574e42fbfb348420506609b982d62c9dcf25363f211c8faa8\", \"verification_profile\": \"checked\"}",
+            "repo_id": "vuoro",
+            "source_type": "system",
+            "sprint_id": 1,
+            "work_item_id": 1
+          },
+          {
+            "actor": "sprintctl:lease-settlement",
+            "created_at": "2026-09-29T05:52:39.799895Z",
+            "event_type": "item-decided",
+            "id": 5,
+            "payload": "{\"kind\": \"accept\", \"resolution\": \"accepted\", \"decision_id\": 1, \"release_digest\": null}",
+            "repo_id": "vuoro",
+            "source_type": "actor",
+            "sprint_id": 1,
+            "work_item_id": 1
+          },
+          {
+            "actor": "github:1002",
+            "created_at": "2026-09-29T05:52:39.799895Z",
+            "event_type": "lease.outcome-reported",
+            "id": 6,
+            "payload": "{\"run_id\": \"run_NVX50405EFM22513R8HR8ME8W7\", \"outcome\": \"succeeded\", \"lease_id\": \"lease_C6A5K52GXR3BYMH9A1SM4Y36B1\", \"report_id\": \"outcome_PY9BHCKKJMA0ARQJJJD1SQF5A4\", \"decision_id\": 1, \"disposition\": \"settled\", \"reason_code\": null, \"payload_digest\": \"1e57fe40f97218f86a0652744dbb4972b55de270513343b9cb198e72b4d9a940\", \"verification_profile\": \"checked\"}",
+            "repo_id": "vuoro",
+            "source_type": "system",
+            "sprint_id": 1,
+            "work_item_id": 1
+          }
+        ],
+        "item": {
+          "aggregate_uuid": "b14cc033-09a5-4823-bc38-0697e0a93a4d",
+          "assignee": null,
+          "created_at": "2026-09-29T05:52:03.045558Z",
+          "description": "agentops#2524 M1-4 scenario marker item; disposable, not real work.",
+          "edit_revision": "item:b14cc033-09a5-4823-bc38-0697e0a93a4d@description:v0@sha256:c2247797ae55ed10ea9529d3c412967ab249d6112f97321f5cb205ca00c07063",
+          "id": 1,
+          "legacy": false,
+          "priority": null,
+          "repo_id": "vuoro",
+          "resolution": "accepted",
+          "sprint_id": 1,
+          "status": "done",
+          "status_revision": "item:b14cc033-09a5-4823-bc38-0697e0a93a4d@status:done",
+          "terminal_decision_id": 1,
+          "title": "M1-4 scenario 20260929T055142Z X: leased item -- disposable, not real work",
+          "track_id": 1,
+          "updated_at": "2026-09-29T05:52:39.799895Z"
+        },
+        "refs": [],
+        "repo_id": "vuoro"
+      },
+      "status": "accepted"
+    },
+    {
+      "at": "2026-09-29T05:52:39.826Z",
+      "case": "takeover",
+      "detail": {
+        "aggregate_uuid": "b14cc033-09a5-4823-bc38-0697e0a93a4d",
+        "assignee": null,
+        "created_at": "2026-09-29T05:52:03.045558Z",
+        "description": "agentops#2524 M1-4 scenario marker item; disposable, not real work.",
+        "edit_revision": "item:b14cc033-09a5-4823-bc38-0697e0a93a4d@description:v0@sha256:c2247797ae55ed10ea9529d3c412967ab249d6112f97321f5cb205ca00c07063",
+        "id": 1,
+        "legacy": false,
+        "priority": null,
+        "repo_id": "vuoro",
+        "resolution": "accepted",
+        "sprint_id": 1,
+        "status": "done",
+        "status_revision": "item:b14cc033-09a5-4823-bc38-0697e0a93a4d@status:done",
+        "terminal_decision_id": 1,
+        "title": "M1-4 scenario 20260929T055142Z X: leased item -- disposable, not real work",
+        "track_id": 1,
+        "updated_at": "2026-09-29T05:52:39.799895Z"
+      },
+      "expectation": "X is done",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "arguments": {
+        "sprint_id": 1
+      },
+      "at": "2026-09-29T05:52:39.830Z",
+      "error": null,
+      "kind": "authority",
+      "note": "after settlement",
+      "operation": "work.read.next-work",
+      "result": {
+        "dispatch_admissible": "admissible",
+        "dispatch_reason": "ready-items-available",
+        "graph_ready": true,
+        "ready_items": [
+          {
+            "aggregate_uuid": "c6bd4d41-8740-4219-8703-13cb338ebd13",
+            "assignee": null,
+            "blockers_resolved": 1,
+            "created_at": "2026-09-29T05:52:03.061550Z",
+            "description": "agentops#2524 M1-4 scenario marker item; disposable, not real work.",
+            "effective_priority": null,
+            "id": 2,
+            "legacy": false,
+            "priority": null,
+            "repo_id": "vuoro",
+            "resolution": null,
+            "sprint_id": 1,
+            "status": "pending",
+            "terminal_decision_id": null,
+            "title": "M1-4 scenario 20260929T055142Z Y: depends on X -- disposable, not real work",
+            "track_id": 1,
+            "track_name": "m1-4-scenario",
+            "unresolved_blockers": 0,
+            "updated_at": "2026-09-29T05:52:03.061550Z"
+          },
+          {
+            "aggregate_uuid": "7f2b98c2-28b0-4e76-8dc6-4fdfeb99f5af",
+            "assignee": null,
+            "blockers_resolved": 0,
+            "created_at": "2026-09-29T05:52:03.074191Z",
+            "description": "agentops#2524 M1-4 scenario marker item; disposable, not real work.",
+            "effective_priority": null,
+            "id": 3,
+            "legacy": false,
+            "priority": null,
+            "repo_id": "vuoro",
+            "resolution": null,
+            "sprint_id": 1,
+            "status": "pending",
+            "terminal_decision_id": null,
+            "title": "M1-4 scenario 20260929T055142Z R: restart case -- disposable, not real work",
+            "track_id": 1,
+            "track_name": "m1-4-scenario",
+            "unresolved_blockers": 0,
+            "updated_at": "2026-09-29T05:52:03.074191Z"
+          },
+          {
+            "aggregate_uuid": "a461c340-3e2d-4320-9a84-db7a28dca354",
+            "assignee": null,
+            "blockers_resolved": 0,
+            "created_at": "2026-09-29T05:52:03.086540Z",
+            "description": "agentops#2524 M1-4 scenario marker item; disposable, not real work.",
+            "effective_priority": null,
+            "id": 4,
+            "legacy": false,
+            "priority": null,
+            "repo_id": "vuoro",
+            "resolution": null,
+            "sprint_id": 1,
+            "status": "pending",
+            "terminal_decision_id": null,
+            "title": "M1-4 scenario 20260929T055142Z S: stale-restart case -- disposable, not real work",
+            "track_id": 1,
+            "track_name": "m1-4-scenario",
+            "unresolved_blockers": 0,
+            "updated_at": "2026-09-29T05:52:03.086540Z"
+          }
+        ],
+        "repo_id": "vuoro",
+        "sprint": {
+          "aggregate_uuid": "6a9ac79a-8967-4191-97ba-ea5025f70d95",
+          "created_at": "2026-09-29T05:52:03.020665Z",
+          "end_date": null,
+          "goal": "agentops#2524 settlement-scenario markers; disposable, not real work",
+          "id": 1,
+          "kind": "active_sprint",
+          "name": "m1-4-scenario-20260929T055142Z",
+          "repo_id": "vuoro",
+          "start_date": null,
+          "status": "active"
+        }
+      },
+      "status": "accepted"
+    },
+    {
+      "at": "2026-09-29T05:52:39.830Z",
+      "case": "takeover",
+      "detail": [
+        2,
+        3,
+        4
+      ],
+      "expectation": "Y is in next-work ready_items after settlement",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "arguments": {},
+      "at": "2026-09-29T05:52:39.839Z",
+      "caller": "B",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "after settlement",
+      "result": {
+        "as_of": "2026-09-29T05:52:39.837800Z",
+        "authority": "sprintctl",
+        "items": [
+          {
+            "blocked": false,
+            "priority": null,
+            "status": "pending",
+            "title": "M1-4 scenario 20260929T055142Z Y: depends on X -- disposable, not real work",
+            "updated_at": "2026-09-29T05:52:03.061550Z",
+            "work_id": 2
+          },
+          {
+            "blocked": false,
+            "priority": null,
+            "status": "pending",
+            "title": "M1-4 scenario 20260929T055142Z R: restart case -- disposable, not real work",
+            "updated_at": "2026-09-29T05:52:03.074191Z",
+            "work_id": 3
+          },
+          {
+            "blocked": false,
+            "priority": null,
+            "status": "pending",
+            "title": "M1-4 scenario 20260929T055142Z S: stale-restart case -- disposable, not real work",
+            "updated_at": "2026-09-29T05:52:03.086540Z",
+            "work_id": 4
+          }
+        ]
+      },
+      "tool": "list_ready_work"
+    },
+    {
+      "at": "2026-09-29T05:52:39.839Z",
+      "case": "takeover",
+      "detail": [
+        2,
+        3,
+        4
+      ],
+      "expectation": "Y is in list_ready_work after settlement",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "at": "2026-09-29T05:52:39.840Z",
+      "case": "restart",
+      "kind": "step",
+      "step": "A claims item 3, heartbeats, and is killed"
+    },
+    {
+      "action": "claim-and-heartbeat",
+      "at": "2026-09-29T05:52:39.934Z",
+      "caller": "A",
+      "event": "started",
+      "kind": "process",
+      "pid": 412197
+    },
+    {
+      "arguments": {
+        "harness_build": "git:afb701b5ce7cd58a5f4966f2a025ab09f05d770c",
+        "harness_id": "vuoro-m1-4-scenario",
+        "idempotency_key": "m14-20260929T055142Z-restart-A-run",
+        "model_id": "none:scripted-caller",
+        "observed_profile": {
+          "instruction_digest": "sha256:b9dafc7a285c9053377bb5c48c97a610d61b6b9258bec0263b4c0aada9986c8d",
+          "skill_digests": []
+        },
+        "recipe_id": "m1-4-settlement-scenario/v1"
+      },
+      "at": "2026-09-29T05:52:39.949Z",
+      "caller": "A",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "run_id": "run_F948F35BMTPZ5KXW5MKZKXJJN7"
+      },
+      "tool": "register_run"
+    },
+    {
+      "arguments": {
+        "idempotency_key": "m14-20260929T055142Z-restart-A-claim",
+        "item_id": 3,
+        "run_id": "run_F948F35BMTPZ5KXW5MKZKXJJN7"
+      },
+      "at": "2026-09-29T05:52:39.969Z",
+      "caller": "A",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "lease": {
+          "acquired_at": "2026-09-29T05:52:39.956615Z",
+          "end_reason": null,
+          "ended_at": null,
+          "expires_at": "2026-09-29T05:53:09.956615Z",
+          "generation": 1,
+          "heartbeat_at": "2026-09-29T05:52:39.956615Z",
+          "heartbeat_interval_seconds": 6,
+          "item_id": 3,
+          "lease_id": "lease_KJFC4JF0K2Y7EF1KP74S3QNRY6",
+          "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+          "run_id": "run_F948F35BMTPZ5KXW5MKZKXJJN7",
+          "state": "active",
+          "superseded_by": null,
+          "takeover_of": null,
+          "ttl_seconds": 30,
+          "verification": {
+            "profile": "checked",
+            "required_checks": [],
+            "requirements": [
+              "checks"
+            ]
+          },
+          "workspace_id": "01M14SCENAR10000000000000W"
+        },
+        "repo_id": "vuoro",
+        "resumed": false,
+        "took_over": null
+      },
+      "tool": "claim_work"
+    },
+    {
+      "arguments": {
+        "lease_id": "lease_KJFC4JF0K2Y7EF1KP74S3QNRY6",
+        "run_id": "run_F948F35BMTPZ5KXW5MKZKXJJN7"
+      },
+      "at": "2026-09-29T05:52:45.992Z",
+      "caller": "A",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "lease": {
+          "acquired_at": "2026-09-29T05:52:39.956615Z",
+          "end_reason": null,
+          "ended_at": null,
+          "expires_at": "2026-09-29T05:53:15.979341Z",
+          "generation": 1,
+          "heartbeat_at": "2026-09-29T05:52:45.979341Z",
+          "heartbeat_interval_seconds": 6,
+          "item_id": 3,
+          "lease_id": "lease_KJFC4JF0K2Y7EF1KP74S3QNRY6",
+          "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+          "run_id": "run_F948F35BMTPZ5KXW5MKZKXJJN7",
+          "state": "active",
+          "superseded_by": null,
+          "takeover_of": null,
+          "ttl_seconds": 30,
+          "verification": {
+            "profile": "checked",
+            "required_checks": [],
+            "requirements": [
+              "checks"
+            ]
+          },
+          "workspace_id": "01M14SCENAR10000000000000W"
+        },
+        "repo_id": "vuoro"
+      },
+      "tool": "heartbeat"
+    },
+    {
+      "at": "2026-09-29T05:52:46.046Z",
+      "caller": "A",
+      "event": "killed",
+      "kind": "process",
+      "pid": 412197,
+      "returncode": -9,
+      "signal": "SIGKILL"
+    },
+    {
+      "at": "2026-09-29T05:52:46.046Z",
+      "case": "restart",
+      "kind": "step",
+      "step": "A restarts: same grant, same run and claim idempotency keys"
+    },
+    {
+      "action": "resume-and-report",
+      "at": "2026-09-29T05:52:46.146Z",
+      "caller": "A",
+      "event": "started",
+      "kind": "process",
+      "pid": 412624
+    },
+    {
+      "arguments": {
+        "harness_build": "git:afb701b5ce7cd58a5f4966f2a025ab09f05d770c",
+        "harness_id": "vuoro-m1-4-scenario",
+        "idempotency_key": "m14-20260929T055142Z-restart-A-run",
+        "model_id": "none:scripted-caller",
+        "observed_profile": {
+          "instruction_digest": "sha256:b9dafc7a285c9053377bb5c48c97a610d61b6b9258bec0263b4c0aada9986c8d",
+          "skill_digests": []
+        },
+        "recipe_id": "m1-4-settlement-scenario/v1"
+      },
+      "at": "2026-09-29T05:52:46.152Z",
+      "caller": "A",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "run_id": "run_F948F35BMTPZ5KXW5MKZKXJJN7"
+      },
+      "tool": "register_run"
+    },
+    {
+      "arguments": {
+        "idempotency_key": "m14-20260929T055142Z-restart-A-claim",
+        "item_id": 3,
+        "run_id": "run_F948F35BMTPZ5KXW5MKZKXJJN7"
+      },
+      "at": "2026-09-29T05:52:46.173Z",
+      "caller": "A",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "lease": {
+          "acquired_at": "2026-09-29T05:52:39.956615Z",
+          "end_reason": null,
+          "ended_at": null,
+          "expires_at": "2026-09-29T05:53:16.160013Z",
+          "generation": 1,
+          "heartbeat_at": "2026-09-29T05:52:46.160013Z",
+          "heartbeat_interval_seconds": 6,
+          "item_id": 3,
+          "lease_id": "lease_KJFC4JF0K2Y7EF1KP74S3QNRY6",
+          "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+          "run_id": "run_F948F35BMTPZ5KXW5MKZKXJJN7",
+          "state": "active",
+          "superseded_by": null,
+          "takeover_of": null,
+          "ttl_seconds": 30,
+          "verification": {
+            "profile": "checked",
+            "required_checks": [],
+            "requirements": [
+              "checks"
+            ]
+          },
+          "workspace_id": "01M14SCENAR10000000000000W"
+        },
+        "repo_id": "vuoro",
+        "resumed": true,
+        "took_over": null
+      },
+      "tool": "claim_work"
+    },
+    {
+      "arguments": {
+        "lease_id": "lease_KJFC4JF0K2Y7EF1KP74S3QNRY6",
+        "run_id": "run_F948F35BMTPZ5KXW5MKZKXJJN7"
+      },
+      "at": "2026-09-29T05:52:46.191Z",
+      "caller": "A",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "lease": {
+          "acquired_at": "2026-09-29T05:52:39.956615Z",
+          "end_reason": null,
+          "ended_at": null,
+          "expires_at": "2026-09-29T05:53:16.181598Z",
+          "generation": 1,
+          "heartbeat_at": "2026-09-29T05:52:46.181598Z",
+          "heartbeat_interval_seconds": 6,
+          "item_id": 3,
+          "lease_id": "lease_KJFC4JF0K2Y7EF1KP74S3QNRY6",
+          "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+          "run_id": "run_F948F35BMTPZ5KXW5MKZKXJJN7",
+          "state": "active",
+          "superseded_by": null,
+          "takeover_of": null,
+          "ttl_seconds": 30,
+          "verification": {
+            "profile": "checked",
+            "required_checks": [],
+            "requirements": [
+              "checks"
+            ]
+          },
+          "workspace_id": "01M14SCENAR10000000000000W"
+        },
+        "repo_id": "vuoro"
+      },
+      "tool": "heartbeat"
+    },
+    {
+      "arguments": {
+        "checks": [
+          {
+            "name": "scenario-check",
+            "ref": "m1-4-settlement-scenario/v1#A",
+            "status": "passed"
+          }
+        ],
+        "idempotency_key": "m14-20260929T055142Z-restart-A-report",
+        "lease_id": "lease_KJFC4JF0K2Y7EF1KP74S3QNRY6",
+        "outcome": "succeeded",
+        "payload": {
+          "caller": "A",
+          "result": "m14-20260929T055142Z-restart-A-payload"
+        },
+        "run_id": "run_F948F35BMTPZ5KXW5MKZKXJJN7",
+        "summary": "A: scenario work on item 3 finished"
+      },
+      "at": "2026-09-29T05:52:46.216Z",
+      "caller": "A",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "repo_id": "vuoro",
+        "report": {
+          "checks": [
+            {
+              "name": "scenario-check",
+              "ref": "m1-4-settlement-scenario/v1#A",
+              "status": "passed"
+            }
+          ],
+          "created_at": "2026-09-29T05:52:46.198621Z",
+          "decision_id": 2,
+          "disposition": "settled",
+          "item_id": 3,
+          "lease_id": "lease_KJFC4JF0K2Y7EF1KP74S3QNRY6",
+          "outcome": "succeeded",
+          "payload": {
+            "caller": "A",
+            "result": "m14-20260929T055142Z-restart-A-payload"
+          },
+          "payload_digest": "e793e670f63597204527ea5a758352f5db31fa4c8b72ccf97159ebc939b51925",
+          "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+          "reason_code": null,
+          "report_id": "outcome_6CBC7TY50SYWSMFZM1CY9646E5",
+          "run_id": "run_F948F35BMTPZ5KXW5MKZKXJJN7",
+          "summary": "A: scenario work on item 3 finished",
+          "verification_profile": "checked"
+        },
+        "settled": true,
+        "settlement_effect": "settled"
+      },
+      "tool": "report_outcome"
+    },
+    {
+      "at": "2026-09-29T05:52:46.260Z",
+      "case": "restart",
+      "detail": [
+        "run_F948F35BMTPZ5KXW5MKZKXJJN7",
+        "run_F948F35BMTPZ5KXW5MKZKXJJN7"
+      ],
+      "expectation": "the restarted A gets the same run id",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "at": "2026-09-29T05:52:46.260Z",
+      "case": "restart",
+      "detail": [
+        "lease_KJFC4JF0K2Y7EF1KP74S3QNRY6",
+        "lease_KJFC4JF0K2Y7EF1KP74S3QNRY6",
+        true
+      ],
+      "expectation": "the restarted A resumes the same lease (resumed: true)",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "at": "2026-09-29T05:52:46.260Z",
+      "case": "restart",
+      "detail": "settled",
+      "expectation": "the restarted A's report settles the item",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "arguments": {
+        "item_id": 3
+      },
+      "at": "2026-09-29T05:52:46.265Z",
+      "error": null,
+      "kind": "authority",
+      "note": "restart: leases and reports",
+      "operation": "work.lease.read-v1",
+      "result": {
+        "current_lease": null,
+        "evaluated_at": "2026-09-29T05:52:46.263922Z",
+        "item_id": 3,
+        "leases": [
+          {
+            "acquired_at": "2026-09-29T05:52:39.956615Z",
+            "end_reason": "settled",
+            "ended_at": "2026-09-29T05:52:46.199733Z",
+            "expires_at": "2026-09-29T05:53:16.181598Z",
+            "generation": 1,
+            "heartbeat_at": "2026-09-29T05:52:46.181598Z",
+            "heartbeat_interval_seconds": 6,
+            "item_id": 3,
+            "lease_id": "lease_KJFC4JF0K2Y7EF1KP74S3QNRY6",
+            "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+            "run_id": "run_F948F35BMTPZ5KXW5MKZKXJJN7",
+            "state": "settled",
+            "superseded_by": null,
+            "takeover_of": null,
+            "ttl_seconds": 30,
+            "verification": {
+              "profile": "checked",
+              "required_checks": [],
+              "requirements": [
+                "checks"
+              ]
+            },
+            "workspace_id": "01M14SCENAR10000000000000W"
+          }
+        ],
+        "outcome_reports": [
+          {
+            "checks": [
+              {
+                "name": "scenario-check",
+                "ref": "m1-4-settlement-scenario/v1#A",
+                "status": "passed"
+              }
+            ],
+            "created_at": "2026-09-29T05:52:46.198621Z",
+            "decision_id": 2,
+            "disposition": "settled",
+            "item_id": 3,
+            "lease_id": "lease_KJFC4JF0K2Y7EF1KP74S3QNRY6",
+            "outcome": "succeeded",
+            "payload": {
+              "caller": "A",
+              "result": "m14-20260929T055142Z-restart-A-payload"
+            },
+            "payload_digest": "e793e670f63597204527ea5a758352f5db31fa4c8b72ccf97159ebc939b51925",
+            "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+            "reason_code": null,
+            "report_id": "outcome_6CBC7TY50SYWSMFZM1CY9646E5",
+            "run_id": "run_F948F35BMTPZ5KXW5MKZKXJJN7",
+            "summary": "A: scenario work on item 3 finished",
+            "verification_profile": "checked"
+          }
+        ],
+        "repo_id": "vuoro",
+        "verification": {
+          "profile": "checked",
+          "required_checks": [],
+          "requirements": [
+            "checks"
+          ]
+        }
+      },
+      "status": "accepted"
+    },
+    {
+      "at": "2026-09-29T05:52:46.265Z",
+      "case": "restart",
+      "detail": {
+        "leases": 1,
+        "reports": [
+          "settled"
+        ]
+      },
+      "expectation": "one lease, one report, nothing rejected",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "arguments": {
+        "item_id": 3
+      },
+      "at": "2026-09-29T05:52:46.268Z",
+      "error": null,
+      "kind": "authority",
+      "note": "restart: the authority's decision",
+      "operation": "work.read.item-decisions",
+      "result": {
+        "decisions": [
+          {
+            "actor": "sprintctl:lease-settlement",
+            "created_at": "2026-09-29T05:52:46.198621Z",
+            "evidence_digests": [
+              "e793e670f63597204527ea5a758352f5db31fa4c8b72ccf97159ebc939b51925"
+            ],
+            "id": 2,
+            "kind": "accept",
+            "legacy_source": null,
+            "rationale": "accepted under verification profile checked: lease lease_KJFC4JF0K2Y7EF1KP74S3QNRY6 held by vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0 (run run_F948F35BMTPZ5KXW5MKZKXJJN7) reported success; checks passed: scenario-check",
+            "release_digest": null,
+            "repo_id": "vuoro",
+            "sprint_id": null,
+            "superseded_by_item_id": null,
+            "work_item_id": 3
+          }
+        ],
+        "item_id": 3,
+        "repo_id": "vuoro",
+        "resolution": "accepted",
+        "status": "done",
+        "terminal_decision_id": 2
+      },
+      "status": "accepted"
+    },
+    {
+      "at": "2026-09-29T05:52:46.268Z",
+      "case": "restart",
+      "detail": [
+        {
+          "actor": "sprintctl:lease-settlement",
+          "created_at": "2026-09-29T05:52:46.198621Z",
+          "evidence_digests": [
+            "e793e670f63597204527ea5a758352f5db31fa4c8b72ccf97159ebc939b51925"
+          ],
+          "id": 2,
+          "kind": "accept",
+          "legacy_source": null,
+          "rationale": "accepted under verification profile checked: lease lease_KJFC4JF0K2Y7EF1KP74S3QNRY6 held by vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0 (run run_F948F35BMTPZ5KXW5MKZKXJJN7) reported success; checks passed: scenario-check",
+          "release_digest": null,
+          "repo_id": "vuoro",
+          "sprint_id": null,
+          "superseded_by_item_id": null,
+          "work_item_id": 3
+        }
+      ],
+      "expectation": "exactly one settlement (one accept decision)",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "at": "2026-09-29T05:52:46.268Z",
+      "case": "stale-restart",
+      "kind": "step",
+      "step": "A claims item 4, heartbeats, and is killed"
+    },
+    {
+      "action": "claim-and-heartbeat",
+      "at": "2026-09-29T05:52:46.364Z",
+      "caller": "A",
+      "event": "started",
+      "kind": "process",
+      "pid": 412686
+    },
+    {
+      "arguments": {
+        "harness_build": "git:afb701b5ce7cd58a5f4966f2a025ab09f05d770c",
+        "harness_id": "vuoro-m1-4-scenario",
+        "idempotency_key": "m14-20260929T055142Z-stale-restart-A-run",
+        "model_id": "none:scripted-caller",
+        "observed_profile": {
+          "instruction_digest": "sha256:b9dafc7a285c9053377bb5c48c97a610d61b6b9258bec0263b4c0aada9986c8d",
+          "skill_digests": []
+        },
+        "recipe_id": "m1-4-settlement-scenario/v1"
+      },
+      "at": "2026-09-29T05:52:46.379Z",
+      "caller": "A",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "run_id": "run_HAD6VHJK13TZDENFM35190T4T0"
+      },
+      "tool": "register_run"
+    },
+    {
+      "arguments": {
+        "idempotency_key": "m14-20260929T055142Z-stale-restart-A-claim",
+        "item_id": 4,
+        "run_id": "run_HAD6VHJK13TZDENFM35190T4T0"
+      },
+      "at": "2026-09-29T05:52:46.398Z",
+      "caller": "A",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "lease": {
+          "acquired_at": "2026-09-29T05:52:46.387237Z",
+          "end_reason": null,
+          "ended_at": null,
+          "expires_at": "2026-09-29T05:53:16.387237Z",
+          "generation": 1,
+          "heartbeat_at": "2026-09-29T05:52:46.387237Z",
+          "heartbeat_interval_seconds": 6,
+          "item_id": 4,
+          "lease_id": "lease_D4T8VR05AF86G0X1RH23XPE01A",
+          "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+          "run_id": "run_HAD6VHJK13TZDENFM35190T4T0",
+          "state": "active",
+          "superseded_by": null,
+          "takeover_of": null,
+          "ttl_seconds": 30,
+          "verification": {
+            "profile": "checked",
+            "required_checks": [],
+            "requirements": [
+              "checks"
+            ]
+          },
+          "workspace_id": "01M14SCENAR10000000000000W"
+        },
+        "repo_id": "vuoro",
+        "resumed": false,
+        "took_over": null
+      },
+      "tool": "claim_work"
+    },
+    {
+      "arguments": {
+        "lease_id": "lease_D4T8VR05AF86G0X1RH23XPE01A",
+        "run_id": "run_HAD6VHJK13TZDENFM35190T4T0"
+      },
+      "at": "2026-09-29T05:52:52.417Z",
+      "caller": "A",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "lease": {
+          "acquired_at": "2026-09-29T05:52:46.387237Z",
+          "end_reason": null,
+          "ended_at": null,
+          "expires_at": "2026-09-29T05:53:22.407349Z",
+          "generation": 1,
+          "heartbeat_at": "2026-09-29T05:52:52.407349Z",
+          "heartbeat_interval_seconds": 6,
+          "item_id": 4,
+          "lease_id": "lease_D4T8VR05AF86G0X1RH23XPE01A",
+          "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+          "run_id": "run_HAD6VHJK13TZDENFM35190T4T0",
+          "state": "active",
+          "superseded_by": null,
+          "takeover_of": null,
+          "ttl_seconds": 30,
+          "verification": {
+            "profile": "checked",
+            "required_checks": [],
+            "requirements": [
+              "checks"
+            ]
+          },
+          "workspace_id": "01M14SCENAR10000000000000W"
+        },
+        "repo_id": "vuoro"
+      },
+      "tool": "heartbeat"
+    },
+    {
+      "at": "2026-09-29T05:52:52.474Z",
+      "caller": "A",
+      "event": "killed",
+      "kind": "process",
+      "pid": 412686,
+      "returncode": -9,
+      "signal": "SIGKILL"
+    },
+    {
+      "at": "2026-09-29T05:52:52.474Z",
+      "case": "stale-restart",
+      "kind": "step",
+      "step": "wait for the owner to see the lease on item 4 as stale"
+    },
+    {
+      "arguments": {
+        "item_id": 4
+      },
+      "at": "2026-09-29T05:53:22.533Z",
+      "error": null,
+      "kind": "authority",
+      "note": "the owner now evaluates the killed caller's lease as stale",
+      "operation": "work.lease.read-v1",
+      "result": {
+        "current_lease": {
+          "acquired_at": "2026-09-29T05:52:46.387237Z",
+          "end_reason": null,
+          "ended_at": null,
+          "expires_at": "2026-09-29T05:53:22.407349Z",
+          "generation": 1,
+          "heartbeat_at": "2026-09-29T05:52:52.407349Z",
+          "heartbeat_interval_seconds": 6,
+          "item_id": 4,
+          "lease_id": "lease_D4T8VR05AF86G0X1RH23XPE01A",
+          "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+          "run_id": "run_HAD6VHJK13TZDENFM35190T4T0",
+          "stale": true,
+          "state": "active",
+          "superseded_by": null,
+          "takeover_of": null,
+          "ttl_seconds": 30,
+          "verification": {
+            "profile": "checked",
+            "required_checks": [],
+            "requirements": [
+              "checks"
+            ]
+          },
+          "workspace_id": "01M14SCENAR10000000000000W"
+        },
+        "evaluated_at": "2026-09-29T05:53:22.532448Z",
+        "item_id": 4,
+        "leases": [
+          {
+            "acquired_at": "2026-09-29T05:52:46.387237Z",
+            "end_reason": null,
+            "ended_at": null,
+            "expires_at": "2026-09-29T05:53:22.407349Z",
+            "generation": 1,
+            "heartbeat_at": "2026-09-29T05:52:52.407349Z",
+            "heartbeat_interval_seconds": 6,
+            "item_id": 4,
+            "lease_id": "lease_D4T8VR05AF86G0X1RH23XPE01A",
+            "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+            "run_id": "run_HAD6VHJK13TZDENFM35190T4T0",
+            "state": "active",
+            "superseded_by": null,
+            "takeover_of": null,
+            "ttl_seconds": 30,
+            "verification": {
+              "profile": "checked",
+              "required_checks": [],
+              "requirements": [
+                "checks"
+              ]
+            },
+            "workspace_id": "01M14SCENAR10000000000000W"
+          }
+        ],
+        "outcome_reports": [],
+        "repo_id": "vuoro",
+        "verification": {
+          "profile": "checked",
+          "required_checks": [],
+          "requirements": [
+            "checks"
+          ]
+        }
+      },
+      "status": "accepted"
+    },
+    {
+      "at": "2026-09-29T05:53:22.533Z",
+      "case": "stale-restart",
+      "kind": "step",
+      "step": "A restarts: same grant, same run and claim idempotency keys"
+    },
+    {
+      "action": "resume-and-report",
+      "at": "2026-09-29T05:53:22.629Z",
+      "caller": "A",
+      "event": "started",
+      "kind": "process",
+      "pid": 416066
+    },
+    {
+      "arguments": {
+        "harness_build": "git:afb701b5ce7cd58a5f4966f2a025ab09f05d770c",
+        "harness_id": "vuoro-m1-4-scenario",
+        "idempotency_key": "m14-20260929T055142Z-stale-restart-A-run",
+        "model_id": "none:scripted-caller",
+        "observed_profile": {
+          "instruction_digest": "sha256:b9dafc7a285c9053377bb5c48c97a610d61b6b9258bec0263b4c0aada9986c8d",
+          "skill_digests": []
+        },
+        "recipe_id": "m1-4-settlement-scenario/v1"
+      },
+      "at": "2026-09-29T05:53:22.634Z",
+      "caller": "A",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "run_id": "run_HAD6VHJK13TZDENFM35190T4T0"
+      },
+      "tool": "register_run"
+    },
+    {
+      "arguments": {
+        "idempotency_key": "m14-20260929T055142Z-stale-restart-A-claim",
+        "item_id": 4,
+        "run_id": "run_HAD6VHJK13TZDENFM35190T4T0"
+      },
+      "at": "2026-09-29T05:53:22.650Z",
+      "caller": "A",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "lease": {
+          "acquired_at": "2026-09-29T05:52:46.387237Z",
+          "end_reason": null,
+          "ended_at": null,
+          "expires_at": "2026-09-29T05:53:52.641603Z",
+          "generation": 1,
+          "heartbeat_at": "2026-09-29T05:53:22.641603Z",
+          "heartbeat_interval_seconds": 6,
+          "item_id": 4,
+          "lease_id": "lease_D4T8VR05AF86G0X1RH23XPE01A",
+          "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+          "run_id": "run_HAD6VHJK13TZDENFM35190T4T0",
+          "state": "active",
+          "superseded_by": null,
+          "takeover_of": null,
+          "ttl_seconds": 30,
+          "verification": {
+            "profile": "checked",
+            "required_checks": [],
+            "requirements": [
+              "checks"
+            ]
+          },
+          "workspace_id": "01M14SCENAR10000000000000W"
+        },
+        "repo_id": "vuoro",
+        "resumed": true,
+        "took_over": null
+      },
+      "tool": "claim_work"
+    },
+    {
+      "arguments": {
+        "lease_id": "lease_D4T8VR05AF86G0X1RH23XPE01A",
+        "run_id": "run_HAD6VHJK13TZDENFM35190T4T0"
+      },
+      "at": "2026-09-29T05:53:22.668Z",
+      "caller": "A",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "lease": {
+          "acquired_at": "2026-09-29T05:52:46.387237Z",
+          "end_reason": null,
+          "ended_at": null,
+          "expires_at": "2026-09-29T05:53:52.656914Z",
+          "generation": 1,
+          "heartbeat_at": "2026-09-29T05:53:22.656914Z",
+          "heartbeat_interval_seconds": 6,
+          "item_id": 4,
+          "lease_id": "lease_D4T8VR05AF86G0X1RH23XPE01A",
+          "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+          "run_id": "run_HAD6VHJK13TZDENFM35190T4T0",
+          "state": "active",
+          "superseded_by": null,
+          "takeover_of": null,
+          "ttl_seconds": 30,
+          "verification": {
+            "profile": "checked",
+            "required_checks": [],
+            "requirements": [
+              "checks"
+            ]
+          },
+          "workspace_id": "01M14SCENAR10000000000000W"
+        },
+        "repo_id": "vuoro"
+      },
+      "tool": "heartbeat"
+    },
+    {
+      "arguments": {
+        "checks": [
+          {
+            "name": "scenario-check",
+            "ref": "m1-4-settlement-scenario/v1#A",
+            "status": "passed"
+          }
+        ],
+        "idempotency_key": "m14-20260929T055142Z-stale-restart-A-report",
+        "lease_id": "lease_D4T8VR05AF86G0X1RH23XPE01A",
+        "outcome": "succeeded",
+        "payload": {
+          "caller": "A",
+          "result": "m14-20260929T055142Z-stale-restart-A-payload"
+        },
+        "run_id": "run_HAD6VHJK13TZDENFM35190T4T0",
+        "summary": "A: scenario work on item 4 finished"
+      },
+      "at": "2026-09-29T05:53:22.686Z",
+      "caller": "A",
+      "is_error": false,
+      "kind": "tool-call",
+      "note": "",
+      "result": {
+        "repo_id": "vuoro",
+        "report": {
+          "checks": [
+            {
+              "name": "scenario-check",
+              "ref": "m1-4-settlement-scenario/v1#A",
+              "status": "passed"
+            }
+          ],
+          "created_at": "2026-09-29T05:53:22.674440Z",
+          "decision_id": 3,
+          "disposition": "settled",
+          "item_id": 4,
+          "lease_id": "lease_D4T8VR05AF86G0X1RH23XPE01A",
+          "outcome": "succeeded",
+          "payload": {
+            "caller": "A",
+            "result": "m14-20260929T055142Z-stale-restart-A-payload"
+          },
+          "payload_digest": "eefbf7a5bc31d3df118ed567d55c5f9b50c78a1c16759f4b7cf7e23390bfbbb3",
+          "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+          "reason_code": null,
+          "report_id": "outcome_KY2543X6N4QKZVCFHTRHT1R0T6",
+          "run_id": "run_HAD6VHJK13TZDENFM35190T4T0",
+          "summary": "A: scenario work on item 4 finished",
+          "verification_profile": "checked"
+        },
+        "settled": true,
+        "settlement_effect": "settled"
+      },
+      "tool": "report_outcome"
+    },
+    {
+      "at": "2026-09-29T05:53:22.747Z",
+      "case": "stale-restart",
+      "detail": [
+        "run_HAD6VHJK13TZDENFM35190T4T0",
+        "run_HAD6VHJK13TZDENFM35190T4T0"
+      ],
+      "expectation": "the restarted A gets the same run id",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "at": "2026-09-29T05:53:22.747Z",
+      "case": "stale-restart",
+      "detail": [
+        "lease_D4T8VR05AF86G0X1RH23XPE01A",
+        "lease_D4T8VR05AF86G0X1RH23XPE01A",
+        true
+      ],
+      "expectation": "the restarted A resumes the same lease (resumed: true)",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "at": "2026-09-29T05:53:22.747Z",
+      "case": "stale-restart",
+      "detail": "settled",
+      "expectation": "the restarted A's report settles the item",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "arguments": {
+        "item_id": 4
+      },
+      "at": "2026-09-29T05:53:22.751Z",
+      "error": null,
+      "kind": "authority",
+      "note": "stale-restart: leases and reports",
+      "operation": "work.lease.read-v1",
+      "result": {
+        "current_lease": null,
+        "evaluated_at": "2026-09-29T05:53:22.750259Z",
+        "item_id": 4,
+        "leases": [
+          {
+            "acquired_at": "2026-09-29T05:52:46.387237Z",
+            "end_reason": "settled",
+            "ended_at": "2026-09-29T05:53:22.675445Z",
+            "expires_at": "2026-09-29T05:53:52.656914Z",
+            "generation": 1,
+            "heartbeat_at": "2026-09-29T05:53:22.656914Z",
+            "heartbeat_interval_seconds": 6,
+            "item_id": 4,
+            "lease_id": "lease_D4T8VR05AF86G0X1RH23XPE01A",
+            "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+            "run_id": "run_HAD6VHJK13TZDENFM35190T4T0",
+            "state": "settled",
+            "superseded_by": null,
+            "takeover_of": null,
+            "ttl_seconds": 30,
+            "verification": {
+              "profile": "checked",
+              "required_checks": [],
+              "requirements": [
+                "checks"
+              ]
+            },
+            "workspace_id": "01M14SCENAR10000000000000W"
+          }
+        ],
+        "outcome_reports": [
+          {
+            "checks": [
+              {
+                "name": "scenario-check",
+                "ref": "m1-4-settlement-scenario/v1#A",
+                "status": "passed"
+              }
+            ],
+            "created_at": "2026-09-29T05:53:22.674440Z",
+            "decision_id": 3,
+            "disposition": "settled",
+            "item_id": 4,
+            "lease_id": "lease_D4T8VR05AF86G0X1RH23XPE01A",
+            "outcome": "succeeded",
+            "payload": {
+              "caller": "A",
+              "result": "m14-20260929T055142Z-stale-restart-A-payload"
+            },
+            "payload_digest": "eefbf7a5bc31d3df118ed567d55c5f9b50c78a1c16759f4b7cf7e23390bfbbb3",
+            "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+            "reason_code": null,
+            "report_id": "outcome_KY2543X6N4QKZVCFHTRHT1R0T6",
+            "run_id": "run_HAD6VHJK13TZDENFM35190T4T0",
+            "summary": "A: scenario work on item 4 finished",
+            "verification_profile": "checked"
+          }
+        ],
+        "repo_id": "vuoro",
+        "verification": {
+          "profile": "checked",
+          "required_checks": [],
+          "requirements": [
+            "checks"
+          ]
+        }
+      },
+      "status": "accepted"
+    },
+    {
+      "at": "2026-09-29T05:53:22.751Z",
+      "case": "stale-restart",
+      "detail": {
+        "leases": 1,
+        "reports": [
+          "settled"
+        ]
+      },
+      "expectation": "one lease, one report, nothing rejected",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "arguments": {
+        "item_id": 4
+      },
+      "at": "2026-09-29T05:53:22.754Z",
+      "error": null,
+      "kind": "authority",
+      "note": "stale-restart: the authority's decision",
+      "operation": "work.read.item-decisions",
+      "result": {
+        "decisions": [
+          {
+            "actor": "sprintctl:lease-settlement",
+            "created_at": "2026-09-29T05:53:22.674440Z",
+            "evidence_digests": [
+              "eefbf7a5bc31d3df118ed567d55c5f9b50c78a1c16759f4b7cf7e23390bfbbb3"
+            ],
+            "id": 3,
+            "kind": "accept",
+            "legacy_source": null,
+            "rationale": "accepted under verification profile checked: lease lease_D4T8VR05AF86G0X1RH23XPE01A held by vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0 (run run_HAD6VHJK13TZDENFM35190T4T0) reported success; checks passed: scenario-check",
+            "release_digest": null,
+            "repo_id": "vuoro",
+            "sprint_id": null,
+            "superseded_by_item_id": null,
+            "work_item_id": 4
+          }
+        ],
+        "item_id": 4,
+        "repo_id": "vuoro",
+        "resolution": "accepted",
+        "status": "done",
+        "terminal_decision_id": 3
+      },
+      "status": "accepted"
+    },
+    {
+      "at": "2026-09-29T05:53:22.754Z",
+      "case": "stale-restart",
+      "detail": [
+        {
+          "actor": "sprintctl:lease-settlement",
+          "created_at": "2026-09-29T05:53:22.674440Z",
+          "evidence_digests": [
+            "eefbf7a5bc31d3df118ed567d55c5f9b50c78a1c16759f4b7cf7e23390bfbbb3"
+          ],
+          "id": 3,
+          "kind": "accept",
+          "legacy_source": null,
+          "rationale": "accepted under verification profile checked: lease lease_D4T8VR05AF86G0X1RH23XPE01A held by vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0 (run run_HAD6VHJK13TZDENFM35190T4T0) reported success; checks passed: scenario-check",
+          "release_digest": null,
+          "repo_id": "vuoro",
+          "sprint_id": null,
+          "superseded_by_item_id": null,
+          "work_item_id": 4
+        }
+      ],
+      "expectation": "exactly one settlement (one accept decision)",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "at": "2026-09-29T05:53:22.754Z",
+      "case": "stale-restart",
+      "detail": {
+        "acquired_at": "2026-09-29T05:52:46.387237Z",
+        "end_reason": "settled",
+        "ended_at": "2026-09-29T05:53:22.675445Z",
+        "expires_at": "2026-09-29T05:53:52.656914Z",
+        "generation": 1,
+        "heartbeat_at": "2026-09-29T05:53:22.656914Z",
+        "heartbeat_interval_seconds": 6,
+        "item_id": 4,
+        "lease_id": "lease_D4T8VR05AF86G0X1RH23XPE01A",
+        "principal_id": "vuoro-cloud-control:01M145N7G6E48DK509CQ6AQ6B3:0",
+        "run_id": "run_HAD6VHJK13TZDENFM35190T4T0",
+        "state": "settled",
+        "superseded_by": null,
+        "takeover_of": null,
+        "ttl_seconds": 30,
+        "verification": {
+          "profile": "checked",
+          "required_checks": [],
+          "requirements": [
+            "checks"
+          ]
+        },
+        "workspace_id": "01M14SCENAR10000000000000W"
+      },
+      "expectation": "the stale lease was reactivated in place (same lease, generation 1, no takeover)",
+      "kind": "expectation",
+      "ok": true
+    },
+    {
+      "at": "2026-09-29T05:53:22.754Z",
+      "case": "cleanup",
+      "kind": "step",
+      "step": "withdraw every disposable item the run did not settle"
+    },
+    {
+      "arguments": {
+        "evidence_digests": [],
+        "item_id": 2,
+        "kind": "withdraw",
+        "rationale": "agentops#2524 disposable scenario item; withdrawn after the run"
+      },
+      "at": "2026-09-29T05:53:22.772Z",
+      "error": null,
+      "kind": "authority",
+      "note": "",
+      "operation": "work.decision.record",
+      "result": {
+        "decision": {
+          "actor": "github:1000",
+          "created_at": "2026-09-29T05:53:22.762196Z",
+          "evidence_digests": [],
+          "id": 4,
+          "kind": "withdraw",
+          "legacy_source": null,
+          "rationale": "agentops#2524 disposable scenario item; withdrawn after the run",
+          "release_digest": null,
+          "repo_id": "vuoro",
+          "sprint_id": null,
+          "superseded_by_item_id": null,
+          "work_item_id": 2
+        },
+        "item_id": 2,
+        "replayed": false,
+        "repo_id": "vuoro",
+        "resolution": "withdrawn",
+        "status": "done",
+        "terminal_decision_id": 4
+      },
+      "status": "accepted"
+    }
+  ],
+  "meta": {
+    "green": true,
+    "harness_build": "git:afb701b5ce7cd58a5f4966f2a025ab09f05d770c",
+    "item_ids": {
+      "R": 3,
+      "S": 4,
+      "X": 1,
+      "Y": 2,
+      "sprint": 1
+    },
+    "mcp_url": "http://127.0.0.1:58121/mcp",
+    "mode": "local",
+    "script_digest": "sha256:b9dafc7a285c9053377bb5c48c97a610d61b6b9258bec0263b4c0aada9986c8d",
+    "stamp": "20260929T055142Z",
+    "ttl": 30.0
+  }
+}
