@@ -141,7 +141,9 @@ are ready, so the gateway mints none that early. What remains is an assertion is
 seconds of a restart that completed in under two seconds, which is shorter
 than process start-up. A new pod has new caches and a new proof key.
 
-**Gateway follow-up (vuoro-cloud).** Correctness here does not depend on
+**Gateway follow-up (vuoro-cloud).** The gateway minting its own jti was part of
+agentops#2519's original intent; it is a vuoro-cloud change, tracked as
+vuoro-cloud #135, and is not delivered in this repository. Correctness here does not depend on
 `jti == request_id`, but the gateway must:
 
 - mint `jti` itself, unique per assertion (for example a ULID or 128 random

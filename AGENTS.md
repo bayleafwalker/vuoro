@@ -32,6 +32,7 @@ their domain repositories.
 Run targeted package tests first, then the repository boundary gate:
 
 ```bash
+uv sync --all-packages --all-extras
 uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests
 uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests
 uv build --package vuoro-client --wheel --out-dir dist/vuoro-client
