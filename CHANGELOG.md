@@ -5,6 +5,22 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service 0.1.81: main's next release after the 0.1.80 hotfix tag. The
+  work adapter is repinned from sprintctl 0.10.0 to 0.10.1, which carries the
+  sprintctl#2110 served-runtime reconnect fix that 0.1.80 shipped on the
+  0.1.72 line (via 0.7.5). The served PostgreSQL connection now survives
+  database restarts: a missing, closed or broken connection is replaced before
+  dispatch; after a connection loss only pure reads and durably keyed commands
+  replay once, others return `postgres-runtime-unavailable` (503, outcome
+  unknown); `/health/ready` reconnects and probes the database (bounded by the
+  connect timeout) instead of latching false; TCP keepalives and
+  `tcp_user_timeout` bound in-flight hangs. 0.10.0 had only the earlier
+  quarantine, under which readiness stayed false after a restart until the
+  process was restarted. Work schema stays 18 (the 17/18 migrations are
+  identical in 0.10.0 and 0.10.1), so no tenant migration beyond what 0.1.79
+  needs. vuoro-mcp-edge is unchanged (its claim tools need sprintctl 0.10.0 or
+  later).
+
 - vuoro-service 0.1.80 was released from the 0.1.72 hotfix line
   (`maint/vuoro-service-0.1.72`, vuoro#154), not from main: it repins the
   deployed line's work adapter to sprintctl 0.7.5 (sprintctl#2110, served

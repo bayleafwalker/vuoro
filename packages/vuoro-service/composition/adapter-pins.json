@@ -5,11 +5,11 @@
       "lock_id": "work-adapter",
       "lock_kind": "adapter",
       "source_repository": "https://github.com/bayleafwalker/sprintctl",
-      "source_revision": "56bfbc44689263b9c2e80abe39de6c8f948a9431",
-      "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/v0.10.0/sprintctl-0.10.0-py3-none-any.whl",
-      "artifact_sha256": "d8cc3515a45c19ed8dc8d2df659188a805395a807c5a08a39f81ed8c170c4270",
+      "source_revision": "9cc718f5f55871eb298d19b5712d54229cdc40cd",
+      "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/v0.10.1/sprintctl-0.10.1-py3-none-any.whl",
+      "artifact_sha256": "0eb5fd96528e041829dfcb95c6797e494c6f49361c19a686132465d8203aead9",
       "distribution": "sprintctl",
-      "distribution_version": "0.10.0"
+      "distribution_version": "0.10.1"
     },
     {
       "lock_id": "vuoro-adapter-kit",
