@@ -8,9 +8,11 @@
 | Run | Where | Result |
 |---|---|---|
 | [`local/`](local/transcript.md) (2026-09-29) | Real MCP edge + real runtime shell + pinned sprintctl 0.10.0 wheel on PostgreSQL 16, loopback, lease TTL 30 s | **GREEN**, 34/34 expectations |
-| live, kotona on `api.vuoro.cloud` | Not run yet: it needs two OAuth consents and a short-lived PAT from the operator (see [Live run](#live-run)) | not run |
+| [`live/`](live/transcript.md) (2026-09-29, sprint `m1-4-scenario-20260929T082145Z`) | Workspace `kotona` on `https://api.vuoro.cloud/mcp` (generation 55), two `claude-connector` grants under the operator's principal, a one-hour PAT, lease TTL 600 s | **Every scenario case passed**: 33/34 expectations, takeover, restart and stale-restart all green. The one failure is cleanup (see below) |
 
-This packet makes no claim about the hosted workspace until the live run's transcript sits next to `local/`. The landing page may cite the scenario only after that (item's definition of done).
+**The live cleanup failure.** The last expectation, "cleanup: the disposable sprint is closed", failed with `ModuleNotFoundError: sprintctl`. `close_sprint` builds the `sprint.close` command with sprintctl's own contracts, and the workstation venv had not installed the pinned wheel. This is a harness environment gap, not a finding about the product. The sprint was closed afterwards with the harness's own `close_sprint`, using the same PAT, once the wheel was installed. Live mode now refuses to start without the wheel (`tests/test_settlement_scenario.py::test_live_mode_refuses_to_start_without_the_sprintctl_wheel`). After the run, both grants and the PAT were revoked: `revoked_at` is 2026-09-29T09:29:16Z. The transcripts passed the mandatory review in step 4: they contain no secret patterns, and the only work items in them are the run's own four.
+
+With `live/` merged, the item's definition of done is met, and the landing page may cite the scenario, pointing at both runs.
 
 ## What runs
 
@@ -89,7 +91,7 @@ The live run uses the same script and the same expectations, pointed at `https:/
 1. **Two `claude-connector` grants, one per caller.** Every authorization-code exchange creates a new grant, so the two grants are distinct lease bindings even under the same GitHub principal. Only `claude-connector` may hold `vuoro:work.claim` (vuoro-cloud `oauth_scopes.SCOPE_CLIENT_RESTRICTIONS`), and control's authorization server offers no grant without a browser (only `authorization_code` + PKCE and `refresh_token`).
 2. **A workspace PAT with `work:read`, `work:sprint` and `work:lifecycle`, valid for one hour.** The MCP surface cannot create items, and kotona's work database (`vuoro_ws_01m3abjs1qw0`) is not the homelab vuoro-shared, so X, Y, R and S have to be created by direct invoke. Do not use the restore drill's device-flow PAT, which is fixed at 30 days. Mint it from the browser session with `expires_in_seconds: 3600` (step 2 below).
 
-Run it from a vuoro checkout on the workstation, after the local setup above. It takes about 30 minutes, because the tenant lease TTL is 600 s and the run waits it out twice.
+Run it from a vuoro checkout on the workstation, after the local setup in [Re-running](#re-running): the pinned sprintctl wheel is needed even in live mode, because cleanup closes the sprint with its contracts. It takes about 30 minutes, because the tenant lease TTL is 600 s and the run waits it out twice.
 
 **Credential files.** Keep them under `$XDG_RUNTIME_DIR` (a per-user tmpfs), never on disk. `shred` does not reliably erase data on a journaling or copy-on-write filesystem. A refresh also rewrites the grant file through a temporary file and a rename, so earlier token versions would be left behind unshredded. The script creates every credential file 0600 from the start. The real protection is step 5: revoke everything on the server.
 
@@ -139,7 +141,7 @@ The run should end with `GREEN: evidence in …/live`. Cleanup withdraws Y and c
 
 - **Only the run's items.** No work item other than the run's own may appear. `omitted_foreign_items` counts are expected.
 - **No secrets.** `grep -n -i -E 'bearer|vuo_pat|vuo_rt|eyJ' live/transcript.*` must print nothing.
-- **Identifiers are acceptable.** `principal_id` (the operator's control-plane user id), grant and run ids are fine to publish. If they are not, stop and do not commit.
+- **Identifiers are acceptable.** `principal_id` (the operator's control-plane user id), the `github:<numeric id>` actor (already public through the GitHub API), and grant and run ids are fine to publish. If they are not, stop and do not commit.
 
 **5. Revoke everything.** Do this even if the run failed. In the same browser console:
 
