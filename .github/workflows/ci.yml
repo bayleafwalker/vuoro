@@ -111,6 +111,62 @@ jobs:
             scripts/validate_released_catalog_composition.py
       - run: python -m json.tool vuoro.dispatch.json >/dev/null
 
+  settlement-scenario:
+    # agentops#2524 (M1-4): the differentiated settlement scenario end to
+    # end -- two callers on the real MCP edge, the real runtime shell and the
+    # pinned sprintctl wheel's lease on PostgreSQL; takeover, stale-result
+    # rejection with evidence retained, settlement under the named profile
+    # `checked`, the dependent item ready only after it, and restart/resume.
+    # The edge's own tests use an in-test stand-in for the lease; this is the
+    # one place the shipped owner and the shipped edge meet.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: m14
+          POSTGRES_PASSWORD: m14-ci-only
+          POSTGRES_DB: m14_scenario
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U m14"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v8.3.2
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --all-packages --all-extras
+      - name: Fetch immutable adapter wheels
+        run: >-
+          python scripts/fetch_pinned_adapters.py
+          packages/vuoro-service/composition/adapter-pins.json
+          dist/adapters
+      - name: Install the pinned work owner with its PostgreSQL driver
+        run: |
+          uv pip install --no-deps dist/adapters/sprintctl-*.whl
+          uv pip install 'psycopg[binary]>=3.1,<4'
+      - name: Run the scenario (lease TTL 30 s)
+        run: >-
+          uv run --no-sync python scripts/settlement_scenario.py run
+          --pg-url postgresql://m14:m14-ci-only@127.0.0.1:5432/m14_scenario
+          --out _artifacts/m1-4-settlement-scenario
+      - name: Upload the evidence packet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m1-4-settlement-scenario
+          # Only the packet: never the worker state (the gateway key is
+          # generated outside this directory as well).
+          path: |
+            _artifacts/m1-4-settlement-scenario/transcript.*
+            !_artifacts/m1-4-settlement-scenario/state/
+
   service-image:
     # The 0.1.76 release found the service image did not build: a workspace
     # package (vuoro-evidence) was not installed from the local tree, so pip
