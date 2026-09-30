@@ -143,10 +143,16 @@ class TestBuildToolsetGate:
     def test_returns_tools_for_a_durable_store(self) -> None:
         toolset = build_toolset(_context(_store(_FakeShell())))
         assert toolset is not None
+        # read_predecessor_context is built but served only when the owner
+        # advertises continuation (its describe decides; see
+        # test_run_continuation.py).
         assert [spec.name for spec in toolset.tools] == [
-            "register_run", "append_evidence", "write_session_note",
+            "register_run", "append_evidence", "write_session_note", "read_predecessor_context",
         ]
-        assert all(spec.bucket == "record" for spec in toolset.tools)
+        assert [spec.bucket for spec in toolset.tools] == ["record"] * 3 + ["read"]
+        assert all(spec.describe is not None for spec in toolset.tools if spec.name in (
+            "register_run", "read_predecessor_context",
+        ))
 
 
 class TestBuildRunRegistry:
