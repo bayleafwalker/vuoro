@@ -104,7 +104,11 @@ class FakeProviderClient:
     #: ("open" | "merged" | "closed") and head commit.
     pr_states: dict[int, str] = field(default_factory=dict)
     pr_heads: dict[int, str | None] = field(default_factory=dict)
+    #: The repository each PR's head lives in (a fork's differs).
+    pr_head_repos: dict[int, str] = field(default_factory=dict)
     fail_lookups: bool = False
+    #: Branches whose lookups fail (a partial, per-intent forge failure).
+    fail_lookups_for: set[str] = field(default_factory=set)
 
     def clone_url(self, repository: str) -> str:
         self.clones.append(repository)
@@ -134,25 +138,31 @@ class FakeProviderClient:
 
     async def find_branch(self, repository: str, branch: str) -> str | None:
         self._authorize(repository)
-        if self.fail_lookups:
+        if self.fail_lookups or branch in self.fail_lookups_for:
             raise RuntimeError("502 Bad Gateway: https://token@forge.example/")
         return self.branch_tip(repository, branch)
 
     async def find_pull_request(self, repository: str, branch: str) -> PullRequestResult | None:
         self._authorize(repository)
-        if self.fail_lookups:
+        if self.fail_lookups or branch in self.fail_lookups_for:
             raise RuntimeError("502 Bad Gateway: https://token@forge.example/")
         found = None
         for number, existing in enumerate(self.pull_requests, start=1):
-            if (existing.repository, existing.branch) == (repository, branch):
+            if (existing.repository, existing.branch) == (repository, branch) and (
+                self.pr_head_repos.get(number, repository) == repository
+            ):
                 found = self._result(repository, number)
         return found
 
-    def add_pull_request(self, request: PullRequest, *, head_sha: str | None, state: str = "open") -> int:
-        """Record a PR as the forge would have it (someone else's, or ours)."""
+    def add_pull_request(
+        self, request: PullRequest, *, head_sha: str | None, state: str = "open", head_repository: str | None = None
+    ) -> int:
+        """Record a PR as the forge would have it (someone else's, or ours;
+        `head_repository` names a fork)."""
 
         self.pull_requests.append(request)
         number = len(self.pull_requests)
+        self.pr_head_repos[number] = head_repository or request.repository
         self.pr_states[number] = state
         self.pr_heads[number] = head_sha
         return number
@@ -182,7 +192,9 @@ class FakeProviderClient:
         number = self.add_pull_request(request, head_sha=head)
         if head is not None:
             # Like GitHub: the PR head stays fetchable after the branch is gone.
-            subprocess.run(
+            # A blocking call is fine here: the fake stands in for a forge and
+            # the tests never run anything else concurrently on this loop.
+            subprocess.run(  # noqa: ASYNC221
                 ["git", "--git-dir", str(self.repositories[request.repository]), "update-ref",
                  f"refs/pull/{number}/head", head],
                 check=True,

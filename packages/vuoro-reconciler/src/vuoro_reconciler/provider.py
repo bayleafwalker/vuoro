@@ -83,7 +83,11 @@ class ProviderClient(Protocol):
     async def find_pull_request(self, repository: str, branch: str) -> PullRequestResult | None:
         """The most recent PR from `branch` in any state (open, merged or
         closed), or `None` if there has never been one. A merged PR is found
-        even after its branch was deleted."""
+        even after its branch was deleted.
+
+        Only PRs whose head repository is `repository` itself: a fork's PR
+        from a branch of the same name is never returned (the reconciler
+        would otherwise mistake it for its own)."""
 
     async def push_branch(self, repository: str, branch: str, *, local_path: str) -> None:
         """Create `branch` at `local_path`'s current HEAD.

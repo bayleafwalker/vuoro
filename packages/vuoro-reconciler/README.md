@@ -128,12 +128,19 @@ for an escaped ESC.
    `provider-credential-rejected` (default branch untouched, other intents
    continue); any other lookup failure returns `deferred`
    (`provider-lookup-failed`) without recording, with a warning naming the
-   intent and exception type, so the next poll retries; after
-   `max_lookup_deferrals` (default 5) consecutive deferrals in one process
-   it is recorded `failed: provider-lookup-failed`. The count resets on
-   restart, so callers should alert on repeated `deferred` outcomes.
+   intent and exception type, so the next poll retries. It is recorded
+   `failed: provider-lookup-failed` only after `max_lookup_deferral_seconds`
+   (default 30 min) since its first deferral AND when another intent on the
+   same repository looked up fine in the same poll, so a forge-wide outage
+   only defers. Deployment shape: one long-lived process polling
+   repeatedly (the first-deferral time is in memory); a process restarted
+   for every poll never reaches the bound, so its caller must alert on
+   repeated `deferred` outcomes. A PR is only ever looked up from the
+   repository's own branches (never a fork's), and a closed PR counts as
+   `pull-request-closed` only if its head is the reconciler's own commit.
    Signatures are tied to the configured key: the OpenPGP signer
-   fingerprint/key id, or the SSH signer principal (`committer_email`).
+   fingerprint/key id (a long key id or full fingerprint is required), or
+   the SSH key fingerprint plus signer principal (`committer_email`).
    `report_applied` must be idempotent for the same sha and PR URL.
 6. Reports the outcome (`applied` with its acceptor, or `failed`) back
    through `IntentSource`. One intent's failure (checkout, apply, policy,

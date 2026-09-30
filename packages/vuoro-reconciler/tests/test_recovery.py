@@ -462,24 +462,110 @@ def test_a_closed_pr_whose_branch_was_deleted_is_closed_not_mismatched(
     assert len(provider.pull_requests) == 1 and provider.pushed_branches == [("repo-a", BRANCH)]
 
 
-def test_repeated_lookup_failures_are_logged_then_capped(
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def _add_accepted(source: FakeIntentSource, intent: EffectIntent) -> None:
+    source.records[intent.intent_id] = intent
+    source.states[intent.intent_id] = "accepted"
+
+
+def test_a_lookup_failure_fails_only_after_the_bound_and_when_the_repository_answers(
     bare_remote: Path, reconciler_signing_key, caplog: pytest.LogCaptureFixture
 ) -> None:
-    source = FakeIntentSource(accepted=[_intent(bare_remote)])
-    provider = FakeProviderClient(repositories={"repo-a": bare_remote}, fail_lookups=True)
-    reconciler = _reconciler(source, provider, reconciler_signing_key, max_lookup_deferrals=2)
+    stuck = _intent(bare_remote)
+    source = FakeIntentSource(accepted=[stuck])
+    provider = FakeProviderClient(repositories={"repo-a": bare_remote}, fail_lookups_for={BRANCH})
+    clock = _Clock()
+    reconciler = _reconciler(source, provider, reconciler_signing_key, max_lookup_deferral_seconds=60)
+    object.__setattr__(reconciler, "clock", clock)
 
     with caplog.at_level(logging.WARNING, logger="vuoro_reconciler.reconciler"):
         first = asyncio.run(reconciler.run_once())
-        second = asyncio.run(reconciler.run_once())
+        clock.now += 30
+        within_bound = asyncio.run(reconciler.run_once())
+        clock.now += 31
+        # Past the bound, but nothing else on repo-a answered: still deferred.
+        alone = asyncio.run(reconciler.run_once())
+        # Another intent on the same repository looks up fine in this poll.
+        _add_accepted(source, _intent(bare_remote, intent_id="effect_rec0002"))
+        last = asyncio.run(reconciler.run_once())
 
-    assert [(o.state, o.reason) for o in first] == [("deferred", "provider-lookup-failed")]
-    assert [(o.state, o.reason) for o in second] == [("failed", "provider-lookup-failed")]
+    for outcomes in (first, within_bound, alone):
+        assert [(o.state, o.reason) for o in outcomes] == [("deferred", "provider-lookup-failed")]
+    assert [(o.intent_id, o.state, o.reason) for o in last] == [
+        ("effect_rec0001", "failed", "provider-lookup-failed"),
+        ("effect_rec0002", "applied", None),
+    ]
     assert source.failed == [{"intent_id": "effect_rec0001", "reason": "provider-lookup-failed"}]
+    assert reconciler._deferrals == {}
     warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
-    assert len(warnings) == 2
+    assert len(warnings) == 4
     assert all("effect_rec0001" in w and "RuntimeError" in w for w in warnings)
     assert not any("token" in w for w in warnings)
+
+
+def test_a_forge_wide_outage_defers_and_never_fails(bare_remote: Path, reconciler_signing_key) -> None:
+    source = FakeIntentSource(
+        accepted=[_intent(bare_remote), _intent(bare_remote, intent_id="effect_rec0002")]
+    )
+    provider = FakeProviderClient(repositories={"repo-a": bare_remote}, fail_lookups=True)
+    clock = _Clock()
+    reconciler = _reconciler(source, provider, reconciler_signing_key, max_lookup_deferral_seconds=60)
+    object.__setattr__(reconciler, "clock", clock)
+
+    for _ in range(3):
+        outcomes = asyncio.run(reconciler.run_once())
+        clock.now += 3600
+        assert {o.state for o in outcomes} == {"deferred"}
+    assert source.failed == [] and set(source.states.values()) == {"accepted"}
+
+
+def test_deferral_state_is_pruned_to_the_current_poll(bare_remote: Path, reconciler_signing_key) -> None:
+    source = FakeIntentSource(accepted=[_intent(bare_remote)])
+    provider = FakeProviderClient(repositories={"repo-a": bare_remote}, fail_lookups=True)
+    reconciler = _reconciler(source, provider, reconciler_signing_key)
+    asyncio.run(reconciler.run_once())
+    assert set(reconciler._deferrals) == {"effect_rec0001"}
+
+    source.states["effect_rec0001"] = "rejected"  # no longer polled
+    asyncio.run(reconciler.run_once())
+    assert reconciler._deferrals == {}
+
+
+def test_a_closed_fork_pr_from_the_same_branch_name_does_not_fail_the_intent(
+    bare_remote: Path, reconciler_signing_key
+) -> None:
+    source = FakeIntentSource(accepted=[_intent(bare_remote)])
+    provider = FakeProviderClient(repositories={"repo-a": bare_remote})
+    provider.add_pull_request(
+        PullRequest("repo-a", BRANCH, "main", "fork", "fork"),
+        head_sha="0" * 40,
+        state="closed",
+        head_repository="mallory/repo-a",
+    )
+
+    outcomes = asyncio.run(_reconciler(source, provider, reconciler_signing_key).run_once())
+
+    assert [(o.state, o.reason) for o in outcomes] == [("applied", None)]
+    assert outcomes[0].pr_url.endswith("/pulls/2")
+
+
+def test_a_closed_pr_whose_head_is_not_ours_is_a_mismatch(bare_remote: Path, reconciler_signing_key) -> None:
+    source = FakeIntentSource(accepted=[_intent(bare_remote)])
+    provider = FakeProviderClient(repositories={"repo-a": bare_remote})
+    provider.add_pull_request(
+        PullRequest("repo-a", BRANCH, "main", "x", "x"), head_sha=base_commit_of(bare_remote), state="closed"
+    )
+
+    outcomes = asyncio.run(_reconciler(source, provider, reconciler_signing_key).run_once())
+
+    assert [(o.state, o.reason) for o in outcomes] == [("failed", "pull-request-mismatch")]
 
 
 def test_verify_commit_is_tied_to_the_configured_key(tmp_path: Path, reconciler_signing_key) -> None:
@@ -539,3 +625,54 @@ def test_verify_commit_is_tied_to_the_configured_key(tmp_path: Path, reconciler_
     assert verify_commit(str(repo), "ours", reconciler_signing_key) is True
     assert verify_commit(str(repo), "theirs", other) is True
     assert verify_commit(str(repo), "theirs", reconciler_signing_key) is False
+
+
+def test_signing_keys_must_be_unambiguous() -> None:
+    for value in ("ABC", "DEADBEEF", "Vuoro Reconciler <reconciler@vuoro.test>", ""):
+        with pytest.raises(ValueError):
+            SigningKey("openpgp", value, "n", "e@x")
+    SigningKey("openpgp", "0x" + "A" * 16, "n", "e@x")
+    SigningKey("openpgp", "A" * 40 + "!", "n", "e@x")
+
+
+@pytest.mark.skipif(shutil.which("ssh-keygen") is None, reason="ssh-keygen is not installed")
+def test_ssh_verify_is_pinned_to_the_configured_key_not_just_the_principal(tmp_path: Path) -> None:
+    keys = {}
+    for name in ("ours", "theirs"):
+        subprocess.run(
+            ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", name, "-f", str(tmp_path / name)],
+            check=True,
+        )
+        keys[name] = tmp_path / f"{name}.pub"
+    # Both keys are allowed for the reconciler's principal.
+    allowed = tmp_path / "allowed_signers"
+    allowed.write_text(
+        "".join(f"reconciler@vuoro.test {' '.join(p.read_text().split()[:2])}\n" for p in keys.values())
+    )
+
+    def ssh_key(name: str) -> SigningKey:
+        return SigningKey(
+            key_format="ssh",
+            signing_key=str(keys[name]),
+            committer_name="Vuoro Reconciler",
+            committer_email="reconciler@vuoro.test",
+            allowed_signers_file=str(allowed),
+        )
+
+    repo = tmp_path / "repo"
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    for name in ("ours", "theirs"):
+        (repo / "f").write_text(f"{name}\n")
+        commit_signed(
+            str(repo),
+            title=name,
+            rationale="r",
+            run_id="run_x",
+            intent_id="effect_x",
+            acceptor=OPERATOR,
+            key=ssh_key(name),
+        )
+        subprocess.run(["git", "-C", str(repo), "tag", name], check=True)
+
+    assert verify_commit(str(repo), "ours", ssh_key("ours")) is True
+    assert verify_commit(str(repo), "theirs", ssh_key("ours")) is False
