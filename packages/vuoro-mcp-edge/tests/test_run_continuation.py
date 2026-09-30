@@ -785,6 +785,75 @@ def test_concurrent_callers_share_one_catalog_read() -> None:
     assert owner.catalog_reads == 1
 
 
+class _GatedOwner(FakeOwner):
+    """A catalog that answers only once the test opens the gate."""
+
+    def __init__(self) -> None:
+        super().__init__(NEW_OWNER_OPERATIONS)
+        self.gate: asyncio.Event | None = None
+
+    def __call__(self, request: httpx.Request) -> Any:
+        if request.url.path != "/api/catalog/v1":
+            return super().__call__(request)
+        self.catalog_reads += 1
+
+        async def answer() -> httpx.Response:
+            assert self.gate is not None
+            await self.gate.wait()
+            return httpx.Response(
+                200,
+                json={"revision": "rev-1", "operations": [{"name": n} for n in self.operations]},
+            )
+
+        return answer()
+
+
+def test_cancelling_a_waiter_leaves_the_read_and_the_others_intact() -> None:
+    owner = _GatedOwner()
+    store = _sprintctl_store(owner)
+
+    async def scenario() -> list[Any]:
+        owner.gate = asyncio.Event()
+        prober = asyncio.create_task(store.continuation_available())
+        await asyncio.sleep(0)
+        waiters = [asyncio.create_task(store.continuation_available()) for _ in range(3)]
+        await asyncio.sleep(0.01)
+        waiters[1].cancel()
+        await asyncio.sleep(0)
+        owner.gate.set()
+        return await asyncio.gather(prober, *waiters, return_exceptions=True)
+
+    results = asyncio.run(scenario())
+    assert results[0] is True and results[1] is True and results[3] is True
+    assert isinstance(results[2], asyncio.CancelledError)
+    assert owner.catalog_reads == 1
+
+
+def test_cancelling_the_prober_neither_fails_the_read_nor_starts_a_backoff() -> None:
+    owner = _GatedOwner()
+    store = _sprintctl_store(owner)
+
+    async def scenario() -> tuple[Any, Any, bool]:
+        owner.gate = asyncio.Event()
+        prober = asyncio.create_task(store.continuation_available())
+        await asyncio.sleep(0.01)
+        waiter = asyncio.create_task(store.continuation_available())
+        await asyncio.sleep(0)
+        prober.cancel()  # the request that started the read disconnects
+        await asyncio.sleep(0)
+        owner.gate.set()
+        results = await asyncio.gather(prober, waiter, return_exceptions=True)
+        fresh = await store.continuation_available()
+        return results[0], results[1], fresh
+
+    cancelled, waiter, fresh = asyncio.run(scenario())
+    assert isinstance(cancelled, asyncio.CancelledError)
+    assert waiter is True
+    assert fresh is True
+    assert store._retry_at == 0.0  # no backoff was started
+    assert owner.catalog_reads == 1
+
+
 @pytest.mark.parametrize(
     "malformed",
     [

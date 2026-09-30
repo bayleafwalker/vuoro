@@ -316,8 +316,8 @@ class SprintctlRecordStore:
         )
         self._continuation: bool | None = None
         self._retry_at = 0.0
-        #: The one in-flight catalog read, with the event loop it runs on.
-        self._probe: tuple[asyncio.AbstractEventLoop, asyncio.Future[bool]] | None = None
+        #: The one in-flight catalog read (a task), with the event loop it runs on.
+        self._probe: tuple[asyncio.AbstractEventLoop, asyncio.Task[bool]] | None = None
         self.catalog_timeout = CATALOG_TIMEOUT_SECONDS
         self.catalog_retry = CATALOG_RETRY_SECONDS
         self.clock: Callable[[], float] = time.monotonic
@@ -344,26 +344,23 @@ class SprintctlRecordStore:
         if self._continuation is not None:
             return self._continuation
         loop = asyncio.get_running_loop()
-        if self._probe is not None and self._probe[0] is loop and not self._probe[1].done():
-            return await asyncio.shield(self._probe[1])
-        if self.clock() < self._retry_at:
-            return False
-        future: asyncio.Future[bool] = loop.create_future()
-        self._probe = (loop, future)
-        try:
-            operations = await self._client.advertised_operations(timeout=self.catalog_timeout)
-            if operations is None:
-                self._retry_at = self.clock() + self.catalog_retry
-                result = False
-            else:
-                self._continuation = OPERATION_RUN_PREDECESSOR_CONTEXT in operations
-                result = self._continuation
-        except BaseException:
+        if self._probe is None or self._probe[0] is not loop or self._probe[1].done():
+            if self.clock() < self._retry_at:
+                return False
+            # The read runs as its own task and every caller -- the one that
+            # started it included -- awaits it shielded, so a caller that is
+            # cancelled (a client disconnect) never cancels the read, and a
+            # healthy shell is never mistaken for a failed one.
+            self._probe = (loop, loop.create_task(self._read_catalog()))
+        return await asyncio.shield(self._probe[1])
+
+    async def _read_catalog(self) -> bool:
+        operations = await self._client.advertised_operations(timeout=self.catalog_timeout)
+        if operations is None:
             self._retry_at = self.clock() + self.catalog_retry
-            future.set_result(False)
-            raise
-        future.set_result(result)
-        return result
+            return False
+        self._continuation = OPERATION_RUN_PREDECESSOR_CONTEXT in operations
+        return self._continuation
 
     async def aclose(self) -> None:
         await self._client.aclose()
