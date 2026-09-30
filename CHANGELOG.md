@@ -5,6 +5,23 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service 0.1.82: the work adapter is repinned from sprintctl 0.10.1 to
+  0.11.0 (tag commit 2c61b36b, wheel sha256 f7664efa...7e398), which adds
+  remote work schemas 19 (`work.effect.*` effect-intent store) and 20 (run
+  continuation: `work.run.register-v1` accepts `predecessor_run_id`, the
+  paged `work.run.predecessor-context-v1` read, serialized note inserts). The
+  work catalog grows from 63 to 70 operations (six `work.effect.*`, one
+  `work.run.predecessor-context-v1`); the two-domain catalog is 75. With this
+  runtime the edge's run continuation is live (its capability detection finds
+  the operation); the effect-intent operations are served by the owner, but
+  the edge's E3 effect tools stay hidden until a durable intent store is wired
+  (`_production_intent_store()` still returns None).
+  **Upgrade order:** sprintctl 0.11.0 refuses a remote schema below 20
+  (`MINIMUM_SCHEMA_VERSION = 20`), so the shared authority database must be
+  migrated to schema 20 with the 0.11.0 migrator *before* this runtime starts;
+  0.1.81 (schema 18) will not run against a schema-20 database either.
+  **Rollback:** restore the pre-migration database backup and redeploy 0.1.81.
+
 - vuoro-mcp-edge: `read_predecessor_context` is paged (follows sprintctl#114's
   bounded `work.run.predecessor-context-v1`): optional `limit` (1-500),
   `after_note_id` and `after_chain_seq` are forwarded, and the owner's
