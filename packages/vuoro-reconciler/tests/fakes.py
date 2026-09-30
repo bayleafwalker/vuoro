@@ -100,6 +100,11 @@ class FakeProviderClient:
     default: str = "main"
     hooks: dict[str, Callable[[str, str], Awaitable[None]]] = field(default_factory=dict)
     revoked: set[str] = field(default_factory=set)
+    #: Per PR number (1-based, index into `pull_requests`): its state
+    #: ("open" | "merged" | "closed") and head commit.
+    pr_states: dict[int, str] = field(default_factory=dict)
+    pr_heads: dict[int, str | None] = field(default_factory=dict)
+    fail_lookups: bool = False
 
     def clone_url(self, repository: str) -> str:
         self.clones.append(repository)
@@ -129,14 +134,28 @@ class FakeProviderClient:
 
     async def find_branch(self, repository: str, branch: str) -> str | None:
         self._authorize(repository)
+        if self.fail_lookups:
+            raise RuntimeError("502 Bad Gateway: https://token@forge.example/")
         return self.branch_tip(repository, branch)
 
-    async def find_open_pull_request(self, repository: str, branch: str) -> PullRequestResult | None:
+    async def find_pull_request(self, repository: str, branch: str) -> PullRequestResult | None:
         self._authorize(repository)
+        if self.fail_lookups:
+            raise RuntimeError("502 Bad Gateway: https://token@forge.example/")
+        found = None
         for number, existing in enumerate(self.pull_requests, start=1):
             if (existing.repository, existing.branch) == (repository, branch):
-                return self._result(repository, number)
-        return None
+                found = self._result(repository, number)
+        return found
+
+    def add_pull_request(self, request: PullRequest, *, head_sha: str | None, state: str = "open") -> int:
+        """Record a PR as the forge would have it (someone else's, or ours)."""
+
+        self.pull_requests.append(request)
+        number = len(self.pull_requests)
+        self.pr_states[number] = state
+        self.pr_heads[number] = head_sha
+        return number
 
     async def push_branch(self, repository: str, branch: str, *, local_path: str) -> None:
         await self._hook("before_push", repository, branch)
@@ -156,12 +175,19 @@ class FakeProviderClient:
 
     async def open_pull_request(self, request: PullRequest) -> PullRequestResult:
         self._authorize(request.repository)
-        if await self.find_open_pull_request(request.repository, request.branch) is not None:
+        found = await self.find_pull_request(request.repository, request.branch)
+        if found is not None and found.state == "open":
             raise PullRequestAlreadyExists(request.branch)
-        self.pull_requests.append(request)
-        result = self._result(request.repository, len(self.pull_requests))
+        number = self.add_pull_request(request, head_sha=self.branch_tip(request.repository, request.branch))
+        result = self._result(request.repository, number)
         await self._hook("after_open_pull_request", request.repository, request.branch)
         return result
 
     def _result(self, repository: str, number: int) -> PullRequestResult:
-        return PullRequestResult(url=f"file://{self.repositories[repository]}/pulls/{number}", number=number)
+        return PullRequestResult(
+            url=f"file://{self.repositories[repository]}/pulls/{number}",
+            number=number,
+            base_branch=self.pull_requests[number - 1].base_branch,
+            head_sha=self.pr_heads.get(number),
+            state=self.pr_states.get(number, "open"),
+        )

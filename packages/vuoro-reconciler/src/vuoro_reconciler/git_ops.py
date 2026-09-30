@@ -185,13 +185,17 @@ def ensure_commit(repo_path: str, branch: str, sha: str) -> bool:
 
 def same_change(repo_path: str, existing: str, candidate: str) -> bool:
     """True if `existing` records the same change as `candidate`: the same
-    tree on the same parent(s). A re-run's freshly signed commit differs
-    from the first run's only in its timestamp and signature."""
+    tree on the same parent(s) with the same message (title, rationale and
+    trailers). A re-run's freshly signed commit differs from the first
+    run's only in its timestamp and signature."""
 
-    def shape(ref: str) -> tuple[str, str]:
+    def shape(ref: str) -> tuple[str, str, str]:
         tree = _run("-C", repo_path, "rev-parse", "--end-of-options", f"{ref}^{{tree}}").stdout.strip()
         parents = _run("-C", repo_path, "rev-list", "--parents", "-n", "1", ref, "--").stdout.split()[1:]
-        return tree, " ".join(parents)
+        # The message carries the run/intent/acceptor trailers: a same-tree
+        # commit for another intent, run or acceptor is not the same change.
+        message = _run("-C", repo_path, "log", "-1", "--format=%B", ref, "--").stdout
+        return tree, " ".join(parents), message
 
     return shape(existing) == shape(candidate)
 

@@ -44,6 +44,13 @@ class PullRequest:
 class PullRequestResult:
     url: str
     number: int | None = None
+    #: The PR's base and head as the forge reports them. The reconciler
+    #: reuses a found PR only when its base is the default branch and its
+    #: head is the verified commit on `vuoro-effect/<intent_id>`.
+    base_branch: str | None = None
+    head_sha: str | None = None
+    #: "open" | "merged" | "closed" (closed without merging).
+    state: str = "open"
 
 
 class ProviderClient(Protocol):
@@ -64,22 +71,27 @@ class ProviderClient(Protocol):
 
     async def find_branch(self, repository: str, branch: str) -> str | None:
         """The commit `branch` points at on the forge now, or `None` if it
-        does not exist. With `find_open_pull_request`, this is the recovery
-        key after a crash: `vuoro-effect/<intent_id>` is deterministic, so a
+        does not exist. With `find_pull_request`, this is the recovery key
+        after a crash: `vuoro-effect/<intent_id>` is deterministic, so a
         restarted reconciler finds what an interrupted run left behind
         without any ledger of its own."""
 
-    async def find_open_pull_request(
-        self, repository: str, branch: str
-    ) -> PullRequestResult | None:
-        """The open PR from `branch`, or `None` if there is none."""
+    async def find_pull_request(self, repository: str, branch: str) -> PullRequestResult | None:
+        """The most recent PR from `branch` in any state (open, merged or
+        closed), or `None` if there has never been one. A merged PR is found
+        even after its branch was deleted."""
 
     async def push_branch(self, repository: str, branch: str, *, local_path: str) -> None:
         """Create `branch` at `local_path`'s current HEAD.
 
-        Create-only: if `branch` already exists, raise `BranchAlreadyExists`
-        and push nothing (never a fast-forward, never a force). Of two
-        concurrent consumers exactly one creates the branch.
+        Must be atomic and create-only: if `branch` already exists, raise
+        `BranchAlreadyExists` and push nothing (never a fast-forward, never
+        a force). Of two concurrent consumers exactly one creates the
+        branch. A plain `git push` does NOT give this (it fast-forwards an
+        existing branch); use a ref-create call that refuses an existing
+        ref (e.g. GitHub `POST /repos/{owner}/{repo}/git/refs`, which
+        answers 422) or `git push --force-with-lease=refs/heads/<branch>:`
+        (empty expected value: the ref must not exist).
 
         Implementations must refuse a `branch` equal to `default_branch` or
         any other protected ref; the reconciler never asks for one, but a
@@ -89,6 +101,6 @@ class ProviderClient(Protocol):
     async def open_pull_request(self, request: PullRequest) -> PullRequestResult:
         """Open a PR from `request.branch` into `request.base_branch`.
 
-        The reconciler looks for an open PR first (`find_open_pull_request`);
-        if one appeared in between, raise `PullRequestAlreadyExists` (or
-        return the existing one) rather than opening a second."""
+        The reconciler looks for a PR first (`find_pull_request`); if an
+        open one appeared in between, raise `PullRequestAlreadyExists`
+        rather than opening a second."""

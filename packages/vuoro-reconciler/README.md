@@ -110,17 +110,22 @@ for an escaped ESC.
    protocol, restricted to a repository allowlist. It never merges and
    never pushes a protected or default branch. A re-run that finds
    `vuoro-effect/<intent_id>` already carrying the same change is success.
-   Crash recovery (M2-3): the forge's branch and open PR are the recovery
-   key. Before pushing, the reconciler looks the branch up
-   (`find_branch`) and, before opening a PR, looks for an open one from it
-   (`find_open_pull_request`), so a restart after the push, after the PR,
-   or before `applied` was recorded yields one branch, one PR and one
-   `applied`. The push is create-only: of two concurrent consumers, the
-   one whose push loses (`BranchAlreadyExists`) records nothing and returns
-   a `duplicate` outcome. A revoked forge credential
-   (`ProviderCredentialRejected`, from any provider call) fails the intent
-   with `provider-credential-rejected`; the default branch is untouched,
-   and other intents continue.
+   Crash recovery (M2-3): the forge's branch and its PR (any state) are
+   the recovery key, adopted only once verified as this intent's own: the
+   branch tip must be signed by the reconciler's key and record the same
+   tree, parents, message and trailers; a PR must target the default
+   branch with that commit as head. So a restart after the push, after the
+   PR, or before `applied` was recorded yields one branch, one PR and one
+   `applied`; a PR merged meanwhile (even with its branch deleted) is
+   `applied`, one closed unmerged is `failed: pull-request-closed`, and
+   anything else found is `branch-exists-with-different-change` or
+   `pull-request-mismatch`. The push is atomic create-only: a consumer
+   that loses the branch or PR race records nothing and returns
+   `duplicate`. A revoked forge credential fails the intent with
+   `provider-credential-rejected` (default branch untouched, other intents
+   continue); any other lookup failure returns `deferred`
+   (`provider-lookup-failed`) without recording, so the next poll retries.
+   `report_applied` must be idempotent for the same sha and PR URL.
 6. Reports the outcome (`applied` with its acceptor, or `failed`) back
    through `IntentSource`. One intent's failure (checkout, apply, policy,
    commit, push, PR) is recorded and the others continue.

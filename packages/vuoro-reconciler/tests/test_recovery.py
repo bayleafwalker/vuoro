@@ -13,11 +13,14 @@ from __future__ import annotations
 import asyncio
 import json
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
 from fakes import FakeIntentSource, FakeProviderClient
+from vuoro_reconciler.git_ops import checkout_at, commit_signed, trailer
 from vuoro_reconciler.intents import Acceptor, EffectIntent, OperatorAcceptor
+from vuoro_reconciler.provider import PullRequest
 from vuoro_reconciler.reconciler import Reconciler, ReconcilerConfig
 
 from conftest import base_commit_of
@@ -219,3 +222,162 @@ def test_credential_revoked_mid_run_fails_cleanly_and_others_continue(
     assert base_commit_of(bare_remote) == main_before
     # The reason is a code: nothing from the provider's error leaks.
     assert "token" not in json.dumps(source.failed)
+
+
+# -- review follow-ups: only the reconciler's own work is ever adopted ---------------------
+
+
+def _push_lookalike(bare_remote: Path, tmp_path: Path, key, *, signed: bool) -> str:
+    """Push a same-tree, same-parent commit to BRANCH that is not this
+    intent's reconciler commit: unsigned with the exact same message, or
+    signed by the reconciler key but carrying another intent's trailers."""
+
+    dest = tmp_path / "lookalike"
+    checkout_at(str(bare_remote), base_commit_of(bare_remote), str(dest))
+    (dest / "docs" / "readme.md").write_text("new\n")
+    if signed:
+        commit_signed(
+            str(dest),
+            title="Fix the typo",
+            rationale="A short rationale.",
+            run_id="run_other",
+            intent_id="effect_other",
+            acceptor=OPERATOR,
+            key=key,
+        )
+    else:
+        message = (
+            f"Fix the typo\n\nA short rationale.\n\n{trailer('run_rec0001', 'effect_rec0001', OPERATOR)}\n"
+        )
+        git = ["git", "-C", str(dest), "-c", "user.name=mallory", "-c", "user.email=m@example.test"]
+        subprocess.run([*git, "-c", "commit.gpgsign=false", "commit", "-qam", message], check=True)
+    subprocess.run(
+        ["git", "-C", str(dest), "push", "-q", str(bare_remote), f"HEAD:refs/heads/{BRANCH}"], check=True
+    )
+    return subprocess.run(
+        ["git", "-C", str(dest), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+@pytest.mark.parametrize("signed", [False, True], ids=["unsigned-same-message", "signed-other-intent"])
+def test_a_foreign_same_tree_branch_is_never_adopted(
+    bare_remote: Path, tmp_path: Path, reconciler_signing_key, signed: bool
+) -> None:
+    _push_lookalike(bare_remote, tmp_path, reconciler_signing_key, signed=signed)
+    source = FakeIntentSource(accepted=[_intent(bare_remote)])
+    provider = FakeProviderClient(repositories={"repo-a": bare_remote})
+
+    outcomes = asyncio.run(_reconciler(source, provider, reconciler_signing_key).run_once())
+
+    assert [(o.state, o.reason) for o in outcomes] == [("failed", "branch-exists-with-different-change")]
+    assert provider.pushed_branches == [] and provider.pull_requests == []
+    assert source.applied == []
+
+
+def test_a_pr_to_the_wrong_base_is_never_adopted(bare_remote: Path, reconciler_signing_key) -> None:
+    source = FakeIntentSource(accepted=[_intent(bare_remote)])
+    provider = FakeProviderClient(
+        repositories={"repo-a": bare_remote}, hooks={"after_push": _crash_at("after_push")}
+    )
+    with pytest.raises(SimulatedCrash):
+        asyncio.run(_reconciler(source, provider, reconciler_signing_key).run_once())
+    provider.hooks.clear()
+    provider.add_pull_request(
+        PullRequest("repo-a", BRANCH, "some-other-base", "evil", "evil"),
+        head_sha=provider.branch_tip("repo-a", BRANCH),
+    )
+
+    outcomes = asyncio.run(_reconciler(source, provider, reconciler_signing_key).run_once())
+
+    assert [(o.state, o.reason) for o in outcomes] == [("failed", "pull-request-mismatch")]
+    assert len(provider.pull_requests) == 1 and source.applied == []
+
+
+def _crash_after_pr(bare_remote: Path, key) -> tuple[FakeIntentSource, FakeProviderClient]:
+    source = FakeIntentSource(accepted=[_intent(bare_remote)])
+    provider = FakeProviderClient(
+        repositories={"repo-a": bare_remote},
+        hooks={"after_open_pull_request": _crash_at("after_open_pull_request")},
+    )
+    with pytest.raises(SimulatedCrash):
+        asyncio.run(_reconciler(source, provider, key).run_once())
+    provider.hooks.clear()
+    return source, provider
+
+
+def test_a_pr_merged_before_restart_is_reported_applied(bare_remote: Path, reconciler_signing_key) -> None:
+    source, provider = _crash_after_pr(bare_remote, reconciler_signing_key)
+    provider.pr_states[1] = "merged"
+
+    outcomes = asyncio.run(_reconciler(source, provider, reconciler_signing_key).run_once())
+
+    _assert_recovered(source, provider, outcomes)
+    assert outcomes[0].pr_url.endswith("/pulls/1")
+
+
+def test_a_merged_pr_whose_branch_was_deleted_is_not_pushed_again(
+    bare_remote: Path, reconciler_signing_key
+) -> None:
+    source, provider = _crash_after_pr(bare_remote, reconciler_signing_key)
+    tip = provider.branch_tip("repo-a", BRANCH)
+    git_dir = ["git", "--git-dir", str(bare_remote)]
+    subprocess.run([*git_dir, "update-ref", "refs/heads/main", tip], check=True)
+    subprocess.run([*git_dir, "update-ref", "-d", f"refs/heads/{BRANCH}"], check=True)
+    provider.pr_states[1] = "merged"
+
+    outcomes = asyncio.run(_reconciler(source, provider, reconciler_signing_key).run_once())
+
+    assert [(o.state, o.commit_sha) for o in outcomes] == [("applied", tip)]
+    assert provider.pushed_branches == [("repo-a", BRANCH)]  # the first run's push only
+    assert provider.branch_tip("repo-a", BRANCH) is None
+    assert len(provider.pull_requests) == 1 and len(source.applied) == 1
+
+
+def test_a_pr_closed_unmerged_fails_and_opens_no_new_pr(bare_remote: Path, reconciler_signing_key) -> None:
+    source, provider = _crash_after_pr(bare_remote, reconciler_signing_key)
+    provider.pr_states[1] = "closed"
+
+    outcomes = asyncio.run(_reconciler(source, provider, reconciler_signing_key).run_once())
+
+    assert [(o.state, o.reason) for o in outcomes] == [("failed", "pull-request-closed")]
+    assert len(provider.pull_requests) == 1 and source.applied == []
+
+
+def test_a_late_second_consumer_after_the_push_reports_once(
+    bare_remote: Path, reconciler_signing_key
+) -> None:
+    source = FakeIntentSource(accepted=[_intent(bare_remote)])
+    late_outcomes = []
+
+    async def second_consumer_runs_now(repository: str, branch: str) -> None:
+        # B starts after A's push and before A's PR, and runs to completion.
+        provider.hooks.clear()
+        late_outcomes.extend(await _reconciler(source, provider, reconciler_signing_key).run_once())
+
+    provider = FakeProviderClient(
+        repositories={"repo-a": bare_remote}, hooks={"after_push": second_consumer_runs_now}
+    )
+    first = asyncio.run(_reconciler(source, provider, reconciler_signing_key).run_once())
+
+    assert [(o.state, o.reason) for o in late_outcomes] == [("applied", None)]
+    assert [(o.state, o.reason) for o in first] == [("duplicate", "concurrent-consumer")]
+    assert provider.pushed_branches == [("repo-a", BRANCH)]
+    assert len(provider.pull_requests) == 1
+    assert len(source.applied) == 1 and source.failed == []
+
+
+def test_a_transient_lookup_failure_leaves_the_intent_for_the_next_poll(
+    bare_remote: Path, reconciler_signing_key
+) -> None:
+    source = FakeIntentSource(accepted=[_intent(bare_remote)])
+    provider = FakeProviderClient(repositories={"repo-a": bare_remote}, fail_lookups=True)
+
+    outcomes = asyncio.run(_reconciler(source, provider, reconciler_signing_key).run_once())
+
+    assert [(o.state, o.reason) for o in outcomes] == [("deferred", "provider-lookup-failed")]
+    assert source.states == {"effect_rec0001": "accepted"} and source.failed == []
+    assert provider.pushed_branches == []
+
+    provider.fail_lookups = False
+    outcomes = asyncio.run(_reconciler(source, provider, reconciler_signing_key).run_once())
+    _assert_recovered(source, provider, outcomes)

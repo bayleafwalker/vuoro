@@ -53,7 +53,7 @@ from .provider import (
     PullRequestAlreadyExists,
     PullRequestResult,
 )
-from .signing import SigningKey
+from .signing import SigningKey, verify_commit
 
 __all__ = [
     "DiffDoesNotApply",
@@ -109,9 +109,12 @@ class ReconcilerConfig:
 @dataclass(frozen=True)
 class Outcome:
     intent_id: str
-    #: "applied" | "failed" | "duplicate". "duplicate" means another
-    #: consumer created the intent's branch first; nothing was recorded, and
-    #: that consumer (or, if it dies, the next run) finishes the intent.
+    #: "applied" | "failed" | "duplicate" | "deferred". "duplicate" means
+    #: another consumer created the intent's branch or PR first; nothing was
+    #: recorded, and that consumer (or, if it dies, the next run) finishes
+    #: the intent. "deferred" (reason `provider-lookup-failed`) means a
+    #: forge lookup failed transiently; nothing was recorded, so the intent
+    #: stays accepted and the next poll retries it.
     state: str
     commit_sha: str | None = None
     pr_url: str | None = None
@@ -122,6 +125,15 @@ class Outcome:
 class _Refused(Exception):
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
+        self.reason = reason
+
+
+class _Unrecorded(Exception):
+    """End this intent's attempt without writing to `IntentSource`."""
+
+    def __init__(self, state: str, reason: str) -> None:
+        super().__init__(reason)
+        self.state = state
         self.reason = reason
 
 
@@ -153,6 +165,10 @@ class Reconciler:
                 outcomes.append(await self._process(intent))
             except _Refused as refused:
                 outcomes.append(await self._fail(intent, refused.reason))
+            except _Unrecorded as unrecorded:
+                outcomes.append(
+                    Outcome(intent.intent_id, unrecorded.state, reason=unrecorded.reason, acceptor=intent.acceptor)
+                )
             except Exception as error:
                 # One intent's unexpected failure never stops the others.
                 outcomes.append(await self._fail(intent, f"internal-error: {type(error).__name__}"))
@@ -196,8 +212,6 @@ class Reconciler:
                 raise _Refused("provider-credential-rejected") from None
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
-        if result is None:
-            return Outcome(intent.intent_id, "duplicate", reason="concurrent-consumer", acceptor=acceptor)
         commit_sha, pr = result
 
         try:
@@ -211,52 +225,93 @@ class Reconciler:
 
     async def _publish(
         self, intent: EffectIntent, branch: str, default_branch: str, commit_sha: str, workdir: str
-    ) -> tuple[str, PullRequestResult] | None:
+    ) -> tuple[str, PullRequestResult]:
         """Push the branch and open its PR, resuming whatever an interrupted
-        run left behind. The forge's branch and open PR are the recovery
-        key: a branch already carrying the same change is reused, an open PR
-        from it is reused, so a restart at any point yields one branch and
-        one PR. `None` means another consumer created the branch first
-        (between our lookup and our push); it owns the rest."""
+        run left behind. The forge's branch and PR are the recovery key, but
+        only once verified as this intent's own: a branch is reused only if
+        its tip is signed by the reconciler's key and records the same
+        change (tree, parents, message and trailers); a PR only if its base
+        is the default branch and its head is that commit. A merged PR is
+        success; a PR closed unmerged is a failure, never a reason to open
+        another. Raises `_Unrecorded("duplicate", ...)` when another
+        consumer created the branch or PR during this run."""
 
-        existing = await self.provider.find_branch(intent.repository, branch)
+        repository = intent.repository
+        existing = await self._lookup(self.provider.find_branch(repository, branch))
+        pr = await self._lookup(self.provider.find_pull_request(repository, branch))
+
         if existing is not None:
             # An earlier run pushed this branch (crash after push, lost report).
-            if not ensure_commit(workdir, branch, existing) or not same_change(
-                workdir, existing, commit_sha
-            ):
-                raise _Refused("branch-exists-with-different-change")
+            self._require_own_commit(workdir, branch, existing, commit_sha)
             commit_sha = existing
-        else:
+        elif pr is not None and pr.state == "merged" and pr.head_sha:
+            # Merged, then the branch was deleted: the head is on the default branch.
+            self._require_own_commit(workdir, default_branch, pr.head_sha, commit_sha)
+            commit_sha = pr.head_sha
+
+        if pr is not None:
+            if pr.base_branch != default_branch or pr.head_sha != commit_sha:
+                raise _Refused("pull-request-mismatch")
+            if pr.state == "closed":
+                raise _Refused("pull-request-closed")
+            if pr.state not in ("open", "merged"):
+                raise _Refused("pull-request-mismatch")
+            return commit_sha, pr
+
+        if existing is None:
             try:
-                await self.provider.push_branch(intent.repository, branch, local_path=workdir)
+                await self.provider.push_branch(repository, branch, local_path=workdir)
             except BranchAlreadyExists:
-                return None
+                raise _Unrecorded("duplicate", "concurrent-consumer") from None
             except ProviderCredentialRejected:
                 raise
             except Exception:
                 raise _Refused("push-failed") from None
+            # Someone may have opened a PR from our branch since we pushed:
+            # they report it, not us.
+            if await self._lookup(self.provider.find_pull_request(repository, branch)) is not None:
+                raise _Unrecorded("duplicate", "concurrent-consumer")
 
-        pr = await self.provider.find_open_pull_request(intent.repository, branch)
-        if pr is None:
-            request = PullRequest(
-                repository=intent.repository,
-                branch=branch,
-                base_branch=default_branch,
-                title=intent.title,
-                body=intent.rationale,
-            )
-            try:
-                pr = await self.provider.open_pull_request(request)
-            except PullRequestAlreadyExists:
-                pr = await self.provider.find_open_pull_request(intent.repository, branch)
-                if pr is None:
-                    raise _Refused("pull-request-failed") from None
-            except ProviderCredentialRejected:
-                raise
-            except Exception:
-                raise _Refused("pull-request-failed") from None
-        return commit_sha, pr
+        request = PullRequest(
+            repository=repository,
+            branch=branch,
+            base_branch=default_branch,
+            title=intent.title,
+            body=intent.rationale,
+        )
+        try:
+            opened = await self.provider.open_pull_request(request)
+        except PullRequestAlreadyExists:
+            # Another consumer opened it between our lookup and our open.
+            raise _Unrecorded("duplicate", "concurrent-consumer") from None
+        except ProviderCredentialRejected:
+            raise
+        except Exception:
+            raise _Refused("pull-request-failed") from None
+        return commit_sha, opened
+
+    async def _lookup(self, call):
+        """Await a forge lookup; a non-credential failure defers the intent
+        (unrecorded, retried on the next poll) instead of failing it."""
+
+        try:
+            return await call
+        except ProviderCredentialRejected:
+            raise
+        except Exception:
+            raise _Unrecorded("deferred", "provider-lookup-failed") from None
+
+    def _require_own_commit(self, workdir: str, ref: str, sha: str, candidate: str) -> None:
+        """`sha` must be the reconciler's own signed commit of this very
+        change; anything else (unsigned, foreign-signed, another intent's
+        trailers) is never adopted as this intent's result."""
+
+        if not (
+            ensure_commit(workdir, ref, sha)
+            and verify_commit(workdir, sha, self.signing_key)
+            and same_change(workdir, sha, candidate)
+        ):
+            raise _Refused("branch-exists-with-different-change")
 
     def _prepare_commit(self, intent: EffectIntent, acceptor: Acceptor, workdir: str) -> str:
         """Validate, checkout, apply, re-validate and sign; the commit exists
