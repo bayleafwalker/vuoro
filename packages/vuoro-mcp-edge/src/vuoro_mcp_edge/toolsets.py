@@ -74,6 +74,7 @@ class ToolFailure(Exception):
 
 Parse = Callable[[dict[str, Any]], Any]
 Run = Callable[[Any, "ForwardedIdentity"], Awaitable[dict[str, Any]]]
+Describe = Callable[[], Awaitable["Mapping[str, Any] | None"]]
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,13 @@ class ToolSpec:
     `parse` validates `arguments` and returns the parsed value (raise
     `ToolFailure("invalid-arguments", ...)` on bad input); `run` performs the
     call and returns the tool's structured content.
+
+    `describe`, when set, decides at request time what the tool looks like
+    to clients: it returns the definition to list, or None when the tool is
+    not served right now (not listed, and a call is `unknown-tool`).  A tool
+    whose owner may or may not offer an operation (capability detection,
+    e.g. run continuation, agentops#2525) uses it; everything else lists
+    `definition` as-is.
     """
 
     name: str
@@ -90,6 +98,7 @@ class ToolSpec:
     definition: Mapping[str, Any]
     parse: Parse
     run: Run
+    describe: Describe | None = None
 
     def __post_init__(self) -> None:
         if self.definition.get("name") != self.name:

@@ -40,10 +40,13 @@ Design notes (for reviewers; see the E2 final report for the full reasoning):
   predecessor's workspace and repository; its principal, client and grant
   may differ.  Continuation transfers context, not authority: the
   successor's own run resolves only to the successor's binding, and the
-  predecessor's run never resolves to it.  A store advertises both only
-  when it sets `supports_continuation`; `SprintctlRecordStore` does not,
-  because the pinned sprintctl (0.10.0) neither records a predecessor nor
-  reads notes or evidence back, so the tools are not advertised against it.
+  predecessor's run never resolves to it.  A store advertises both when
+  it sets `supports_continuation` (the in-memory reference), or -- for
+  `SprintctlRecordStore` -- when the runtime shell's catalog advertises
+  `work.run.predecessor-context-v1` (sprintctl 0.11.0, schema 20), which
+  ships together with `work.run.register-v1`'s `predecessor_run_id`.
+  Against an older work adapter neither is advertised: capability
+  detection, not a version flip, so an older sprintctl keeps working.
 """
 
 from __future__ import annotations
@@ -78,6 +81,11 @@ OPERATION_RUN_RESOLVE = "work.run.resolve-v1"
 OPERATION_EVIDENCE_TAIL = "work.evidence.tail-v1"
 OPERATION_EVIDENCE_APPEND = "work.evidence.append-v1"
 OPERATION_SESSION_NOTE_WRITE = "work.session-note.write-v1"
+#: agentops#2525 (sprintctl 0.11.0, schema 20).  Its presence in the shell's
+#: catalog is the continuation capability: the same release makes
+#: `work.run.register-v1` accept `predecessor_run_id`.
+OPERATION_RUN_PREDECESSOR_CONTEXT = "work.run.predecessor-context-v1"
+_CATALOG_PATH = "/api/catalog/v1"
 
 _NOT_YOURS = "no run with that id belongs to the caller"
 
@@ -185,6 +193,24 @@ class RecordShellClient:
     async def aclose(self) -> None:
         await self._client.aclose()
 
+    async def advertised_operations(self) -> frozenset[str] | None:
+        """The operation names the runtime shell's catalog advertises, or
+        None when the catalog cannot be read right now.  The catalog is
+        public and caller-independent, so no forwarded assertion is sent."""
+
+        try:
+            response = await self._client.get(_CATALOG_PATH)
+            body = response.json() if response.status_code == 200 else None
+        except (httpx.HTTPError, ValueError):
+            return None
+        if not isinstance(body, dict) or not isinstance(body.get("operations"), list):
+            return None
+        return frozenset(
+            operation["name"]
+            for operation in body["operations"]
+            if isinstance(operation, dict) and isinstance(operation.get("name"), str)
+        )
+
     async def invoke(
         self, operation: str, arguments: dict[str, Any], forwarded: ForwardedIdentity
     ) -> Any:
@@ -255,8 +281,9 @@ class SprintctlRecordStore:
     room for.
     """
 
-    #: The pinned owner has no operation that records a run's predecessor
-    #: or reads its notes and evidence back, so continuation is not served.
+    #: Not a static yes: whether the owner records predecessors and reads
+    #: their context back depends on the work adapter the runtime shell
+    #: loaded, so it is detected (`continuation_available`).
     supports_continuation = False
 
     def __init__(
@@ -270,6 +297,26 @@ class SprintctlRecordStore:
         self._client = RecordShellClient(
             base_url=base_url, timeout=timeout, transport=transport, auth=auth
         )
+        self._continuation: bool | None = None
+
+    async def continuation_available(self) -> bool:
+        """Whether the runtime shell's catalog advertises
+        `work.run.predecessor-context-v1` (and so `predecessor_run_id` on
+        `work.run.register-v1`).
+
+        The answer from a catalog that was read is kept for the process: the
+        edge and the work adapter ship in one image, so the adapter cannot
+        change under a running edge.  A catalog that could not be read
+        answers False and is asked again next time, so a shell that was not
+        ready yet does not switch continuation off for good.
+        """
+
+        if self._continuation is None:
+            operations = await self._client.advertised_operations()
+            if operations is None:
+                return False
+            self._continuation = OPERATION_RUN_PREDECESSOR_CONTEXT in operations
+        return self._continuation
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -294,7 +341,7 @@ class SprintctlRecordStore:
         manifest: Mapping[str, Any],
         predecessor_run_id: str | None = None,
     ) -> str:
-        if predecessor_run_id is not None:
+        if predecessor_run_id is not None and not await self.continuation_available():
             # Never dropped silently: a run registered without the link it
             # asked for would read as a fresh run.
             raise ToolFailure(
@@ -309,6 +356,10 @@ class SprintctlRecordStore:
             "observed_profile": manifest["observed_profile"],
             "idempotency_key": idempotency_key,
         }
+        if predecessor_run_id is not None:
+            # Only when set: a request without a predecessor keeps the digest
+            # sprintctl stored for it before continuation existed.
+            arguments["predecessor_run_id"] = predecessor_run_id
         result = await self._client.invoke(OPERATION_RUN_REGISTER, arguments, forwarded)
         run = _expect_mapping(result, OPERATION_RUN_REGISTER).get("run")
         run = _expect_mapping(run, OPERATION_RUN_REGISTER)
@@ -366,10 +417,34 @@ class SprintctlRecordStore:
     async def read_predecessor_context(
         self, run_id: str, *, forwarded: ForwardedIdentity
     ) -> dict[str, Any]:
-        raise ToolFailure(
-            RECORD_OWNER_INCOMPATIBLE,
-            "the runtime's work adapter cannot read a predecessor's notes and evidence",
+        """The predecessor's notes and evidence, read by sprintctl through
+        the caller's own run (it answers run-not-found for any other
+        binding, as `work.run.resolve-v1` does)."""
+
+        if not await self.continuation_available():
+            raise ToolFailure(
+                RECORD_OWNER_INCOMPATIBLE,
+                "the runtime's work adapter cannot read a predecessor's notes and evidence",
+            )
+        result = await self._client.invoke(
+            OPERATION_RUN_PREDECESSOR_CONTEXT, {"run_id": run_id}, forwarded
         )
+        body = _expect_mapping(result, OPERATION_RUN_PREDECESSOR_CONTEXT)
+        predecessor = body.get("predecessor_run_id")
+        notes = body.get("session_notes")
+        evidence = body.get("evidence")
+        if (
+            body.get("run_id") != run_id
+            or not (predecessor is None or (isinstance(predecessor, str) and RUN_ID.fullmatch(predecessor)))
+            or not isinstance(notes, list)
+            or not isinstance(evidence, list)
+            or not all(isinstance(entry, dict) for entry in (*notes, *evidence))
+        ):
+            raise ToolFailure(
+                "record-shell-unavailable",
+                f"{OPERATION_RUN_PREDECESSOR_CONTEXT} returned a malformed result",
+            )
+        return {"predecessor_run_id": predecessor, "session_notes": notes, "evidence": evidence}
 
     async def evidence_tail(
         self, run_id: str, *, forwarded: ForwardedIdentity
@@ -921,12 +996,23 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
         # bucket has nothing it could serve durably, so it advertises
         # nothing rather than tools that would fail every call.
         return None
-    continuation = bool(getattr(store, "supports_continuation", False))
+    # Static for a store that always serves continuation (the in-memory
+    # reference); detected per request for one that may or may not, by what
+    # its owner advertises (`SprintctlRecordStore.continuation_available`).
+    static_continuation = bool(getattr(store, "supports_continuation", False))
+    detect = None if static_continuation else getattr(store, "continuation_available", None)
+    continuation = static_continuation or detect is not None
 
     async def _run_register_run(
         parsed: dict[str, Any], forwarded: ForwardedIdentity
     ) -> dict[str, Any]:
         binding = binding_for(forwarded)
+        if parsed["predecessor_run_id"] is not None and detect is not None and not await detect():
+            # Listed without predecessor_run_id right now: refused exactly as
+            # a store without continuation refuses it (_parse_register_run).
+            raise ToolFailure(
+                "invalid-arguments", "register_run does not accept: predecessor_run_id"
+            )
         if parsed["predecessor_run_id"] is not None:
             _require_continuation_authority(forwarded)
         run_id = await store.register(
@@ -1020,6 +1106,17 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
             "evidence": list(continued.get("evidence") or []),
         }
 
+    register_definition = _register_run_definition(continuation=continuation)
+    describe_register = None
+    describe_read = None
+    if detect is not None:
+
+        async def describe_register() -> Mapping[str, Any]:
+            return register_definition if await detect() else _REGISTER_RUN_DEFINITION
+
+        async def describe_read() -> Mapping[str, Any] | None:
+            return _READ_PREDECESSOR_CONTEXT_DEFINITION if await detect() else None
+
     continuation_tools: tuple[ToolSpec, ...] = ()
     if continuation:
         continuation_tools = (
@@ -1029,6 +1126,7 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
                 definition=_READ_PREDECESSOR_CONTEXT_DEFINITION,
                 parse=_parse_read_predecessor_context,
                 run=_run_read_predecessor_context,
+                describe=describe_read,
             ),
         )
 
@@ -1038,11 +1136,12 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
             ToolSpec(
                 name="register_run",
                 bucket="record",
-                definition=_register_run_definition(continuation=continuation),
+                definition=register_definition,
                 parse=lambda arguments: _parse_register_run(
                     arguments, continuation=continuation
                 ),
                 run=_run_register_run,
+                describe=describe_register,
             ),
             ToolSpec(
                 name="append_evidence",

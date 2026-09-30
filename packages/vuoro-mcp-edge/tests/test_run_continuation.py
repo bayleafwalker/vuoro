@@ -12,9 +12,11 @@ the successor can do.
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import replace
 from typing import Any
 
+import httpx
 import pytest
 from edge_support import (
     ISSUER,
@@ -470,42 +472,250 @@ def test_over_mcp_the_successor_inherits_no_authority_from_the_predecessor(keys)
     ) == "authority-required"
 
 
-# -- the durable store: not served until the owner records predecessors ------------
+# -- the durable store: served only when the owner advertises it -------------------
 
 
-def test_the_sprintctl_store_does_not_advertise_continuation() -> None:
-    store = SprintctlRecordStore(base_url="http://127.0.0.1:8080", timeout=5.0)
-    specs = _toolset(store)
-    assert set(specs) == {"register_run", "append_evidence", "write_session_note"}
-    schema = specs["register_run"].definition["inputSchema"]
-    assert "predecessor_run_id" not in schema["properties"]
-    with pytest.raises(ToolFailure) as refused:
-        specs["register_run"].parse(
-            {**_MANIFEST, "idempotency_key": "key-0001", "predecessor_run_id": "run_" + "0" * 26}
+CONTEXT_OPERATION = "work.run.predecessor-context-v1"
+#: What a sprintctl before 0.11.0 advertises for the record bucket.
+OLD_OWNER_OPERATIONS = (
+    "work.public.list-v1", "work.public.item-v1", "work.run.register-v1",
+    "work.run.resolve-v1", "work.evidence.tail-v1", "work.evidence.append-v1",
+    "work.session-note.write-v1",
+)
+NEW_OWNER_OPERATIONS = (*OLD_OWNER_OPERATIONS, CONTEXT_OPERATION)
+PREDECESSOR_RUN = "run_" + "P" * 26
+SUCCESSOR_RUN = "run_" + "S" * 26
+
+
+class FakeOwner:
+    """The runtime shell in front of a sprintctl work adapter, for
+    `SprintctlRecordStore`: a catalog (optionally failing first) and scripted
+    answers per operation.  Records every invoke envelope."""
+
+    def __init__(
+        self,
+        operations: tuple[str, ...],
+        *,
+        catalog_failures: int = 0,
+        resolve_binding: dict[str, Any] | None = None,
+    ) -> None:
+        self.operations = operations
+        self.catalog_failures = catalog_failures
+        self.catalog_reads = 0
+        self.invoked: list[dict[str, Any]] = []
+        self.resolve_binding = resolve_binding
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/catalog/v1":
+            self.catalog_reads += 1
+            if self.catalog_failures:
+                self.catalog_failures -= 1
+                return httpx.Response(503, json={"error": "not ready"})
+            return httpx.Response(
+                200,
+                json={"revision": "rev-1", "operations": [{"name": n} for n in self.operations]},
+            )
+        envelope = json.loads(request.content)
+        self.invoked.append(envelope)
+        operation = envelope["operation"]
+        if operation not in self.operations:
+            return self._error(operation, "unknown-operation", 404)
+        if operation == "work.run.register-v1":
+            run = {
+                "run_id": SUCCESSOR_RUN, "harness_id": "h", "harness_build": "1",
+                "model_id": "m", "recipe_id": "r", "observed_profile": OBSERVED_PROFILE,
+                "grant_ids": [], "claim_ids": [],
+            }
+            return self._ok(operation, {"repo_id": REPO_ID, "run": run})
+        if operation == "work.run.resolve-v1":
+            if self.resolve_binding is None:
+                return self._error(operation, "run-not-found", 404)
+            return self._ok(
+                operation, {"repo_id": REPO_ID, "run_id": envelope["arguments"]["run_id"],
+                            **self.resolve_binding},
+            )
+        if operation == CONTEXT_OPERATION:
+            return self._ok(operation, {
+                "repo_id": REPO_ID,
+                "run_id": envelope["arguments"]["run_id"],
+                "predecessor_run_id": PREDECESSOR_RUN,
+                "session_notes": [
+                    {"note_id": 1, "note": "stopped after step 3", "created_at": "2026-09-30T10:00:00Z"},
+                ],
+                "evidence": [{"item_id": "evi_1", "kind": "test-report", "chain_seq": 0}],
+            })
+        raise AssertionError(f"unexpected operation {operation}")
+
+    @staticmethod
+    def _ok(operation: str, result: dict[str, Any]) -> httpx.Response:
+        return httpx.Response(
+            200, json={"status": "accepted", "operation": operation, "result": result}
         )
-    assert refused.value.code == "invalid-arguments"
+
+    @staticmethod
+    def _error(operation: str, code: str, status: int) -> httpx.Response:
+        return httpx.Response(
+            status,
+            json={"status": "rejected", "operation": operation,
+                  "error": {"code": code, "message": code}},
+        )
+
+
+def _sprintctl_store(owner: FakeOwner) -> SprintctlRecordStore:
+    return SprintctlRecordStore(
+        base_url="http://127.0.0.1:8080", timeout=5.0, transport=httpx.MockTransport(owner)
+    )
+
+
+def _sprintctl_edge(keys: Any, owner: FakeOwner) -> Any:
+    context = ToolsetContext(
+        env={}, work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"),
+        runs=_sprintctl_store(owner),
+    )
+    return edge_client(keys[0], FakeShell(), toolsets=(build_toolset(context),))
+
+
+def _successor_headers(keys: Any, authorities: list[str] | None = None) -> Any:
+    """A factory: every request carries a fresh assertion (replays are refused)."""
+    return lambda: _headers(
+        keys, subject=SUCCESSOR_SUBJECT,
+        authorities=authorities or ["work:read", "work:evidence"], grant_id="grant-2",
+    )
+
+
+def _listed(client: Any, headers: Any) -> dict[str, Any]:
+    tools = client.post(MCP_PATH, headers=headers(), json=rpc("tools/list")).json()["result"]["tools"]
+    return {tool["name"]: tool for tool in tools}
+
+
+def _successor_binding() -> dict[str, Any]:
+    return {
+        "principal_id": SUCCESSOR_PRINCIPAL, "workspace_id": WORKSPACE_ID,
+        "client_id": "claude-connector", "grant_id": "grant-2",
+    }
+
+
+def test_against_an_older_work_adapter_continuation_is_not_listed(keys) -> None:
+    """No regression: a sprintctl without the capability gets exactly the
+    record tools it had, and a predecessor is refused before the owner."""
+    owner = FakeOwner(OLD_OWNER_OPERATIONS)
+    client = _sprintctl_edge(keys, owner)
+    headers = _successor_headers(keys)
+    listed = _listed(client, headers)
+    assert "read_predecessor_context" not in listed
+    assert {"register_run", "append_evidence", "write_session_note"} <= set(listed)
+    assert "predecessor_run_id" not in listed["register_run"]["inputSchema"]["properties"]
+    assert _error_code(
+        _result(client, headers(), "read_predecessor_context", {"run_id": SUCCESSOR_RUN})
+    ) == "unknown-tool"
+    assert _error_code(
+        _result(
+            client, headers(), "register_run",
+            {**_MANIFEST, "idempotency_key": "succ-run-0001", "predecessor_run_id": PREDECESSOR_RUN},
+        )
+    ) == "invalid-arguments"
+    assert owner.invoked == []
+    # Without a predecessor register_run works as before, and sends no
+    # predecessor_run_id at all (the request digest sprintctl stores is unchanged).
+    registered = _result(client, headers(), "register_run", {**_MANIFEST, "idempotency_key": "succ-run-0002"})
+    assert registered["isError"] is False, registered
+    assert "predecessor_run_id" not in owner.invoked[-1]["arguments"]
+    # The catalog answer is kept: one read for all of the above.
+    assert owner.catalog_reads == 1
 
 
 def test_the_sprintctl_store_never_drops_a_predecessor_silently() -> None:
-    def no_call(request: Any) -> Any:
-        raise AssertionError("the owner must not be called")
-
-    import httpx
-
-    store = SprintctlRecordStore(
-        base_url="http://127.0.0.1:8080", timeout=5.0, transport=httpx.MockTransport(no_call)
-    )
+    owner = FakeOwner(OLD_OWNER_OPERATIONS)
+    store = _sprintctl_store(owner)
     binding = RunBinding(principal_id=PREDECESSOR_PRINCIPAL, workspace_id=WORKSPACE_ID, repo_id=REPO_ID)
-    for attempt in (
-        store.register(
-            binding, idempotency_key="key-0001", forwarded=_forwarded(), manifest=_MANIFEST,
-            predecessor_run_id="run_" + "0" * 26,
-        ),
-        store.read_predecessor_context("run_" + "0" * 26, forwarded=_forwarded()),
-    ):
-        with pytest.raises(ToolFailure) as refused:
-            asyncio.run(attempt)
-        assert refused.value.code == RECORD_OWNER_INCOMPATIBLE
+
+    async def attempts() -> list[str]:
+        codes = []
+        for attempt in (
+            lambda: store.register(
+                binding, idempotency_key="key-0001", forwarded=_forwarded(), manifest=_MANIFEST,
+                predecessor_run_id=PREDECESSOR_RUN,
+            ),
+            lambda: store.read_predecessor_context(SUCCESSOR_RUN, forwarded=_forwarded()),
+        ):
+            try:
+                await attempt()
+            except ToolFailure as failure:
+                codes.append(failure.code)
+        return codes
+
+    assert asyncio.run(attempts()) == [RECORD_OWNER_INCOMPATIBLE, RECORD_OWNER_INCOMPATIBLE]
+    assert owner.invoked == []
+
+
+def test_with_the_capability_the_sprintctl_store_serves_continuation(keys) -> None:
+    owner = FakeOwner(NEW_OWNER_OPERATIONS, resolve_binding=_successor_binding())
+    client = _sprintctl_edge(keys, owner)
+    headers = _successor_headers(keys)
+    listed = _listed(client, headers)
+    assert listed["read_predecessor_context"]["annotations"]["readOnlyHint"] is True
+    assert "predecessor_run_id" in listed["register_run"]["inputSchema"]["properties"]
+
+    registered = _result(
+        client, headers(), "register_run",
+        {**_MANIFEST, "idempotency_key": "succ-run-0001", "predecessor_run_id": PREDECESSOR_RUN},
+    )
+    assert registered["isError"] is False, registered
+    assert owner.invoked[-1]["operation"] == "work.run.register-v1"
+    assert owner.invoked[-1]["arguments"]["predecessor_run_id"] == PREDECESSOR_RUN
+
+    context = _result(client, headers(), "read_predecessor_context", {"run_id": SUCCESSOR_RUN})
+    assert context["isError"] is False, context
+    assert context["structuredContent"] == {
+        "run_id": SUCCESSOR_RUN,
+        "predecessor_run_id": PREDECESSOR_RUN,
+        "session_notes": [
+            {"note_id": 1, "note": "stopped after step 3", "created_at": "2026-09-30T10:00:00Z"},
+        ],
+        "evidence": [{"item_id": "evi_1", "kind": "test-report", "chain_seq": 0}],
+    }
+    # The caller's own run is resolved first, then read through that run only.
+    assert [e["operation"] for e in owner.invoked[-2:]] == ["work.run.resolve-v1", CONTEXT_OPERATION]
+    assert owner.invoked[-1]["arguments"] == {"run_id": SUCCESSOR_RUN}
+
+
+@pytest.mark.parametrize("binding", ["unknown", "someone-else"])
+def test_over_the_sprintctl_store_only_the_caller_s_own_run_is_read(keys, binding) -> None:
+    other = {**_successor_binding(), "principal_id": PREDECESSOR_PRINCIPAL, "grant_id": "grant-1"}
+    owner = FakeOwner(
+        NEW_OWNER_OPERATIONS, resolve_binding=None if binding == "unknown" else other
+    )
+    client = _sprintctl_edge(keys, owner)
+    assert _error_code(
+        _result(client, _successor_headers(keys)(), "read_predecessor_context", {"run_id": SUCCESSOR_RUN})
+    ) == "run-not-found"
+    assert CONTEXT_OPERATION not in [e["operation"] for e in owner.invoked]
+
+
+def test_reading_the_context_needs_work_read(keys) -> None:
+    owner = FakeOwner(NEW_OWNER_OPERATIONS, resolve_binding=_successor_binding())
+    client = _sprintctl_edge(keys, owner)
+    headers = _successor_headers(keys, ["work:evidence"])
+    assert "read_predecessor_context" not in _listed(client, headers)
+    assert _error_code(
+        _result(client, headers(), "read_predecessor_context", {"run_id": SUCCESSOR_RUN})
+    ) == "authority-required"
+    assert owner.invoked == []
+
+
+def test_an_unreadable_catalog_hides_continuation_and_is_asked_again(keys) -> None:
+    # One tools/list asks for register_run's and read_predecessor_context's
+    # definitions: two unreadable catalogs hide continuation for that list.
+    owner = FakeOwner(NEW_OWNER_OPERATIONS, catalog_failures=2)
+    client = _sprintctl_edge(keys, owner)
+    headers = _successor_headers(keys)
+    first = _listed(client, headers)
+    assert "read_predecessor_context" not in first
+    assert "predecessor_run_id" not in first["register_run"]["inputSchema"]["properties"]
+    assert "read_predecessor_context" in _listed(client, headers)
+    assert "read_predecessor_context" in _listed(client, headers)
+    # Asked again after each failure; kept once read.
+    assert owner.catalog_reads == 3
 
 
 def test_the_advertised_schema_carries_the_predecessor_only_with_continuation() -> None:

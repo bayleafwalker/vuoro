@@ -46,7 +46,7 @@ from __future__ import annotations
 import inspect
 import json
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
@@ -329,19 +329,34 @@ def create_edge_app(
             if name in toolset_specs or (name in TOOL_SCOPES and name in _TOOL_DEFS)
         ]
 
-    def _app_tool_list_payload(identity: Identity) -> list[dict[str, Any]]:
+    async def _served_definition(name: str) -> Mapping[str, Any] | None:
+        """The definition `name` is served with right now, or None when its
+        toolset's `describe` says it is not served (see `ToolSpec`)."""
+
+        if name not in toolset_specs:
+            return _TOOL_DEFS[name]
+        spec = toolset_specs[name]
+        if spec.describe is None:
+            return spec.definition
+        return await spec.describe()
+
+    async def _app_tool_list_payload(identity: Identity) -> list[dict[str, Any]]:
         """The callable tools the caller's authorities can call, in tool order.
 
         A tool whose bucket authority the assertion lacks is not listed (it
         would only answer authority-required); a caller with none of them
-        gets an empty list, which is still a valid tools result.
+        gets an empty list, which is still a valid tools result.  A tool its
+        toolset does not serve right now is not listed either.
         """
 
-        return [
-            dict(toolset_specs[name].definition) if name in toolset_specs else _TOOL_DEFS[name]
-            for name in _app_callable_tools()
-            if _bucket_authority(_tool_bucket(name) or "") in identity.authorities
-        ]
+        listed: list[dict[str, Any]] = []
+        for name in _app_callable_tools():
+            if _bucket_authority(_tool_bucket(name) or "") not in identity.authorities:
+                continue
+            definition = await _served_definition(name)
+            if definition is not None:
+                listed.append(dict(definition))
+        return listed
 
     def _app_allowed_authorities() -> frozenset[str]:
         buckets = {_tool_bucket(name) for name in _app_callable_tools()}
@@ -514,6 +529,8 @@ def create_edge_app(
         if not isinstance(name, str) or name not in _app_callable_tools():
             raise _ToolFailure("unknown-tool", "no callable tool has that name")
         if name not in tools and name not in toolset_specs:
+            raise _ToolFailure("unknown-tool", "no callable tool has that name")
+        if name in toolset_specs and await _served_definition(name) is None:
             raise _ToolFailure("unknown-tool", "no callable tool has that name")
         arguments = params.get("arguments")
         if arguments is None:
@@ -690,7 +707,7 @@ def create_edge_app(
                     "supportedVersions": sorted(SUPPORTED_PROTOCOL_VERSIONS),
                     "capabilities": capabilities,
                     "serverInfo": server_info,
-                    "tools": _app_tool_list_payload(identity),
+                    "tools": await _app_tool_list_payload(identity),
                 },
                 ttl_ms=0,
                 cache_scope="private",
@@ -699,7 +716,7 @@ def create_edge_app(
 
         if method == "tools/list":
             result = _with_envelope(
-                {"tools": _app_tool_list_payload(identity)},
+                {"tools": await _app_tool_list_payload(identity)},
                 ttl_ms=0,
                 cache_scope="private",
             )

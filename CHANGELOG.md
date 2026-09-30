@@ -5,6 +5,15 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-mcp-edge: run continuation over the sprintctl record store
+  (agentops#2525). `SprintctlRecordStore` serves `read_predecessor_context`
+  and `register_run`'s `predecessor_run_id` when the runtime shell's catalog
+  advertises `work.run.predecessor-context-v1` (sprintctl 0.11.0, work schema
+  20), detected at request time; against sprintctl 0.10.x neither is listed,
+  as before. A toolset tool may now carry a `describe` hook that decides at
+  request time whether and how it is listed. Takes effect once vuoro-service
+  repins the work adapter to sprintctl 0.11.0.
+
 - vuoro-service 0.1.81: main's next release after the 0.1.80 hotfix tag. The
   work adapter is repinned from sprintctl 0.10.0 to 0.10.1, which carries the
   sprintctl#2110 served-runtime reconnect fix that 0.1.80 shipped on the

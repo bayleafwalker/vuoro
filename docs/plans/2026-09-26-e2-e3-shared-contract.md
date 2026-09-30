@@ -90,10 +90,11 @@
 - **Continuation transfers context, not authority.**
   - `resolve` is unchanged, so the predecessor's run never resolves to the successor. The successor cannot write notes or evidence to it, or propose an effect against it.
   - The successor's own run is bound to the successor's own binding. Every operation still needs the successor's own grant (`work:evidence`, `effect:propose`, …).
-- **Served only where the owner supports it.** A record store advertises `predecessor_run_id` and `read_predecessor_context` only when it sets `supports_continuation`.
+- **Served only where the owner supports it.** A record store advertises `predecessor_run_id` and `read_predecessor_context` when it sets `supports_continuation`, or, for a store whose owner may or may not offer it, when that owner advertises it at request time (the toolset's `describe` hook; `tools/list` omits the tool and `tools/call` answers `unknown-tool` otherwise).
   - `InMemoryRunRegistry` implements the rules and is the reference.
-  - `SprintctlRecordStore` does not set it. The pinned sprintctl (0.9.0, and 0.10.0 unchanged) cannot record a predecessor, and `work.run.resolve-v1`/`work.evidence.tail-v1` refuse every binding but the run's own. It also has no operation that lists a run's notes or evidence.
-  - Serving continuation needs a sprintctl release that records the link under these eligibility rules and reads a predecessor's notes and evidence through the successor's own run. vuoro-cloud also needs a `MCP_TOOL_SCOPES` row for `read_predecessor_context` (`vuoro:work.read`).
+  - `SprintctlRecordStore` detects it: continuation is served when the runtime shell's catalog advertises `work.run.predecessor-context-v1` (sprintctl 0.11.0, schema 20, agentops#2525), which ships with `predecessor_run_id` on `work.run.register-v1`. A catalog that was read is kept for the process; one that could not be read hides continuation and is asked again. Against sprintctl 0.10.x and earlier nothing changes: neither is advertised.
+  - sprintctl records the link under these eligibility rules (`run_predecessor`, schema 20) and reads a predecessor's notes and evidence only through the successor's own run. `predecessor_run_id` is sent only when set, so a register request without one keeps the digest sprintctl stored for it earlier.
+  - Enabling it on vuoro.cloud needs, in one generation, a tenant runtime built with sprintctl 0.11.0 and a `MCP_TOOL_SCOPES` row `read_predecessor_context` -> `vuoro:work.read`.
 - §6 (claims) is not changed by this amendment.
 
 **Implementations.**
