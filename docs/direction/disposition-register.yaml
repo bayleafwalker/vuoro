@@ -29,6 +29,10 @@ revision_history:
   than left unrun. Prose is compressed relative to v1; all verified facts and citations are retained.'
 - 'v3 amendment (2026-09-30, operator correction): the actionq row retires ActionQ as a host, not the authority-plane
   abstraction it carries; the abstraction is relocated per the split-horizon model. See items[actionq].goal_state.amended.'
+- 'v3 amendment (2026-09-30, open items resolved): the two items in items[actionq].goal_state.amended.open are moved,
+  verbatim, to open_resolved with answers derived from operator intent and the architecture records, not newly decided:
+  no sprintctl-internal interface (the interface is the Vuoro-held contract and the served operations); the conformance
+  suite lives in vuoro, bound to providers. Work filed as agentops #2593-#2595.'
 path_conventions:
   absolute_paths_only: Every `source` value is an absolute path or a command, with `~/` abbreviating `/projects/dev/`.
     A path that is relative to anything else is a defect - v1 carried one on its most consequential citation.
@@ -627,11 +631,64 @@ items:
         per #253 R4, with ActionQ''s fenced-claim tests as a cross-check only. The action-resource ownership projection becomes
         a derived query over the resource contract; dropping it is no longer an option. Archive the actionq repository only
         after the contract text and its conformance tests have a home outside it.'
-      open:
-      - 'Recommendation, not decided (asked of the operator 2026-09-30): give the coordination-horizon provider a narrow provider-neutral
-        claim/lease and effect-authority interface in sprintctl, so a second provider (the DEGRADED LOCAL island, a durable-workflow
-        challenger) can implement the same contract.'
-      - Where the conformance suite lives (sprintctl, vuoro or vuoro-service); asked of the operator 2026-09-30.
+      open: []
+      open_resolved:
+      - question: 'Recommendation, not decided (asked of the operator 2026-09-30): give the coordination-horizon provider a
+          narrow provider-neutral claim/lease and effect-authority interface in sprintctl, so a second provider (the DEGRADED
+          LOCAL island, a durable-workflow challenger) can implement the same contract.'
+        resolved: '2026-09-30'
+        how: 'Derived, not decided: intent first, then the architecture records (operator rule 2026-09-30: intent -> architecture
+          docs and ADRs -> implementation).'
+        answer: 'No sprintctl-internal provider-neutral interface. The provider-neutral interface is the contract Vuoro holds
+          (contract text plus the driver protocol of its conformance suite, see the next entry) and the served operations
+          a provider exposes (work.lease.*, work.effect.*, the shared ledger); sprintctl conforms at that edge. pg.py is
+          not refactored for this. The one normative typed shape R4 requires inside the provider, the ledger''s begin(...)
+          -> LedgerEntry (R4 semantics 6), already exists as a thin wrapper (agentops #2542, sprintctl 7851601), and is
+          the pattern if a later normative contract needs another. Sequencing against sprintctl #114 and agentops #2540
+          is therefore moot: no unit of this work edits pg.py or work_application.py.'
+        derived_from:
+        - 'Intent: "I explicitly needed that abstraction" / "enable *somewhere*. Not explicitly or necessarily actionq"
+          - the abstraction must exist provider-neutrally and be enabled in a provider; neither says where the interface
+          sits in code.'
+        - /projects/dev/vuoro/docs/plans/2026-08-22-long-term-direction.md:297 (Vuoro owns acceptance and authority semantics
+          "as contract definitions bound to providers"), :278-284 (normalize edges, not interiors), :513-518 (a challenger
+          qualifies against a provider-neutral black-box suite and "should not have to impersonate the incumbent"), :684
+          (do not begin with a general provider ecosystem)
+        - /projects/dev/vuoro/docs/plans/2026-09-26-e2-e3-shared-contract.md:136 and :146 (the lease behaviour spec is
+          vuoro_service/lease.py; providers are validated by its contract tests parametrized over implementations)
+        - /projects/dev/agentops/docs/plans/2026-09-27-backlog-ideation.md:249 (R4 semantics 6, the only normative in-provider
+          typed shape)
+        - 'The DEGRADED LOCAL island is the same sprintctl on vuoro-shared under an outage epoch (/projects/dev/agentops/docs/architecture/2026-09-27-agentic-ecosystem-and-split-horizon.md
+          section 3.3), so it is not a second implementation; a durable-workflow challenger qualifies through the suite.'
+      - question: Where the conformance suite lives (sprintctl, vuoro or vuoro-service); asked of the operator 2026-09-30.
+        resolved: '2026-09-30'
+        how: Derived, not decided (as above).
+        answer: 'In the vuoro repository, bound to providers through their served operations. The provider-neutral outcome
+          and invariant suite lives with the reference specs the shared contract already names: the lease suite beside
+          vuoro_service/lease.py in packages/vuoro-service, the ledger suite in packages/vuoro-mcp-edge/tests/test_ledger_behaviour.py;
+          the effect-authority and freeze-derived scenarios follow the same pattern. Each provider joins by a binding; sprintctl''s
+          binding drives its served operations on PostgreSQL in vuoro CI''s settlement-scenario job. sprintctl keeps its
+          own PostgreSQL tests as the incumbent-specific migration/compatibility layer (long-term direction 7.1, layer 2),
+          not as the contract. Options (b) and (c) of the question coincide: vuoro-service is a package in this repository.'
+        derived_from:
+        - 'Intent: the abstraction is enabled "somewhere", not tied to one host - so its tests cannot live only inside
+          one provider.'
+        - /projects/dev/_artifacts/agentops/session-notes/2026-09-14-owner-decisions.md:8 (D1, Vuoro owns the semantics
+          inside sprintctl's served authority)
+        - /projects/dev/vuoro/docs/plans/2026-08-22-long-term-direction.md:297, :513-518, :556 (ActionQ's durable contribution
+          "may become the invariant suite")
+        - /projects/dev/vuoro/docs/plans/2026-09-19-agentic-pipeline-first-principles-rebuild.md:119 (a property enforced
+          only inside the provider cannot be enforced when that provider is replaced)
+        - /projects/dev/vuoro/docs/plans/2026-09-26-e2-e3-shared-contract.md:116, :125, :136, :146
+        - /projects/dev/agentops/docs/architecture/2026-09-27-agentic-ecosystem-and-split-horizon.md:237 (which service
+          carries each responsibility is a component choice)
+        work: 'agentops #2593 (lease suite, unit 1; starts when agentops #2570 is done), #2594 (ledger begin shape on the
+          vuoro reference, sprintctl ledger binding, effect-authority suite; after #2567 and #2593), #2595 (freeze harvest;
+          after #2594). The actionq archive precondition in step above is met when #2595 is done.'
+        doc_corrections: 'Intent-driven corrections made alongside this entry: /projects/dev/vuoro/docs/plans/2026-09-26-e2-e3-shared-contract.md
+          section 5 (the sprintctl ledger joins the shared suite; the protocol shape is R4 semantics 6''s begin) and
+          /projects/dev/vuoro/docs/plans/2026-08-22-long-term-direction.md section 7.3 ActionQ (ActionQ is no longer the run
+          authority; its contract and invariant suite are relocated).'
 - key: actionq-cas
   name: ActionQ CAS object store
   repos:
