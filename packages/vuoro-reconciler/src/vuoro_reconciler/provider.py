@@ -51,6 +51,10 @@ class PullRequestResult:
     head_sha: str | None = None
     #: "open" | "merged" | "closed" (closed without merging).
     state: str = "open"
+    #: A full ref, fetchable from `clone_url`, that still reaches `head_sha`
+    #: after the branch is gone (GitHub `refs/pull/<n>/head`); used to verify
+    #: a squash- or rebase-merged PR whose branch was deleted.
+    head_ref: str | None = None
 
 
 class ProviderClient(Protocol):

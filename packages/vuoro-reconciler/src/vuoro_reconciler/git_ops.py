@@ -163,10 +163,11 @@ def remote_branch_tip(repo_path: str, branch: str) -> str | None:
     return tip.stdout.strip() if tip.returncode == 0 else None
 
 
-def ensure_commit(repo_path: str, branch: str, sha: str) -> bool:
-    """Make `sha` (the forge's current tip of `branch`) available in the
-    clone, fetching `branch` from origin if it was pushed after the clone.
-    True if the commit is present afterwards."""
+def ensure_commit(repo_path: str, sha: str, *, ref: str) -> bool:
+    """Make `sha` available in the clone, fetching the full ref `ref` (e.g.
+    `refs/heads/<branch>`, or a forge's `refs/pull/<n>/head` for a PR head
+    no branch reaches any more) from origin if the clone lacks it. True if
+    the commit is present afterwards."""
 
     if not OBJECT_ID.fullmatch(sha or ""):
         return False
@@ -176,9 +177,11 @@ def ensure_commit(repo_path: str, branch: str, sha: str) -> bool:
 
     if present():
         return True
+    if not ref.startswith("refs/") or _run("check-ref-format", ref).returncode != 0:
+        return False
     _run(
         "-C", repo_path, "fetch", "--no-tags", "--quiet", "origin", "--",
-        f"+refs/heads/{branch}:refs/remotes/origin/{branch}",
+        f"+{ref}:refs/vuoro-recovery/head",
     )
     return present()
 

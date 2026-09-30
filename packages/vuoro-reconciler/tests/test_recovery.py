@@ -13,14 +13,19 @@ from __future__ import annotations
 import asyncio
 import json
 import shutil
+import logging
+import os
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
 from fakes import FakeIntentSource, FakeProviderClient
+from vuoro_reconciler import gitenv
 from vuoro_reconciler.git_ops import checkout_at, commit_signed, trailer
 from vuoro_reconciler.intents import Acceptor, EffectIntent, OperatorAcceptor
 from vuoro_reconciler.provider import PullRequest
+from vuoro_reconciler.signing import SigningKey, verify_commit
 from vuoro_reconciler.reconciler import Reconciler, ReconcilerConfig
 
 from conftest import base_commit_of
@@ -61,12 +66,35 @@ def _intent(
     )
 
 
-def _reconciler(source, provider, key, repositories=("repo-a",)) -> Reconciler:
+#: The git clock for this module's tests. Every new `Reconciler` (a start
+#: or a restart) moves it 10s on, so a restarted run's freshly signed commit
+#: never shares the first run's timestamp (and sha): recovery must compare
+#: the change, not luck into an identical object.
+_CLOCK: dict[str, int] = {}
+
+
+@pytest.fixture(autouse=True)
+def _git_clock(monkeypatch: pytest.MonkeyPatch):
+    _CLOCK["now"] = int(time.time())
+    original = gitenv.scrubbed_env
+
+    def with_clock(home, extra_env=None):
+        env = original(home, extra_env)
+        env["GIT_COMMITTER_DATE"] = env["GIT_AUTHOR_DATE"] = f"@{_CLOCK['now']} +0000"
+        return env
+
+    monkeypatch.setattr(gitenv, "scrubbed_env", with_clock)
+    yield
+    _CLOCK.clear()
+
+
+def _reconciler(source, provider, key, repositories=("repo-a",), **config) -> Reconciler:
+    _CLOCK["now"] = _CLOCK.get("now", int(time.time())) + 10
     return Reconciler(
         intent_source=source,
         provider=provider,
         signing_key=key,
-        config=ReconcilerConfig(repository_allowlist=frozenset(repositories)),
+        config=ReconcilerConfig(repository_allowlist=frozenset(repositories), **config),
     )
 
 
@@ -381,3 +409,133 @@ def test_a_transient_lookup_failure_leaves_the_intent_for_the_next_poll(
     provider.fail_lookups = False
     outcomes = asyncio.run(_reconciler(source, provider, reconciler_signing_key).run_once())
     _assert_recovered(source, provider, outcomes)
+
+
+def _merge_by_squash(bare_remote: Path, tmp_path: Path) -> str:
+    """Squash-merge the PR: a new, unsigned commit of the same change on
+    main, then delete the branch. The PR head is on no branch any more."""
+
+    dest = tmp_path / "squash"
+    checkout_at(str(bare_remote), base_commit_of(bare_remote), str(dest))
+    (dest / "docs" / "readme.md").write_text("new\n")
+    git = ["git", "-C", str(dest), "-c", "user.name=forge", "-c", "user.email=forge@example.test"]
+    subprocess.run([*git, "-c", "commit.gpgsign=false", "commit", "-qam", "Fix the typo (#1)"], check=True)
+    subprocess.run(
+        ["git", "-C", str(dest), "push", "-q", str(bare_remote), "HEAD:refs/heads/main"], check=True
+    )
+    subprocess.run(
+        ["git", "--git-dir", str(bare_remote), "update-ref", "-d", f"refs/heads/{BRANCH}"], check=True
+    )
+    return base_commit_of(bare_remote)
+
+
+def test_a_squash_merged_pr_whose_branch_was_deleted_is_applied(
+    bare_remote: Path, tmp_path: Path, reconciler_signing_key
+) -> None:
+    source, provider = _crash_after_pr(bare_remote, reconciler_signing_key)
+    head = provider.pr_heads[1]
+    squash = _merge_by_squash(bare_remote, tmp_path)
+    assert squash != head
+    provider.pr_states[1] = "merged"
+
+    outcomes = asyncio.run(_reconciler(source, provider, reconciler_signing_key).run_once())
+
+    # The recorded commit is the reconciler's signed PR head, fetched from
+    # the PR head ref; nothing is pushed again and no second PR opens.
+    assert [(o.state, o.commit_sha) for o in outcomes] == [("applied", head)], outcomes
+    assert provider.pushed_branches == [("repo-a", BRANCH)]
+    assert len(provider.pull_requests) == 1 and len(source.applied) == 1
+
+
+def test_a_closed_pr_whose_branch_was_deleted_is_closed_not_mismatched(
+    bare_remote: Path, reconciler_signing_key
+) -> None:
+    source, provider = _crash_after_pr(bare_remote, reconciler_signing_key)
+    subprocess.run(
+        ["git", "--git-dir", str(bare_remote), "update-ref", "-d", f"refs/heads/{BRANCH}"], check=True
+    )
+    provider.pr_states[1] = "closed"
+
+    outcomes = asyncio.run(_reconciler(source, provider, reconciler_signing_key).run_once())
+
+    assert [(o.state, o.reason) for o in outcomes] == [("failed", "pull-request-closed")]
+    assert len(provider.pull_requests) == 1 and provider.pushed_branches == [("repo-a", BRANCH)]
+
+
+def test_repeated_lookup_failures_are_logged_then_capped(
+    bare_remote: Path, reconciler_signing_key, caplog: pytest.LogCaptureFixture
+) -> None:
+    source = FakeIntentSource(accepted=[_intent(bare_remote)])
+    provider = FakeProviderClient(repositories={"repo-a": bare_remote}, fail_lookups=True)
+    reconciler = _reconciler(source, provider, reconciler_signing_key, max_lookup_deferrals=2)
+
+    with caplog.at_level(logging.WARNING, logger="vuoro_reconciler.reconciler"):
+        first = asyncio.run(reconciler.run_once())
+        second = asyncio.run(reconciler.run_once())
+
+    assert [(o.state, o.reason) for o in first] == [("deferred", "provider-lookup-failed")]
+    assert [(o.state, o.reason) for o in second] == [("failed", "provider-lookup-failed")]
+    assert source.failed == [{"intent_id": "effect_rec0001", "reason": "provider-lookup-failed"}]
+    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 2
+    assert all("effect_rec0001" in w and "RuntimeError" in w for w in warnings)
+    assert not any("token" in w for w in warnings)
+
+
+def test_verify_commit_is_tied_to_the_configured_key(tmp_path: Path, reconciler_signing_key) -> None:
+    """Another key in the same keyring makes `git verify-commit` succeed,
+    but it is not the reconciler's key."""
+
+    env = {**os.environ, **reconciler_signing_key.env}
+    subprocess.run(
+        [
+            "gpg",
+            "--batch",
+            "--pinentry-mode",
+            "loopback",
+            "--passphrase",
+            "",
+            "--quick-gen-key",
+            "Other <other@vuoro.test>",
+            "ed25519",
+            "sign",
+            "never",
+        ],
+        env=env,
+        check=True,
+        capture_output=True,
+    )
+    listing = subprocess.run(
+        ["gpg", "--list-secret-keys", "--with-colons", "other@vuoro.test"],
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    other_id = next(line.split(":")[4] for line in listing.splitlines() if line.startswith("sec:"))
+    other = SigningKey(
+        key_format="openpgp",
+        signing_key=other_id,
+        committer_name="Other",
+        committer_email="other@vuoro.test",
+        env=reconciler_signing_key.env,
+    )
+    repo = tmp_path / "repo"
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    (repo / "f").write_text("x\n")
+    for key, name in ((reconciler_signing_key, "ours"), (other, "theirs")):
+        (repo / "f").write_text(f"{name}\n")
+        commit_signed(
+            str(repo),
+            title=name,
+            rationale="r",
+            run_id="run_x",
+            intent_id="effect_x",
+            acceptor=OPERATOR,
+            key=key,
+        )
+        subprocess.run(["git", "-C", str(repo), "tag", name], check=True)
+
+    assert verify_commit(str(repo), "ours", reconciler_signing_key) is True
+    assert verify_commit(str(repo), "theirs", other) is True
+    assert verify_commit(str(repo), "theirs", reconciler_signing_key) is False

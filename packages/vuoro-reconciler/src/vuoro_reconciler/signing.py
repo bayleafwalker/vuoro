@@ -78,10 +78,30 @@ def configure_signing(repo_path: str, key: SigningKey) -> None:
 
 
 def verify_commit(repo_path: str, ref: str, key: SigningKey) -> bool:
-    """True if `ref`'s signature verifies against `key`."""
+    """True if `ref`'s signature verifies and was made by `key` itself.
 
-    result = _git(repo_path, "verify-commit", "--end-of-options", ref, key=key, check=False)
-    return result.returncode == 0
+    `git verify-commit` alone accepts any key the keyring (or allowed
+    signers file) knows; this also ties the signer to `key`: for OpenPGP
+    the signing key's fingerprint, its primary key's fingerprint or its
+    key id must match `key.signing_key` (a fingerprint or long key id);
+    for SSH the signer principal must be `key.committer_email` (the
+    principal the allowed signers file names the reconciler key under)."""
+
+    if _git(repo_path, "verify-commit", "--end-of-options", ref, key=key, check=False).returncode != 0:
+        return False
+    shown = _git(
+        repo_path, "log", "-1", "--format=%G?%n%GF%n%GP%n%GK%n%GS", ref, "--", key=key, check=False
+    )
+    if shown.returncode != 0:
+        return False
+    status, fingerprint, primary, key_id, signer = (shown.stdout.split("\n") + [""] * 5)[:5]
+    if status not in ("G", "U"):
+        return False
+    if key.key_format == "ssh":
+        return signer == key.committer_email
+    wanted = key.signing_key.strip().upper().removeprefix("0X").rstrip("!")
+    candidates = {value.strip().upper() for value in (fingerprint, primary, key_id) if value.strip()}
+    return bool(wanted) and any(c == wanted or (len(wanted) >= 16 and c.endswith(wanted)) for c in candidates)
 
 
 def _git(

@@ -116,15 +116,24 @@ for an escaped ESC.
    tree, parents, message and trailers; a PR must target the default
    branch with that commit as head. So a restart after the push, after the
    PR, or before `applied` was recorded yields one branch, one PR and one
-   `applied`; a PR merged meanwhile (even with its branch deleted) is
-   `applied`, one closed unmerged is `failed: pull-request-closed`, and
+   `applied`; a PR merged meanwhile is `applied` (after a squash or rebase
+   merge with the branch deleted, the PR head is fetched from the forge's
+   PR head ref and verified; with the branch kept, the recorded commit is
+   the branch commit, not the squash commit), one closed unmerged is
+   `failed: pull-request-closed`, and
    anything else found is `branch-exists-with-different-change` or
    `pull-request-mismatch`. The push is atomic create-only: a consumer
    that loses the branch or PR race records nothing and returns
    `duplicate`. A revoked forge credential fails the intent with
    `provider-credential-rejected` (default branch untouched, other intents
    continue); any other lookup failure returns `deferred`
-   (`provider-lookup-failed`) without recording, so the next poll retries.
+   (`provider-lookup-failed`) without recording, with a warning naming the
+   intent and exception type, so the next poll retries; after
+   `max_lookup_deferrals` (default 5) consecutive deferrals in one process
+   it is recorded `failed: provider-lookup-failed`. The count resets on
+   restart, so callers should alert on repeated `deferred` outcomes.
+   Signatures are tied to the configured key: the OpenPGP signer
+   fingerprint/key id, or the SSH signer principal (`committer_email`).
    `report_applied` must be idempotent for the same sha and PR URL.
 6. Reports the outcome (`applied` with its acceptor, or `failed`) back
    through `IntentSource`. One intent's failure (checkout, apply, policy,

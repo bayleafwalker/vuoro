@@ -98,6 +98,11 @@ class ReconcilerConfig:
     protected_branches: frozenset[str] = frozenset({"main", "master"})
     branch_prefix: str = "vuoro-effect"
     diff_policies: Mapping[str, DiffPolicy] = field(default_factory=dict)
+    #: Consecutive `provider-lookup-failed` deferrals of one intent (counted
+    #: per `Reconciler` instance, so a restart resets it) after which the
+    #: intent is recorded `failed: provider-lookup-failed`. Callers should
+    #: still alert on repeated `deferred` outcomes across restarts.
+    max_lookup_deferrals: int = 5
 
     def branch_for(self, intent: EffectIntent) -> str:
         return f"{self.branch_prefix}/{intent.intent_id}"
@@ -131,10 +136,12 @@ class _Refused(Exception):
 class _Unrecorded(Exception):
     """End this intent's attempt without writing to `IntentSource`."""
 
-    def __init__(self, state: str, reason: str) -> None:
+    def __init__(self, state: str, reason: str, cause: str = "-") -> None:
         super().__init__(reason)
         self.state = state
         self.reason = reason
+        #: The underlying exception's type name only (never its message).
+        self.cause = cause
 
 
 @dataclass(frozen=True)
@@ -147,6 +154,7 @@ class Reconciler:
     #: only ever acts on intents an operator already accepted.
     auto_accept: AutoAcceptConfig | None = None
     _workdir_root: str | None = field(default=None, repr=False)
+    _deferrals: dict[str, int] = field(default_factory=dict, repr=False, compare=False)
 
     async def run_once(self) -> list[Outcome]:
         """Apply auto-accept (if configured) to proposed intents, then poll
@@ -166,12 +174,12 @@ class Reconciler:
             except _Refused as refused:
                 outcomes.append(await self._fail(intent, refused.reason))
             except _Unrecorded as unrecorded:
-                outcomes.append(
-                    Outcome(intent.intent_id, unrecorded.state, reason=unrecorded.reason, acceptor=intent.acceptor)
-                )
+                outcomes.append(await self._unrecorded(intent, unrecorded))
             except Exception as error:
                 # One intent's unexpected failure never stops the others.
                 outcomes.append(await self._fail(intent, f"internal-error: {type(error).__name__}"))
+            if outcomes[-1].state != "deferred":
+                self._deferrals.pop(intent.intent_id, None)
         return outcomes
 
     async def _process(self, intent: EffectIntent) -> Outcome:
@@ -240,21 +248,28 @@ class Reconciler:
         existing = await self._lookup(self.provider.find_branch(repository, branch))
         pr = await self._lookup(self.provider.find_pull_request(repository, branch))
 
+        if pr is not None and pr.state == "closed":
+            # Rejected by a human: never re-open, whatever the branch holds.
+            raise _Refused("pull-request-closed")
         if existing is not None:
             # An earlier run pushed this branch (crash after push, lost report).
-            self._require_own_commit(workdir, branch, existing, commit_sha)
+            # If a PR from it was squash- or rebase-merged while the branch
+            # was kept, this branch commit (not the squash commit) is what is
+            # recorded as applied.
+            self._require_own_commit(workdir, f"refs/heads/{branch}", existing, commit_sha)
             commit_sha = existing
         elif pr is not None and pr.state == "merged" and pr.head_sha:
-            # Merged, then the branch was deleted: the head is on the default branch.
-            self._require_own_commit(workdir, default_branch, pr.head_sha, commit_sha)
+            # Merged, then the branch was deleted. After a squash or rebase
+            # merge the head is not on the default branch; the PR head ref
+            # still reaches it.
+            head_ref = pr.head_ref or f"refs/heads/{default_branch}"
+            self._require_own_commit(workdir, head_ref, pr.head_sha, commit_sha)
             commit_sha = pr.head_sha
 
         if pr is not None:
-            if pr.base_branch != default_branch or pr.head_sha != commit_sha:
-                raise _Refused("pull-request-mismatch")
-            if pr.state == "closed":
-                raise _Refused("pull-request-closed")
             if pr.state not in ("open", "merged"):
+                raise _Refused("pull-request-mismatch")
+            if pr.base_branch != default_branch or pr.head_sha != commit_sha:
                 raise _Refused("pull-request-mismatch")
             return commit_sha, pr
 
@@ -298,8 +313,8 @@ class Reconciler:
             return await call
         except ProviderCredentialRejected:
             raise
-        except Exception:
-            raise _Unrecorded("deferred", "provider-lookup-failed") from None
+        except Exception as error:
+            raise _Unrecorded("deferred", "provider-lookup-failed", type(error).__name__) from None
 
     def _require_own_commit(self, workdir: str, ref: str, sha: str, candidate: str) -> None:
         """`sha` must be the reconciler's own signed commit of this very
@@ -307,7 +322,7 @@ class Reconciler:
         trailers) is never adopted as this intent's result."""
 
         if not (
-            ensure_commit(workdir, ref, sha)
+            ensure_commit(workdir, sha, ref=ref)
             and verify_commit(workdir, sha, self.signing_key)
             and same_change(workdir, sha, candidate)
         ):
@@ -366,6 +381,23 @@ class Reconciler:
             )
         except Exception as error:
             raise _Refused(f"commit-failed: {error}") from None
+
+    async def _unrecorded(self, intent: EffectIntent, unrecorded: _Unrecorded) -> Outcome:
+        if unrecorded.state == "deferred":
+            count = self._deferrals.get(intent.intent_id, 0) + 1
+            self._deferrals[intent.intent_id] = count
+            _log.warning(
+                "deferring intent %s (%s, %s, attempt %d/%d)",
+                intent.intent_id,
+                unrecorded.reason,
+                unrecorded.cause,
+                count,
+                self.config.max_lookup_deferrals,
+            )
+            if count >= self.config.max_lookup_deferrals:
+                self._deferrals.pop(intent.intent_id, None)
+                return await self._fail(intent, unrecorded.reason)
+        return Outcome(intent.intent_id, unrecorded.state, reason=unrecorded.reason, acceptor=intent.acceptor)
 
     async def _fail(self, intent: EffectIntent, reason: str) -> Outcome:
         try:

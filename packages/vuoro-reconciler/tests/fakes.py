@@ -178,7 +178,15 @@ class FakeProviderClient:
         found = await self.find_pull_request(request.repository, request.branch)
         if found is not None and found.state == "open":
             raise PullRequestAlreadyExists(request.branch)
-        number = self.add_pull_request(request, head_sha=self.branch_tip(request.repository, request.branch))
+        head = self.branch_tip(request.repository, request.branch)
+        number = self.add_pull_request(request, head_sha=head)
+        if head is not None:
+            # Like GitHub: the PR head stays fetchable after the branch is gone.
+            subprocess.run(
+                ["git", "--git-dir", str(self.repositories[request.repository]), "update-ref",
+                 f"refs/pull/{number}/head", head],
+                check=True,
+            )
         result = self._result(request.repository, number)
         await self._hook("after_open_pull_request", request.repository, request.branch)
         return result
@@ -190,4 +198,5 @@ class FakeProviderClient:
             base_branch=self.pull_requests[number - 1].base_branch,
             head_sha=self.pr_heads.get(number),
             state=self.pr_states.get(number, "open"),
+            head_ref=f"refs/pull/{number}/head",
         )
