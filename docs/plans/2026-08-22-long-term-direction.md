@@ -555,6 +555,8 @@ A replacement should either:
 
 ActionQ remains the current durable run authority until a challenger qualifies. Its durable long-term contribution may become the invariant suite, migration evidence, and adapter rather than the execution implementation itself.
 
+`[amended 2026-09-30, intent-driven correction]` ActionQ is no longer the run authority: it retires as a host, not as an abstraction (disposition register `actionq.goal_state.amended`). The authority-plane contract it carried is provider-neutral; its invariant suite lives in vuoro and is bound to the coordination-horizon provider (sprintctl) through its served operations, with protected-horizon acceptance held on the trusted side (agentops#2593-#2595).
+
 #### Sprintctl
 
 Sprintctl remains the reference local work authority. External task systems may replace it only with explicit authority fencing and reconciliation. Transparent dual-writer synchronization remains disallowed.

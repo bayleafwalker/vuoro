@@ -127,6 +127,10 @@
   - `heartbeat` has no `idempotency_key` (sprintctl's input schema forbids one). Refreshing a lease has no effect a retry could double, and the owner refuses a heartbeat on a dead lease whatever a key would say.
   - `claim_work` uses the ledger for conflicts only. A same-key, same-digest request is **re-evaluated by the owner, not replayed** (§6 decision 5): that is how a restarted worker resumes. The edge keeps no ledger for it and never answers it from a stored result.
 
+**Amendment (2026-09-30, intent-driven correction; disposition register `actionq.goal_state.amended.open_resolved`).**
+- The protocol shape is R4 lease semantics 6's `begin(workspace_id, principal_id, tool, key, request_digest) -> LedgerEntry` (agentops `docs/plans/2026-09-27-backlog-ideation.md`:249, normative). sprintctl already exposes it (`LedgerEntry`, `PgIdempotencyLedger`, agentops#2542); the edge's `lookup`/`store` above become adapters over it (agentops#2594).
+- The sprintctl ledger is not outside this protocol. The operator needs the authority-plane abstraction enabled in a provider, not only inside one host, so the durable ledger joins this behaviour test as a binding that drives sprintctl's served operations on PostgreSQL (agentops#2594). sprintctl's own PostgreSQL tests remain its incumbent-specific proof (long-term direction §7.1, layer 2), not the contract. This supersedes "proved against PostgreSQL on the sprintctl side" in the bullet above as the conformance statement.
+
 ## 6. Claims (E2)
 
 **Lease semantics.** `vuoro_service/lease.py` (the E0 `LeaseStore`) is the behaviour spec:
