@@ -8,7 +8,14 @@ from __future__ import annotations
 from .acceptance import AcceptanceRefused, AutoAcceptConfig, OperatorAcceptance
 from .diff_policy import DiffPolicy
 from .intents import Acceptor, EffectIntent, IntentSource, OperatorAcceptor, PolicyAcceptor
-from .provider import ProviderClient, PullRequest, PullRequestResult
+from .provider import (
+    BranchAlreadyExists,
+    ProviderClient,
+    ProviderCredentialRejected,
+    PullRequest,
+    PullRequestAlreadyExists,
+    PullRequestResult,
+)
 from .reconciler import (
     DiffDoesNotApply,
     Outcome,
@@ -22,6 +29,7 @@ __all__ = [
     "AcceptanceRefused",
     "Acceptor",
     "AutoAcceptConfig",
+    "BranchAlreadyExists",
     "DiffDoesNotApply",
     "DiffPolicy",
     "EffectIntent",
@@ -31,7 +39,9 @@ __all__ = [
     "Outcome",
     "PolicyAcceptor",
     "ProviderClient",
+    "ProviderCredentialRejected",
     "PullRequest",
+    "PullRequestAlreadyExists",
     "PullRequestResult",
     "Reconciler",
     "ReconcilerConfig",

@@ -110,6 +110,17 @@ for an escaped ESC.
    protocol, restricted to a repository allowlist. It never merges and
    never pushes a protected or default branch. A re-run that finds
    `vuoro-effect/<intent_id>` already carrying the same change is success.
+   Crash recovery (M2-3): the forge's branch and open PR are the recovery
+   key. Before pushing, the reconciler looks the branch up
+   (`find_branch`) and, before opening a PR, looks for an open one from it
+   (`find_open_pull_request`), so a restart after the push, after the PR,
+   or before `applied` was recorded yields one branch, one PR and one
+   `applied`. The push is create-only: of two concurrent consumers, the
+   one whose push loses (`BranchAlreadyExists`) records nothing and returns
+   a `duplicate` outcome. A revoked forge credential
+   (`ProviderCredentialRejected`, from any provider call) fails the intent
+   with `provider-credential-rejected`; the default branch is untouched,
+   and other intents continue.
 6. Reports the outcome (`applied` with its acceptor, or `failed`) back
    through `IntentSource`. One intent's failure (checkout, apply, policy,
    commit, push, PR) is recorded and the others continue.

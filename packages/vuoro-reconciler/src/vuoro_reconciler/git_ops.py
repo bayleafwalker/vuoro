@@ -24,6 +24,7 @@ __all__ = [
     "DiffDoesNotApply",
     "checkout_at",
     "commit_signed",
+    "ensure_commit",
     "push_branch",
     "refuse_if_protected",
     "remote_branch_tip",
@@ -160,6 +161,26 @@ def remote_branch_tip(repo_path: str, branch: str) -> str | None:
         f"refs/remotes/origin/{branch}^{{commit}}",
     )
     return tip.stdout.strip() if tip.returncode == 0 else None
+
+
+def ensure_commit(repo_path: str, branch: str, sha: str) -> bool:
+    """Make `sha` (the forge's current tip of `branch`) available in the
+    clone, fetching `branch` from origin if it was pushed after the clone.
+    True if the commit is present afterwards."""
+
+    if not OBJECT_ID.fullmatch(sha or ""):
+        return False
+
+    def present() -> bool:
+        return _run("-C", repo_path, "cat-file", "-e", "--end-of-options", f"{sha}^{{commit}}").returncode == 0
+
+    if present():
+        return True
+    _run(
+        "-C", repo_path, "fetch", "--no-tags", "--quiet", "origin", "--",
+        f"+refs/heads/{branch}:refs/remotes/origin/{branch}",
+    )
+    return present()
 
 
 def same_change(repo_path: str, existing: str, candidate: str) -> bool:

@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+import subprocess
 from typing import Any
 
 from vuoro_reconciler.git_ops import push_branch
 from vuoro_reconciler.intents import Acceptor, EffectIntent
-from vuoro_reconciler.provider import PullRequest, PullRequestResult
+from vuoro_reconciler.provider import (
+    BranchAlreadyExists,
+    ProviderCredentialRejected,
+    PullRequest,
+    PullRequestAlreadyExists,
+    PullRequestResult,
+)
 
 
 @dataclass
@@ -73,7 +81,15 @@ class FakeIntentSource:
 @dataclass
 class FakeProviderClient:
     """Backed by real local bare git repositories: `repositories` maps a
-    repository id to the path of its bare remote."""
+    repository id to the path of its bare remote.
+
+    Behaves like a real forge where it matters for recovery: a push only
+    creates a branch (`BranchAlreadyExists` otherwise), and a second PR from
+    the same branch is refused (`PullRequestAlreadyExists`, like GitHub's
+    422). `hooks` run at named points ("before_push", "after_push",
+    "after_open_pull_request") so a test can interleave two consumers or
+    kill the process mid-step; `revoked` repositories refuse every forge
+    call with `ProviderCredentialRejected`."""
 
     repositories: dict[str, Path]
     protected_branches: frozenset[str] = frozenset({"main"})
@@ -82,6 +98,8 @@ class FakeProviderClient:
     clones: list[str] = field(default_factory=list)
     fail_push_for: frozenset[str] = frozenset()
     default: str = "main"
+    hooks: dict[str, Callable[[str, str], Awaitable[None]]] = field(default_factory=dict)
+    revoked: set[str] = field(default_factory=set)
 
     def clone_url(self, repository: str) -> str:
         self.clones.append(repository)
@@ -90,9 +108,43 @@ class FakeProviderClient:
     def default_branch(self, repository: str) -> str:
         return self.default
 
+    def _authorize(self, repository: str) -> None:
+        if repository in self.revoked:
+            raise ProviderCredentialRejected("401 Bad credentials: https://token@forge.example/")
+
+    async def _hook(self, point: str, repository: str, branch: str) -> None:
+        hook = self.hooks.get(point)
+        if hook is not None:
+            await hook(repository, branch)
+
+    def branch_tip(self, repository: str, branch: str) -> str | None:
+        result = subprocess.run(
+            ["git", "--git-dir", str(self.repositories[repository]), "rev-parse", "--verify",
+             "--quiet", f"refs/heads/{branch}^{{commit}}"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return result.stdout.strip() if result.returncode == 0 else None
+
+    async def find_branch(self, repository: str, branch: str) -> str | None:
+        self._authorize(repository)
+        return self.branch_tip(repository, branch)
+
+    async def find_open_pull_request(self, repository: str, branch: str) -> PullRequestResult | None:
+        self._authorize(repository)
+        for number, existing in enumerate(self.pull_requests, start=1):
+            if (existing.repository, existing.branch) == (repository, branch):
+                return self._result(repository, number)
+        return None
+
     async def push_branch(self, repository: str, branch: str, *, local_path: str) -> None:
+        await self._hook("before_push", repository, branch)
+        self._authorize(repository)
         if branch in self.fail_push_for:
             raise RuntimeError("simulated push failure: https://token@forge.example/")
+        if self.branch_tip(repository, branch) is not None:
+            raise BranchAlreadyExists(branch)
         push_branch(
             local_path,
             remote_url=str(self.repositories[repository]),
@@ -100,13 +152,16 @@ class FakeProviderClient:
             protected_branches=self.protected_branches,
         )
         self.pushed_branches.append((repository, branch))
+        await self._hook("after_push", repository, branch)
 
     async def open_pull_request(self, request: PullRequest) -> PullRequestResult:
-        for number, existing in enumerate(self.pull_requests, start=1):
-            if (existing.repository, existing.branch) == (request.repository, request.branch):
-                return self._result(request.repository, number)
+        self._authorize(request.repository)
+        if await self.find_open_pull_request(request.repository, request.branch) is not None:
+            raise PullRequestAlreadyExists(request.branch)
         self.pull_requests.append(request)
-        return self._result(request.repository, len(self.pull_requests))
+        result = self._result(request.repository, len(self.pull_requests))
+        await self._hook("after_open_pull_request", request.repository, request.branch)
+        return result
 
     def _result(self, repository: str, number: int) -> PullRequestResult:
         return PullRequestResult(url=f"file://{self.repositories[repository]}/pulls/{number}", number=number)

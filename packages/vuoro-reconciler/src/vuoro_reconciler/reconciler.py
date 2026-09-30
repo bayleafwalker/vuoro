@@ -38,14 +38,21 @@ from .git_ops import (
     DiffDoesNotApply,
     checkout_at,
     commit_signed,
+    ensure_commit,
     refuse_if_protected,
-    remote_branch_tip,
     same_change,
     stage_all,
     try_apply_diff,
 )
 from .intents import Acceptor, EffectIntent, IntentSource, OperatorAcceptor, PolicyAcceptor
-from .provider import ProviderClient, PullRequest
+from .provider import (
+    BranchAlreadyExists,
+    ProviderClient,
+    ProviderCredentialRejected,
+    PullRequest,
+    PullRequestAlreadyExists,
+    PullRequestResult,
+)
 from .signing import SigningKey
 
 __all__ = [
@@ -102,7 +109,10 @@ class ReconcilerConfig:
 @dataclass(frozen=True)
 class Outcome:
     intent_id: str
-    state: str  # "applied" | "failed"
+    #: "applied" | "failed" | "duplicate". "duplicate" means another
+    #: consumer created the intent's branch first; nothing was recorded, and
+    #: that consumer (or, if it dies, the next run) finishes the intent.
+    state: str
     commit_sha: str | None = None
     pr_url: str | None = None
     reason: str | None = None
@@ -180,43 +190,73 @@ class Reconciler:
         workdir = tempfile.mkdtemp(prefix="vuoro-reconciler-", dir=self._workdir_root)
         try:
             commit_sha = self._prepare_commit(intent, acceptor, workdir)
-            existing = remote_branch_tip(workdir, branch)
-            if existing is not None:
-                # A re-run (e.g. report_applied was lost): the same change is
-                # already on the branch, so it is not pushed again.
-                if not same_change(workdir, existing, commit_sha):
-                    raise _Refused("branch-exists-with-different-change")
-                commit_sha = existing
-            else:
-                try:
-                    await self.provider.push_branch(intent.repository, branch, local_path=workdir)
-                except Exception:
-                    raise _Refused("push-failed") from None
             try:
-                result = await self.provider.open_pull_request(
-                    PullRequest(
-                        repository=intent.repository,
-                        branch=branch,
-                        base_branch=default_branch,
-                        title=intent.title,
-                        body=intent.rationale,
-                    )
-                )
-            except Exception:
-                raise _Refused("pull-request-failed") from None
+                result = await self._publish(intent, branch, default_branch, commit_sha, workdir)
+            except ProviderCredentialRejected:
+                raise _Refused("provider-credential-rejected") from None
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
+        if result is None:
+            return Outcome(intent.intent_id, "duplicate", reason="concurrent-consumer", acceptor=acceptor)
+        commit_sha, pr = result
 
         try:
             await self.intent_source.report_applied(
-                intent.intent_id, commit_sha=commit_sha, pr_url=result.url, acceptor=acceptor
+                intent.intent_id, commit_sha=commit_sha, pr_url=pr.url, acceptor=acceptor
             )
         except Exception:
             # The branch and PR exist; a re-run finds them and reports again.
             _log.exception("report_applied failed for intent %s", intent.intent_id)
-        return Outcome(
-            intent.intent_id, "applied", commit_sha=commit_sha, pr_url=result.url, acceptor=acceptor
-        )
+        return Outcome(intent.intent_id, "applied", commit_sha=commit_sha, pr_url=pr.url, acceptor=acceptor)
+
+    async def _publish(
+        self, intent: EffectIntent, branch: str, default_branch: str, commit_sha: str, workdir: str
+    ) -> tuple[str, PullRequestResult] | None:
+        """Push the branch and open its PR, resuming whatever an interrupted
+        run left behind. The forge's branch and open PR are the recovery
+        key: a branch already carrying the same change is reused, an open PR
+        from it is reused, so a restart at any point yields one branch and
+        one PR. `None` means another consumer created the branch first
+        (between our lookup and our push); it owns the rest."""
+
+        existing = await self.provider.find_branch(intent.repository, branch)
+        if existing is not None:
+            # An earlier run pushed this branch (crash after push, lost report).
+            if not ensure_commit(workdir, branch, existing) or not same_change(
+                workdir, existing, commit_sha
+            ):
+                raise _Refused("branch-exists-with-different-change")
+            commit_sha = existing
+        else:
+            try:
+                await self.provider.push_branch(intent.repository, branch, local_path=workdir)
+            except BranchAlreadyExists:
+                return None
+            except ProviderCredentialRejected:
+                raise
+            except Exception:
+                raise _Refused("push-failed") from None
+
+        pr = await self.provider.find_open_pull_request(intent.repository, branch)
+        if pr is None:
+            request = PullRequest(
+                repository=intent.repository,
+                branch=branch,
+                base_branch=default_branch,
+                title=intent.title,
+                body=intent.rationale,
+            )
+            try:
+                pr = await self.provider.open_pull_request(request)
+            except PullRequestAlreadyExists:
+                pr = await self.provider.find_open_pull_request(intent.repository, branch)
+                if pr is None:
+                    raise _Refused("pull-request-failed") from None
+            except ProviderCredentialRejected:
+                raise
+            except Exception:
+                raise _Refused("pull-request-failed") from None
+        return commit_sha, pr
 
     def _prepare_commit(self, intent: EffectIntent, acceptor: Acceptor, workdir: str) -> str:
         """Validate, checkout, apply, re-validate and sign; the commit exists

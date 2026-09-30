@@ -15,6 +15,22 @@ from dataclasses import dataclass
 from typing import Protocol
 
 
+class BranchAlreadyExists(Exception):
+    """`push_branch` found the branch already there: another consumer (or an
+    earlier, interrupted run) created it first. Nothing was pushed."""
+
+
+class PullRequestAlreadyExists(Exception):
+    """`open_pull_request` found an open PR from the branch already (a forge
+    refuses a second one, e.g. GitHub's 422). Nothing was opened."""
+
+
+class ProviderCredentialRejected(Exception):
+    """The forge refused the reconciler's credential (revoked, expired or
+    lacking scope). Raised by any `ProviderClient` call, so the reconciler
+    can record one stable reason instead of a step-specific one."""
+
+
 @dataclass(frozen=True)
 class PullRequest:
     repository: str
@@ -46,8 +62,24 @@ class ProviderClient(Protocol):
     def default_branch(self, repository: str) -> str:
         """`repository`'s protected default branch; a pull request's base."""
 
+    async def find_branch(self, repository: str, branch: str) -> str | None:
+        """The commit `branch` points at on the forge now, or `None` if it
+        does not exist. With `find_open_pull_request`, this is the recovery
+        key after a crash: `vuoro-effect/<intent_id>` is deterministic, so a
+        restarted reconciler finds what an interrupted run left behind
+        without any ledger of its own."""
+
+    async def find_open_pull_request(
+        self, repository: str, branch: str
+    ) -> PullRequestResult | None:
+        """The open PR from `branch`, or `None` if there is none."""
+
     async def push_branch(self, repository: str, branch: str, *, local_path: str) -> None:
-        """Push `local_path`'s current HEAD to a new branch named `branch`.
+        """Create `branch` at `local_path`'s current HEAD.
+
+        Create-only: if `branch` already exists, raise `BranchAlreadyExists`
+        and push nothing (never a fast-forward, never a force). Of two
+        concurrent consumers exactly one creates the branch.
 
         Implementations must refuse a `branch` equal to `default_branch` or
         any other protected ref; the reconciler never asks for one, but a
@@ -57,6 +89,6 @@ class ProviderClient(Protocol):
     async def open_pull_request(self, request: PullRequest) -> PullRequestResult:
         """Open a PR from `request.branch` into `request.base_branch`.
 
-        Idempotent per branch: if a PR from `request.branch` is already
-        open, return it rather than opening a second one (a re-run after a
-        lost `report_applied` asks again)."""
+        The reconciler looks for an open PR first (`find_open_pull_request`);
+        if one appeared in between, raise `PullRequestAlreadyExists` (or
+        return the existing one) rather than opening a second."""
