@@ -92,6 +92,8 @@ _CONTEXT_CURSORS = ("next_after_note_id", "next_after_chain_seq")
 #: The paging arguments read_predecessor_context accepts and forwards.
 _CONTEXT_PAGING = ("limit", "after_note_id", "after_chain_seq")
 CONTEXT_MAX_LIMIT = 500
+#: sprintctl#114's page size when the caller sends no limit.
+CONTEXT_DEFAULT_LIMIT = 100
 _CATALOG_PATH = "/api/catalog/v1"
 #: A catalog read is a capability probe on the listing path (tools/list,
 #: server/discover, initialize), so it gets its own short bound rather than
@@ -173,6 +175,37 @@ def _mint_item_id(run_id: str, idempotency_key: str) -> str:
 
     digest = hashlib.sha256(f"{run_id}:{idempotency_key}".encode()).hexdigest()
     return "evi_" + digest[:32]
+
+
+def _page_is_consistent(
+    page: Mapping[str, int],
+    entries: list[Any],
+    key: str,
+    cursor: Any,
+    after_name: str,
+) -> bool:
+    """Whether one list of a predecessor-context page is what sprintctl#114
+    defines (`sprintctl.pg.predecessor_context`): at most `limit` entries
+    (default `CONTEXT_DEFAULT_LIMIT`), each with `key` strictly greater than
+    the cursor sent (`after_*`, or none when absent -- sprintctl reads
+    `> -1`) and strictly ascending; and a non-null next cursor only on a
+    full page, equal to the last entry's `key` (sprintctl sets
+    `next_after_* = entries[-1][key]` when more rows remain).  Anything else
+    is a broken owner: the edge fails closed rather than return a page that
+    could skip, repeat or silently truncate rows."""
+
+    limit = page.get("limit", CONTEXT_DEFAULT_LIMIT)
+    if len(entries) > limit:
+        return False
+    previous = page.get(after_name, -1)
+    for entry in entries:
+        value = entry.get(key) if isinstance(entry, dict) else None
+        if isinstance(value, bool) or not isinstance(value, int) or value <= previous:
+            return False
+        previous = value
+    if cursor is None:
+        return True
+    return len(entries) == limit and cursor == previous
 
 
 class RecordShellClient:
@@ -499,6 +532,10 @@ class SprintctlRecordStore:
             or not all(
                 cursor is None or (isinstance(cursor, int) and not isinstance(cursor, bool) and cursor >= 0)
                 for cursor in cursors.values()
+            )
+            or not _page_is_consistent(page or {}, notes, "note_id", cursors["next_after_note_id"], "after_note_id")
+            or not _page_is_consistent(
+                page or {}, evidence, "chain_seq", cursors["next_after_chain_seq"], "after_chain_seq"
             )
         ):
             raise ToolFailure(

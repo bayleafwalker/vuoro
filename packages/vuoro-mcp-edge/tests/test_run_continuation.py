@@ -92,6 +92,12 @@ class ReferenceRecordStore(InMemoryRunRegistry):
     async def read_predecessor_context(
         self, run_id: str, *, forwarded: Any, page: Any = None
     ) -> dict[str, Any]:
+        if page:
+            # Unpaged: refuse paging rather than silently ignore it (a
+            # caller would read a first page as the whole).
+            raise ToolFailure(
+                "invalid-arguments", "this record store does not page predecessor context"
+            )
         predecessor = self.predecessor_of(run_id)
         if predecessor is None:
             return {"predecessor_run_id": None, "session_notes": [], "evidence": []}
@@ -929,6 +935,69 @@ def test_out_of_range_paging_is_refused_before_the_owner(keys, arguments) -> Non
         )
     ) == "invalid-arguments"
     assert owner.invoked == []
+
+
+def _context_page(notes: list[int], seqs: list[int], **cursors: Any) -> dict[str, Any]:
+    return {
+        "run_id": SUCCESSOR_RUN, "predecessor_run_id": PREDECESSOR_RUN,
+        "session_notes": [{"note_id": n, "note": "n", "created_at": "t"} for n in notes],
+        "evidence": [{"item_id": f"evi_{q}", "chain_seq": q} for q in seqs],
+        "next_after_note_id": None, "next_after_chain_seq": None, **cursors,
+    }
+
+
+@pytest.mark.parametrize(
+    ("arguments", "page"),
+    [
+        # Over-long: more entries than the limit sent, or than the default 100.
+        ({"limit": 2}, _context_page([1, 2, 3], [])),
+        ({}, _context_page(list(range(1, 102)), [])),
+        # A non-advancing cursor: equal to the after_* sent.
+        ({"limit": 1, "after_note_id": 5}, _context_page([], [], next_after_note_id=5)),
+        # A regressing cursor: below the last entry returned.
+        ({"limit": 2}, _context_page([], [0, 1], next_after_chain_seq=0)),
+        # Entries not past the cursor sent, or out of order.
+        ({"after_chain_seq": 3}, _context_page([], [3])),
+        ({}, _context_page([2, 1], [])),
+        # A cursor on a page that is not full.
+        ({"limit": 5}, _context_page([1, 2], [], next_after_note_id=2)),
+    ],
+    ids=[
+        "over-limit", "over-default", "non-advancing", "regressing",
+        "not-past-cursor", "out-of-order", "cursor-on-short-page",
+    ],
+)
+def test_an_inconsistent_page_fails_closed(keys, arguments, page) -> None:
+    owner = FakeOwner(NEW_OWNER_OPERATIONS, resolve_binding=_successor_binding(), context_result=page)
+    client = _sprintctl_edge(keys, owner)
+    assert _error_code(
+        _result(
+            client, _successor_headers(keys)(), "read_predecessor_context",
+            {"run_id": SUCCESSOR_RUN, **arguments},
+        )
+    ) == "record-shell-unavailable"
+
+
+def test_a_consistent_full_page_with_cursors_passes(keys) -> None:
+    page = _context_page([3, 4], [0, 1], next_after_note_id=4, next_after_chain_seq=1)
+    owner = FakeOwner(NEW_OWNER_OPERATIONS, resolve_binding=_successor_binding(), context_result=page)
+    client = _sprintctl_edge(keys, owner)
+    result = _result(
+        client, _successor_headers(keys)(), "read_predecessor_context",
+        {"run_id": SUCCESSOR_RUN, "limit": 2, "after_note_id": 2},
+    )
+    assert result["isError"] is False, result
+    assert result["structuredContent"]["next_after_note_id"] == 4
+
+
+def test_an_unpaged_store_refuses_paging_rather_than_ignoring_it() -> None:
+    store = ReferenceRecordStore()
+    specs = _toolset(store)
+    run_id = _register(specs, _forwarded(), key="solo-run-0002")
+    _refused(
+        "invalid-arguments", specs, "read_predecessor_context",
+        {"run_id": run_id, "after_note_id": 1}, _forwarded(),
+    )
 
 
 def test_naming_a_predecessor_needs_work_read_with_the_capability_on(keys) -> None:
