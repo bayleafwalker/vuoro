@@ -7,9 +7,9 @@ from sprintctl.vuoro_adapter import register_work_catalog
 from vuoro_service.catalog import CatalogRegistry
 
 
-EXPECTED_TOTAL = 68
-EXPECTED_REVISION = "e2cd0d97d25c0e0471f425d0bfbbba12724baad259b59b41f684a2b8a7e4964b"
-EXPECTED_DOMAIN_COUNTS = {"work": 63, "audit": 5}
+EXPECTED_TOTAL = 75
+EXPECTED_REVISION = "6a21698d620408aa57b0387fe828de9ec836f6422ab7239074cd324413e9b16c"
+EXPECTED_DOMAIN_COUNTS = {"work": 70, "audit": 5}
 
 
 class WorkStub:
