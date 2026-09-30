@@ -5,6 +5,13 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-mcp-edge: `read_predecessor_context` is paged (follows sprintctl#114's
+  bounded `work.run.predecessor-context-v1`): optional `limit` (1-500),
+  `after_note_id` and `after_chain_seq` are forwarded, and the owner's
+  `next_after_note_id` / `next_after_chain_seq` cursors are returned (null
+  when a list is exhausted). A malformed cursor from the owner fails closed
+  as `record-shell-unavailable`.
+
 - vuoro-mcp-edge: run continuation over the sprintctl record store
   (agentops#2525). `SprintctlRecordStore` serves `read_predecessor_context`
   and `register_run`'s `predecessor_run_id` when the runtime shell's catalog

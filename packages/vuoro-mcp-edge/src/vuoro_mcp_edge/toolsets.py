@@ -98,6 +98,12 @@ class ToolSpec:
     change the list once without notice -- e.g. appear after the owner's
     catalog is first read -- and a client sees it on its next tools/list.
     `describe` must stay cheap and bounded: it runs on every tools/list.
+
+    A tool that forwards caller arguments to a store (e.g.
+    `read_predecessor_context`'s paging arguments) relies on the store to
+    honour them or refuse them (`invalid-arguments`); a store must never
+    silently ignore an argument it was given, since the caller would read
+    a partial or repeated result as the whole.
     """
 
     name: str

@@ -87,6 +87,13 @@ OPERATION_SESSION_NOTE_WRITE = "work.session-note.write-v1"
 #: catalog is the continuation capability: the same release makes
 #: `work.run.register-v1` accept `predecessor_run_id`.
 OPERATION_RUN_PREDECESSOR_CONTEXT = "work.run.predecessor-context-v1"
+#: The owner's next-page cursors (sprintctl#114), passed through as-is.
+_CONTEXT_CURSORS = ("next_after_note_id", "next_after_chain_seq")
+#: The paging arguments read_predecessor_context accepts and forwards.
+_CONTEXT_PAGING = ("limit", "after_note_id", "after_chain_seq")
+CONTEXT_MAX_LIMIT = 500
+#: sprintctl#114's page size when the caller sends no limit.
+CONTEXT_DEFAULT_LIMIT = 100
 _CATALOG_PATH = "/api/catalog/v1"
 #: A catalog read is a capability probe on the listing path (tools/list,
 #: server/discover, initialize), so it gets its own short bound rather than
@@ -168,6 +175,37 @@ def _mint_item_id(run_id: str, idempotency_key: str) -> str:
 
     digest = hashlib.sha256(f"{run_id}:{idempotency_key}".encode()).hexdigest()
     return "evi_" + digest[:32]
+
+
+def _page_is_consistent(
+    page: Mapping[str, int],
+    entries: list[Any],
+    key: str,
+    cursor: Any,
+    after_name: str,
+) -> bool:
+    """Whether one list of a predecessor-context page is what sprintctl#114
+    defines (`sprintctl.pg.predecessor_context`): at most `limit` entries
+    (default `CONTEXT_DEFAULT_LIMIT`), each with `key` strictly greater than
+    the cursor sent (`after_*`, or none when absent -- sprintctl reads
+    `> -1`) and strictly ascending; and a non-null next cursor only on a
+    full page, equal to the last entry's `key` (sprintctl sets
+    `next_after_* = entries[-1][key]` when more rows remain).  Anything else
+    is a broken owner: the edge fails closed rather than return a page that
+    could skip, repeat or silently truncate rows."""
+
+    limit = page.get("limit", CONTEXT_DEFAULT_LIMIT)
+    if len(entries) > limit:
+        return False
+    previous = page.get(after_name, -1)
+    for entry in entries:
+        value = entry.get(key) if isinstance(entry, dict) else None
+        if isinstance(value, bool) or not isinstance(value, int) or value <= previous:
+            return False
+        previous = value
+    if cursor is None:
+        return True
+    return len(entries) == limit and cursor == previous
 
 
 class RecordShellClient:
@@ -459,11 +497,18 @@ class SprintctlRecordStore:
         return binding
 
     async def read_predecessor_context(
-        self, run_id: str, *, forwarded: ForwardedIdentity
+        self,
+        run_id: str,
+        *,
+        forwarded: ForwardedIdentity,
+        page: Mapping[str, int] | None = None,
     ) -> dict[str, Any]:
-        """The predecessor's notes and evidence, read by sprintctl through
-        the caller's own run (it answers run-not-found for any other
-        binding, as `work.run.resolve-v1` does)."""
+        """One page of the predecessor's notes and evidence, read by
+        sprintctl through the caller's own run (it answers run-not-found for
+        any other binding, as `work.run.resolve-v1` does).  `page` carries
+        the caller's `limit` / `after_note_id` / `after_chain_seq`; sprintctl
+        bounds every page (sprintctl#114: default 100, at most 500 per list)
+        and returns the next cursor of each list, null when exhausted."""
 
         if not await self.continuation_available():
             raise ToolFailure(
@@ -471,24 +516,36 @@ class SprintctlRecordStore:
                 "the runtime's work adapter cannot read a predecessor's notes and evidence",
             )
         result = await self._client.invoke(
-            OPERATION_RUN_PREDECESSOR_CONTEXT, {"run_id": run_id}, forwarded
+            OPERATION_RUN_PREDECESSOR_CONTEXT, {"run_id": run_id, **(page or {})}, forwarded
         )
         body = _expect_mapping(result, OPERATION_RUN_PREDECESSOR_CONTEXT)
         predecessor = body.get("predecessor_run_id")
         notes = body.get("session_notes")
         evidence = body.get("evidence")
+        cursors = {name: body.get(name) for name in _CONTEXT_CURSORS}
         if (
             body.get("run_id") != run_id
             or not (predecessor is None or (isinstance(predecessor, str) and RUN_ID.fullmatch(predecessor)))
             or not isinstance(notes, list)
             or not isinstance(evidence, list)
             or not all(isinstance(entry, dict) for entry in (*notes, *evidence))
+            or not all(
+                cursor is None or (isinstance(cursor, int) and not isinstance(cursor, bool) and cursor >= 0)
+                for cursor in cursors.values()
+            )
+            or not _page_is_consistent(page or {}, notes, "note_id", cursors["next_after_note_id"], "after_note_id")
+            or not _page_is_consistent(
+                page or {}, evidence, "chain_seq", cursors["next_after_chain_seq"], "after_chain_seq"
+            )
         ):
             raise ToolFailure(
                 "record-shell-unavailable",
                 f"{OPERATION_RUN_PREDECESSOR_CONTEXT} returned a malformed result",
             )
-        return {"predecessor_run_id": predecessor, "session_notes": notes, "evidence": evidence}
+        return {
+            "predecessor_run_id": predecessor, "session_notes": notes, "evidence": evidence,
+            **cursors,
+        }
 
     async def evidence_tail(
         self, run_id: str, *, forwarded: ForwardedIdentity
@@ -991,6 +1048,10 @@ _READ_PREDECESSOR_CONTEXT_DEFINITION: dict[str, Any] = {
         "up where it stopped. run_id is your own run; an unknown or someone "
         "else's run_id is a tool error with code run-not-found. A run with "
         "no predecessor returns predecessor_run_id null and empty lists. "
+        "Results are paged: each call returns at most limit notes and limit "
+        "evidence items (default 100, at most 500); when next_after_note_id "
+        "or next_after_chain_seq is not null, call again passing it as "
+        "after_note_id / after_chain_seq for the rest of that list. "
         "Read-only: it grants nothing the predecessor could do, and the "
         "predecessor's run_id stays unusable for your writes."
     ),
@@ -1002,6 +1063,18 @@ _READ_PREDECESSOR_CONTEXT_DEFINITION: dict[str, Any] = {
                 "pattern": RUN_ID.pattern,
                 "description": "Your own run_id, registered with predecessor_run_id.",
             },
+            "limit": {
+                "type": "integer", "minimum": 1, "maximum": CONTEXT_MAX_LIMIT,
+                "description": "At most this many notes and this many evidence items (default 100).",
+            },
+            "after_note_id": {
+                "type": "integer", "minimum": 0,
+                "description": "next_after_note_id from the previous page.",
+            },
+            "after_chain_seq": {
+                "type": "integer", "minimum": 0,
+                "description": "next_after_chain_seq from the previous page.",
+            },
         },
         "required": ["run_id"],
         "additionalProperties": False,
@@ -1011,7 +1084,7 @@ _READ_PREDECESSOR_CONTEXT_DEFINITION: dict[str, Any] = {
 
 
 def _parse_read_predecessor_context(arguments: dict[str, Any]) -> dict[str, Any]:
-    unexpected = set(arguments) - {"run_id"}
+    unexpected = set(arguments) - {"run_id", *_CONTEXT_PAGING}
     if unexpected:
         raise ToolFailure(
             "invalid-arguments",
@@ -1020,7 +1093,20 @@ def _parse_read_predecessor_context(arguments: dict[str, Any]) -> dict[str, Any]
     run_id = arguments.get("run_id")
     if not isinstance(run_id, str) or not RUN_ID.fullmatch(run_id):
         raise ToolFailure("invalid-arguments", "run_id must be a run_<ULID> handle")
-    return {"run_id": run_id}
+    page: dict[str, int] = {}
+    for name in _CONTEXT_PAGING:
+        value = arguments.get(name)
+        if value is None:
+            continue
+        low, high = (1, CONTEXT_MAX_LIMIT) if name == "limit" else (0, None)
+        if (
+            isinstance(value, bool) or not isinstance(value, int)
+            or value < low or (high is not None and value > high)
+        ):
+            bound = f"between {low} and {high}" if high is not None else f"at least {low}"
+            raise ToolFailure("invalid-arguments", f"{name} must be an integer {bound}")
+        page[name] = value
+    return {"run_id": run_id, "page": page}
 
 
 def _require_continuation_authority(forwarded: ForwardedIdentity) -> None:
@@ -1142,12 +1228,17 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
         # The caller's own run, by its exact binding: the successor reads
         # through its own handle, never by presenting the predecessor's.
         await store.resolve(parsed["run_id"], binding, forwarded=forwarded)
-        continued = await store.read_predecessor_context(parsed["run_id"], forwarded=forwarded)
+        continued = await store.read_predecessor_context(
+            parsed["run_id"], forwarded=forwarded, page=parsed["page"]
+        )
         return {
             "run_id": parsed["run_id"],
             "predecessor_run_id": continued.get("predecessor_run_id"),
             "session_notes": list(continued.get("session_notes") or []),
             "evidence": list(continued.get("evidence") or []),
+            # Null when the list is exhausted (always, for an unpaged store).
+            "next_after_note_id": continued.get("next_after_note_id"),
+            "next_after_chain_seq": continued.get("next_after_chain_seq"),
         }
 
     register_definition = _register_run_definition(continuation=continuation)
