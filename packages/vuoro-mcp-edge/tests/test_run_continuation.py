@@ -89,7 +89,9 @@ class ReferenceRecordStore(InMemoryRunRegistry):
         self.notes.setdefault(run_id, []).append(written)
         return {"run_id": run_id, **written}
 
-    async def read_predecessor_context(self, run_id: str, *, forwarded: Any) -> dict[str, Any]:
+    async def read_predecessor_context(
+        self, run_id: str, *, forwarded: Any, page: Any = None
+    ) -> dict[str, Any]:
         predecessor = self.predecessor_of(run_id)
         if predecessor is None:
             return {"predecessor_run_id": None, "session_notes": [], "evidence": []}
@@ -281,6 +283,7 @@ def test_a_run_without_a_predecessor_reads_an_empty_context() -> None:
     run_id = _register(specs, _forwarded(), key="solo-run-0001")
     assert _invoke(specs, "read_predecessor_context", {"run_id": run_id}, _forwarded()) == {
         "run_id": run_id, "predecessor_run_id": None, "session_notes": [], "evidence": [],
+        "next_after_note_id": None, "next_after_chain_seq": None,
     }
 
 
@@ -695,6 +698,8 @@ def test_with_the_capability_the_sprintctl_store_serves_continuation(keys) -> No
             {"note_id": 1, "note": "stopped after step 3", "created_at": "2026-09-30T10:00:00Z"},
         ],
         "evidence": [{"item_id": "evi_1", "kind": "test-report", "chain_seq": 0}],
+        "next_after_note_id": None,
+        "next_after_chain_seq": None,
     }
     # The caller's own run is resolved first, then read through that run only.
     assert [e["operation"] for e in owner.invoked[-2:]] == ["work.run.resolve-v1", CONTEXT_OPERATION]
@@ -861,8 +866,15 @@ def test_cancelling_the_prober_neither_fails_the_read_nor_starts_a_backoff() -> 
         {"run_id": SUCCESSOR_RUN, "predecessor_run_id": "run_bad", "session_notes": [], "evidence": []},
         {"run_id": SUCCESSOR_RUN, "predecessor_run_id": None, "session_notes": {}, "evidence": []},
         {"run_id": SUCCESSOR_RUN, "predecessor_run_id": None, "session_notes": [], "evidence": ["x"]},
+        {"run_id": SUCCESSOR_RUN, "predecessor_run_id": None, "session_notes": [], "evidence": [],
+         "next_after_note_id": "7"},
+        {"run_id": SUCCESSOR_RUN, "predecessor_run_id": None, "session_notes": [], "evidence": [],
+         "next_after_chain_seq": -1},
     ],
-    ids=["other-run", "bad-predecessor", "notes-not-a-list", "evidence-not-objects"],
+    ids=[
+        "other-run", "bad-predecessor", "notes-not-a-list", "evidence-not-objects",
+        "cursor-not-an-integer", "negative-cursor",
+    ],
 )
 def test_a_malformed_context_result_is_refused(keys, malformed) -> None:
     owner = FakeOwner(
@@ -872,6 +884,51 @@ def test_a_malformed_context_result_is_refused(keys, malformed) -> None:
     assert _error_code(
         _result(client, _successor_headers(keys)(), "read_predecessor_context", {"run_id": SUCCESSOR_RUN})
     ) == "record-shell-unavailable"
+
+
+def test_paging_arguments_reach_the_owner_and_its_cursors_come_back(keys) -> None:
+    page = {
+        "run_id": SUCCESSOR_RUN, "predecessor_run_id": PREDECESSOR_RUN,
+        "session_notes": [{"note_id": 8, "note": "n", "created_at": "2026-09-30T10:00:00Z"}],
+        "evidence": [{"item_id": "evi_4", "chain_seq": 4}],
+        "next_after_note_id": 8, "next_after_chain_seq": None,
+    }
+    owner = FakeOwner(
+        NEW_OWNER_OPERATIONS, resolve_binding=_successor_binding(), context_result=page
+    )
+    client = _sprintctl_edge(keys, owner)
+    listed = _listed(client, _successor_headers(keys))
+    properties = listed["read_predecessor_context"]["inputSchema"]["properties"]
+    assert properties["limit"]["maximum"] == 500
+    result = _result(
+        client, _successor_headers(keys)(), "read_predecessor_context",
+        {"run_id": SUCCESSOR_RUN, "limit": 1, "after_note_id": 7, "after_chain_seq": 3},
+    )
+    assert result["isError"] is False, result
+    assert owner.invoked[-1]["arguments"] == {
+        "run_id": SUCCESSOR_RUN, "limit": 1, "after_note_id": 7, "after_chain_seq": 3,
+    }
+    assert result["structuredContent"]["next_after_note_id"] == 8
+    assert result["structuredContent"]["next_after_chain_seq"] is None
+    # Without paging arguments only run_id is sent.
+    _result(client, _successor_headers(keys)(), "read_predecessor_context", {"run_id": SUCCESSOR_RUN})
+    assert owner.invoked[-1]["arguments"] == {"run_id": SUCCESSOR_RUN}
+
+
+@pytest.mark.parametrize("arguments", [
+    {"limit": 0}, {"limit": 501}, {"limit": True}, {"after_note_id": -1},
+    {"after_chain_seq": "3"}, {"cursor": 1},
+])
+def test_out_of_range_paging_is_refused_before_the_owner(keys, arguments) -> None:
+    owner = FakeOwner(NEW_OWNER_OPERATIONS, resolve_binding=_successor_binding())
+    client = _sprintctl_edge(keys, owner)
+    assert _error_code(
+        _result(
+            client, _successor_headers(keys)(), "read_predecessor_context",
+            {"run_id": SUCCESSOR_RUN, **arguments},
+        )
+    ) == "invalid-arguments"
+    assert owner.invoked == []
 
 
 def test_naming_a_predecessor_needs_work_read_with_the_capability_on(keys) -> None:

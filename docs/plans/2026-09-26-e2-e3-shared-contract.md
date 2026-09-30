@@ -87,6 +87,8 @@
   - The registry checks workspace and repository, records the link, and otherwise refuses with `predecessor-not-eligible`. Unknown, malformed, other-workspace and other-repository ids share that one code and one message, as `run-not-found` does.
   - The same idempotency key with a different `predecessor_run_id` is `idempotency-conflict`.
 - **Reading.** `read_predecessor_context(run_id)` is a read-bucket tool (`work:read`). `run_id` is the successor's own run, resolved to its exact binding. It returns the predecessor's session notes and evidence, and `predecessor_run_id`. It reads one hop only, and never through the predecessor's handle.
+  - Paged (sprintctl#114 review): each call returns at most `limit` notes and `limit` evidence items (default 100, at most 500). `next_after_note_id` / `next_after_chain_seq` are the cursors for the rest of each list, passed back as `after_note_id` / `after_chain_seq`; null means that list is exhausted.
+  - Confidentiality: any principal in the workspace holding `work:read` and `work:evidence` can continue another principal's run in the same repository and read all of its notes and evidence; there is no opt-out. Notes and evidence must not hold secrets. (Whether §4 should narrow this is an open operator question.)
 - **Continuation transfers context, not authority.**
   - `resolve` is unchanged, so the predecessor's run never resolves to the successor. The successor cannot write notes or evidence to it, or propose an effect against it.
   - The successor's own run is bound to the successor's own binding. Every operation still needs the successor's own grant (`work:evidence`, `effect:propose`, …).
