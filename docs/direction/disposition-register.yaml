@@ -27,6 +27,8 @@ revision_history:
   promote -> hold on its own evidence. Made every source path absolute. Two v1 findings were themselves corrected: the
   meta-layer identifier-absence claim is false, and the takeover package was executed to an adjudicated verdict rather
   than left unrun. Prose is compressed relative to v1; all verified facts and citations are retained.'
+- 'v3 amendment (2026-09-30, operator correction): the actionq row retires ActionQ as a host, not the authority-plane
+  abstraction it carries; the abstraction is relocated per the split-horizon model. See items[actionq].goal_state.amended.'
 path_conventions:
   absolute_paths_only: Every `source` value is an absolute path or a command, with `~/` abbreviating `/projects/dev/`.
     A path that is relative to anything else is a defect - v1 carried one on its most consequential citation.
@@ -536,8 +538,15 @@ items:
     leases and attempt identities, settles terminal outcomes against signed runner proofs, and records an as-yet-unserved
     federation resource ledger whose acceptances must cite verified evidence.
   status: retiring
-  intention: Retiring (D1). Until S3 lands, the freeze and grant-conflict invariants are the reference for sprintctl's Release;
-    no new execution, federation or placement work.
+  intention: 'Retiring (D1) as a host, not as an abstraction (amended 2026-09-30, see goal_state.amended). No new execution,
+    federation or placement work in the actionq repository. The authority-plane contract it carries (tranche-4 freeze
+    ''Chosen federation contract v1'' and ''Frozen invariants''; federation.principal/v1, federation.grant/v1, federation.resource/v1)
+    is relocated per the split-horizon model. The freeze is the reference for the CAS resource aggregate, the actor/ACL
+    matrix, the command-decision ledger and acceptance kept distinct from settlement, which the coordination-horizon provider
+    (sprintctl work.effect.*, the idempotency ledger, Release) and the protected horizon (digest-bound acceptance, principal
+    issuance, cred-broker grants) conform to. Lease/claim is not part of that contract (freeze Decision, :28-31, classes
+    claim, renew and sweep as execution-plane semantics); sprintctl work.lease.* conforms to agentops #253 R4 (INV-L1/L2),
+    with ActionQ''s fenced-claim tests as a cross-check only.'
   waking_condition: 'Reverses only if the walk''s falsifier fires (dossier §17: one quarter after S3, >=6 of 40 terminal
     items not delivered as released or >=6 of 40 open items already shipped), or sustained concurrency above 5 workers appears
     - and then the preserved option is durable execution by DEPEND (dossier §15), not ActionQ.'
@@ -590,6 +599,39 @@ items:
         frozen #2027 verification bundle) and the 2026-08-27 effect-intent projection pilot. Does any of it survive?'
       step: Harvest the freeze and conflict-refusal invariants into S3 Release tests in sprintctl, make any resource projection
         (action-resource ownership, the 2026-08-27 effect-intent pilot) a derived query, and archive the repo after S3.
+    amended:
+      date: '2026-09-30'
+      by: operator correction ("I explicitly needed that abstraction. Check the extended plan documentations." / "The whole
+        point was to enable *somewhere*. Not explicitly or necessarily actionq. There should be a split horizon model.")
+      prior_intention: Retiring (D1). Until S3 lands, the freeze and grant-conflict invariants are the reference for sprintctl's
+        Release; no new execution, federation or placement work.
+      reason: 'The 2026-09-17 reading, repeated in actionq #59, took "no new federation work" as retiring the authority-plane
+        abstraction. It retires only the host. D1 (2026-09-14 owner-decisions note) is the product sentence and names neither
+        ActionQ nor federation (/projects/dev/_artifacts/agentops/session-notes/2026-09-14-owner-decisions.md:8). The abstraction
+        is defined provider-neutrally by /projects/dev/vuoro/docs/plans/2026-08-22-long-term-direction.md section 10 (:686)
+        and section 7.3 (:556), with /projects/dev/vuoro/docs/plans/2026-08-22-extended-sprint-plan.md Week 4 items 11-13
+        as its ActionQ-side sprint. Records dated after D1 restate the need: /projects/dev/vuoro/docs/plans/2026-09-19-agentic-pipeline-first-principles-rebuild.md
+        (R3, :44 and :119; coordination = leased claims, effect grants, resource reservations: Build), /projects/dev/agentops/docs/plans/2026-09-26-cloud-environments-options-memo.md
+        Open question 3 (recommendation, :344-350), /projects/dev/agentops/docs/plans/2026-09-26-trusted-service-boundary-design.md,
+        /projects/dev/agentops/docs/architecture/2026-09-27-agentic-ecosystem-and-split-horizon.md (#255) and /projects/dev/agentops/docs/plans/2026-09-27-backlog-ideation.md
+        R4 (#253).'
+      placement: 'Coordination horizon (vuoro.cloud primary; vuoro-shared only as the DEGRADED LOCAL island (target; authoritative
+        for work items until Q1(b))): fenced claim/lease with generation (sprintctl work.lease.*, agentops #2520; reference
+        #253 R4), command-decision/idempotency ledger (agentops #2542), resource
+        identity, revision CAS, relations and supersession (sprintctl work items and Release), effect proposal (work.effect.propose,
+        agentops #2541). Protected horizon: digest-bound acceptance and settlement (work.effect.accept and mark-applied held
+        only by a trusted-side principal, credctl accept, the homelab reconciler), mint-once principal issuance (issuer:subject:epoch;
+        vuoro #53 and vuoro-cloud epoch), grants (cred-broker grant evidence; effect-grant row, S7 while D2 stands).'
+      step: 'Harvest the whole contract, not only the immutable-action invariants: the resource aggregate, the ACL matrix,
+        the command-decision ledger and acceptance kept distinct from settlement, as provider conformance tests; lease semantics
+        per #253 R4, with ActionQ''s fenced-claim tests as a cross-check only. The action-resource ownership projection becomes
+        a derived query over the resource contract; dropping it is no longer an option. Archive the actionq repository only
+        after the contract text and its conformance tests have a home outside it.'
+      open:
+      - 'Recommendation, not decided (asked of the operator 2026-09-30): give the coordination-horizon provider a narrow provider-neutral
+        claim/lease and effect-authority interface in sprintctl, so a second provider (the DEGRADED LOCAL island, a durable-workflow
+        challenger) can implement the same contract.'
+      - Where the conformance suite lives (sprintctl, vuoro or vuoro-service); asked of the operator 2026-09-30.
 - key: actionq-cas
   name: ActionQ CAS object store
   repos:
