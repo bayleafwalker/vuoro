@@ -487,6 +487,9 @@ PREDECESSOR_RUN = "run_" + "P" * 26
 SUCCESSOR_RUN = "run_" + "S" * 26
 
 
+_MESSAGES = {"predecessor-not-eligible": "that run cannot be continued by the caller"}
+
+
 class FakeOwner:
     """The runtime shell in front of a sprintctl work adapter, for
     `SprintctlRecordStore`: a catalog (optionally failing first) and scripted
@@ -498,9 +501,15 @@ class FakeOwner:
         *,
         catalog_failures: int = 0,
         resolve_binding: dict[str, Any] | None = None,
+        hang_catalog: bool = False,
+        context_result: dict[str, Any] | None = None,
+        register_refusal: str | None = None,
     ) -> None:
         self.operations = operations
         self.catalog_failures = catalog_failures
+        self.hang_catalog = hang_catalog
+        self.context_result = context_result
+        self.register_refusal = register_refusal
         self.catalog_reads = 0
         self.invoked: list[dict[str, Any]] = []
         self.resolve_binding = resolve_binding
@@ -508,6 +517,8 @@ class FakeOwner:
     def __call__(self, request: httpx.Request) -> httpx.Response:
         if request.url.path == "/api/catalog/v1":
             self.catalog_reads += 1
+            if self.hang_catalog:
+                return self._hang()
             if self.catalog_failures:
                 self.catalog_failures -= 1
                 return httpx.Response(503, json={"error": "not ready"})
@@ -521,6 +532,10 @@ class FakeOwner:
         if operation not in self.operations:
             return self._error(operation, "unknown-operation", 404)
         if operation == "work.run.register-v1":
+            if self.register_refusal is not None and "predecessor_run_id" in envelope["arguments"]:
+                # sprintctl#114: one code and one message for unknown,
+                # malformed and other-workspace predecessors alike.
+                return self._error(operation, self.register_refusal, 422)
             run = {
                 "run_id": SUCCESSOR_RUN, "harness_id": "h", "harness_build": "1",
                 "model_id": "m", "recipe_id": "r", "observed_profile": OBSERVED_PROFILE,
@@ -535,6 +550,8 @@ class FakeOwner:
                             **self.resolve_binding},
             )
         if operation == CONTEXT_OPERATION:
+            if self.context_result is not None:
+                return self._ok(operation, self.context_result)
             return self._ok(operation, {
                 "repo_id": REPO_ID,
                 "run_id": envelope["arguments"]["run_id"],
@@ -547,6 +564,11 @@ class FakeOwner:
         raise AssertionError(f"unexpected operation {operation}")
 
     @staticmethod
+    async def _hang() -> httpx.Response:
+        await asyncio.sleep(30)
+        raise AssertionError("the catalog read was not bounded")
+
+    @staticmethod
     def _ok(operation: str, result: dict[str, Any]) -> httpx.Response:
         return httpx.Response(
             200, json={"status": "accepted", "operation": operation, "result": result}
@@ -557,7 +579,7 @@ class FakeOwner:
         return httpx.Response(
             status,
             json={"status": "rejected", "operation": operation,
-                  "error": {"code": code, "message": code}},
+                  "error": {"code": code, "message": _MESSAGES.get(code, code)}},
         )
 
 
@@ -567,10 +589,10 @@ def _sprintctl_store(owner: FakeOwner) -> SprintctlRecordStore:
     )
 
 
-def _sprintctl_edge(keys: Any, owner: FakeOwner) -> Any:
+def _sprintctl_edge(keys: Any, owner: FakeOwner, store: SprintctlRecordStore | None = None) -> Any:
     context = ToolsetContext(
         env={}, work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"),
-        runs=_sprintctl_store(owner),
+        runs=store or _sprintctl_store(owner),
     )
     return edge_client(keys[0], FakeShell(), toolsets=(build_toolset(context),))
 
@@ -703,19 +725,117 @@ def test_reading_the_context_needs_work_read(keys) -> None:
     assert owner.invoked == []
 
 
-def test_an_unreadable_catalog_hides_continuation_and_is_asked_again(keys) -> None:
-    # One tools/list asks for register_run's and read_predecessor_context's
-    # definitions: two unreadable catalogs hide continuation for that list.
-    owner = FakeOwner(NEW_OWNER_OPERATIONS, catalog_failures=2)
-    client = _sprintctl_edge(keys, owner)
+def test_an_unreadable_catalog_hides_continuation_and_backs_off(keys) -> None:
+    owner = FakeOwner(NEW_OWNER_OPERATIONS, catalog_failures=1)
+    store = _sprintctl_store(owner)
+    now = [100.0]
+    store.clock = lambda: now[0]
+    client = _sprintctl_edge(keys, owner, store)
     headers = _successor_headers(keys)
     first = _listed(client, headers)
     assert "read_predecessor_context" not in first
     assert "predecessor_run_id" not in first["register_run"]["inputSchema"]["properties"]
+    # One read for the whole list (both describes), none during the backoff.
+    assert owner.catalog_reads == 1
+    assert "read_predecessor_context" not in _listed(client, headers)
+    assert owner.catalog_reads == 1
+    now[0] += store.catalog_retry + 0.1
     assert "read_predecessor_context" in _listed(client, headers)
     assert "read_predecessor_context" in _listed(client, headers)
-    # Asked again after each failure; kept once read.
-    assert owner.catalog_reads == 3
+    # Kept once read.
+    assert owner.catalog_reads == 2
+
+
+def test_a_hung_catalog_does_not_stall_tools_list(keys) -> None:
+    import time
+
+    owner = FakeOwner(NEW_OWNER_OPERATIONS, hang_catalog=True)
+    store = _sprintctl_store(owner)
+    store.catalog_timeout = 0.2
+    client = _sprintctl_edge(keys, owner, store)
+    headers = _successor_headers(keys)
+    started = time.monotonic()
+    listed = _listed(client, headers)
+    elapsed = time.monotonic() - started
+    assert "read_predecessor_context" not in listed
+    # One bounded read, not one upstream timeout per describe.
+    assert elapsed < 1.5, elapsed
+    assert owner.catalog_reads == 1
+    # register_run's own check shares the backoff: no second read.
+    started = time.monotonic()
+    assert _error_code(
+        _result(
+            client, headers(), "register_run",
+            {**_MANIFEST, "idempotency_key": "succ-run-0001", "predecessor_run_id": PREDECESSOR_RUN},
+        )
+    ) == "invalid-arguments"
+    assert time.monotonic() - started < 1.5
+    assert owner.catalog_reads == 1
+    assert owner.invoked == []
+
+
+def test_concurrent_callers_share_one_catalog_read() -> None:
+    owner = FakeOwner(NEW_OWNER_OPERATIONS)
+    store = _sprintctl_store(owner)
+
+    async def many() -> list[bool]:
+        return list(await asyncio.gather(*(store.continuation_available() for _ in range(5))))
+
+    assert asyncio.run(many()) == [True] * 5
+    assert owner.catalog_reads == 1
+
+
+@pytest.mark.parametrize(
+    "malformed",
+    [
+        {"run_id": PREDECESSOR_RUN, "predecessor_run_id": None, "session_notes": [], "evidence": []},
+        {"run_id": SUCCESSOR_RUN, "predecessor_run_id": "run_bad", "session_notes": [], "evidence": []},
+        {"run_id": SUCCESSOR_RUN, "predecessor_run_id": None, "session_notes": {}, "evidence": []},
+        {"run_id": SUCCESSOR_RUN, "predecessor_run_id": None, "session_notes": [], "evidence": ["x"]},
+    ],
+    ids=["other-run", "bad-predecessor", "notes-not-a-list", "evidence-not-objects"],
+)
+def test_a_malformed_context_result_is_refused(keys, malformed) -> None:
+    owner = FakeOwner(
+        NEW_OWNER_OPERATIONS, resolve_binding=_successor_binding(), context_result=malformed
+    )
+    client = _sprintctl_edge(keys, owner)
+    assert _error_code(
+        _result(client, _successor_headers(keys)(), "read_predecessor_context", {"run_id": SUCCESSOR_RUN})
+    ) == "record-shell-unavailable"
+
+
+def test_naming_a_predecessor_needs_work_read_with_the_capability_on(keys) -> None:
+    owner = FakeOwner(NEW_OWNER_OPERATIONS)
+    client = _sprintctl_edge(keys, owner)
+    headers = _successor_headers(keys, ["work:evidence"])
+    assert _error_code(
+        _result(
+            client, headers(), "register_run",
+            {**_MANIFEST, "idempotency_key": "succ-run-0001", "predecessor_run_id": PREDECESSOR_RUN},
+        )
+    ) == "authority-required"
+    assert owner.invoked == []
+
+
+def test_the_owner_s_predecessor_refusal_reaches_the_caller_uniformly(keys) -> None:
+    """Unknown and ineligible (another workspace's) predecessors are one
+    answer from sprintctl (#114), passed through unchanged."""
+    owner = FakeOwner(NEW_OWNER_OPERATIONS, register_refusal="predecessor-not-eligible")
+    client = _sprintctl_edge(keys, owner)
+    headers = _successor_headers(keys)
+    answers = []
+    for index, predecessor in enumerate(("run_" + "0" * 26, PREDECESSOR_RUN)):
+        result = _result(
+            client, headers(), "register_run",
+            {**_MANIFEST, "idempotency_key": f"succ-run-000{index}", "predecessor_run_id": predecessor},
+        )
+        assert result["isError"] is True
+        answers.append(result["structuredContent"]["error"])
+    assert answers[0] == answers[1] == {
+        "code": "predecessor-not-eligible",
+        "message": "that run cannot be continued by the caller",
+    }
 
 
 def test_the_advertised_schema_carries_the_predecessor_only_with_continuation() -> None:

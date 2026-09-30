@@ -51,8 +51,10 @@ Design notes (for reviewers; see the E2 final report for the full reasoning):
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
-from collections.abc import Mapping
+import time
+from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
 from typing import Any
 
@@ -86,6 +88,14 @@ OPERATION_SESSION_NOTE_WRITE = "work.session-note.write-v1"
 #: `work.run.register-v1` accept `predecessor_run_id`.
 OPERATION_RUN_PREDECESSOR_CONTEXT = "work.run.predecessor-context-v1"
 _CATALOG_PATH = "/api/catalog/v1"
+#: A catalog read is a capability probe on the listing path (tools/list,
+#: server/discover, initialize), so it gets its own short bound rather than
+#: the upstream call timeout: a shell that hangs during warmup must not
+#: stall a connector's initialize.
+CATALOG_TIMEOUT_SECONDS = 1.0
+#: After a failed catalog read, answer "not available" without asking again
+#: for this long: one probe per few seconds, not one per request or per tool.
+CATALOG_RETRY_SECONDS = 3.0
 
 _NOT_YOURS = "no run with that id belongs to the caller"
 
@@ -193,15 +203,22 @@ class RecordShellClient:
     async def aclose(self) -> None:
         await self._client.aclose()
 
-    async def advertised_operations(self) -> frozenset[str] | None:
+    async def advertised_operations(
+        self, *, timeout: float = CATALOG_TIMEOUT_SECONDS
+    ) -> frozenset[str] | None:
         """The operation names the runtime shell's catalog advertises, or
-        None when the catalog cannot be read right now.  The catalog is
-        public and caller-independent, so no forwarded assertion is sent."""
+        None when the catalog cannot be read within `timeout` seconds.  The
+        catalog is public and caller-independent, so no forwarded assertion
+        is sent."""
 
         try:
-            response = await self._client.get(_CATALOG_PATH)
+            # wait_for bounds the whole exchange, whatever the transport
+            # enforces; the httpx timeout also releases the connection.
+            response = await asyncio.wait_for(
+                self._client.get(_CATALOG_PATH, timeout=timeout), timeout
+            )
             body = response.json() if response.status_code == 200 else None
-        except (httpx.HTTPError, ValueError):
+        except (httpx.HTTPError, ValueError, asyncio.TimeoutError):
             return None
         if not isinstance(body, dict) or not isinstance(body.get("operations"), list):
             return None
@@ -298,25 +315,55 @@ class SprintctlRecordStore:
             base_url=base_url, timeout=timeout, transport=transport, auth=auth
         )
         self._continuation: bool | None = None
+        self._retry_at = 0.0
+        #: The one in-flight catalog read, with the event loop it runs on.
+        self._probe: tuple[asyncio.AbstractEventLoop, asyncio.Future[bool]] | None = None
+        self.catalog_timeout = CATALOG_TIMEOUT_SECONDS
+        self.catalog_retry = CATALOG_RETRY_SECONDS
+        self.clock: Callable[[], float] = time.monotonic
 
     async def continuation_available(self) -> bool:
         """Whether the runtime shell's catalog advertises
         `work.run.predecessor-context-v1` (and so `predecessor_run_id` on
         `work.run.register-v1`).
 
-        The answer from a catalog that was read is kept for the process: the
-        edge and the work adapter ship in one image, so the adapter cannot
-        change under a running edge.  A catalog that could not be read
-        answers False and is asked again next time, so a shell that was not
-        ready yet does not switch continuation off for good.
+        * A catalog that was read decides for the process: the edge and the
+          work adapter ship in one image, so the adapter cannot change under
+          a running edge.
+        * Until then there is at most one catalog read in flight per process
+          (concurrent callers await the same read), bounded by
+          `catalog_timeout` (1 s), not the upstream call timeout.
+        * A read that fails or times out answers False, and for
+          `catalog_retry` seconds (3 s) every caller gets False without a
+          read.  So one request -- a tools/list asking for two definitions,
+          or a register_run call after its describe -- costs at most one
+          bounded read, and a shell that was not ready yet does not switch
+          continuation off for good.
         """
 
-        if self._continuation is None:
-            operations = await self._client.advertised_operations()
+        if self._continuation is not None:
+            return self._continuation
+        loop = asyncio.get_running_loop()
+        if self._probe is not None and self._probe[0] is loop and not self._probe[1].done():
+            return await asyncio.shield(self._probe[1])
+        if self.clock() < self._retry_at:
+            return False
+        future: asyncio.Future[bool] = loop.create_future()
+        self._probe = (loop, future)
+        try:
+            operations = await self._client.advertised_operations(timeout=self.catalog_timeout)
             if operations is None:
-                return False
-            self._continuation = OPERATION_RUN_PREDECESSOR_CONTEXT in operations
-        return self._continuation
+                self._retry_at = self.clock() + self.catalog_retry
+                result = False
+            else:
+                self._continuation = OPERATION_RUN_PREDECESSOR_CONTEXT in operations
+                result = self._continuation
+        except BaseException:
+            self._retry_at = self.clock() + self.catalog_retry
+            future.set_result(False)
+            raise
+        future.set_result(result)
+        return result
 
     async def aclose(self) -> None:
         await self._client.aclose()

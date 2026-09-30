@@ -91,6 +91,13 @@ class ToolSpec:
     whose owner may or may not offer an operation (capability detection,
     e.g. run continuation, agentops#2525) uses it; everything else lists
     `definition` as-is.
+
+    The server declares `tools.listChanged: false` and, being stateless
+    request/response HTTP, has no channel to send
+    `notifications/tools/list_changed`.  A `describe`d tool can therefore
+    change the list once without notice -- e.g. appear after the owner's
+    catalog is first read -- and a client sees it on its next tools/list.
+    `describe` must stay cheap and bounded: it runs on every tools/list.
     """
 
     name: str
