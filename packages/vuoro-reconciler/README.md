@@ -110,6 +110,38 @@ for an escaped ESC.
    protocol, restricted to a repository allowlist. It never merges and
    never pushes a protected or default branch. A re-run that finds
    `vuoro-effect/<intent_id>` already carrying the same change is success.
+   Crash recovery (M2-3): the forge's branch and its PR (any state) are
+   the recovery key, adopted only once verified as this intent's own: the
+   branch tip must be signed by the reconciler's key and record the same
+   tree, parents, message and trailers; a PR must target the default
+   branch with that commit as head. So a restart after the push, after the
+   PR, or before `applied` was recorded yields one branch, one PR and one
+   `applied`; a PR merged meanwhile is `applied` (after a squash or rebase
+   merge with the branch deleted, the PR head is fetched from the forge's
+   PR head ref and verified; with the branch kept, the recorded commit is
+   the branch commit, not the squash commit), one closed unmerged is
+   `failed: pull-request-closed`, and
+   anything else found is `branch-exists-with-different-change` or
+   `pull-request-mismatch`. The push is atomic create-only: a consumer
+   that loses the branch or PR race records nothing and returns
+   `duplicate`. A revoked forge credential fails the intent with
+   `provider-credential-rejected` (default branch untouched, other intents
+   continue); any other lookup failure returns `deferred`
+   (`provider-lookup-failed`) without recording, with a warning naming the
+   intent and exception type, so the next poll retries. It is recorded
+   `failed: provider-lookup-failed` only after `max_lookup_deferral_seconds`
+   (default 30 min) since its first deferral AND when another intent on the
+   same repository looked up fine in the same poll, so a forge-wide outage
+   only defers. Deployment shape: one long-lived process polling
+   repeatedly (the first-deferral time is in memory); a process restarted
+   for every poll never reaches the bound, so its caller must alert on
+   repeated `deferred` outcomes. A PR is only ever looked up from the
+   repository's own branches (never a fork's), and a closed PR counts as
+   `pull-request-closed` only if its head is the reconciler's own commit.
+   Signatures are tied to the configured key: the OpenPGP signer
+   fingerprint/key id (a long key id or full fingerprint is required), or
+   the SSH key fingerprint plus signer principal (`committer_email`).
+   `report_applied` must be idempotent for the same sha and PR URL.
 6. Reports the outcome (`applied` with its acceptor, or `failed`) back
    through `IntentSource`. One intent's failure (checkout, apply, policy,
    commit, push, PR) is recorded and the others continue.

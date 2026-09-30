@@ -13,12 +13,13 @@ none, `run_once` never accepts anything itself.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 import logging
 import re
 import shutil
 import tempfile
+import time
 
 from .acceptance import AutoAcceptConfig, apply_auto_accept, scope_admits
 from .diff_policy import (
@@ -38,15 +39,22 @@ from .git_ops import (
     DiffDoesNotApply,
     checkout_at,
     commit_signed,
+    ensure_commit,
     refuse_if_protected,
-    remote_branch_tip,
     same_change,
     stage_all,
     try_apply_diff,
 )
 from .intents import Acceptor, EffectIntent, IntentSource, OperatorAcceptor, PolicyAcceptor
-from .provider import ProviderClient, PullRequest
-from .signing import SigningKey
+from .provider import (
+    BranchAlreadyExists,
+    ProviderClient,
+    ProviderCredentialRejected,
+    PullRequest,
+    PullRequestAlreadyExists,
+    PullRequestResult,
+)
+from .signing import SigningKey, verify_commit
 
 __all__ = [
     "DiffDoesNotApply",
@@ -91,6 +99,16 @@ class ReconcilerConfig:
     protected_branches: frozenset[str] = frozenset({"main", "master"})
     branch_prefix: str = "vuoro-effect"
     diff_policies: Mapping[str, DiffPolicy] = field(default_factory=dict)
+    #: How long an intent may keep being `deferred` (`provider-lookup-failed`)
+    #: after its first deferral before it is recorded `failed`. It is failed
+    #: only once this has elapsed AND a lookup for another intent on the same
+    #: repository succeeded in the same poll: a forge-wide outage keeps
+    #: deferring, never fails. The first-deferral time is held in memory by
+    #: the `Reconciler`, so this assumes a long-lived process polling
+    #: repeatedly; a process restarted for every poll never reaches the bound
+    #: and defers indefinitely, so its caller must alert on repeated
+    #: `deferred` outcomes.
+    max_lookup_deferral_seconds: float = 1800.0
 
     def branch_for(self, intent: EffectIntent) -> str:
         return f"{self.branch_prefix}/{intent.intent_id}"
@@ -102,7 +120,13 @@ class ReconcilerConfig:
 @dataclass(frozen=True)
 class Outcome:
     intent_id: str
-    state: str  # "applied" | "failed"
+    #: "applied" | "failed" | "duplicate" | "deferred". "duplicate" means
+    #: another consumer created the intent's branch or PR first; nothing was
+    #: recorded, and that consumer (or, if it dies, the next run) finishes
+    #: the intent. "deferred" (reason `provider-lookup-failed`) means a
+    #: forge lookup failed transiently; nothing was recorded, so the intent
+    #: stays accepted and the next poll retries it.
+    state: str
     commit_sha: str | None = None
     pr_url: str | None = None
     reason: str | None = None
@@ -115,6 +139,17 @@ class _Refused(Exception):
         self.reason = reason
 
 
+class _Unrecorded(Exception):
+    """End this intent's attempt without writing to `IntentSource`."""
+
+    def __init__(self, state: str, reason: str, cause: str = "-") -> None:
+        super().__init__(reason)
+        self.state = state
+        self.reason = reason
+        #: The underlying exception's type name only (never its message).
+        self.cause = cause
+
+
 @dataclass(frozen=True)
 class Reconciler:
     intent_source: IntentSource
@@ -125,6 +160,12 @@ class Reconciler:
     #: only ever acts on intents an operator already accepted.
     auto_accept: AutoAcceptConfig | None = None
     _workdir_root: str | None = field(default=None, repr=False)
+    #: Monotonic clock; injectable for tests.
+    clock: Callable[[], float] = field(default=time.monotonic, repr=False, compare=False)
+    #: intent id -> time of its first consecutive deferral.
+    _deferrals: dict[str, float] = field(default_factory=dict, repr=False, compare=False)
+    #: Repositories with at least one successful lookup in the current poll.
+    _reachable: set[str] = field(default_factory=set, repr=False, compare=False)
 
     async def run_once(self) -> list[Outcome]:
         """Apply auto-accept (if configured) to proposed intents, then poll
@@ -137,16 +178,38 @@ class Reconciler:
 
         await apply_auto_accept(self.intent_source, self.auto_accept)
         intents = await self.intent_source.poll_accepted()
+        self._reachable.clear()
         outcomes = []
         for intent in intents:
             try:
                 outcomes.append(await self._process(intent))
             except _Refused as refused:
                 outcomes.append(await self._fail(intent, refused.reason))
+            except _Unrecorded as unrecorded:
+                outcomes.append(await self._unrecorded(intent, unrecorded))
             except Exception as error:
                 # One intent's unexpected failure never stops the others.
                 outcomes.append(await self._fail(intent, f"internal-error: {type(error).__name__}"))
+            if outcomes[-1].state != "deferred":
+                self._deferrals.pop(intent.intent_id, None)
+        # Decided after the whole poll, so a later intent's successful lookup
+        # on the same repository counts.
+        for index, (intent, outcome) in enumerate(zip(intents, outcomes, strict=True)):
+            if outcome.state == "deferred" and self._deferral_expired(intent):
+                self._deferrals.pop(intent.intent_id, None)
+                outcomes[index] = await self._fail(intent, outcome.reason or "provider-lookup-failed")
+        polled = {intent.intent_id for intent in intents}
+        for stale in set(self._deferrals) - polled:
+            del self._deferrals[stale]
         return outcomes
+
+    def _deferral_expired(self, intent: EffectIntent) -> bool:
+        first = self._deferrals.get(intent.intent_id)
+        return (
+            first is not None
+            and self.clock() - first >= self.config.max_lookup_deferral_seconds
+            and intent.repository in self._reachable
+        )
 
     async def _process(self, intent: EffectIntent) -> Outcome:
         acceptor = intent.acceptor
@@ -180,43 +243,128 @@ class Reconciler:
         workdir = tempfile.mkdtemp(prefix="vuoro-reconciler-", dir=self._workdir_root)
         try:
             commit_sha = self._prepare_commit(intent, acceptor, workdir)
-            existing = remote_branch_tip(workdir, branch)
-            if existing is not None:
-                # A re-run (e.g. report_applied was lost): the same change is
-                # already on the branch, so it is not pushed again.
-                if not same_change(workdir, existing, commit_sha):
-                    raise _Refused("branch-exists-with-different-change")
-                commit_sha = existing
-            else:
-                try:
-                    await self.provider.push_branch(intent.repository, branch, local_path=workdir)
-                except Exception:
-                    raise _Refused("push-failed") from None
             try:
-                result = await self.provider.open_pull_request(
-                    PullRequest(
-                        repository=intent.repository,
-                        branch=branch,
-                        base_branch=default_branch,
-                        title=intent.title,
-                        body=intent.rationale,
-                    )
-                )
-            except Exception:
-                raise _Refused("pull-request-failed") from None
+                result = await self._publish(intent, branch, default_branch, commit_sha, workdir)
+            except ProviderCredentialRejected:
+                raise _Refused("provider-credential-rejected") from None
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
+        commit_sha, pr = result
 
         try:
             await self.intent_source.report_applied(
-                intent.intent_id, commit_sha=commit_sha, pr_url=result.url, acceptor=acceptor
+                intent.intent_id, commit_sha=commit_sha, pr_url=pr.url, acceptor=acceptor
             )
         except Exception:
             # The branch and PR exist; a re-run finds them and reports again.
             _log.exception("report_applied failed for intent %s", intent.intent_id)
-        return Outcome(
-            intent.intent_id, "applied", commit_sha=commit_sha, pr_url=result.url, acceptor=acceptor
+        return Outcome(intent.intent_id, "applied", commit_sha=commit_sha, pr_url=pr.url, acceptor=acceptor)
+
+    async def _publish(
+        self, intent: EffectIntent, branch: str, default_branch: str, commit_sha: str, workdir: str
+    ) -> tuple[str, PullRequestResult]:
+        """Push the branch and open its PR, resuming whatever an interrupted
+        run left behind. The forge's branch and PR are the recovery key, but
+        only once verified as this intent's own: a branch is reused only if
+        its tip is signed by the reconciler's key and records the same
+        change (tree, parents, message and trailers); a PR only if its base
+        is the default branch and its head is that commit. A merged PR is
+        success; a PR closed unmerged is a failure, never a reason to open
+        another. Raises `_Unrecorded("duplicate", ...)` when another
+        consumer created the branch or PR during this run."""
+
+        repository = intent.repository
+        existing = await self._lookup(repository, self.provider.find_branch(repository, branch))
+        pr = await self._lookup(repository, self.provider.find_pull_request(repository, branch))
+
+        if pr is not None and pr.state == "closed":
+            # Rejected by a human: never re-open. But only our own closed PR
+            # counts as that rejection; anything else is a mismatch.
+            try:
+                self._require_own_commit(
+                    workdir, pr.head_ref or f"refs/heads/{branch}", pr.head_sha or "", commit_sha
+                )
+            except _Refused:
+                raise _Refused("pull-request-mismatch") from None
+            raise _Refused("pull-request-closed")
+        if existing is not None:
+            # An earlier run pushed this branch (crash after push, lost report).
+            # If a PR from it was squash- or rebase-merged while the branch
+            # was kept, this branch commit (not the squash commit) is what is
+            # recorded as applied.
+            self._require_own_commit(workdir, f"refs/heads/{branch}", existing, commit_sha)
+            commit_sha = existing
+        elif pr is not None and pr.state == "merged" and pr.head_sha:
+            # Merged, then the branch was deleted. After a squash or rebase
+            # merge the head is not on the default branch; the PR head ref
+            # still reaches it.
+            head_ref = pr.head_ref or f"refs/heads/{default_branch}"
+            self._require_own_commit(workdir, head_ref, pr.head_sha, commit_sha)
+            commit_sha = pr.head_sha
+
+        if pr is not None:
+            if pr.state not in ("open", "merged"):
+                raise _Refused("pull-request-mismatch")
+            if pr.base_branch != default_branch or pr.head_sha != commit_sha:
+                raise _Refused("pull-request-mismatch")
+            return commit_sha, pr
+
+        if existing is None:
+            try:
+                await self.provider.push_branch(repository, branch, local_path=workdir)
+            except BranchAlreadyExists:
+                raise _Unrecorded("duplicate", "concurrent-consumer") from None
+            except ProviderCredentialRejected:
+                raise
+            except Exception:
+                raise _Refused("push-failed") from None
+            # Someone may have opened a PR from our branch since we pushed:
+            # they report it, not us.
+            if await self._lookup(repository, self.provider.find_pull_request(repository, branch)) is not None:
+                raise _Unrecorded("duplicate", "concurrent-consumer")
+
+        request = PullRequest(
+            repository=repository,
+            branch=branch,
+            base_branch=default_branch,
+            title=intent.title,
+            body=intent.rationale,
         )
+        try:
+            opened = await self.provider.open_pull_request(request)
+        except PullRequestAlreadyExists:
+            # Another consumer opened it between our lookup and our open.
+            raise _Unrecorded("duplicate", "concurrent-consumer") from None
+        except ProviderCredentialRejected:
+            raise
+        except Exception:
+            raise _Refused("pull-request-failed") from None
+        return commit_sha, opened
+
+    async def _lookup(self, repository: str, call):
+        """Await a forge lookup; a non-credential failure defers the intent
+        (unrecorded, retried on the next poll) instead of failing it."""
+
+        try:
+            result = await call
+        except ProviderCredentialRejected:
+            raise
+        except Exception as error:
+            raise _Unrecorded("deferred", "provider-lookup-failed", type(error).__name__) from None
+        self._reachable.add(repository)
+        return result
+
+    def _require_own_commit(self, workdir: str, ref: str, sha: str, candidate: str) -> None:
+        """`sha` must be the reconciler's own signed commit of this very
+        change; anything else (unsigned, foreign-signed, another intent's
+        trailers) is never adopted as this intent's result."""
+
+        if not (
+            ensure_commit(workdir, sha, ref=ref)
+            and verify_commit(workdir, sha, self.signing_key)
+            and same_change(workdir, sha, candidate)
+        ):
+            raise _Refused("branch-exists-with-different-change")
 
     def _prepare_commit(self, intent: EffectIntent, acceptor: Acceptor, workdir: str) -> str:
         """Validate, checkout, apply, re-validate and sign; the commit exists
@@ -271,6 +419,19 @@ class Reconciler:
             )
         except Exception as error:
             raise _Refused(f"commit-failed: {error}") from None
+
+    async def _unrecorded(self, intent: EffectIntent, unrecorded: _Unrecorded) -> Outcome:
+        if unrecorded.state == "deferred":
+            first = self._deferrals.setdefault(intent.intent_id, self.clock())
+            _log.warning(
+                "deferring intent %s (%s, %s, deferred for %.0fs of %.0fs)",
+                intent.intent_id,
+                unrecorded.reason,
+                unrecorded.cause,
+                self.clock() - first,
+                self.config.max_lookup_deferral_seconds,
+            )
+        return Outcome(intent.intent_id, unrecorded.state, reason=unrecorded.reason, acceptor=intent.acceptor)
 
     async def _fail(self, intent: EffectIntent, reason: str) -> Outcome:
         try:

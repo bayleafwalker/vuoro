@@ -24,6 +24,7 @@ __all__ = [
     "DiffDoesNotApply",
     "checkout_at",
     "commit_signed",
+    "ensure_commit",
     "push_branch",
     "refuse_if_protected",
     "remote_branch_tip",
@@ -162,15 +163,42 @@ def remote_branch_tip(repo_path: str, branch: str) -> str | None:
     return tip.stdout.strip() if tip.returncode == 0 else None
 
 
+def ensure_commit(repo_path: str, sha: str, *, ref: str) -> bool:
+    """Make `sha` available in the clone, fetching the full ref `ref` (e.g.
+    `refs/heads/<branch>`, or a forge's `refs/pull/<n>/head` for a PR head
+    no branch reaches any more) from origin if the clone lacks it. True if
+    the commit is present afterwards."""
+
+    if not OBJECT_ID.fullmatch(sha or ""):
+        return False
+
+    def present() -> bool:
+        return _run("-C", repo_path, "cat-file", "-e", "--end-of-options", f"{sha}^{{commit}}").returncode == 0
+
+    if present():
+        return True
+    if not ref.startswith("refs/") or _run("check-ref-format", ref).returncode != 0:
+        return False
+    _run(
+        "-C", repo_path, "fetch", "--no-tags", "--quiet", "origin", "--",
+        f"+{ref}:refs/vuoro-recovery/head",
+    )
+    return present()
+
+
 def same_change(repo_path: str, existing: str, candidate: str) -> bool:
     """True if `existing` records the same change as `candidate`: the same
-    tree on the same parent(s). A re-run's freshly signed commit differs
-    from the first run's only in its timestamp and signature."""
+    tree on the same parent(s) with the same message (title, rationale and
+    trailers). A re-run's freshly signed commit differs from the first
+    run's only in its timestamp and signature."""
 
-    def shape(ref: str) -> tuple[str, str]:
+    def shape(ref: str) -> tuple[str, str, str]:
         tree = _run("-C", repo_path, "rev-parse", "--end-of-options", f"{ref}^{{tree}}").stdout.strip()
         parents = _run("-C", repo_path, "rev-list", "--parents", "-n", "1", ref, "--").stdout.split()[1:]
-        return tree, " ".join(parents)
+        # The message carries the run/intent/acceptor trailers: a same-tree
+        # commit for another intent, run or acceptor is not the same change.
+        message = _run("-C", repo_path, "log", "-1", "--format=%B", ref, "--").stdout
+        return tree, " ".join(parents), message
 
     return shape(existing) == shape(candidate)
 

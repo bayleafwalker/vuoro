@@ -128,7 +128,11 @@ class IntentSource(Protocol):
         self, intent_id: str, *, commit_sha: str, pr_url: str, acceptor: Acceptor
     ) -> None:
         """The intent was applied: `commit_sha` is the signed commit, `pr_url`
-        the pull request opened for it, `acceptor` who authorised it."""
+        the pull request opened for it, `acceptor` who authorised it.
+
+        Must be idempotent for the same `commit_sha` and `pr_url`: after a
+        crash, or with two consumers where one finds the other's PR before
+        that one reports, the same outcome can be reported twice."""
 
     async def report_failed(self, intent_id: str, *, reason: str) -> None:
         """The intent could not be reconciled. `reason` is a stable,
