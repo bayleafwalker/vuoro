@@ -5,6 +5,10 @@ recorded here.
 
 ## Unreleased
 
+- Provider-neutral lease conformance: seven safety/workflow scenarios bind the
+  reference LeaseStore and pinned sprintctl owner on disposable PostgreSQL; an
+  INV-L1 mutant proves that settling a superseded outcome fails the oracle.
+
 - vuoro-service: the reference LeaseStore models same-holder Case B reactivation
   in place, preserving an expired current lease's identity, issue time and TTL;
   superseded lease ids remain permanently dead (agentops#2570).
