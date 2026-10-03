@@ -143,6 +143,18 @@
 - a superseded lease id is permanently dead;
 - a heartbeat or completion replayed against a dead lease fails even when it comes from the former holder.
 
+**Amendment (2026-10-03, agentops#2593).** The provider-neutral lease
+suite in `packages/vuoro-service/tests/conformance/` realizes the parametrized
+contract below: seven essential safety/workflow scenarios always run against
+the reference and also run against the immutable sprintctl wheel named by
+`composition/adapter-pins.json` when `--lease-pg-url` is supplied. The configured
+PostgreSQL binding is required, never skipped. Same-holder resume preserves the
+binding's acquisition idempotency key; the driver treats that key as part of the stable holder binding.
+Reactivation is observed as a nonstale lease before any heartbeat, excluding
+cached acquisition responses from the proof.
+The explicit test time hook backdates only the disposable owner's heartbeat.
+The CI settlement job runs both providers before the end-to-end scenario.
+
 **What it lacks.** The store is in memory only, so it is not the durable owner.
 
 **E2 builds** `claim_work`, `heartbeat` and `report_outcome` (named `complete_work` before the agentops#2540 amendment) on a durable implementation of that same contract.

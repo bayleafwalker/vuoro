@@ -151,6 +151,14 @@ jobs:
         run: |
           uv pip install --no-deps dist/adapters/sprintctl-*.whl
           uv pip install 'psycopg[binary]>=3.1,<4'
+      - name: Create an isolated lease conformance database
+        env:
+          PGPASSWORD: m14-ci-only
+        run: createdb -h 127.0.0.1 -U m14 lease_conformance_ci
+      - name: Provider-neutral lease contract (reference and pinned owner)
+        run: >-
+          uv run --no-sync pytest packages/vuoro-service/tests/conformance -q
+          --lease-pg-url postgresql://m14:m14-ci-only@127.0.0.1:5432/lease_conformance_ci
       - name: Run the scenario (lease TTL 30 s)
         run: >-
           uv run --no-sync python scripts/settlement_scenario.py run
