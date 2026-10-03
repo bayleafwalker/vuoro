@@ -9,16 +9,17 @@ module runs the same checks against every implementation the edge has:
 - the effect intent store's ledger path (`InMemoryIntentStore.lookup` /
   `create`), which writes the intent only when its row wins.
 
-A durable ledger joins by adding a factory to `LEDGERS`.  The lease owner's
-ledger (sprintctl `work_idempotency_ledger`) is not this protocol: its key
-also carries the repo, (repo, workspace, principal, tool, key).  It is proved
-on the sprintctl side against real PostgreSQL; the edge's claim toolset adds
-its client-side view here when it lands.
+A durable ledger joins through a repository-scoped factory. The PostgreSQL
+binding uses the pinned sprintctl owner ledger begin/complete path. Repository
+scope is fixed by the binding, while this shared protocol retains the four
+caller key parts. Configuring the disposable PostgreSQL URL makes this binding
+mandatory; it is not silently skipped on a missing driver or owner.
 """
 
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import Callable
 from typing import Any
 
@@ -28,6 +29,7 @@ from vuoro_mcp_edge.idempotency import (
     IdempotencyLedger,
     InMemoryIdempotencyLedger,
     StoredResult,
+    LedgerEntry,
     replay_or_conflict,
     request_digest,
 )
@@ -77,9 +79,21 @@ def _run(coro):
     return asyncio.run(coro)
 
 
+if os.environ.get("VUORO_AUTHORITY_TEST_PG_URL"):
+    LEDGERS["sprintctl-pg"] = None
+
+
 @pytest.fixture(params=sorted(LEDGERS))
 def ledger(request) -> IdempotencyLedger:
-    return LEDGERS[request.param]()
+    if request.param == "sprintctl-pg":
+        from authority_pg_binding import PgLedgerBinding
+        binding = PgLedgerBinding(os.environ["VUORO_AUTHORITY_TEST_PG_URL"])
+        try:
+            yield binding
+        finally:
+            binding.close()
+    else:
+        yield LEDGERS[request.param]()
 
 
 def test_an_unknown_key_has_nothing_stored(ledger) -> None:
@@ -156,3 +170,76 @@ def test_parts_that_would_collide_if_joined_stay_distinct(ledger) -> None:
         return await ledger.lookup("w", "x|p", "t", "key-0001")
 
     assert _run(scenario()) is None
+
+
+
+def test_reference_begin_complete_is_the_normative_ledger_entry():
+    async def scenario():
+        ledger = InMemoryIdempotencyLedger()
+        entry = await ledger.begin("w", "p", "tool", "key-0001", _row(1).digest)
+        assert entry == LedgerEntry("w", "p", "tool", "key-0001", _row(1).digest, None, False)
+        assert await ledger.lookup("w", "p", "tool", "key-0001") is None
+        completed = await ledger.complete(entry, {"value": 1})
+        assert completed.result == {"value": 1} and completed.replayed is False
+        replay = await ledger.begin("w", "p", "tool", "key-0001", _row(1).digest)
+        assert replay.result == {"value": 1} and replay.replayed is True
+        with pytest.raises(ToolFailure) as error:
+            await ledger.begin("w", "p", "tool", "key-0001", _row(2).digest)
+        assert error.value.code == "idempotency-conflict"
+        with pytest.raises(ValueError):
+            await ledger.complete(replay, {"value": 2})
+    _run(scenario())
+
+
+
+@pytest.mark.skipif(not os.environ.get("VUORO_AUTHORITY_TEST_PG_URL"), reason="disposable owner not configured")
+def test_owner_concurrent_transactions_and_reconnect_keep_first_result():
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    from authority_pg_binding import PgLedgerBinding
+    bindings = [PgLedgerBinding(os.environ["VUORO_AUTHORITY_TEST_PG_URL"]) for _ in range(4)]
+    repo = bindings[0].owner_store.repo_id
+    barrier = Barrier(4, timeout=10)
+    try:
+        for binding in bindings:
+            binding.owner_store.repo_id = repo
+            original = binding.owner.begin
+            def begin(*args, _original=original):
+                barrier.wait()
+                return _original(*args)
+            binding.owner.begin = begin
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = [executor.submit(_run, binding.store("w", "p", "t", "race-0001", _row(i)))
+                       for i, binding in enumerate(bindings)]
+            results = [future.result(timeout=15) for future in futures]
+        assert results[0] in [_row(i) for i in range(4)]
+        assert all(result == results[0] for result in results)
+        for binding in bindings:
+            binding.close()
+        fresh = PgLedgerBinding(os.environ["VUORO_AUTHORITY_TEST_PG_URL"])
+        try:
+            fresh.owner_store.repo_id = repo
+            assert _run(fresh.lookup("w", "p", "t", "race-0001")) == results[0]
+        finally:
+            fresh.close()
+    finally:
+        for binding in bindings:
+            binding.close()
+
+
+
+def test_reference_begin_never_grants_a_second_incomplete_claim_or_mutable_replay():
+    async def scenario():
+        ledger = InMemoryIdempotencyLedger()
+        entry = await ledger.begin("w", "p", "t", "key-0001", _row(1).digest)
+        with pytest.raises(ToolFailure) as error:
+            await ledger.begin("w", "p", "t", "key-0001", _row(1).digest)
+        assert error.value.code == "idempotency-in-progress"
+        result = {"nested": {"value": 1}}
+        await ledger.complete(entry, result)
+        result["nested"]["value"] = 2
+        replay = await ledger.begin("w", "p", "t", "key-0001", _row(1).digest)
+        assert replay.result == {"nested": {"value": 1}}
+        replay.result["nested"]["value"] = 3
+        assert (await ledger.begin("w", "p", "t", "key-0001", _row(1).digest)).result == {"nested": {"value": 1}}
+    _run(scenario())

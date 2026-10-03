@@ -28,6 +28,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
+import copy
 import hashlib
 import json
 import re
@@ -40,6 +41,7 @@ __all__ = [
     "IdempotencyLedger",
     "InMemoryIdempotencyLedger",
     "StoredResult",
+    "LedgerEntry",
     "replay_or_conflict",
     "request_digest",
     "require_key",
@@ -86,7 +88,30 @@ class StoredResult:
     result: Mapping[str, Any]
 
 
+@dataclass(frozen=True)
+class LedgerEntry:
+    """Canonical begin/complete value; completed reads are fresh snapshots.
+
+    A fresh begin has no result and replayed=False. A begin after completion
+    returns the first result with replayed=True. Repository scope belongs to
+    the provider binding, outside this workspace/principal/tool/key tuple.
+    """
+
+    workspace_id: str
+    principal_id: str
+    tool: str
+    key: str
+    request_digest: str
+    result: Mapping[str, Any] | None
+    replayed: bool
+
+
 class IdempotencyLedger(Protocol):
+    async def begin(self, workspace_id: str, principal_id: str, tool: str,
+                    key: str, request_digest: str) -> LedgerEntry: ...
+
+    async def complete(self, entry: LedgerEntry, result: Mapping[str, Any]) -> LedgerEntry: ...
+
     async def lookup(
         self, workspace_id: str, principal_id: str, tool: str, key: str
     ) -> StoredResult | None:
@@ -117,6 +142,37 @@ class InMemoryIdempotencyLedger:
 
     def __init__(self) -> None:
         self._rows: dict[tuple[str, str, str, str], StoredResult] = {}
+        self._pending: dict[tuple[str, str, str, str], LedgerEntry] = {}
+
+    async def begin(self, workspace_id: str, principal_id: str, tool: str,
+                    key: str, request_digest: str) -> LedgerEntry:
+        scope = (workspace_id, principal_id, tool, key)
+        row = self._rows.get(scope)
+        if row is not None:
+            replay_or_conflict(row, request_digest)
+            return LedgerEntry(*scope, request_digest, copy.deepcopy(row.result), True)
+        pending = self._pending.get(scope)
+        if pending is not None:
+            if pending.request_digest != request_digest:
+                replay_or_conflict(StoredResult(pending.request_digest, {}), request_digest)
+            # This test reference has no surrounding database transaction to
+            # wait for. Never grant another claimant an incomplete entry.
+            raise ToolFailure("idempotency-in-progress", "this logical operation is incomplete")
+        entry = LedgerEntry(*scope, request_digest, None, False)
+        self._pending[scope] = entry
+        return entry
+
+    def _complete(self, entry: LedgerEntry, stored: StoredResult) -> LedgerEntry:
+        scope = (entry.workspace_id, entry.principal_id, entry.tool, entry.key)
+        if entry.replayed or self._pending.get(scope) != entry or stored.digest != entry.request_digest:
+            raise ValueError("no incomplete entry was begun for this completion")
+        self._rows[scope] = stored
+        del self._pending[scope]
+        return LedgerEntry(*scope, entry.request_digest, copy.deepcopy(stored.result), False)
+
+    async def complete(self, entry: LedgerEntry, result: Mapping[str, Any]) -> LedgerEntry:
+        return self._complete(entry, StoredResult(entry.request_digest, copy.deepcopy(result)))
+
 
     async def lookup(
         self, workspace_id: str, principal_id: str, tool: str, key: str
@@ -126,4 +182,11 @@ class InMemoryIdempotencyLedger:
     async def store(
         self, workspace_id: str, principal_id: str, tool: str, key: str, stored: StoredResult
     ) -> StoredResult:
-        return self._rows.setdefault((workspace_id, principal_id, tool, key), stored)
+        # Thin compatibility adapter: store still returns the first row even
+        # for a conflicting racer; its caller maps that row to the wire refusal.
+        previous = await self.lookup(workspace_id, principal_id, tool, key)
+        if previous is not None:
+            return previous
+        entry = await self.begin(workspace_id, principal_id, tool, key, stored.digest)
+        self._complete(entry, stored)
+        return stored

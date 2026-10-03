@@ -598,6 +598,9 @@ class InMemoryIntentStore:
     def seed(self, intent: EffectIntent) -> None:
         """Test-only: place an intent directly (e.g. one bound elsewhere)."""
 
+        previous = self._intents.get(intent.intent_id)
+        if previous is not None and previous != intent:
+            raise ToolFailure("effect-immutable", "a changed intent requires a new proposal")
         self._intents[intent.intent_id] = intent
 
     async def get(self, intent_id: str, caller: RunBinding, *, forwarded=None) -> EffectIntent:
