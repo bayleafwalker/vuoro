@@ -245,3 +245,49 @@ def test_a_stale_heartbeat_retains_nothing() -> None:
     with pytest.raises(LeaseNotCurrentError):
         store.heartbeat(lease.lease_id, "worker-a")
     assert store.retained_outcomes("run-1") == ()
+
+
+@pytest.mark.parametrize("operation", ["claim", "reclaim", "claim_work"])
+def test_same_holder_reactivates_expired_current_lease_in_place(operation: str) -> None:
+    clock = FakeClock()
+    store = LeaseStore(clock=clock)
+    original = store.claim("run-1", "worker-a", ttl_seconds=10)
+    clock.advance(11)
+    with pytest.raises(LeaseNotCurrentError):
+        store.complete(original.lease_id, "worker-a", result="late before resume")
+    resumed = getattr(store, operation)("run-1", "worker-a", ttl_seconds=99)
+    assert resumed.lease_id == original.lease_id
+    assert resumed.issued_at == original.issued_at
+    assert resumed.ttl_seconds == original.ttl_seconds
+    assert resumed.last_heartbeat_at == clock.now
+    assert store.retained_outcomes("run-1")[0].result == "late before resume"
+    clock.advance(9)
+    store.heartbeat(original.lease_id, "worker-a")
+    store.complete(original.lease_id, "worker-a", result="done after resume")
+    assert store.is_expired("run-1") is None
+    assert len(store.retained_outcomes("run-1")) == 1
+
+
+@pytest.mark.parametrize("operation", ["claim", "reclaim"])
+def test_same_holder_does_not_reactivate_a_live_lease(operation: str) -> None:
+    store = LeaseStore(clock=FakeClock())
+    store.claim("run-1", "worker-a", ttl_seconds=10)
+    with pytest.raises(LeaseConflictError):
+        getattr(store, operation)("run-1", "worker-a", ttl_seconds=10)
+
+
+def test_former_holder_never_resurrects_superseded_id_after_later_takeover() -> None:
+    clock = FakeClock()
+    store = LeaseStore(clock=clock)
+    old = store.claim("run-1", "worker-a", ttl_seconds=10)
+    clock.advance(11)
+    other = store.reclaim("run-1", "worker-b", ttl_seconds=10)
+    clock.advance(11)
+    returned = store.claim("run-1", "worker-a", ttl_seconds=10)
+    assert returned.lease_id not in {old.lease_id, other.lease_id}
+    with pytest.raises(LeaseNotCurrentError):
+        store.heartbeat(old.lease_id, "worker-a")
+    with pytest.raises(LeaseNotCurrentError):
+        store.complete(old.lease_id, "worker-a", result="superseded")
+    assert store.retained_outcomes("run-1")[0].reason == "superseded"
+    store.complete(returned.lease_id, "worker-a")

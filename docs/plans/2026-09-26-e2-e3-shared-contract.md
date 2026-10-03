@@ -138,6 +138,7 @@
 
 **Lease semantics.** `vuoro_service/lease.py` (the E0 `LeaseStore`) is the behaviour spec:
 - expiry with heartbeat;
+- same-holder Case B: claim/reclaim reactivates the expired current lease in place, keeping its lease id, issued time and TTL and refreshing its heartbeat;
 - the lease id, not the holder, is what counts as "current";
 - a superseded lease id is permanently dead;
 - a heartbeat or completion replayed against a dead lease fails even when it comes from the former holder.

@@ -5,6 +5,10 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service: the reference LeaseStore models same-holder Case B reactivation
+  in place, preserving an expired current lease's identity, issue time and TTL;
+  superseded lease ids remain permanently dead (agentops#2570).
+
 - vuoro-service 0.1.82: the work adapter is repinned from sprintctl 0.10.1 to
   0.11.0 (tag commit 2c61b36b, wheel sha256 f7664efa...7e398), which adds
   remote work schemas 19 (`work.effect.*` effect-intent store) and 20 (run
