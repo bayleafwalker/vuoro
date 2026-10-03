@@ -206,7 +206,7 @@ def test_a_repository_outside_the_allowlist_is_refused_before_any_clone(
     assert provider.pull_requests == []
 
 
-@pytest.mark.parametrize("mutation", ["diff", "title", "revision", "digest", "principal", "missing"])
+@pytest.mark.parametrize("mutation", ["diff", "title", "revision", "digest", "principal", "missing", "recomputed", "acceptance-id", "acceptance-digest"])
 def test_acceptance_binding_mismatch_refused_before_repository_effect(
     bare_remote, reconciler_signing_key, mutation
 ):
@@ -224,6 +224,14 @@ def test_acceptance_binding_mismatch_refused_before_repository_effect(
         sealed = replace(sealed, canonical_intent_digest="0" * 64)
     elif mutation == "principal":
         sealed = replace(sealed, acceptance={**sealed.acceptance, "acceptor_principal": "stranger"})
+    elif mutation == "recomputed":
+        from vuoro_reconciler.intents import canonical_digest
+        sealed = replace(sealed, title="changed but consistently redigested")
+        sealed = replace(sealed, canonical_intent_digest=canonical_digest(sealed))
+    elif mutation == "acceptance-id":
+        sealed = replace(sealed, acceptance={**sealed.acceptance, "intent_id": "other"})
+    elif mutation == "acceptance-digest":
+        sealed = replace(sealed, acceptance={**sealed.acceptance, "canonical_intent_digest": "0" * 64})
     else:
         sealed = replace(sealed, acceptance=None)
     source.records[intent.intent_id] = sealed
@@ -232,6 +240,6 @@ def test_acceptance_binding_mismatch_refused_before_repository_effect(
                            config=ReconcilerConfig(repository_allowlist=frozenset({"repo-a"})))
     (outcome,) = asyncio.run(reconciler.run_once())
     assert outcome.state == "failed"
-    assert outcome.reason in {"acceptance-digest-mismatch", "acceptance-principal-mismatch"}
+    assert outcome.reason == ("acceptance-principal-mismatch" if mutation == "principal" else "acceptance-digest-mismatch")
     assert provider.clones == [] and provider.pushed_branches == [] and provider.pull_requests == []
     assert source.applied == []

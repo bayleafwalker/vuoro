@@ -46,3 +46,10 @@ def test_report_applied_preserves_acceptance_digest_and_revision():
     assert arguments == {"intent_id": "intent_x", "revision": 7, "canonical_intent_digest": "c" * 64,
                          "commit_sha": "b" * 40, "pr_url": "https://forge.example/pull/1"}
     assert not any("acceptor" in key for key in arguments)
+
+
+def test_nonascii_digest_matches_owner_contract_golden_vector():
+    from vuoro_reconciler.intents import EffectIntent, canonical_digest
+    intent = EffectIntent("intent_local", "run", "repo", "a" * 40, "Muutos 漢字", "",
+                          "diff café\n", "w", "p", item_id=2147483647)
+    assert canonical_digest(intent) == "bb41fc3fb92a7849ed058c46ca1420ba379c581f57795f18e0dc0e3447f1bc02"

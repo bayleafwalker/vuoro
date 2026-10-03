@@ -1,7 +1,7 @@
 """Disposable PostgreSQL restart-to-signed-PR proof for the served source.
 
 Opt-in local proof: VUORO_EFFECT_TEST_PG_URL. Setting it requires a working
-loopback lease_conformance* DB and installed candidate owner; never skipped
+loopback lease_conformance* DB and installed immutable pinned owner; never skipped
 when configured. CI uses the immutable owner pin after its release.
 """
 import asyncio

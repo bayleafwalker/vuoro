@@ -68,7 +68,7 @@ __all__ = [
 ]
 
 #: `effect_` + 26 Crockford base32 characters, mirroring `runs.RUN_ID`.
-INTENT_ID = re.compile(r"^effect_[0-9A-HJKMNP-TV-Z]{26}$")
+INTENT_ID = re.compile(r"^(?:effect|intent)_[0-9A-HJKMNP-TV-Z]{26}$")
 
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
@@ -653,18 +653,22 @@ class ShellIntentStore:
             "item_id": intent.item_id, "run_id": intent.run_id, "repository": intent.repository,
             "base_commit": intent.base_commit, "title": intent.title, "rationale": intent.rationale,
             "unified_diff": intent.unified_diff, "idempotency_key": key}, forwarded))["intent"]
+        if not re.fullmatch(r"intent_[0-9A-HJKMNP-TV-Z]{26}", row["intent_id"]):
+            raise ToolFailure("effects-unavailable", "the owner returned an invalid intent id")
         return StoredResult(stored.digest, {"intent_id": row["intent_id"], "state": row["state"]})
 
     async def get(self, intent_id, caller, *, forwarded=None):
-        row = (await self.invoke("work.effect.get-v1", {"intent_id": intent_id}, forwarded))["intent"]
-        # Resolve the run on every request: exact workspace/principal/client/grant
-        # ownership is the run owner's check, never inferred from an untrusted row.
+        if not INTENT_ID.fullmatch(intent_id or ""):
+            raise ToolFailure("effect-not-found", _NOT_YOURS)
         try:
+            row = (await self.invoke("work.effect.get-v1", {"intent_id": intent_id}, forwarded))["intent"]
             await self.invoke("work.run.resolve-v1", {"run_id": row["run_id"]}, forwarded)
         except ToolFailure as error:
-            if error.code == "run-not-found":
-                raise ToolFailure("effect-not-found", _NOT_YOURS) from None
-            raise
+            # Owner get is repository-readable; the public surface is caller-only.
+            # Never expose owner validation/ownership distinctions as an ID oracle.
+            if error.code in {"effects-unavailable", "backend-unavailable"}:
+                raise
+            raise ToolFailure("effect-not-found", _NOT_YOURS) from None
         if row["proposer_principal"] != caller.principal_id:
             raise ToolFailure("effect-not-found", _NOT_YOURS)
         acceptance = row["acceptance"]
@@ -672,7 +676,10 @@ class ShellIntentStore:
             item_id=row["item_id"], revision=row["revision"], canonical_intent_digest=row["canonical_intent_digest"],
             repository=row["repository"], base_commit=row["base_commit"], title=row["title"],
             rationale=row["rationale"], unified_diff=row["unified_diff"], state=row["state"],
-            acceptor={"kind": "operator", "subject": acceptance["acceptor_principal"]} if acceptance else None)
+            acceptor=({"kind": "policy", "subject": acceptance["acceptor_principal"],
+                       "version": acceptance["acceptor_policy_version"]}
+                      if acceptance and acceptance["acceptor_policy_version"] is not None else
+                      {"kind": "operator", "subject": acceptance["acceptor_principal"]} if acceptance else None))
 
 
 def _new_intent_id() -> str:

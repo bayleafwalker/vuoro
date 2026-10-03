@@ -82,7 +82,8 @@ def test_default_composition_ships_no_toolset_without_durable_stores() -> None:
 
     context = ToolsetContext(
         env={},
-        work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"),
+        work_source=ShellWorkSource(base_url="http://shell", transport=__import__("httpx").MockTransport(
+                lambda request: __import__("httpx").Response(200, json={"operations": []}))),
         runs=UnavailableRunRegistry(),
     )
     toolsets = build_toolsets(context)

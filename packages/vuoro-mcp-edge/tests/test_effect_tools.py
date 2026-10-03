@@ -376,12 +376,13 @@ def test_unavailable_intent_store_fails_closed_for_both_tools(keys) -> None:
     _assert_error(fetched, "effects-unavailable")
 
 
-def test_production_composition_advertises_no_effect_tools_without_a_store() -> None:
+def test_production_composition_hides_effect_tools_without_owner_operations() -> None:
     """Until a durable intent store exists, the production builder lists no
     tools at all, rather than two that would fail every call."""
     for runs in (UnavailableRunRegistry(), InMemoryRunRegistry()):
         context = ToolsetContext(
-            env={}, work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"), runs=runs
+            env={}, work_source=ShellWorkSource(base_url="http://shell", transport=__import__("httpx").MockTransport(
+                lambda request: __import__("httpx").Response(200, json={"operations": []}))), runs=runs
         )
         toolset = effect_tools.build_toolset(context)
         assert all(asyncio.run(tool.describe()) is None for tool in toolset.tools)
@@ -556,7 +557,8 @@ def test_the_edge_tool_list_has_no_accept_or_transition_tool(keys, monkeypatch) 
     monkeypatch.setattr(effect_tools, "_production_intent_store", InMemoryIntentStore)
     context = ToolsetContext(
         env={"VUORO_MCP_EFFECT_AUTO_ACCEPT": "1"},
-        work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"),
+        work_source=ShellWorkSource(base_url="http://shell", transport=__import__("httpx").MockTransport(
+                lambda request: __import__("httpx").Response(200, json={"operations": []}))),
         runs=UnavailableRunRegistry(),
     )
     toolsets = build_toolsets(context)
@@ -600,10 +602,12 @@ def test_auto_accept_env_has_no_effect_on_the_edge(keys, monkeypatch) -> None:
         store = InMemoryIntentStore()
         monkeypatch.setattr(effect_tools, "_production_intent_store", lambda: store)
         runs = InMemoryRunRegistry()
-        context = ToolsetContext(env=env, work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"), runs=runs)
+        context = ToolsetContext(env=env, work_source=ShellWorkSource(base_url="http://shell", transport=__import__("httpx").MockTransport(
+                lambda request: __import__("httpx").Response(200, json={"operations": []}))), runs=runs)
         toolset = effect_tools.build_toolset(context)
         baseline = effect_tools.build_toolset(
-            ToolsetContext(env={}, work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"), runs=runs)
+            ToolsetContext(env={}, work_source=ShellWorkSource(base_url="http://shell", transport=__import__("httpx").MockTransport(
+                lambda request: __import__("httpx").Response(200, json={"operations": []}))), runs=runs)
         )
         assert [(t.name, t.definition) for t in toolset.tools] == [(t.name, t.definition) for t in baseline.tools]
 

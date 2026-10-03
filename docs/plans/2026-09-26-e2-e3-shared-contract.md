@@ -38,7 +38,7 @@ intent lifecycle. These owner capabilities are separate from the edge bucket:
 | Owner operation | Assertion authority | Horizon |
 |---|---|---|
 | `work.effect.propose-v1` | `work.effect.propose` | proposer, mapped from `vuoro:effect.propose` |
-| `work.effect.get-v1` | `work.effect.get` | proposer read, mapped from the same scope |
+| `work.effect.get-v1` | `work.effect.get` | repository read (public edge restricts to proposer-owned run), mapped from the same scope |
 | `work.effect.list-proposed-v1` | `work.effect.list-proposed` | trusted acceptance |
 | `work.effect.list-accepted-v1` | `work.effect.list-accepted` | trusted restart discovery |
 | `work.effect.accept-v1` | `work.effect.accept` | trusted acceptance |
@@ -304,3 +304,5 @@ Error codes the edge passes through unchanged: `lease-held`, `lease-superseded`,
 2. E2 and E3 on independent branches (`e2/*`, `e3/*`) in bayleafwalker/vuoro. Their vuoro-cloud changes are pushed as branches on the GitHub replica, marked "carry to Forgejo".
 3. E2 merges first. E3 rebases: expected conflicts are only the vuoro-cloud scope-table block and none in vuoro.
 4. A local session carries the vuoro-cloud branches to Forgejo and does the releases, runtime pin, scope grants and promotion.
+
+Owner `work.effect.get` is an explicit repository read capability, including trusted operator reads. The public edge independently requires the exact caller-owned run and proposer before returning content. Its OAuth mapping grants owner propose/get only behind this boundary, not an owner credential to the public caller. Owner proposal idempotency is scoped to repository/workspace/principal/key; replay returns current intent state.
