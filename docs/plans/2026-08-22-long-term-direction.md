@@ -116,7 +116,8 @@ Four amendments land inline, each marked `[edge 2026-09-20]` where it lands:
 4. **Falsifier (§13 falsifier 12).** If a month of E1 passes without the substrate being reached from
    a hosted runtime, the rest is not built.
 
-**One conflict resolved, one recorded rather than resolved.** Both are tracked in §14.
+**Two conflicts resolved.** E3 was resolved on 2026-09-20; hosted evidence authority was
+resolved on 2026-10-03 (agentops#2480, Decision 199). The dated resolutions are tracked in §14.
 
 - **E3's intent queue — resolved 2026-09-20, and the blocker withdrawn.** The earlier reading of this
   entry held that E3 was unauthorized until a decision was taken, and grounded that in §1.2's "no new
@@ -135,16 +136,20 @@ Four amendments land inline, each marked `[edge 2026-09-20]` where it lands:
   assignment, scheduling, retry, supervision or expiry of intents is ever added, TS-1's exclusion bites and
   that behaviour belongs outside Vuoro. The reconciliation is recorded against TS-1 itself in the
   agentops target state so the live document carries it too.
-- **Where a hosted runtime's evidence is authoritative.** §1.2 keeps repo shards authoritative and
-  §14 settles auditctl as the canonical home of `EvidenceSet` and `Decision`. A hosted runtime holds
-  no merge rights, so it cannot write a shard; `append_evidence` therefore lands in the substrate
-  first. Whether the substrate's hash chain is the authoritative capture and the shard a projection
-  of it, or the reverse, is undecided. As of this writing, `agentops
-  docs/plans/2026-09-17-target-state.md` named no MCP surface, no public endpoint and no cloud
-  runtime anywhere: TS-6 ("evidence is append-only and has one home") and TS-9 (resumability and
-  successor export proven by rehearsal) had no story for a run that cannot reach that home. That was
-  the gap this realignment closed: TS-16 now names all three, and the substrate-vs-projection
-  question above is what TS-16's own dependency risk paragraph leaves open.
+- **Where a hosted runtime's evidence is authoritative — resolved 2026-10-03.** The
+  2026-09-20 amendment recorded this question without deciding it. Agentops#2480 (Decision 199)
+  chooses the **substrate hash chain as the authoritative capture for new hosted-runtime
+  evidence; repository exports are projections**. A hosted caller cannot merge a shard, so
+  acknowledged capture must not depend on a second repository writer. For E2/#2466,
+  `append_evidence` commits to the authenticated append-only chain and returns its evidence
+  identity/digest; a repository projection is not a second acceptance step. For S4/#2485,
+  existing committed auditctl shards remain authoritative historical source records until
+  verified import. Import preserves authored payloads, original digests and provenance alongside
+  the new chain/import reference; a new envelope must not replace an original digest or rewrite
+  a committed shard. This settles the direction, not implementation or deployed reachability.
+  TS-16's hosted boundary remains: no hosted merge rights, signing authority, credentials or
+  effect-apply scope. Verified import, hosted reachability and reconstructability still require
+  their own evidence. `[decision 2026-10-03; agentops#2480]`
 
 **One correction, pre-emptive.** Quota portfolio routing came out materially weaker than it was
 pitched. There is no supported programmatic read of individual plan consumption on either vendor, so
@@ -239,8 +244,10 @@ rather than against this section, which D1 overrides; see §0.2. *No Vuoro owner
 intent, evidence or acceptance* was already overridden by D1 (2026-09-14) and is not further amended by the edge work; what the edge work adds is
 an internet-reachable write path into a record D1 had already placed inside Vuoro's semantics. *No
 centralized evidence ownership in auditctl — repo shards stay authoritative* is **amended in scope**:
-a hosted runtime cannot write a shard it has no merge rights to, which makes the authoritative
-capture point for its evidence an open question, also in §0.2. *No pre-emptive enablement of
+a hosted runtime cannot write a shard it has no merge rights to. The question recorded on
+2026-09-20 was resolved on 2026-10-03: new hosted evidence is authoritative in the substrate
+hash chain and repository exports are projections; legacy committed shard digests and provenance
+are preserved through verified S4 import (agentops#2480; §0.2). *No pre-emptive enablement of
 repositories without a consumer* is unaffected, and is in fact the rule the E1 stop condition applies
 to the surface itself (§13 falsifier 12). The remaining non-goals — no federation schema on
 speculation, no `scribedispatch` integration, no W7, no `hostproto-semantics` merge, no renovation of
@@ -827,8 +834,10 @@ If ordinary solo work remains neutral or negative and multi-agent bursts do not 
 - whether served/cloud demand becomes real enough to justify productization — **under test rather
   than open in principle** since 2026-09-20: E1 is the cheap experiment and §13 falsifier 12 is its
   stop condition; `[edge 2026-09-20]`
-- where a hosted runtime's evidence is authoritative, given that it holds no merge rights and so
-  cannot write the repo shard §1.2 keeps authoritative. `[edge 2026-09-20]`
+- hosted evidence authority — **resolved 2026-10-03** by agentops#2480 (Decision 199):
+  new hosted captures are authoritative in the substrate hash chain, with repository exports as
+  projections; preserve legacy shard payloads, digests and provenance through verified S4 import.
+  Implementation and deployment proof remain separate (§0.2). `[edge 2026-09-20; decision 2026-10-03]`
 
 ### Deferred topology
 
