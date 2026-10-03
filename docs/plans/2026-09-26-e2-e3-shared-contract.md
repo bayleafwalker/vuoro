@@ -306,3 +306,23 @@ Error codes the edge passes through unchanged: `lease-held`, `lease-superseded`,
 4. A local session carries the vuoro-cloud branches to Forgejo and does the releases, runtime pin, scope grants and promotion.
 
 Owner `work.effect.get` is an explicit repository read capability, including trusted operator reads. The public edge independently requires the exact caller-owned run and proposer before returning content. Its OAuth mapping grants owner propose/get only behind this boundary, not an owner credential to the public caller. Owner proposal idempotency is scoped to repository/workspace/principal/key; replay returns current intent state.
+
+
+**Ledger/effect conformance amendment (2026-10-03, agentops#2594).**
+The reference ledger exposes `begin(workspace_id, principal_id, tool, key,
+request_digest) -> LedgerEntry` and `complete(entry, result)`. A fresh entry
+has no result and is not replayed; a completed-key begin returns the first
+result as a replay. A different digest is refused. Repository scope is fixed
+by the provider binding. `lookup/store` remain compatibility adapters with
+the published `idempotency-conflict` wire spelling. The memory reference
+refuses an incomplete claim rather than granting a second caller authority;
+the durable owner holds that claim in its caller-owned database transaction,
+and rollback frees it. Neither an incomplete claim nor expiry grants effects.
+The same ledger behavior suite binds the reference, intent store and immutable
+Sprintctl PostgreSQL owner; separate-session racing transactions and reconnect
+prove first-result durability. The effect suite binds actual in-memory intent
+storage and served owner operations: accepted content is immutable, acceptance
+binds exact id/revision/digest, propose is not acceptance, and acceptance plus
+mark-applied never settles work. The acceptance capability is distinct from
+ordinary work write authority. CI configures the disposable owner explicitly;
+unavailable configured bindings fail, with no silent skips.

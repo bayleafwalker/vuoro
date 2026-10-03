@@ -596,8 +596,15 @@ class InMemoryIntentStore:
         return winner
 
     def seed(self, intent: EffectIntent) -> None:
-        """Test-only: place an intent directly (e.g. one bound elsewhere)."""
+        """Test-only: insert an immutable fixture, never overwrite a known ID.
 
+        State simulation uses set_state; seed is broader than a content edit
+        guard because it must not bypass the reference's transition fixture.
+        """
+
+        previous = self._intents.get(intent.intent_id)
+        if previous is not None and previous != intent:
+            raise ToolFailure("effect-immutable", "a changed intent requires a new proposal")
         self._intents[intent.intent_id] = intent
 
     async def get(self, intent_id: str, caller: RunBinding, *, forwarded=None) -> EffectIntent:
