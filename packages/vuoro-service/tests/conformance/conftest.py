@@ -9,6 +9,7 @@ def pytest_addoption(parser):
 
 
 def pytest_configure(config):
+    config.addinivalue_line("markers", "conformance_gap(tracker): reproduced owner gap, never an invariant pass")
     config.addinivalue_line("markers", "essential_safety: LTD7.1 essential safety invariant")
     config.addinivalue_line("markers", "essential_workflow: LTD7.1 essential workflow")
 
