@@ -38,6 +38,9 @@ class ReferenceProvider:
     def make_stale(self, handle):
         self.now += 11
 
+    def is_stale(self, handle):
+        return self.store.is_expired(handle.subject) is True
+
     def retained_outcomes(self, subject):
         return [dict(claim_id=o.lease_id, outcome=o.result,
                      disposition=o.disposition, settlement_effect=o.settlement_effect)

@@ -5,7 +5,7 @@ from .reference import ReferenceProvider
 from .test_lease_contract import assert_late_report_is_nonsettling_and_retained
 
 
-class SettlesSupersededStore(LeaseStore):
+class SucceedsSupersededStore(LeaseStore):
     def complete(self, lease_id, holder, *, result=None):
         if self._current_for_lease_id(lease_id) is None:
             return
@@ -13,5 +13,5 @@ class SettlesSupersededStore(LeaseStore):
 
 
 def test_oracle_rejects_settlement_of_a_superseded_report():
-    with pytest.raises(AssertionError):
-        assert_late_report_is_nonsettling_and_retained(ReferenceProvider(SettlesSupersededStore))
+    with pytest.raises(AssertionError, match="superseded report must never settle"):
+        assert_late_report_is_nonsettling_and_retained(ReferenceProvider(SucceedsSupersededStore))

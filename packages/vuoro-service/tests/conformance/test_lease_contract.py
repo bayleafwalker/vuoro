@@ -42,7 +42,7 @@ def assert_late_report_is_nonsettling_and_retained(provider):
     provider.make_stale(old)
     new = provider.claim(subject, "B")
     result = provider.report_outcome(old, "A", {"late": "result"})
-    assert not result.settled
+    assert not result.settled, "superseded report must never settle"
     assert result.code == "CLAIM_SUPERSEDED"
     assert provider.current_claim_id(subject) == new.claim_id
     assert provider.retained_outcomes(subject) == [dict(claim_id=old.claim_id,
@@ -59,8 +59,10 @@ def test_same_holder_stale_claim_reactivates_identity(provider):
     subject = provider.new_subject()
     old = provider.claim(subject, "A")
     provider.make_stale(old)
+    assert provider.is_stale(old)
     resumed = provider.claim(subject, "A")
     assert resumed.claim_id == old.claim_id
+    assert not provider.is_stale(old)  # observed before heartbeat: no cached replay
     provider.heartbeat(old, "A")
     assert provider.report_outcome(old, "A", {"resumed": True}).settled
 

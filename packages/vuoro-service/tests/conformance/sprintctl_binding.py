@@ -9,7 +9,7 @@ import uuid
 from .lease_contract import Claim, Outcome, Refused
 
 _CODES = {"lease-held": "LEASE_HELD", "claim-superseded": "CLAIM_SUPERSEDED",
-          "lease-expired": "CLAIM_SUPERSEDED", "lease-ended": "CLAIM_SUPERSEDED", "lease-not-found": "CLAIM_SUPERSEDED",
+          "lease-expired": "CLAIM_EXPIRED", "lease-ended": "CLAIM_ENDED", "lease-not-found": "CLAIM_NOT_FOUND",
           "idempotency-conflict": "IDEMPOTENCY_KEY_REUSED"}
 
 
@@ -18,8 +18,8 @@ class SprintctlProvider:
         parsed = urlsplit(url)
         if parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
             raise ValueError("lease conformance requires a loopback disposable PostgreSQL database")
-        if not (parsed.path.startswith("/lease_conformance") or parsed.path == "/m14_scenario"):
-            raise ValueError("database must be lease_conformance* or the CI disposable m14_scenario")
+        if not (parsed.path.startswith("/lease_conformance")):
+            raise ValueError("database must be lease_conformance*")
         from sprintctl import pg
         from sprintctl.application import WorkApplication, ApplicationRejection
         self.pg = pg
@@ -91,6 +91,11 @@ class SprintctlProvider:
 
     def read(self, subject):
         return self.invoke("work.lease.read-v1", {"item_id": int(subject)})
+
+    def is_stale(self, handle):
+        row = self.read(handle.subject)["current_lease"]
+        assert row["lease_id"] == handle.claim_id
+        return row["stale"]
 
     def retained_outcomes(self, subject):
         retained = []
