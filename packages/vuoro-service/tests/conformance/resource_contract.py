@@ -49,6 +49,7 @@ class ResourceReference:
         self.decisions = {}
         self.response_digests = {}
         self.conflicts = {}
+        self.conflict_response_digests = {}
         self.evidence = {}
 
     def command(self, resource_id, operation, arguments, *, principal, roles, key, expected):
@@ -60,15 +61,17 @@ class ResourceReference:
             if prior_digest == digest:
                 return response
             conflict_key = (*binding, digest)
-            return self.conflicts.setdefault(conflict_key, canonical({"status": "rejected", "code": "key-conflict", "message": "key-conflict", "resource_id": resource_id, "before": self.rows[resource_id].revision if resource_id in self.rows else 0, "after": None, "first_binding_digest": prior_digest}))
+            response = self.conflicts.setdefault(conflict_key, canonical({"status": "rejected", "code": "key-conflict", "message": "key-conflict", "resource_id": resource_id, "before": self.rows[resource_id].revision if resource_id in self.rows else 0, "after": None, "first_binding_digest": prior_digest}))
+            self.conflict_response_digests[conflict_key] = sha256(response).hexdigest()
+            return response
         row = self.rows.get(resource_id)
         try:
             required_role = {"create": "creator", "relation": "relation-writer", "evidence": "evidence-ingester", "accept": "acceptance-reviewer", "reject": "acceptance-reviewer", "settle": "reconciler", "supersede": "owning-superseder"}[operation]
             if required_role not in roles:
                 raise ValueError("authority")
+            if row is not None and operation in {"relation", "supersede"} and principal != row.creator:
+                raise ValueError("owner")
             if operation == "create":
-                if "creator" not in roles:
-                    raise ValueError("authority")
                 if row is not None or expected != 0:
                     raise ValueError("revision")
                 updated = Resource(resource_id, principal, 1)
@@ -77,12 +80,6 @@ class ResourceReference:
                     raise ValueError("revision")
                 if row.state == "superseded":
                     raise ValueError("state")
-                required = {"relation": "relation-writer", "evidence": "evidence-ingester", "accept": "acceptance-reviewer",
-                            "reject": "acceptance-reviewer", "settle": "reconciler", "supersede": "owning-superseder"}[operation]
-                if required not in roles:
-                    raise ValueError("authority")
-                if operation in {"relation", "supersede"} and principal != row.creator:
-                    raise ValueError("owner")
                 updated = replace(row, revision=row.revision + 1)
                 if operation == "relation":
                     kind, target = arguments["kind"], arguments["target"]

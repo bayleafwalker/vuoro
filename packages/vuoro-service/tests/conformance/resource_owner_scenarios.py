@@ -34,6 +34,7 @@ def test_description_cas_preserves_aggregate_identity_and_refuses_stale_write(re
     assert after["edit_revision"] != row["edit_revision"]
     stale = owner.invoke("work.item.edit", {**args, "description": "second"})
     assert stale.status_code == 409, stale.text
+    assert stale.json()["error"]["code"] == "item-edit-conflict"
     assert owner.read(item)["item"] == after
 
 
@@ -43,8 +44,12 @@ def test_reader_cannot_edit_and_stale_catalog_cannot_dispatch(resource_owner):
     item = owner.item()
     row = owner.read(item)["item"]
     args = {"item_id": item, "description": "forbidden", "expected_revision": row["edit_revision"]}
-    assert owner.invoke("work.item.edit", args, token="reader").status_code == 403
-    assert owner.invoke("work.item.edit", args, revision="stale").status_code == 409
+    denied = owner.invoke("work.item.edit", args, token="reader")
+    assert denied.status_code == 403
+    assert denied.json()["error"]["code"] == "authority-required"
+    stale = owner.invoke("work.item.edit", args, revision="stale")
+    assert stale.status_code == 409
+    assert stale.json()["error"]["code"] == "stale-catalog"
     assert owner.read(item)["item"] == row
 
 

@@ -37,6 +37,7 @@ item or confer an external authority's decision.
 
 Relations are source-owned directed parent-of, depends-on, derived-from and
 supersedes edges. They mutate only the source revision. Self relations are refused;
+All relation edges point source → target, including parent-of and depends-on;
 parent/dependency cycles, including mixed and concurrent reverse edges, must be
 refused atomically. Targets keep their identity, revision and owner. Relations,
 external references and supersession do not transfer ownership. External
@@ -130,7 +131,8 @@ CI job with the immutable published owner. It uses the real authenticated Vuoro
 HTTP shell, not a direct invocation that bypasses central authorization. Supported
 observations: description CAS preserves aggregate identity, stale writes leave the
 projection unchanged, a reader cannot edit, and a stale catalog cannot dispatch.
-Its explicit **gap receipts** execute real counterexamples: opposite dependencies both
+Sprint and track fixtures are initialized directly on the disposable owner store;
+resource creation and all observed mutations use authenticated HTTP. Its explicit **gap receipts** execute real counterexamples: opposite dependencies both
 commit; an epoch-one principal with repo write authority edits an existing item, and an
 omitted catalog revision dispatches a legacy-compatible write.
 Passing those receipt tests means the gaps remain accurately recorded; it does

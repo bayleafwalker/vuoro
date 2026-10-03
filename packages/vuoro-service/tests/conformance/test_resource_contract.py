@@ -113,15 +113,22 @@ def test_canonical_bytes_preserve_unicode_and_reject_floats():
 
 @pytest.mark.essential_safety
 def test_rebuild_refuses_gaps_duplicate_positions_and_identity_conflicts():
-    from dataclasses import replace
+    from dataclasses import asdict, replace
     from .resource_contract import rebuild
     model = created("A")
     command(model, "A", "supersede", 1)
     history = model.changes["A"]
     assert rebuild(history, model.change_digests["A"]) == model.rows["A"]
-    for invalid in (history[1:], history + [history[-1]], [history[0], replace(history[1], creator="issuer:subject:1")]):
-        with pytest.raises(ValueError, match="journal"):
-            rebuild(invalid, model.change_digests["A"])
+    for invalid, error in ((history[1:], "journal position"),
+                           (history + [history[-1]], "journal position"),
+                           ([history[0], replace(history[1], creator="issuer:subject:1")], "journal identity")):
+        digests = [sha256(canonical(asdict(row))).hexdigest() for row in invalid]
+        with pytest.raises(ValueError, match="^" + error + "$"):
+            rebuild(invalid, digests)
+    with pytest.raises(ValueError, match="^journal digest count$"):
+        rebuild(history[1:], model.change_digests["A"])
+    with pytest.raises(ValueError, match="^journal digest$"):
+        rebuild(history, list(reversed(model.change_digests["A"])))
 
 
 @pytest.mark.essential_safety

@@ -161,7 +161,7 @@ jobs:
           --lease-pg-url postgresql://m14:m14-ci-only@127.0.0.1:5432/lease_conformance_ci
       - name: Resource carrier observations and explicit conformance gap receipts
         run: >-
-          uv run --no-sync pytest packages/vuoro-service/tests/conformance/resource_owner_scenarios.py -q
+          uv run --no-sync pytest packages/vuoro-service/tests/conformance/resource_owner_scenarios.py --strict-markers -q
           --lease-pg-url postgresql://m14:m14-ci-only@127.0.0.1:5432/lease_conformance_ci
       - name: Published owner accepted-discovery restart and signed-PR proof
         env:
