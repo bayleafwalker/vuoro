@@ -653,6 +653,9 @@ class ShellIntentStore:
             "item_id": intent.item_id, "run_id": intent.run_id, "repository": intent.repository,
             "base_commit": intent.base_commit, "title": intent.title, "rationale": intent.rationale,
             "unified_diff": intent.unified_diff, "idempotency_key": key}, forwarded))["intent"]
+        if (row.get("canonical_intent_digest") != intent.canonical_intent_digest
+                or row.get("run_id") != intent.run_id or row.get("item_id") != intent.item_id):
+            raise ToolFailure("idempotency-conflict", "the owner result does not match this proposal")
         if not re.fullmatch(r"intent_[0-9A-HJKMNP-TV-Z]{26}", row["intent_id"]):
             raise ToolFailure("effects-unavailable", "the owner returned an invalid intent id")
         return StoredResult(stored.digest, {"intent_id": row["intent_id"], "state": row["state"]})

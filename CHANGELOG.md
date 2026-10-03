@@ -5,6 +5,11 @@ recorded here.
 
 ## Unreleased
 
+### Vuoro service0.1.83
+
+Pins the verified attested Sprintctl0.12.0 owner wheel and enables accepted-effect restart proof against that published owner. Remote schema remains20; Cloud OAuth mapping and deployment are separate prerequisites.
+
+
 - Effect proposals now use sprintctl's atomic served owner through caller-only
   assertions, bound to an item and run. Trusted reconciliation checks the
   revision and canonical content digest against acceptance before effects,
