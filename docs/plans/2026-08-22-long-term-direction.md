@@ -116,8 +116,8 @@ Four amendments land inline, each marked `[edge 2026-09-20]` where it lands:
 4. **Falsifier (§13 falsifier 12).** If a month of E1 passes without the substrate being reached from
    a hosted runtime, the rest is not built.
 
-**Two conflicts resolved.** E3 was resolved on 2026-09-20; hosted evidence authority was
-resolved on 2026-10-03 (agentops#2480, Decision 199). The dated resolutions are tracked in §14.
+**One conflict resolved 2026-09-20; one recorded then and resolved 2026-10-03.**
+The dated resolutions are tracked in §14 (agentops#2480, Decision 199).
 
 - **E3's intent queue — resolved 2026-09-20, and the blocker withdrawn.** The earlier reading of this
   entry held that E3 was unauthorized until a decision was taken, and grounded that in §1.2's "no new
@@ -136,12 +136,23 @@ resolved on 2026-10-03 (agentops#2480, Decision 199). The dated resolutions are 
   assignment, scheduling, retry, supervision or expiry of intents is ever added, TS-1's exclusion bites and
   that behaviour belongs outside Vuoro. The reconciliation is recorded against TS-1 itself in the
   agentops target state so the live document carries it too.
-- **Where a hosted runtime's evidence is authoritative — resolved 2026-10-03.** The
-  2026-09-20 amendment recorded this question without deciding it. Agentops#2480 (Decision 199)
+- **Where a hosted runtime's evidence is authoritative — resolved 2026-10-03.**
+  **Historical record (2026-09-20, authority question superseded below).** §1.2 keeps repo shards authoritative and
+  §14 settles auditctl as the canonical home of `EvidenceSet` and `Decision`. A hosted runtime holds
+  no merge rights, so it cannot write a shard; `append_evidence` therefore lands in the substrate
+  first. Whether the substrate's hash chain is the authoritative capture and the shard a projection
+  of it, or the reverse, was then left open. As of this writing, `agentops
+  docs/plans/2026-09-17-target-state.md` named no MCP surface, no public endpoint and no cloud
+  runtime anywhere: TS-6 ("evidence is append-only and has one home") and TS-9 (resumability and
+  successor export proven by rehearsal) had no story for a run that cannot reach that home. That was
+  the gap this realignment closed: TS-16 now names all three, and the substrate-vs-projection
+  question above was carried as an open dependency question in TS-16.
+
+  **Resolution (2026-10-03).** Agentops#2480 (Decision 199)
   chooses the **substrate hash chain as the authoritative capture for new hosted-runtime
   evidence; repository exports are projections**. A hosted caller cannot merge a shard, so
   acknowledged capture must not depend on a second repository writer. For E2/#2466,
-  `append_evidence` commits to the authenticated append-only chain and returns its evidence
+  `append_evidence` must commit to the authenticated append-only chain and return its evidence
   identity/digest; a repository projection is not a second acceptance step. For S4/#2485,
   existing committed auditctl shards remain authoritative historical source records until
   verified import. Import preserves authored payloads, original digests and provenance alongside
