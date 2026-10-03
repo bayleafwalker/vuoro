@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from typing import Any
 
 import pytest
@@ -79,12 +79,11 @@ def _run(coro):
     return asyncio.run(coro)
 
 
-if os.environ.get("VUORO_AUTHORITY_TEST_PG_URL"):
-    LEDGERS["sprintctl-pg"] = None
+LEDGER_PROVIDERS = sorted(LEDGERS) + (["sprintctl-pg"] if os.environ.get("VUORO_AUTHORITY_TEST_PG_URL") else [])
 
 
-@pytest.fixture(params=sorted(LEDGERS))
-def ledger(request) -> IdempotencyLedger:
+@pytest.fixture(params=LEDGER_PROVIDERS)
+def ledger(request) -> Iterator[IdempotencyLedger]:
     if request.param == "sprintctl-pg":
         from authority_pg_binding import PgLedgerBinding
         binding = PgLedgerBinding(os.environ["VUORO_AUTHORITY_TEST_PG_URL"])
@@ -216,6 +215,7 @@ def test_owner_concurrent_transactions_and_reconnect_keep_first_result():
         assert all(result == results[0] for result in results)
         for binding in bindings:
             binding.close()
+        bindings = []
         fresh = PgLedgerBinding(os.environ["VUORO_AUTHORITY_TEST_PG_URL"])
         try:
             fresh.owner_store.repo_id = repo
@@ -243,3 +243,32 @@ def test_reference_begin_never_grants_a_second_incomplete_claim_or_mutable_repla
         replay.result["nested"]["value"] = 3
         assert (await ledger.begin("w", "p", "t", "key-0001", _row(1).digest)).result == {"nested": {"value": 1}}
     _run(scenario())
+
+
+
+@pytest.mark.skipif(not os.environ.get("VUORO_AUTHORITY_TEST_PG_URL"), reason="disposable owner not configured")
+def test_owner_canonical_entry_rollback_and_snapshot_are_durable():
+    from authority_pg_binding import PgLedgerBinding
+    binding = PgLedgerBinding(os.environ["VUORO_AUTHORITY_TEST_PG_URL"])
+    class Abort(Exception):
+        pass
+    try:
+        with pytest.raises(Abort):
+            with binding.owner_store.conn.transaction():
+                entry = binding.owner.begin("w", "p", "t", "rollback-0001", _row(1).digest)
+                assert vars(entry) == vars(LedgerEntry("w", "p", "t", "rollback-0001", _row(1).digest, None, False))
+                binding.owner.complete(entry, {"nested": {"value": 1}})
+                raise Abort()
+        assert _run(binding.lookup("w", "p", "t", "rollback-0001")) is None
+        with binding.owner_store.conn.transaction():
+            entry = binding.owner.begin("w", "p", "t", "rollback-0001", _row(2).digest)
+            assert entry.result is None and entry.replayed is False
+            binding.owner.complete(entry, {"nested": {"value": 2}})
+        with binding.owner_store.conn.transaction():
+            replay = binding.owner.begin("w", "p", "t", "rollback-0001", _row(2).digest)
+            assert replay.replayed is True
+            replay.result["nested"]["value"] = 3
+        with binding.owner_store.conn.transaction():
+            assert binding.owner.begin("w", "p", "t", "rollback-0001", _row(2).digest).result == {"nested": {"value": 2}}
+    finally:
+        binding.close()

@@ -39,6 +39,7 @@ __all__ = [
     "IDEMPOTENCY_KEY",
     "IDEMPOTENCY_KEY_SCHEMA",
     "IdempotencyLedger",
+    "CanonicalIdempotencyLedger",
     "InMemoryIdempotencyLedger",
     "StoredResult",
     "LedgerEntry",
@@ -107,11 +108,6 @@ class LedgerEntry:
 
 
 class IdempotencyLedger(Protocol):
-    async def begin(self, workspace_id: str, principal_id: str, tool: str,
-                    key: str, request_digest: str) -> LedgerEntry: ...
-
-    async def complete(self, entry: LedgerEntry, result: Mapping[str, Any]) -> LedgerEntry: ...
-
     async def lookup(
         self, workspace_id: str, principal_id: str, tool: str, key: str
     ) -> StoredResult | None:
@@ -122,6 +118,15 @@ class IdempotencyLedger(Protocol):
     ) -> StoredResult:
         """Record the first result atomically; if another writer won the race,
         return theirs (the caller must then compare digests)."""
+
+
+class CanonicalIdempotencyLedger(IdempotencyLedger, Protocol):
+    """Begin/complete authority protocol; old edge callers use the view above."""
+
+    async def begin(self, workspace_id: str, principal_id: str, tool: str,
+                    key: str, request_digest: str) -> LedgerEntry: ...
+
+    async def complete(self, entry: LedgerEntry, result: Mapping[str, Any]) -> LedgerEntry: ...
 
 
 def replay_or_conflict(stored: StoredResult | None, digest: str) -> Mapping[str, Any] | None:
@@ -182,6 +187,8 @@ class InMemoryIdempotencyLedger:
     async def store(
         self, workspace_id: str, principal_id: str, tool: str, key: str, stored: StoredResult
     ) -> StoredResult:
+        # Do not mix a legacy lookup/effect/store transaction with pending
+        # canonical begins: the deployed owner must own the whole transaction.
         # Thin compatibility adapter: store still returns the first row even
         # for a conflicting racer; its caller maps that row to the wire refusal.
         previous = await self.lookup(workspace_id, principal_id, tool, key)

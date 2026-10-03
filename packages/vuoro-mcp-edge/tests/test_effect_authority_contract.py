@@ -61,7 +61,7 @@ def test_every_transition_refuses_wrong_acceptance_binding(authority, operation,
     if operation == "mark-applied":
         row = authority.transition("accept", row)
     before = authority.get(row["intent_id"])
-    changed = {**row, field: 2 if field == "revision" else "0" * 64}
+    changed = {**row, field: row["revision"] + 1 if field == "revision" else "0" * 64}
     refused(code, lambda: authority.transition(operation, changed))
     assert authority.get(row["intent_id"]) == before
 
@@ -100,3 +100,15 @@ def test_oracle_detects_false_settlement_on_acceptance():
             return result
     with pytest.raises(AssertionError, match="acceptance never settles work"):
         test_accept_binds_exact_revision_digest_but_is_not_application_or_settlement(SettlingOnAccept())
+
+
+
+@pytest.mark.parametrize("terminal,next_operation", [("rejected", "mark-applied"), ("applied", "accept")])
+def test_terminal_effect_cannot_be_reaccepted_or_applied(authority, terminal, next_operation):
+    row = authority.propose()
+    if terminal == "rejected":
+        row = authority.transition("reject", row)
+    else:
+        row = authority.transition("mark-applied", authority.transition("accept", row))
+    refused("effect-invalid-transition", lambda: authority.transition(next_operation, row))
+    assert authority.get(row["intent_id"])["state"] == terminal
