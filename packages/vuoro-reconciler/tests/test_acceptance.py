@@ -157,7 +157,7 @@ def _touch(path: Path) -> Path:
 def test_the_proposer_cannot_accept_its_own_intent(bare_remote: Path) -> None:
     source = FakeIntentSource(proposed=[_intent(bare_remote)])
     with pytest.raises(AcceptanceRefused):
-        asyncio.run(OperatorAcceptance(source).accept_interactive("effect_acc0001", PROPOSER))
+        asyncio.run(OperatorAcceptance(source).accept_interactive("effect_acc0001", PROPOSER, expected_revision=source.records["effect_acc0001"].revision, expected_digest=source.records["effect_acc0001"].canonical_intent_digest))
     assert source.states["effect_acc0001"] == "proposed"
 
 
@@ -421,3 +421,15 @@ def test_the_default_branch_is_always_protected(bare_remote: Path, reconciler_si
     outcomes = asyncio.run(_reconciler(source, provider, reconciler_signing_key).run_once())
     assert outcomes[0].reason == "branch-is-protected"
     assert provider.clones == [] and provider.pushed_branches == []
+
+
+def test_operator_review_snapshot_is_not_replaced_by_fresh_content(bare_remote):
+    from dataclasses import replace
+    source = FakeIntentSource(proposed=[_intent(bare_remote)])
+    reviewed = source.records["effect_acc0001"]
+    source.records[reviewed.intent_id] = replace(reviewed, revision=reviewed.revision + 1,
+                                               canonical_intent_digest="f" * 64)
+    with pytest.raises(AcceptanceRefused, match="operator reviewed"):
+        asyncio.run(OperatorAcceptance(source).accept_interactive(reviewed.intent_id, "other-operator",
+                    expected_revision=reviewed.revision, expected_digest=reviewed.canonical_intent_digest))
+    assert source.states[reviewed.intent_id] == "proposed"

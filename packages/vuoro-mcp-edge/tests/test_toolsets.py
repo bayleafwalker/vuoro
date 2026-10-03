@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import httpx
 from dataclasses import replace
 from typing import Any
 
@@ -82,12 +83,13 @@ def test_default_composition_ships_no_toolset_without_durable_stores() -> None:
 
     context = ToolsetContext(
         env={},
-        work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"),
+        work_source=ShellWorkSource(base_url="http://shell", transport=httpx.MockTransport(
+                lambda request: httpx.Response(200, json={"operations": []}))),
         runs=UnavailableRunRegistry(),
     )
     toolsets = build_toolsets(context)
-    names = [tool.name for toolset in toolsets for tool in toolset.tools]
-    assert names == []
+    definitions = [asyncio.run(tool.describe()) for toolset in toolsets for tool in toolset.tools]
+    assert all(definition is None for definition in definitions)
 
 
 def test_toolset_tools_follow_the_builtins_in_list_and_discover(keys, auth) -> None:

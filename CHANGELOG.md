@@ -5,6 +5,18 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service 0.1.83: pins the verified attested Sprintctl 0.12.0 owner wheel
+  and enables accepted-effect restart proof against that published owner. Remote
+  schema remains 20; Cloud OAuth mapping and deployment are separate prerequisites.
+
+
+- Effect proposals now use sprintctl's atomic served owner through caller-only
+  assertions, bound to an item and run. Trusted reconciliation checks the
+  revision and canonical content digest against acceptance before effects,
+  and reports the signed commit/PR through mark-applied. Accepted discovery
+  uses its separate owner capability; deployment awaits the released consumer runtime
+  and Cloud mapping (agentops#2567, #2598, #2600).
+
 - Provider-neutral lease conformance: seven safety/workflow scenarios bind the
   reference LeaseStore and pinned sprintctl owner on disposable PostgreSQL; an
   INV-L1 mutant detects false success on a superseded report.

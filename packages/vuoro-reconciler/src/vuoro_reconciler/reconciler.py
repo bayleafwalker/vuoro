@@ -45,7 +45,7 @@ from .git_ops import (
     stage_all,
     try_apply_diff,
 )
-from .intents import Acceptor, EffectIntent, IntentSource, OperatorAcceptor, PolicyAcceptor
+from .intents import Acceptor, EffectIntent, IntentSource, OperatorAcceptor, PolicyAcceptor, canonical_digest
 from .provider import (
     BranchAlreadyExists,
     ProviderClient,
@@ -228,6 +228,16 @@ class Reconciler:
                 raise _Refused("outside-policy-scope")
         if not _INTENT_ID.fullmatch(intent.intent_id or ""):
             raise _Refused("invalid-intent-id")
+        acceptance = intent.acceptance
+        digest = canonical_digest(intent)
+        if (acceptance is None or not re.fullmatch(r"[0-9a-f]{64}", intent.canonical_intent_digest)
+                or digest != intent.canonical_intent_digest
+                or acceptance.get("canonical_intent_digest") != digest
+                or acceptance.get("intent_id") != intent.intent_id
+                or acceptance.get("intent_revision") != intent.revision):
+            raise _Refused("acceptance-digest-mismatch")
+        if isinstance(acceptor, OperatorAcceptor) and acceptance.get("acceptor_principal") != acceptor.subject:
+            raise _Refused("acceptance-principal-mismatch")
         if intent.effect_kind != "diff":
             raise _Refused("effect-kind-not-supported")
         if intent.repository not in self.config.repository_allowlist:
@@ -253,7 +263,8 @@ class Reconciler:
 
         try:
             await self.intent_source.report_applied(
-                intent.intent_id, commit_sha=commit_sha, pr_url=pr.url, acceptor=acceptor
+                intent.intent_id, commit_sha=commit_sha, pr_url=pr.url, acceptor=acceptor,
+                revision=intent.revision, canonical_intent_digest=intent.canonical_intent_digest
             )
         except Exception:
             # The branch and PR exist; a re-run finds them and reports again.

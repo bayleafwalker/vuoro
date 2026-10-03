@@ -9,7 +9,7 @@ import subprocess
 from typing import Any
 
 from vuoro_reconciler.git_ops import push_branch
-from vuoro_reconciler.intents import Acceptor, EffectIntent
+from vuoro_reconciler.intents import Acceptor, EffectIntent, canonical_digest, OperatorAcceptor
 from vuoro_reconciler.provider import (
     BranchAlreadyExists,
     ProviderCredentialRejected,
@@ -36,6 +36,16 @@ class FakeIntentSource:
     polls_proposed: int = 0
 
     def __post_init__(self) -> None:
+        def sealed(intent):
+            digest = canonical_digest(intent)
+            acceptance = None if intent.acceptor is None else {
+                "intent_id": intent.intent_id, "intent_revision": intent.revision,
+                "canonical_intent_digest": digest,
+                "acceptor_principal": intent.acceptor.subject if isinstance(intent.acceptor, OperatorAcceptor) else "policy:test",
+                "acceptor_policy_version": None, "accepted_at": "2026-10-03T00:00:00Z"}
+            return replace(intent, canonical_intent_digest=digest, acceptance=acceptance)
+        self.proposed = [sealed(i) for i in self.proposed]
+        self.accepted = [sealed(i) for i in self.accepted]
         for intent in self.proposed:
             self.records[intent.intent_id] = intent
             self.states[intent.intent_id] = "proposed"
@@ -53,20 +63,22 @@ class FakeIntentSource:
     async def poll_accepted(self) -> list[EffectIntent]:
         return self._in("accepted")
 
-    async def accept(self, intent_id: str, acceptor: Acceptor) -> None:
+    async def accept(self, intent_id: str, acceptor: Acceptor, *, revision: int, canonical_intent_digest: str) -> None:
         if self.states.get(intent_id) != "proposed":
             raise RuntimeError(f"{intent_id} is not proposed")
-        self.records[intent_id] = replace(self.records[intent_id], acceptor=acceptor)
+        self.records[intent_id] = replace(self.records[intent_id], acceptor=acceptor, acceptance={
+            "intent_id": intent_id, "intent_revision": revision, "canonical_intent_digest": canonical_intent_digest,
+            "acceptor_principal": acceptor.subject if isinstance(acceptor, OperatorAcceptor) else "policy:test"})
         self.states[intent_id] = "accepted"
 
-    async def reject(self, intent_id: str, acceptor: Acceptor, reason: str) -> None:
+    async def reject(self, intent_id: str, acceptor: Acceptor, reason: str, *, revision: int, canonical_intent_digest: str) -> None:
         if self.states.get(intent_id) != "proposed":
             raise RuntimeError(f"{intent_id} is not proposed")
         self.states[intent_id] = "rejected"
         self.rejected.append({"intent_id": intent_id, "acceptor": acceptor, "reason": reason})
 
     async def report_applied(
-        self, intent_id: str, *, commit_sha: str, pr_url: str, acceptor: Acceptor
+        self, intent_id: str, *, commit_sha: str, pr_url: str, acceptor: Acceptor, revision: int, canonical_intent_digest: str
     ) -> None:
         self.states[intent_id] = "applied"
         self.applied.append(

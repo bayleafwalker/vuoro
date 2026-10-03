@@ -204,3 +204,42 @@ def test_a_repository_outside_the_allowlist_is_refused_before_any_clone(
     ]
     assert provider.pushed_branches == []
     assert provider.pull_requests == []
+
+
+@pytest.mark.parametrize("mutation", ["diff", "title", "revision", "digest", "principal", "missing", "recomputed", "acceptance-id", "acceptance-digest"])
+def test_acceptance_binding_mismatch_refused_before_repository_effect(
+    bare_remote, reconciler_signing_key, mutation
+):
+    from dataclasses import replace
+    intent = _intent(bare_remote, unified_diff=MODIFY_DIFF)
+    source = FakeIntentSource(accepted=[intent])
+    sealed = source.records[intent.intent_id]
+    if mutation == "diff":
+        sealed = replace(sealed, unified_diff=MODIFY_DIFF.replace("+new", "+tampered"))
+    elif mutation == "title":
+        sealed = replace(sealed, title="tampered")
+    elif mutation == "revision":
+        sealed = replace(sealed, revision=sealed.revision + 1)
+    elif mutation == "digest":
+        sealed = replace(sealed, canonical_intent_digest="0" * 64)
+    elif mutation == "principal":
+        sealed = replace(sealed, acceptance={**sealed.acceptance, "acceptor_principal": "stranger"})
+    elif mutation == "recomputed":
+        from vuoro_reconciler.intents import canonical_digest
+        sealed = replace(sealed, title="changed but consistently redigested")
+        sealed = replace(sealed, canonical_intent_digest=canonical_digest(sealed))
+    elif mutation == "acceptance-id":
+        sealed = replace(sealed, acceptance={**sealed.acceptance, "intent_id": "other"})
+    elif mutation == "acceptance-digest":
+        sealed = replace(sealed, acceptance={**sealed.acceptance, "canonical_intent_digest": "0" * 64})
+    else:
+        sealed = replace(sealed, acceptance=None)
+    source.records[intent.intent_id] = sealed
+    provider = FakeProviderClient(repositories={"repo-a": bare_remote})
+    reconciler = Reconciler(intent_source=source, provider=provider, signing_key=reconciler_signing_key,
+                           config=ReconcilerConfig(repository_allowlist=frozenset({"repo-a"})))
+    (outcome,) = asyncio.run(reconciler.run_once())
+    assert outcome.state == "failed"
+    assert outcome.reason == ("acceptance-principal-mismatch" if mutation == "principal" else "acceptance-digest-mismatch")
+    assert provider.clones == [] and provider.pushed_branches == [] and provider.pull_requests == []
+    assert source.applied == []

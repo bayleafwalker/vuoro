@@ -17,6 +17,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+import hashlib
+import json
 from typing import Any, Literal, Protocol
 
 __all__ = [
@@ -101,6 +103,10 @@ class EffectIntent:
     unified_diff: str
     workspace_id: str
     proposer_principal: str
+    item_id: int = 1
+    revision: int = 1
+    canonical_intent_digest: str = ""
+    acceptance: Mapping[str, Any] | None = None
     effect_kind: str = "diff"
     acceptor: Acceptor | None = field(default=None)
 
@@ -117,15 +123,15 @@ class IntentSource(Protocol):
         """Intents ready to reconcile. An empty list means none are ready --
         never an error; a source that cannot answer raises instead."""
 
-    async def accept(self, intent_id: str, acceptor: Acceptor) -> None:
+    async def accept(self, intent_id: str, acceptor: Acceptor, *, revision: int, canonical_intent_digest: str) -> None:
         """`proposed -> accepted`, recording `acceptor`. Compare-and-set: an
         intent no longer in `proposed` is not transitioned (raise)."""
 
-    async def reject(self, intent_id: str, acceptor: Acceptor, reason: str) -> None:
+    async def reject(self, intent_id: str, acceptor: Acceptor, reason: str, *, revision: int, canonical_intent_digest: str) -> None:
         """`proposed -> rejected`, recording who rejected it and why."""
 
     async def report_applied(
-        self, intent_id: str, *, commit_sha: str, pr_url: str, acceptor: Acceptor
+        self, intent_id: str, *, commit_sha: str, pr_url: str, acceptor: Acceptor, revision: int, canonical_intent_digest: str
     ) -> None:
         """The intent was applied: `commit_sha` is the signed commit, `pr_url`
         the pull request opened for it, `acceptor` who authorised it.
@@ -138,3 +144,14 @@ class IntentSource(Protocol):
         """The intent could not be reconciled. `reason` is a stable,
         machine-readable code (e.g. `diff-does-not-apply`,
         `repository-not-allowlisted`), never upstream/log detail."""
+
+
+def canonical_digest(intent: EffectIntent) -> str:
+    """Recompute the published sprintctl-effect-intent/v1 content digest.
+
+    Verification only: the owner computes and persists the authoritative value.
+    """
+    fields = ("item_id", "repository", "base_commit", "title", "rationale", "unified_diff")
+    body = {"schema": "sprintctl-effect-intent/v1", **{name: getattr(intent, name) for name in fields}}
+    return hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":"),
+                                   ensure_ascii=False).encode("utf-8")).hexdigest()

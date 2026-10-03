@@ -137,10 +137,12 @@ async def _run(
             return 1
     try:
         if arguments.command == "accept":
-            acceptor = await acceptance.accept_interactive(intent.intent_id, arguments.operator)
+            acceptor = await acceptance.accept_interactive(intent.intent_id, arguments.operator,
+                expected_revision=intent.revision, expected_digest=intent.canonical_intent_digest)
         else:
             acceptor = await acceptance.reject_interactive(
-                intent.intent_id, arguments.operator, arguments.reason
+                intent.intent_id, arguments.operator, arguments.reason,
+                expected_revision=intent.revision, expected_digest=intent.canonical_intent_digest
             )
     except AcceptanceRefused as refused:
         stdout.write(f"refused: {visible(str(refused))}\n")

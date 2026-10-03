@@ -256,7 +256,8 @@ async def apply_auto_accept(
             acceptor = config.evaluate(intent)
             if acceptor is None:
                 continue
-            await intent_source.accept(intent.intent_id, acceptor)
+            await intent_source.accept(intent.intent_id, acceptor, revision=intent.revision,
+                                       canonical_intent_digest=intent.canonical_intent_digest)
         except Exception:
             _log.exception("auto-accept: intent %s could not be accepted; skipped", intent.intent_id)
             continue
@@ -278,24 +279,32 @@ class OperatorAcceptance:
                 return intent
         raise AcceptanceRefused(f"no proposed intent {intent_id!r}")
 
-    async def accept_interactive(self, intent_id: str, operator_subject: str) -> OperatorAcceptor:
+    async def accept_interactive(self, intent_id: str, operator_subject: str, *,
+                                 expected_revision: int, expected_digest: str) -> OperatorAcceptor:
         intent = await self.pending(intent_id)
+        if (intent.revision, intent.canonical_intent_digest) != (expected_revision, expected_digest):
+            raise AcceptanceRefused("intent differs from the operator reviewed revision and digest")
         _require_subject(operator_subject)
         if operator_subject == intent.proposer_principal:
             raise AcceptanceRefused("the proposing principal cannot accept its own intent")
         acceptor = OperatorAcceptor(subject=operator_subject)
-        await self.intent_source.accept(intent_id, acceptor)
+        await self.intent_source.accept(intent_id, acceptor, revision=expected_revision,
+                                        canonical_intent_digest=expected_digest)
         return acceptor
 
     async def reject_interactive(
-        self, intent_id: str, operator_subject: str, reason: str
+        self, intent_id: str, operator_subject: str, reason: str, *,
+        expected_revision: int, expected_digest: str
     ) -> OperatorAcceptor:
-        await self.pending(intent_id)
+        intent = await self.pending(intent_id)
+        if (intent.revision, intent.canonical_intent_digest) != (expected_revision, expected_digest):
+            raise AcceptanceRefused("intent differs from the operator reviewed revision and digest")
         _require_subject(operator_subject)
         if not reason.strip():
             raise AcceptanceRefused("a rejection needs a reason")
         acceptor = OperatorAcceptor(subject=operator_subject)
-        await self.intent_source.reject(intent_id, acceptor, reason)
+        await self.intent_source.reject(intent_id, acceptor, reason, revision=expected_revision,
+                                        canonical_intent_digest=expected_digest)
         return acceptor
 
 

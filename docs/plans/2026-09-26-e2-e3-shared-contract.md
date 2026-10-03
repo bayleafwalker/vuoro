@@ -32,6 +32,33 @@
 | `vuoro:effect.propose` | `effect:propose` | `propose` | `propose_effect`, `get_effect` | E3 |
 | `vuoro:effect.apply` | none | none | none | refused forever |
 
+**Amendment (2026-10-03, agentops#2567/#2598).** sprintctl owns the
+intent lifecycle. These owner capabilities are separate from the edge bucket:
+
+| Owner operation | Assertion authority | Horizon |
+|---|---|---|
+| `work.effect.propose-v1` | `work.effect.propose` | proposer, mapped from `vuoro:effect.propose` |
+| `work.effect.get-v1` | `work.effect.get` | repository read (public edge restricts to proposer-owned run), mapped from the same scope |
+| `work.effect.list-proposed-v1` | `work.effect.list-proposed` | trusted acceptance |
+| `work.effect.list-accepted-v1` | `work.effect.list-accepted` | trusted restart discovery |
+| `work.effect.accept-v1` | `work.effect.accept` | trusted acceptance |
+| `work.effect.reject-v1` | `work.effect.reject` | trusted rejection |
+| `work.effect.mark-applied-v1` | `work.effect.mark-applied` | trusted reconciler |
+
+No list or transition capability crosses to the public scope. Neither listing
+capability implies the other. `propose_effect` requires `item_id` as well as
+the existing run and diff fields; the owner computes the canonical digest and
+proposer, and transition callers name revision plus digest rather than an
+acceptor wire argument. The reconciler recomputes the content digest and checks
+acceptance id/revision/digest before any repository effect. Its served source
+polls accepted intents through the owner after restart; an older owner refusing
+that operation is an error, never an empty work list. The owner has no failed
+transition or policy acceptance yet: failed application keeps the intent
+accepted, and the adapter refuses policy acceptance rather than dropping policy
+attribution. Deployment needs an immutable owner release containing accepted
+discovery, a pinned runtime and Cloud scope mapping (agentops#2600); code
+acceptance does not claim these capabilities are available in production.
+
 - **Mutating.** All three new authorities are mutating. vuoro-cloud `api.is_mutating_authority` must return true for them, so read-only and frozen workspaces refuse them.
 - **Mutation freeze.** It must cover every tool above except the read bucket. Today `/mcp` skips the freeze; E2 fixes that for all write buckets at once.
 - **Grants.** Each scope becomes grantable only for the pre-registered `claude-connector` client. The row is added to `SCOPE_TO_AUTHORITIES` by the item that owns the scope. vuoro-cloud `MCP_TOOL_SCOPES` gets one row per tool.
@@ -277,3 +304,5 @@ Error codes the edge passes through unchanged: `lease-held`, `lease-superseded`,
 2. E2 and E3 on independent branches (`e2/*`, `e3/*`) in bayleafwalker/vuoro. Their vuoro-cloud changes are pushed as branches on the GitHub replica, marked "carry to Forgejo".
 3. E2 merges first. E3 rebases: expected conflicts are only the vuoro-cloud scope-table block and none in vuoro.
 4. A local session carries the vuoro-cloud branches to Forgejo and does the releases, runtime pin, scope grants and promotion.
+
+Owner `work.effect.get` is an explicit repository read capability, including trusted operator reads. The public edge independently requires the exact caller-owned run and proposer before returning content. Its OAuth mapping grants owner propose/get only behind this boundary, not an owner credential to the public caller. Owner proposal idempotency is scoped to repository/workspace/principal/key; replay returns current intent state.
