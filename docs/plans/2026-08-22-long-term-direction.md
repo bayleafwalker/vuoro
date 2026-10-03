@@ -116,8 +116,8 @@ Four amendments land inline, each marked `[edge 2026-09-20]` where it lands:
 4. **Falsifier (§13 falsifier 12).** If a month of E1 passes without the substrate being reached from
    a hosted runtime, the rest is not built.
 
-**One conflict resolved 2026-09-20; one recorded then and resolved 2026-10-03.**
-The dated resolutions are tracked in §14 (agentops#2480, Decision 199).
+**One conflict resolved 2026-09-20; one recorded then and resolved 2026-10-03
+(agentops#2480, Decision 199).** Both are tracked in §14.
 
 - **E3's intent queue — resolved 2026-09-20, and the blocker withdrawn.** The earlier reading of this
   entry held that E3 was unauthorized until a decision was taken, and grounded that in §1.2's "no new
@@ -146,7 +146,9 @@ The dated resolutions are tracked in §14 (agentops#2480, Decision 199).
   runtime anywhere: TS-6 ("evidence is append-only and has one home") and TS-9 (resumability and
   successor export proven by rehearsal) had no story for a run that cannot reach that home. That was
   the gap this realignment closed: TS-16 now names all three, and the substrate-vs-projection
-  question above was carried as an open dependency question in TS-16.
+  question above was left open here. `[Correction 2026-10-03: the earlier text attributed
+  this open question to TS-16's dependency paragraph; that paragraph actually covers the
+  availability of the rebuild document, not evidence authority.]`
 
   **Resolution (2026-10-03).** Agentops#2480 (Decision 199)
   chooses the **substrate hash chain as the authoritative capture for new hosted-runtime
@@ -256,8 +258,8 @@ intent, evidence or acceptance* was already overridden by D1 (2026-09-14) and is
 an internet-reachable write path into a record D1 had already placed inside Vuoro's semantics. *No
 centralized evidence ownership in auditctl — repo shards stay authoritative* is **amended in scope**:
 a hosted runtime cannot write a shard it has no merge rights to. The question recorded on
-2026-09-20 was resolved on 2026-10-03: new hosted evidence is authoritative in the substrate
-hash chain and repository exports are projections; legacy committed shard digests and provenance
+2026-09-20 was resolved on 2026-10-03: new hosted evidence is to be authoritative in the substrate
+hash chain and repository exports are projections (target semantics; §0.2); legacy committed shard digests and provenance
 are preserved through verified S4 import (agentops#2480; §0.2). *No pre-emptive enablement of
 repositories without a consumer* is unaffected, and is in fact the rule the E1 stop condition applies
 to the surface itself (§13 falsifier 12). The remaining non-goals — no federation schema on
