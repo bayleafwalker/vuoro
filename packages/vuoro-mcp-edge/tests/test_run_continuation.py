@@ -398,6 +398,7 @@ def _headers(keys: Any, *, subject: str, authorities: list[str], grant_id: str) 
 def _propose(run_id: str) -> dict[str, Any]:
     return {
         "run_id": run_id,
+        "item_id": 1,
         "repository": REPO_ID,
         "base_commit": "a" * 40,
         "title": "Fix the typo",

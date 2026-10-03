@@ -174,6 +174,7 @@ def ci_workflow_diff(path: str = ".github/workflows/ci.yml") -> str:
 def _args(**overrides: Any) -> dict[str, Any]:
     base = {
         "run_id": "run_placeholder",
+        "item_id": 1,
         "repository": REPO_ID,
         "base_commit": _OLD_SHA,
         "title": "Fix the typo",
@@ -382,7 +383,8 @@ def test_production_composition_advertises_no_effect_tools_without_a_store() -> 
         context = ToolsetContext(
             env={}, work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"), runs=runs
         )
-        assert effect_tools.build_toolset(context) is None
+        toolset = effect_tools.build_toolset(context)
+        assert all(asyncio.run(tool.describe()) is None for tool in toolset.tools)
 
 
 # -- get_effect --------------------------------------------------------------------
@@ -705,7 +707,7 @@ class _YieldingStore(InMemoryIntentStore):
     """Suspends in lookup so two proposals interleave exactly where a real
     store's round trip would."""
 
-    async def lookup(self, workspace_id, principal_id, tool, key):
+    async def lookup(self, workspace_id, principal_id, tool, key, *, forwarded=None):
         found = await super().lookup(workspace_id, principal_id, tool, key)
         await asyncio.sleep(0)
         await asyncio.sleep(0)

@@ -17,22 +17,13 @@ once there is one, to the caller that proposed it. Nothing here moves an
 intent out of `proposed` (TS-16): acceptance is an operator or an opt-in
 policy on the trusted side (`vuoro_reconciler.acceptance`).
 
-The intent store's durable home is with its lifecycle owner. Per
-`vuoro-cloud/13-REPO-OWNERSHIP-AND-CHANGE-MATRIX.md` ("Hosted action
-state" -> owner actionq) and the trusted-service boundary design memo
-("ActionQ owns execution lifecycle and accepted action outcomes"), that
-owner is ActionQ, reached the same way `ShellWorkSource` reaches sprintctl:
-through the runtime shell's invoke API, with no credential held here.
-ActionQ's served catalog does not yet publish that operation (see
-`13-REPO-OWNERSHIP-AND-CHANGE-MATRIX.md`'s actionq row: "connector-safe
-claim and lease operations... idempotent outcome reporting" are still
-required changes, not shipped ones), so -- exactly like `UnavailableRunRegistry`
-before E2 -- `build_toolset` lists no tools today: `_production_intent_store()`
-returns None until a durable store is wired in at composition, so production
-never advertises tools that would fail every call. `UnavailableIntentStore`
-remains the fail-closed store for callers that compose one explicitly. `InMemoryIntentStore` is the
-reference behaviour this module's own tests use; a real `ShellIntentStore`
-lands with ActionQ's operation, the same way E2 wires its `RunRegistry`.
+The durable intent lifecycle owner is sprintctl's served work.effect.*
+contract. ShellIntentStore forwards the caller's own gateway assertion;
+the edge has no owner credential and never accepts an intent. Its proposal
+is bound to an existing item and the caller's run; sprintctl computes the
+canonical digest and the proposer identity. Production tools are advertised
+only when the owner publishes propose/get operations. Trusted-side accepted
+discovery and reconciliation belong to vuoro-reconciler, never this bucket.
 
 Only the owning work item edits this module; see
 docs/plans/2026-09-26-e2-e3-shared-contract.md.
@@ -43,7 +34,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, Protocol
+import asyncio
 import fnmatch
+import hashlib
 import json
 import re
 import secrets
@@ -482,6 +475,9 @@ class EffectIntent:
     title: str
     rationale: str
     unified_diff: str
+    item_id: int = 1
+    revision: int = 1
+    canonical_intent_digest: str = ""
     state: str = "proposed"
     #: Who moved it `proposed -> accepted` (or rejected it), as the trusted
     #: side recorded it: `{kind: "operator", subject}` or `{kind: "policy",
@@ -489,13 +485,21 @@ class EffectIntent:
     acceptor: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
+        if not self.canonical_intent_digest:
+            body = {"schema": "sprintctl-effect-intent/v1", **{name: getattr(self, name) for name in
+                ("item_id", "repository", "base_commit", "title", "rationale", "unified_diff")}}
+            digest = hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":"),
+                                             ensure_ascii=False).encode("utf-8")).hexdigest()
+            object.__setattr__(self, "canonical_intent_digest", digest)
+        if self.revision < 1 or not re.fullmatch(r"[0-9a-f]{64}", self.canonical_intent_digest):
+            raise ValueError("intent requires a positive revision and canonical sha256 digest")
         if self.state not in _INTENT_STATES:
             raise ValueError(f"unknown effect intent state {self.state!r}")
 
 
 class IntentStore(Protocol):
     """Where proposed effect intents live. Durable implementations live with
-    the lifecycle owner (ActionQ), not in the edge -- see the module
+    the lifecycle owner (sprintctl), not in the edge -- see the module
     docstring. Shares the idempotency ledger's `lookup` shape (section 5).
 
     There is deliberately no transition method: `proposed -> accepted` is
@@ -503,7 +507,7 @@ class IntentStore(Protocol):
     proposer), so nothing the edge holds can accept an intent."""
 
     async def lookup(
-        self, workspace_id: str, principal_id: str, tool: str, key: str
+        self, workspace_id: str, principal_id: str, tool: str, key: str, *, forwarded=None
     ) -> StoredResult | None: ...
 
     async def create(
@@ -514,6 +518,7 @@ class IntentStore(Protocol):
         key: str,
         stored: StoredResult,
         intent: EffectIntent,
+        *, forwarded=None,
     ) -> StoredResult:
         """Atomically record the ledger row for (workspace, principal, tool,
         key) -- contract section 5 as amended 2026-09-26 -- and
@@ -521,7 +526,7 @@ class IntentStore(Protocol):
         that row. First write wins (section 5): a racing duplicate never
         leaves an orphan `proposed` intent behind."""
 
-    async def get(self, intent_id: str, caller: RunBinding) -> EffectIntent:
+    async def get(self, intent_id: str, caller: RunBinding, *, forwarded=None) -> EffectIntent:
         """The intent if it belongs to `caller`.
 
         Raises `ToolFailure("effect-not-found", ...)` for an unknown,
@@ -532,11 +537,11 @@ class IntentStore(Protocol):
 
 
 class UnavailableIntentStore:
-    """The store until ActionQ's intent-lifecycle operation lands: every
+    """The fail-closed store when the durable owner is unavailable: every
     call fails closed, exactly as `UnavailableRunRegistry` does for runs."""
 
     async def lookup(
-        self, workspace_id: str, principal_id: str, tool: str, key: str
+        self, workspace_id: str, principal_id: str, tool: str, key: str, *, forwarded=None
     ) -> StoredResult | None:
         raise ToolFailure("effects-unavailable", "the effect intent store is not available yet")
 
@@ -548,10 +553,11 @@ class UnavailableIntentStore:
         key: str,
         stored: StoredResult,
         intent: EffectIntent,
+        *, forwarded=None,
     ) -> StoredResult:
         raise ToolFailure("effects-unavailable", "the effect intent store is not available yet")
 
-    async def get(self, intent_id: str, caller: RunBinding) -> EffectIntent:
+    async def get(self, intent_id: str, caller: RunBinding, *, forwarded=None) -> EffectIntent:
         raise ToolFailure("effects-unavailable", "the effect intent store is not available yet")
 
 
@@ -567,7 +573,7 @@ class InMemoryIntentStore:
         self._intents: dict[str, EffectIntent] = {}
 
     async def lookup(
-        self, workspace_id: str, principal_id: str, tool: str, key: str
+        self, workspace_id: str, principal_id: str, tool: str, key: str, *, forwarded=None
     ) -> StoredResult | None:
         return await self._ledger.lookup(workspace_id, principal_id, tool, key)
 
@@ -579,6 +585,7 @@ class InMemoryIntentStore:
         key: str,
         stored: StoredResult,
         intent: EffectIntent,
+        *, forwarded=None,
     ) -> StoredResult:
         # The ledger's store never suspends, so the row and the intent are
         # written together on one event loop: the intent exists only if
@@ -593,7 +600,7 @@ class InMemoryIntentStore:
 
         self._intents[intent.intent_id] = intent
 
-    async def get(self, intent_id: str, caller: RunBinding) -> EffectIntent:
+    async def get(self, intent_id: str, caller: RunBinding, *, forwarded=None) -> EffectIntent:
         intent = self._intents.get(intent_id) if INTENT_ID.fullmatch(intent_id or "") else None
         if intent is None or intent.binding != caller:
             raise ToolFailure("effect-not-found", _NOT_YOURS)
@@ -610,6 +617,62 @@ class InMemoryIntentStore:
         one."""
 
         self._intents[intent_id] = replace(self._intents[intent_id], state=state, acceptor=acceptor)
+
+
+class ShellIntentStore:
+    """Caller-forwarding adapter; no local proposal, result cache or credential."""
+
+    def __init__(self, client):
+        self.client = client
+
+    async def available(self):
+        import httpx
+        try:
+            response = await asyncio.wait_for(self.client.get("/api/catalog/v1", timeout=1.0), timeout=1.0)
+            names = {op["name"] for op in response.json()["operations"]}
+            return response.status_code == 200 and {"work.effect.propose-v1", "work.effect.get-v1"} <= names
+        except (httpx.HTTPError, asyncio.TimeoutError, ValueError, KeyError, TypeError):
+            return False
+
+    async def invoke(self, operation, arguments, forwarded):
+        from .record_tools import _unwrap
+        if forwarded is None:
+            raise ToolFailure("effects-unavailable", "a caller assertion is required")
+        response = await self.client.post("/api/invoke/v1", headers=forwarded.headers(), json={
+            "schema_version": "invocation/v1", "request_id": forwarded.request_id,
+            "operation": operation, "arguments": arguments, "repo_id": forwarded.repo_id,
+            "catalog_revision": None, "basis_revision": None, "idempotency_key": None})
+        return _unwrap(operation, response)
+
+    async def lookup(self, workspace_id, principal_id, tool, key, *, forwarded=None):
+        # The owner evaluates the key atomically with proposal creation.
+        return None
+
+    async def create(self, workspace_id, principal_id, tool, key, stored, intent, *, forwarded=None):
+        row = (await self.invoke("work.effect.propose-v1", {
+            "item_id": intent.item_id, "run_id": intent.run_id, "repository": intent.repository,
+            "base_commit": intent.base_commit, "title": intent.title, "rationale": intent.rationale,
+            "unified_diff": intent.unified_diff, "idempotency_key": key}, forwarded))["intent"]
+        return StoredResult(stored.digest, {"intent_id": row["intent_id"], "state": row["state"]})
+
+    async def get(self, intent_id, caller, *, forwarded=None):
+        row = (await self.invoke("work.effect.get-v1", {"intent_id": intent_id}, forwarded))["intent"]
+        # Resolve the run on every request: exact workspace/principal/client/grant
+        # ownership is the run owner's check, never inferred from an untrusted row.
+        try:
+            await self.invoke("work.run.resolve-v1", {"run_id": row["run_id"]}, forwarded)
+        except ToolFailure as error:
+            if error.code == "run-not-found":
+                raise ToolFailure("effect-not-found", _NOT_YOURS) from None
+            raise
+        if row["proposer_principal"] != caller.principal_id:
+            raise ToolFailure("effect-not-found", _NOT_YOURS)
+        acceptance = row["acceptance"]
+        return EffectIntent(intent_id=row["intent_id"], run_id=row["run_id"], binding=caller,
+            item_id=row["item_id"], revision=row["revision"], canonical_intent_digest=row["canonical_intent_digest"],
+            repository=row["repository"], base_commit=row["base_commit"], title=row["title"],
+            rationale=row["rationale"], unified_diff=row["unified_diff"], state=row["state"],
+            acceptor={"kind": "operator", "subject": acceptance["acceptor_principal"]} if acceptance else None)
 
 
 def _new_intent_id() -> str:
@@ -646,6 +709,7 @@ _PROPOSE_DEFINITION: dict[str, Any] = {
     "inputSchema": {
         "type": "object",
         "properties": {
+            "item_id": {"type": "integer", "minimum": 1, "description": "Existing work item this proposal describes."},
             "run_id": {
                 "type": "string",
                 "description": "The run handle from register_run (E2).",
@@ -671,6 +735,7 @@ _PROPOSE_DEFINITION: dict[str, Any] = {
         },
         "required": [
             "run_id",
+            "item_id",
             "repository",
             "base_commit",
             "title",
@@ -728,6 +793,7 @@ def _refuse_unprintable(name: str, value: str, *, allowed: str) -> None:
 def _parse_propose(arguments: dict[str, Any]) -> dict[str, Any]:
     allowed = {
         "run_id",
+        "item_id",
         "repository",
         "base_commit",
         "title",
@@ -743,6 +809,9 @@ def _parse_propose(arguments: dict[str, Any]) -> dict[str, Any]:
             f"propose_effect requires exactly {sorted(allowed)}; "
             f"unexpected {unexpected}, missing {missing}",
         )
+    item_id = arguments.get("item_id")
+    if isinstance(item_id, bool) or not isinstance(item_id, int) or item_id < 1:
+        raise ToolFailure("invalid-arguments", "item_id must be a positive integer")
     run_id = _require_str(arguments, "run_id")
     repository = _require_str(arguments, "repository")
     if not _REPOSITORY.fullmatch(repository):
@@ -764,6 +833,7 @@ def _parse_propose(arguments: dict[str, Any]) -> dict[str, Any]:
     key = require_key(arguments)
     return {
         "run_id": run_id,
+        "item_id": item_id,
         "repository": repository,
         "base_commit": base_commit,
         "title": title,
@@ -794,7 +864,7 @@ def _build(
             )
         digest = request_digest("propose_effect", parsed)
         stored = await intent_store.lookup(
-            binding.workspace_id, binding.principal_id, "propose_effect", parsed["idempotency_key"]
+            binding.workspace_id, binding.principal_id, "propose_effect", parsed["idempotency_key"], forwarded=forwarded
         )
         replay = replay_or_conflict(stored, digest)
         if replay is not None:
@@ -810,6 +880,7 @@ def _build(
         intent = EffectIntent(
             intent_id=_new_intent_id(),
             run_id=parsed["run_id"],
+            item_id=parsed["item_id"],
             binding=binding,
             repository=parsed["repository"],
             base_commit=parsed["base_commit"],
@@ -825,6 +896,7 @@ def _build(
             parsed["idempotency_key"],
             StoredResult(digest, result),
             intent,
+            forwarded=forwarded,
         )
         # A racing writer with the same key won: replay its result, or
         # refuse if it was for different arguments.
@@ -832,17 +904,25 @@ def _build(
 
     async def get_effect(parsed: dict[str, Any], forwarded: "ForwardedIdentity") -> dict[str, Any]:
         binding = binding_for(forwarded)
-        intent = await intent_store.get(parsed["intent_id"], binding)
+        intent = await intent_store.get(parsed["intent_id"], binding, forwarded=forwarded)
         reported: dict[str, Any] = {"intent_id": intent.intent_id, "state": intent.state}
         if intent.acceptor is not None:
             reported["acceptor"] = dict(intent.acceptor)
         return reported
 
+    async def describe_propose():
+        return _PROPOSE_DEFINITION if await intent_store.available() else None
+
+    async def describe_get():
+        return _GET_DEFINITION if await intent_store.available() else None
+
     return ToolSet(
         name="effect",
         tools=(
-            ToolSpec("propose_effect", "propose", _PROPOSE_DEFINITION, _parse_propose, propose_effect),
-            ToolSpec("get_effect", "propose", _GET_DEFINITION, _parse_get, get_effect),
+            ToolSpec("propose_effect", "propose", _PROPOSE_DEFINITION, _parse_propose, propose_effect,
+                     describe=describe_propose if isinstance(intent_store, ShellIntentStore) else None),
+            ToolSpec("get_effect", "propose", _GET_DEFINITION, _parse_get, get_effect,
+                     describe=describe_get if isinstance(intent_store, ShellIntentStore) else None),
         ),
     )
 
@@ -857,6 +937,8 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
 
     store = _production_intent_store()
     if store is None:
+        store = ShellIntentStore(context.work_source._client)
+    if store is None:
         # No durable intent store is wired in yet: this bucket has nothing it
         # could serve, so it advertises nothing rather than two tools that
         # fail every call -- the same posture record_tools takes without a
@@ -870,9 +952,5 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
 
 
 def _production_intent_store() -> IntentStore | None:
-    """The durable intent store production composes, or None while there is
-    none (ActionQ's intent-lifecycle operation has not landed). The single
-    seam a durable store is wired through; tests substitute the reference
-    store here to exercise the production composition path."""
-
+    """Optional composition override; default is the credential-free shell store."""
     return None

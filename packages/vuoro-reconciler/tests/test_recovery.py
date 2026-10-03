@@ -162,12 +162,12 @@ class _DiesOnFirstReport(FakeIntentSource):
     crashes_left: int = 1
 
     async def report_applied(
-        self, intent_id: str, *, commit_sha: str, pr_url: str, acceptor: Acceptor
+        self, intent_id: str, *, commit_sha: str, pr_url: str, acceptor: Acceptor, **binding
     ) -> None:
         if self.crashes_left:
             self.crashes_left -= 1
             raise SimulatedCrash("before report_applied")
-        await super().report_applied(intent_id, commit_sha=commit_sha, pr_url=pr_url, acceptor=acceptor)
+        await super().report_applied(intent_id, commit_sha=commit_sha, pr_url=pr_url, acceptor=acceptor, **binding)
 
 
 def test_crash_before_success_recorded_restart_records_applied_once(
@@ -471,7 +471,7 @@ class _Clock:
 
 
 def _add_accepted(source: FakeIntentSource, intent: EffectIntent) -> None:
-    source.records[intent.intent_id] = intent
+    source.records[intent.intent_id] = FakeIntentSource(accepted=[intent]).records[intent.intent_id]
     source.states[intent.intent_id] = "accepted"
 
 

@@ -310,10 +310,10 @@ class _FlakySource(FakeIntentSource):
             raise RuntimeError("source down")
         return await super().poll_proposed()
 
-    async def accept(self, intent_id, acceptor):
+    async def accept(self, intent_id, acceptor, **binding):
         if intent_id in self.fail_accept_for:
             raise RuntimeError("lost the compare-and-set race")
-        await super().accept(intent_id, acceptor)
+        await super().accept(intent_id, acceptor, **binding)
 
     async def report_failed(self, intent_id, *, reason):
         if self.fail_reports:

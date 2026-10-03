@@ -86,8 +86,8 @@ def test_default_composition_ships_no_toolset_without_durable_stores() -> None:
         runs=UnavailableRunRegistry(),
     )
     toolsets = build_toolsets(context)
-    names = [tool.name for toolset in toolsets for tool in toolset.tools]
-    assert names == []
+    definitions = [asyncio.run(tool.describe()) for toolset in toolsets for tool in toolset.tools]
+    assert all(definition is None for definition in definitions)
 
 
 def test_toolset_tools_follow_the_builtins_in_list_and_discover(keys, auth) -> None:

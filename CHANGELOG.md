@@ -5,6 +5,13 @@ recorded here.
 
 ## Unreleased
 
+- Effect proposals now use sprintctl's atomic served owner through caller-only
+  assertions, bound to an item and run. Trusted reconciliation checks the
+  revision and canonical content digest against acceptance before effects,
+  and reports the signed commit/PR through mark-applied. Accepted discovery
+  uses its separate owner capability; deployment awaits the immutable owner
+  release and Cloud mapping (agentops#2567, #2598, #2600).
+
 - Provider-neutral lease conformance: seven safety/workflow scenarios bind the
   reference LeaseStore and pinned sprintctl owner on disposable PostgreSQL; an
   INV-L1 mutant detects false success on a superseded report.
