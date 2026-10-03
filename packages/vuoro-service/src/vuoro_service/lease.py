@@ -15,6 +15,11 @@ lease never settles, but its result is retained as evidence
 Only the lease's own holder's result is retained; an unknown lease id or
 another holder's completion leaves nothing.
 
+Same-holder Case B (INV-L2): claiming or reclaiming one's own expired,
+unsuperseded lease reactivates that lease in place, keeping its id, issue
+time and TTL while refreshing its last heartbeat. A different holder gets
+a new id, so a superseded id can never be resurrected.
+
 This is new surface with no existing consumer (see
 docs/plans/2026-09-20-e0-hardening-status-and-design.md): the store is
 in-memory, keyed by subject, with an injectable clock so tests do not sleep.
@@ -106,6 +111,12 @@ class LeaseStore:
         current = self._current(subject)
         if current is not None and not current.is_expired(now=now):
             raise LeaseConflictError(f"subject {subject!r} is already leased")
+        if current is not None and current.holder == holder:
+            # Case B: only the expired current lease can be reactivated.
+            renewed = replace(current, last_heartbeat_at=now)
+            self._by_subject[subject] = renewed
+            self._issued[renewed.lease_id] = renewed
+            return renewed
         lease = Lease(
             lease_id=str(uuid.uuid4()),
             subject=subject,
@@ -124,8 +135,9 @@ class LeaseStore:
     claim_work = claim
 
     def reclaim(self, subject: str, holder: str, *, ttl_seconds: float) -> Lease:
-        """Reclaim `subject` for a new `holder`. Fails unless the current
-        lease (if any) is expired -- a live lease must be heartbeated or
+        """Reclaim `subject`, reactivating its own expired lease for `holder`.
+
+        Fails unless the current lease (if any) is expired -- a live lease must be heartbeated or
         released by its own holder, never taken by force."""
         now = self._now()
         current = self._current(subject)
@@ -133,6 +145,12 @@ class LeaseStore:
             raise LeaseConflictError(
                 f"subject {subject!r} is still leased and has not expired"
             )
+        if current is not None and current.holder == holder:
+            # Case B: only the expired current lease can be reactivated.
+            renewed = replace(current, last_heartbeat_at=now)
+            self._by_subject[subject] = renewed
+            self._issued[renewed.lease_id] = renewed
+            return renewed
         lease = Lease(
             lease_id=str(uuid.uuid4()),
             subject=subject,
