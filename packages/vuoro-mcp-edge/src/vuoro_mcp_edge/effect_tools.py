@@ -44,6 +44,7 @@ import secrets
 from .idempotency import (
     IDEMPOTENCY_KEY_SCHEMA,
     InMemoryIdempotencyLedger,
+    LedgerEntry,
     StoredResult,
     replay_or_conflict,
     request_digest,
@@ -571,6 +572,35 @@ class InMemoryIntentStore:
     def __init__(self) -> None:
         self._ledger = InMemoryIdempotencyLedger()
         self._intents: dict[str, EffectIntent] = {}
+
+    async def begin(
+        self, workspace_id: str, principal_id: str, tool: str, key: str,
+        request_digest: str,
+    ) -> LedgerEntry:
+        """Reference canonical claim; no intent exists until completion.
+
+        Production proposal creation remains one transaction in the durable
+        owner. This test reference never supplies a distributed claim.
+        """
+        return await self._ledger.begin(workspace_id, principal_id, tool, key, request_digest)
+
+    async def complete(
+        self, entry: LedgerEntry, result: Mapping[str, Any], intent: EffectIntent,
+    ) -> LedgerEntry:
+        """Complete the reference ledger and intent together on one event loop.
+
+        Refuse binding drift and reused intent IDs before completing the key.
+        The composed reference ledger does not suspend inside completion;
+        rejected or replayed completions cannot leave an orphan intent.
+        """
+        if (intent.binding.workspace_id != entry.workspace_id
+                or intent.binding.principal_id != entry.principal_id):
+            raise ValueError("intent binding differs from the begun ledger entry")
+        if intent.intent_id in self._intents:
+            raise ValueError("intent ID is already present")
+        completed = await self._ledger.complete(entry, result)
+        self._intents[intent.intent_id] = intent
+        return completed
 
     async def lookup(
         self, workspace_id: str, principal_id: str, tool: str, key: str, *, forwarded=None
