@@ -116,6 +116,7 @@ def _invocation_response(
     result: object | None = None,
     error_code: str | None = None,
     error_message: str | None = None,
+    error_details: object | None = None,
     http_status: int = 200,
 ) -> JSONResponse:
     envelope = InvocationResponse(
@@ -125,7 +126,9 @@ def _invocation_response(
         status=status,
         result=result,
         error=(
-            InvocationError(code=error_code, message=error_message or error_code)
+            InvocationError(
+                code=error_code, message=error_message or error_code, details=error_details
+            )
             if error_code
             else None
         ),
@@ -476,6 +479,7 @@ def create_app(
                 revision=revision,
                 status="rejected",
                 error_code=error.code,
+                error_details=getattr(error, "details", None),
                 error_message=str(error),
                 http_status=error.http_status,
             )
