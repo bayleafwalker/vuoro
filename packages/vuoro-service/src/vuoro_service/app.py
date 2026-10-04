@@ -479,7 +479,7 @@ def create_app(
                 revision=revision,
                 status="rejected",
                 error_code=error.code,
-                error_details=error.details,
+                error_details=getattr(error, "details", None),
                 error_message=str(error),
                 http_status=error.http_status,
             )

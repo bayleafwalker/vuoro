@@ -871,6 +871,7 @@ dependencies = [
     { name = "cryptography" },
     { name = "fastapi" },
     { name = "jsonschema" },
+    { name = "pydantic" },
     { name = "pyjwt" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -887,6 +888,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115,<1" },
     { name = "httpx", marker = "extra == 'test'", specifier = ">=0.27,<1" },
     { name = "jsonschema", specifier = ">=4.23,<5" },
+    { name = "pydantic", specifier = ">=2.12,<3" },
     { name = "pyjwt", specifier = ">=2.10,<3" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34,<1" },

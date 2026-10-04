@@ -136,7 +136,7 @@ async def test_handshake_and_etag_catalog_contract() -> None:
         assert handshake["client_protocol"] == {"minimum": 1, "maximum": 1}
         assert handshake["service_release"] == {
             "distribution": "vuoro-service",
-            "version": "0.1.83",
+            "version": "0.1.84",
         }
         assert handshake["catalog_revision"] == registry.revision
         assert handshake["compatibility"]["domains"]["work"]["state"] == "compatible"
@@ -251,7 +251,9 @@ async def test_invocation_derives_identity_and_enforces_contract() -> None:
             "/api/invoke/v1", headers=protocol, json=request
         )
         assert missing_identity.status_code == 401
-        assert missing_identity.json()["error"]["code"] == "identity-required"
+        assert missing_identity.json()["error"] == {
+            "code": "identity-required", "message": "a valid bearer identity is required",
+        }
 
         wrong_environment = await client.post(
             "/api/invoke/v1",
@@ -293,7 +295,10 @@ async def test_invocation_derives_identity_and_enforces_contract() -> None:
             json={**request, "catalog_revision": "0" * 64},
         )
         assert stale.status_code == 409
-        assert stale.json()["error"]["code"] == "stale-catalog"
+        assert stale.json()["error"] == {
+            "code": "stale-catalog",
+            "message": "catalog revision changed; rediscover before retrying",
+        }
 
 
 @pytest.mark.anyio
@@ -730,8 +735,37 @@ def test_domain_rejection_snapshots_nested_json_details() -> None:
 @pytest.mark.parametrize(
     "details",
     [[], "private", {1: "value"}, {"value": object()},
-     {"value": float("nan")}, {"value": float("inf")}, {"value": (1, 2)}],
+     {"value": float("nan")}, {"value": float("inf")}, {"value": (1, 2)},
+     {"value": [float("nan")]}, {"value": {"nested": float("-inf")}}],
 )
 def test_domain_rejection_refuses_non_json_object_details(details) -> None:
     with pytest.raises(ValueError):
         OperationRejectedError("stale", "stale", details=details)
+
+
+@pytest.mark.anyio
+async def test_invalid_handler_details_fail_closed_without_exposing_input(caplog) -> None:
+    marker = "private-invalid-details-value"
+
+    def reject(arguments, context):
+        raise OperationRejectedError("stale", "stale", details={"private": (marker,)})
+
+    registry, app = configured_service(reject)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/api/invoke/v1",
+            headers={"X-Vuoro-Client-Protocol": "1", "Authorization": "Bearer dev-token"},
+            json={
+                "schema_version": "invocation/v1", "request_id": "invalid-details",
+                "operation": "work.pilot.transition", "arguments": {"value": 7},
+                "catalog_revision": registry.revision, "idempotency_key": "transition-7",
+            },
+        )
+    assert response.status_code == 500
+    assert response.json()["error"] == {
+        "code": "operation-handler-failed", "message": "operation handler failed",
+    }
+    assert marker not in response.text
+    assert marker not in caplog.text

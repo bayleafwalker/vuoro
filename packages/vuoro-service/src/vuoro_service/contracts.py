@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, TypeAdapter, field_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, TypeAdapter, ValidationError, field_validator
 
 
 class StrictModel(BaseModel):
@@ -160,7 +160,11 @@ def validate_error_details(value: Mapping[str, Any] | None) -> dict[str, JsonVal
         return None
     if not isinstance(value, Mapping):
         raise ValueError("rejection details must be a JSON object")
-    return _ERROR_DETAILS.validate_python(dict(value), strict=True)
+    try:
+        return _ERROR_DETAILS.validate_python(dict(value), strict=True)
+    except ValidationError:
+        # Handler failures are logged; keep rejected input out of their traceback.
+        raise ValueError("rejection details must contain only finite JSON values") from None
 
 
 class InvocationError(StrictModel):

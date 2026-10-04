@@ -1,4 +1,5 @@
 """Structured stale-lease refusal through the published owner's HTTP adapter."""
+import json
 import uuid
 
 from fastapi.testclient import TestClient
@@ -49,10 +50,17 @@ def test_pinned_owner_stale_outcome_preserves_generation_details_over_http(reque
                         "outcome": "succeeded", "summary": "Stale non-deciding result",
                         "payload": {"result": "old"},
                         "checks": [{"name": "tests", "status": "passed"}],
-                        "idempotency_key": uuid.uuid4().hex,
+                        "idempotency_key": "stale-outcome-" + first.claim_id,
                     },
                 },
             )
+            replay = client.post(
+                "/api/invoke/v1",
+                headers={"Authorization": "Bearer caller-a", "X-Vuoro-Client-Protocol": "1"},
+                json=json.loads(response.request.content),
+            )
+        assert replay.status_code == response.status_code
+        assert replay.json() == response.json()
         assert response.status_code == 409, response.text
         envelope = response.json()
         assert envelope["status"] == "rejected"
