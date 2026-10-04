@@ -14,10 +14,10 @@ SHARED_PACKAGES = {
 }
 SHARED_PACKAGE_VERSIONS = {
     "vuoro-schema-runtime": "0.1.0",
-    # 0.1.1 adds vuoro_adapter_kit.adapters, the uniform construction shims that
-    # composition v4 named. v4 was deleted in S2 change 1 (D4); the shims remain
-    # in the released 0.1.1 wheel and nothing in this repository loads them.
-    "vuoro-adapter-kit": "0.1.1",
+    # 0.2.0 adds pure strict-view metadata and admission values. Legacy shims
+    # and spec bytes remain unchanged. The runtime composition remains pinned
+    # to immutable 0.1.1 until the separate reviewed release/repin step.
+    "vuoro-adapter-kit": "0.2.0",
 }
 FORBIDDEN_CLIENT_TERMS = {
     "adapter",
@@ -114,3 +114,16 @@ def test_shared_packages_are_stdlib_only_and_have_isolated_wheel_boundaries() ->
             metadata = BytesParser().parsebytes(wheel.read(metadata_name))
             requirements = metadata.get_all("Requires-Dist", failobj=[])
             assert all("extra == 'test'" in requirement for requirement in requirements)
+
+
+def test_candidate_kit_wheel_contains_pure_admission_values_without_fake_owner() -> None:
+    import ast
+    with zipfile.ZipFile(_one_wheel("vuoro-adapter-kit")) as wheel:
+        names = wheel.namelist()
+        assert not any("fake" in name.lower() or "/tests/" in name for name in names)
+        for module in ("admission", "catalog_v2"):
+            source = wheel.read(f"vuoro_adapter_kit/{module}.py").decode()
+            tree = ast.parse(source)
+            imports = {node.module or "" for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
+            imports |= {alias.name for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names}
+            assert not any(name.startswith(("vuoro_service", "sprintctl", "psycopg", "httpx", "pydantic")) for name in imports)
