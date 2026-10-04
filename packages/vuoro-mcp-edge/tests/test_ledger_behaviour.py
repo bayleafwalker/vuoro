@@ -48,6 +48,19 @@ class _IntentStoreLedger:
     async def lookup(self, workspace_id: str, principal_id: str, tool: str, key: str):
         return await self.intents.lookup(workspace_id, principal_id, tool, key)
 
+    async def begin(self, workspace_id, principal_id, tool, key, request_digest):
+        return await self.intents.begin(workspace_id, principal_id, tool, key, request_digest)
+
+    async def complete(self, entry, result):
+        self._counter += 1
+        intent = EffectIntent(
+            intent_id=f"effect_{self._counter:026d}",
+            run_id="run_" + "0" * 26,
+            binding=RunBinding(principal_id=entry.principal_id, workspace_id=entry.workspace_id, repo_id="r"),
+            repository="r", base_commit="0" * 40, title="t", rationale="r", unified_diff="",
+        )
+        return await self.intents.complete(entry, result, intent)
+
     async def store(self, workspace_id: str, principal_id: str, tool: str, key: str, stored):
         self._counter += 1
         intent = EffectIntent(
@@ -172,9 +185,10 @@ def test_parts_that_would_collide_if_joined_stay_distinct(ledger) -> None:
 
 
 
-def test_reference_begin_complete_is_the_normative_ledger_entry():
+@pytest.mark.parametrize("factory", LEDGERS.values(), ids=LEDGERS.keys())
+def test_begin_complete_is_the_normative_ledger_entry(factory):
     async def scenario():
-        ledger = InMemoryIdempotencyLedger()
+        ledger = factory()
         entry = await ledger.begin("w", "p", "tool", "key-0001", _row(1).digest)
         assert entry == LedgerEntry("w", "p", "tool", "key-0001", _row(1).digest, None, False)
         assert await ledger.lookup("w", "p", "tool", "key-0001") is None
@@ -228,13 +242,18 @@ def test_owner_concurrent_transactions_and_reconnect_keep_first_result():
 
 
 
-def test_reference_begin_never_grants_a_second_incomplete_claim_or_mutable_replay():
+@pytest.mark.parametrize("factory", LEDGERS.values(), ids=LEDGERS.keys())
+def test_begin_never_grants_a_second_incomplete_claim_or_mutable_replay(factory):
     async def scenario():
-        ledger = InMemoryIdempotencyLedger()
+        ledger = factory()
         entry = await ledger.begin("w", "p", "t", "key-0001", _row(1).digest)
         with pytest.raises(ToolFailure) as error:
             await ledger.begin("w", "p", "t", "key-0001", _row(1).digest)
         assert error.value.code == "idempotency-in-progress"
+        with pytest.raises(ToolFailure) as conflict:
+            await ledger.begin("w", "p", "t", "key-0001", _row(2).digest)
+        assert conflict.value.code == "idempotency-conflict"
+        assert await ledger.lookup("w", "p", "t", "key-0001") is None
         result = {"nested": {"value": 1}}
         await ledger.complete(entry, result)
         result["nested"]["value"] = 2
@@ -242,6 +261,54 @@ def test_reference_begin_never_grants_a_second_incomplete_claim_or_mutable_repla
         assert replay.result == {"nested": {"value": 1}}
         replay.result["nested"]["value"] = 3
         assert (await ledger.begin("w", "p", "t", "key-0001", _row(1).digest)).result == {"nested": {"value": 1}}
+    _run(scenario())
+
+
+@pytest.mark.parametrize("factory", LEDGERS.values(), ids=LEDGERS.keys())
+@pytest.mark.parametrize("other", [("w2", "p", "t"), ("w", "p2", "t"), ("w", "p", "t2")])
+def test_canonical_begin_scopes_pending_and_completed_keys(factory, other):
+    async def scenario():
+        ledger = factory()
+        first = await ledger.begin("w", "p", "t", "key-0001", _row(1).digest)
+        independent = await ledger.begin(*other, "key-0001", _row(2).digest)
+        await ledger.complete(independent, {"value": 2})
+        await ledger.complete(first, {"value": 1})
+        assert (await ledger.begin("w", "p", "t", "key-0001", _row(1).digest)).result == {"value": 1}
+        assert (await ledger.begin(*other, "key-0001", _row(2).digest)).result == {"value": 2}
+    _run(scenario())
+
+
+def test_intent_canonical_completion_refusals_leave_no_ledger_result_or_orphan():
+    from dataclasses import replace
+
+    async def scenario():
+        store = InMemoryIntentStore()
+        entry = await store.begin("w", "p", "t", "key-0001", _row(1).digest)
+        intent = EffectIntent(
+            intent_id="effect_" + "0" * 26, run_id="run_" + "0" * 26,
+            binding=RunBinding(principal_id="p", workspace_id="w", repo_id="r"),
+            repository="r", base_commit="0" * 40, title="t", rationale="r", unified_diff="",
+        )
+        for binding in [replace(intent.binding, principal_id="other"), replace(intent.binding, workspace_id="other")]:
+            with pytest.raises(ValueError, match="^intent binding differs from the begun ledger entry$"):
+                await store.complete(entry, {"value": 1}, replace(intent, binding=binding))
+            assert await store.lookup("w", "p", "t", "key-0001") is None
+            assert store._intents == {}
+        with pytest.raises(ValueError, match="^no incomplete entry was begun for this completion$"):
+            await store.complete(replace(entry, request_digest=_row(2).digest), {"value": 2}, intent)
+        assert store._intents == {}
+        store.seed(intent)
+        with pytest.raises(ValueError, match="^intent ID is already present$"):
+            await store.complete(entry, {"value": 1}, intent)
+        assert await store.lookup("w", "p", "t", "key-0001") is None
+        new_intent = replace(intent, intent_id="effect_" + "1" * 26)
+        completed = await store.complete(entry, {"value": 1}, new_intent)
+        assert completed.result == {"value": 1}
+        replay = await store.begin("w", "p", "t", "key-0001", _row(1).digest)
+        with pytest.raises(ValueError, match="^no incomplete entry was begun for this completion$"):
+            await store.complete(replay, {"value": 1}, replace(intent, intent_id="effect_" + "2" * 26))
+        assert store._intents == {intent.intent_id: intent, new_intent.intent_id: new_intent}
+        assert (await store.lookup("w", "p", "t", "key-0001")).result == {"value": 1}
     _run(scenario())
 
 

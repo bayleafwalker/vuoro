@@ -326,3 +326,15 @@ binds exact id/revision/digest, propose is not acceptance, and acceptance plus
 mark-applied never settles work. The acceptance capability is distinct from
 ordinary work write authority. CI configures the disposable owner explicitly;
 unavailable configured bindings fail, with no silent skips.
+
+**Reference intent-ledger completion (2026-10-04, agentops#2569).**
+`InMemoryIntentStore.begin` delegates to the canonical reference ledger.
+Its `complete(entry, result, intent)` binds the intent's workspace/principal
+to the entry and records both the first result and intent without suspending
+inside completion. Binding drift, an existing intent ID, a forged entry or a
+replayed completion cannot publish another intent. The shared canonical
+begin/complete scenarios run against both memory-ledger factories, including
+pending-key conflicts, scope isolation and immutable replay snapshots.
+This remains a test reference. `ShellIntentStore` still forwards production
+proposal creation to the durable owner's single transaction; the edge acquires
+no durable claim or effect authority through these reference methods.
