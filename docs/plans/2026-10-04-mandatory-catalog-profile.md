@@ -69,7 +69,11 @@ configuration, not automatic negotiation or fallback.
 The strict catalog revision is SHA-256 of the UTF-8 domain separator
 `vuoro-operation-catalog/v2` followed by one zero byte and RFC 8785 JSON Canonicalization
 Scheme bytes of the complete profile descriptor and sorted active operation and
-resource definitions, including descriptions and validation schemas. The revision
+resource definitions, including descriptions, validation schemas and strict-only/
+legacy owner metadata. Operation arrays sort by unique operation name and resource
+arrays by unique resource type in Unicode codepoint order. Duplicate names/types
+across adapters and values outside the JCS number model (non-finite values or
+integers not exactly representable) fail composition rather than being coerced. The revision
 field, ETag and serving-instance metadata are excluded from that input. Adapter
 load order cannot change the sorted composition. Changing any included contract
 or description changes the revision; deployments cannot alter that composition
@@ -125,7 +129,7 @@ Order in the proposed strict shell:
    invoke the handler under the owner's existing semantics.
 
 Missing/null/empty revision returns HTTP 400 `catalog-revision-required`;
-wrong type/format returns HTTP 400 `catalog-revision-invalid`; a well-formed
+wrong type/format, including uppercase or mixed-case hex, returns HTTP 400 `catalog-revision-invalid`; a well-formed
 noncurrent revision returns HTTP 409 `stale-catalog`. Protocol/schema/profile
 mismatch returns HTTP 400 `client-protocol-incompatible` before dispatch.
 A current revision with an unknown operation
@@ -186,7 +190,9 @@ resource mutation's missing capability enter that owner's private denial ledger.
 Operations whose owner requires the strict admission contract, including the
 proposed general resource mutations, must appear only in the strict catalog and
 have no legacy route alias. Owner metadata and immutable composition enforce that
-restriction; a legacy lookup must not reach the strict handler even with a valid
+restriction; current v1 `_dispatch` already returns unknown-operation before
+identity resolution. Already released operations may appear in both catalogs;
+adding strict-only operations does not change the frozen v1 revision. A legacy lookup must not reach the strict handler even with a valid
 resource grant or a wildcard mapping. During dual-profile serving, already
 released legacy operations may remain intentionally unqualified on v1.
 The actual profile/schema/routes, framing and internal recorder must be reviewed
@@ -213,14 +219,20 @@ prove ordering only by checking the HTTP status.
 | Unknown operation with current revision | Public unknown-operation result before auth/ledger/handler, with no proof consumption |
 | Catalog changed between discovery and call | Stale receipt without invocation retry, despite reads or idempotent annotation; explicit subsequent caller invocation uses new discovery |
 | SDK/edge/reconciler transports | Mock/real HTTP call count stays one per attempted invocation on stale/error/timeout; no automatic re-sign or redispatch |
-| Multi-call effect/get path | Every component has its own exact bound strict revision; a stale component stops the flow, not a hidden refresh/continue |
-| Resource long poll | Stale before owner/poll registration; no implicit reconnect after catalog refusal; explicit cursor recovery belongs to owner contract |
+| Multi-call effect/get path | Every component binds the same single discovered strict revision for the flow; a stale component stops the flow, not a hidden refresh/continue |
+| Resource long poll | Stale before owner/poll registration; no implicit reconnect after catalog refusal, dropped connection or rollout termination; explicit cursor recovery belongs to owner contract |
 | Legacy compatibility | Pinned golden status/code/body fixtures for protocol1 omission/null and explicit stale refusal, plus SDK1 profiles, retain their recorded behavior during dual-profile stage |
 | Profile artifact identity | Immutable profile/schema/catalog digest bound across handshake/catalog; ETag corresponds to that deterministic catalog; refresh cannot select a different profile |
 | Intermediary proof boundary | Actual gateway/wrapper fixture demonstrates that a stale inner strict invocation leaves its one-use proof replay store untouched; separately measured outer MCP authentication is not conflated with inner admission |
 | Proxy/library retry settings | Stale, 502/503 and timeout cannot trigger automatic invocation replay through connector, agent loop, HTTP transport or proxy configuration |
 | Proof boundary | Valid strict calls verify body/profile/correlation and replay protection; rejected catalog guards consume nothing; no unguarded new-route bypass |
 | Strict-only retirement | Every legacy invocation route returns the documented incompatibility without auth/ledger/handler; no reachable alias permits omission |
+
+The stale-then-first-admission proof oracle uses a test-controlled verifier and
+registry pair sharing a test key, and inspects the actual nonce store; it is a
+semantic guard/consumption test, not a claim that production pods share keys or
+mutate their immutable catalog in place. Production restart and cross-pod MAC
+refusals have separate real-verifier fixtures.
 
 After source implementation, public tests bind released immutable client/service
 artifacts and actual pinned adapters. Existing omission counterexamples remain
