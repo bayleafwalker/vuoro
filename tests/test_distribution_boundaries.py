@@ -17,7 +17,7 @@ SHARED_PACKAGE_VERSIONS = {
     # 0.2.0 adds pure strict-view metadata and admission values. Legacy shims
     # and spec bytes remain unchanged. The runtime composition remains pinned
     # to immutable 0.1.1 until the separate reviewed release/repin step.
-    "vuoro-adapter-kit": "0.2.0",
+    "vuoro-adapter-kit": "0.2.1",
 }
 FORBIDDEN_CLIENT_TERMS = {
     "adapter",

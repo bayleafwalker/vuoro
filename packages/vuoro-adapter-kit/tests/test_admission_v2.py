@@ -269,3 +269,36 @@ def test_invalid_operation_and_nonstring_contract_refuse_for_specific_reason():
         OwnerAdmissionRequest("work-only", b"{}", context())
     with pytest.raises(ValueError, match="versioned identifier"):
         spec(owner_admission_contract=1)
+
+
+def test_published_audit_receipt_lookup_root_oneof_is_preserved_only_in_v2():
+    # Exact released auditctl 0.1.9 audit.receipt.lookup input schema; independent
+    # installed-owner gate compares the entire real catalog as well.
+    schema = {"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object",
+              "properties": {"receipt_id": {"type": "string", "format": "uuid"},
+                             "event_id": {"type": "string", "pattern": "^ad:[0-9A-HJKMNP-TV-Z]{26}$"}},
+              "additionalProperties": False,
+              "oneOf": [{"required": ["receipt_id"]}, {"required": ["event_id"]}]}
+    value = spec(input_schema=schema)
+    assert value["input_schema"] == schema
+    schema["oneOf"][0]["required"].append("later")
+    schema["oneOf"].reverse()
+    assert value["input_schema"]["oneOf"] == [{"required": ["receipt_id"]}, {"required": ["event_id"]}]
+    with pytest.raises(ValueError, match="unsupported root fields"):
+        operation_spec("audit.receipt.lookup", input_schema=value["input_schema"],
+                       result_schema=object_schema({}), execution_semantics="read", idempotency="not-allowed")
+
+
+@pytest.mark.parametrize("branches", [None, "required", {}, [], [None], [3], [[]], [{1: "bad"}],
+                                     [{"required": "id"}], [{"required": [True]}],
+                                     [{"required": ["id", "id"]}]])
+def test_v2_oneof_refuses_invalid_branch_shapes(branches):
+    schema = dict(object_schema({}), oneOf=branches)
+    with pytest.raises((ValueError, TypeError)):
+        spec(input_schema=schema)
+
+
+def test_v2_oneof_root_extension_keeps_other_unknown_roots_closed():
+    with pytest.raises(ValueError, match="unsupported root fields"):
+        spec(input_schema=dict(object_schema({}), oneOf=[True, False], unknown=True))
+    assert spec(result_schema=dict(object_schema({}), oneOf=[False, True]))["result_schema"]["oneOf"] == [False, True]
