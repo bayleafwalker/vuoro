@@ -5,10 +5,9 @@ from collections.abc import Mapping, Sequence
 import re
 from typing import Any, Literal
 
-from .admission import CATALOG_REQUIRED_PROFILE
+from .admission import CATALOG_REQUIRED_PROFILE, _AUTHORITY
 from .catalog import SCHEMA_FEATURES, operation_spec
 
-_AUTHORITY = re.compile(r"^[a-z][a-z0-9.-]*(?::[a-z][a-z0-9.-]*)?$")
 _CONTRACT = re.compile(r"^[a-z][a-z0-9.-]*/v[1-9][0-9]*$")
 
 
@@ -36,19 +35,25 @@ def operation_spec_v2(
     ordering does not convey policy and is normalized for deterministic metadata.
     Inner schemas retain their array order and are deep-copied, as in v1.
     """
-    if admission_profile != CATALOG_REQUIRED_PROFILE:
+    if type(name) is not str:
+        raise TypeError("name must be exact str")
+    if type(execution_semantics) is not str or type(idempotency) is not str:
+        raise TypeError("execution_semantics and idempotency must be exact str")
+    if type(admission_profile) is not str or admission_profile != CATALOG_REQUIRED_PROFILE:
         raise ValueError("unsupported admission profile")
-    if legacy_availability not in {"released-legacy", "strict-only"}:
+    if type(legacy_availability) is not str or legacy_availability not in {"released-legacy", "strict-only"}:
         raise ValueError("invalid legacy availability")
     if isinstance(required_authorities, (str, bytes)) or not isinstance(required_authorities, Sequence):
         raise TypeError("required_authorities must be a sequence")
     authorities = tuple(required_authorities)
-    if any(not isinstance(value, str) or not _AUTHORITY.fullmatch(value) for value in authorities):
+    if any(type(value) is not str or not _AUTHORITY.fullmatch(value) for value in authorities):
         raise ValueError("required authorities must be exact non-wildcard names")
     if len(authorities) != len(set(authorities)):
         raise ValueError("required authorities must be unique")
+    if execution_semantics in {"write", "enqueue", "admin"} and not authorities:
+        raise ValueError("strict mutations require explicit authorities")
     if owner_admission_contract is not None:
-        if not isinstance(owner_admission_contract, str) or not _CONTRACT.fullmatch(owner_admission_contract):
+        if type(owner_admission_contract) is not str or not _CONTRACT.fullmatch(owner_admission_contract):
             raise ValueError("owner admission contract must be a versioned identifier")
         if (
             legacy_availability != "strict-only"

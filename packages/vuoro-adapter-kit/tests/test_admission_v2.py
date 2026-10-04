@@ -214,3 +214,58 @@ def test_immutable_primitive_subclasses_cannot_smuggle_mutable_contents():
         replace(identity(), authorities=wrapped)
     with pytest.raises(TypeError):
         AdmissionResponse(200, MutableBytesWrapper(b"{}"))
+
+
+@pytest.mark.parametrize("semantics", ["write", "enqueue", "admin"])
+def test_mutation_without_recorder_still_requires_an_explicit_authority(semantics):
+    with pytest.raises(ValueError, match="strict mutations require explicit authorities"):
+        spec(owner_admission_contract=None, execution_semantics=semantics, required_authorities=[])
+
+
+@pytest.mark.parametrize("semantics", ["write", "enqueue", "admin"])
+def test_recorder_allows_each_authorized_mutation_semantics(semantics):
+    assert spec(execution_semantics=semantics)["execution_semantics"] == semantics
+
+
+def test_string_subclasses_cannot_smuggle_mutable_dispatch_or_profile_metadata():
+    class MutableString(str):
+        pass
+    for field, value in (("catalog_revision", "a" * 64), ("admission_profile", CATALOG_REQUIRED_PROFILE)):
+        with pytest.raises(ValueError):
+            context(**{field: MutableString(value)})
+    with pytest.raises(ValueError, match="operation"):
+        OwnerAdmissionRequest(MutableString("work.resource.create-v1"), b"{}", context())
+    with pytest.raises(ValueError, match="ingress profile"):
+        TrustedIngressProvenance(identity().principal, "issuer", "audience", MutableString("resource-review-ingress/v1"))
+    for field, value in (("admission_profile", CATALOG_REQUIRED_PROFILE), ("legacy_availability", "strict-only"),
+                         ("owner_admission_contract", "resource-command-admission/v1")):
+        with pytest.raises(ValueError):
+            spec(**{field: MutableString(value)})
+    with pytest.raises(ValueError, match="authorities"):
+        spec(required_authorities=[MutableString("work.resource.read")])
+
+
+@pytest.mark.parametrize("authority", ["work..read", "work.read.", "work.read-", "*"])
+def test_authority_names_have_unambiguous_nonempty_segments(authority):
+    with pytest.raises(ValueError, match="authorities"):
+        replace(identity(), authorities=frozenset({authority}))
+
+
+@pytest.mark.parametrize("field", ["issuer", "subject"])
+def test_trusted_ingress_refuses_other_issuer_or_subject(field):
+    principal = replace(identity().principal, **{field: "other"})
+    with pytest.raises(ValueError, match="same end principal"):
+        context(trusted_ingress=TrustedIngressProvenance(principal, "issuer", "audience"))
+
+
+@pytest.mark.parametrize("overrides", [{"request_id": ""}, {"repo_id": ""}, {"repo_id": "r" * 257}])
+def test_context_preserves_frozen_character_bounds(overrides):
+    with pytest.raises(ValueError, match="1..256"):
+        context(**overrides)
+
+
+def test_invalid_operation_and_nonstring_contract_refuse_for_specific_reason():
+    with pytest.raises(ValueError, match="operation"):
+        OwnerAdmissionRequest("work-only", b"{}", context())
+    with pytest.raises(ValueError, match="versioned identifier"):
+        spec(owner_admission_contract=1)

@@ -11,11 +11,12 @@ from dataclasses import dataclass
 import re
 from typing import Literal, Protocol
 
+from .catalog import _NAME as _OPERATION_NAME
+
 CATALOG_REQUIRED_PROFILE = "catalog-required/v2"
 TRUSTED_REVIEW_INGRESS_PROFILE = "resource-review-ingress/v1"
 ARGUMENT_BYTES_LIMIT = 65_536
-_OPERATION_NAME = re.compile(r"^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*){2,}$")
-_AUTHORITY = re.compile(r"^[a-z][a-z0-9.-]*(?::[a-z][a-z0-9.-]*)?$")
+_AUTHORITY = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*(?:[.:][a-z][a-z0-9]*(?:-[a-z0-9]+)*)*$")
 _REVISION = re.compile(r"^[0-9a-f]{64}$")
 _SUBJECT = re.compile(r"^[A-Za-z0-9._-]+$")
 
@@ -99,7 +100,7 @@ class TrustedIngressProvenance:
             raise TypeError("principal must be PrincipalIdentity")
         _text(self.assertion_issuer, "assertion_issuer")
         _text(self.assertion_audience, "assertion_audience")
-        if self.profile != TRUSTED_REVIEW_INGRESS_PROFILE:
+        if type(self.profile) is not str or self.profile != TRUSTED_REVIEW_INGRESS_PROFILE:
             raise ValueError("unsupported trusted ingress profile")
 
 
@@ -119,9 +120,9 @@ class OwnerAdmissionContext:
         _bounded_envelope_text(self.request_id, "request_id")
         _bounded_envelope_text(self.repo_id, "repo_id")
         _bounded_envelope_text(self.idempotency_key, "idempotency_key")
-        if not isinstance(self.catalog_revision, str) or not _REVISION.fullmatch(self.catalog_revision):
+        if type(self.catalog_revision) is not str or not _REVISION.fullmatch(self.catalog_revision):
             raise ValueError("catalog_revision must be exact lowercase SHA256 hex")
-        if self.admission_profile != CATALOG_REQUIRED_PROFILE:
+        if type(self.admission_profile) is not str or self.admission_profile != CATALOG_REQUIRED_PROFILE:
             raise ValueError("unsupported admission profile")
         if self.trusted_ingress is not None:
             if type(self.trusted_ingress) is not TrustedIngressProvenance:
@@ -137,12 +138,12 @@ class OwnerAdmissionRequest:
     context: OwnerAdmissionContext
 
     def __post_init__(self) -> None:
-        if not isinstance(self.operation, str) or not _OPERATION_NAME.fullmatch(self.operation):
+        if type(self.operation) is not str or not _OPERATION_NAME.fullmatch(self.operation):
             raise ValueError("operation must be an exact operation name")
         if type(self.argument_bytes) is not bytes:
             raise TypeError("argument_bytes must be immutable bytes")
         if not 0 < len(self.argument_bytes) <= ARGUMENT_BYTES_LIMIT:
-            raise ValueError("argument_bytes exceed the frozen framing bound")
+            raise ValueError("argument_bytes must contain 1..65536 immutable bytes")
         if type(self.context) is not OwnerAdmissionContext:
             raise TypeError("context must be OwnerAdmissionContext")
 

@@ -120,10 +120,17 @@ def test_candidate_kit_wheel_contains_pure_admission_values_without_fake_owner()
     import ast
     with zipfile.ZipFile(_one_wheel("vuoro-adapter-kit")) as wheel:
         names = wheel.namelist()
-        assert not any("fake" in name.lower() or "/tests/" in name for name in names)
+        assert not any("fake" in name.lower() or (name.startswith("tests/") or "/tests/" in name) for name in names)
         for module in ("admission", "catalog_v2"):
             source = wheel.read(f"vuoro_adapter_kit/{module}.py").decode()
             tree = ast.parse(source)
             imports = {node.module or "" for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
             imports |= {alias.name for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names}
-            assert not any(name.startswith(("vuoro_service", "sprintctl", "psycopg", "httpx", "pydantic")) for name in imports)
+            import sys
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.level:
+                    assert node.level == 1 and node.module in {"catalog", "admission"}
+                elif isinstance(node, ast.ImportFrom):
+                    assert (node.module or "").split(".", 1)[0] in sys.stdlib_module_names
+                elif isinstance(node, ast.Import):
+                    assert all(alias.name.split(".", 1)[0] in sys.stdlib_module_names for alias in node.names)
