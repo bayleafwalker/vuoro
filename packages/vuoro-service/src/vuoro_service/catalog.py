@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 import hashlib
 import inspect
@@ -18,6 +18,7 @@ from vuoro_service.contracts import (
     CatalogResponse,
     OperationDefinition,
     ResourceKindDefinition,
+    validate_error_details,
 )
 from vuoro_service.identity import InvocationContext
 
@@ -60,10 +61,18 @@ class InvocationResultValidationError(RuntimeError):
 class OperationRejectedError(RuntimeError):
     """Intentional domain rejection returned through the invocation envelope."""
 
-    def __init__(self, code: str, message: str, *, http_status: int = 409) -> None:
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        http_status: int = 409,
+        details: Mapping[str, Any] | None = None,
+    ) -> None:
         super().__init__(message)
         self.code = code
         self.http_status = http_status
+        self.details = validate_error_details(details)
 
 
 @dataclass(frozen=True)

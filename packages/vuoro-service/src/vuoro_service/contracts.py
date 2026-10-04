@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, TypeAdapter, field_validator
 
 
 class StrictModel(BaseModel):
@@ -148,9 +149,31 @@ class InvocationRequest(StrictModel):
     repo_id: str | None = Field(default=None, min_length=1, max_length=256)
 
 
+_ERROR_DETAILS = TypeAdapter(
+    dict[str, JsonValue], config=ConfigDict(strict=True, allow_inf_nan=False)
+)
+
+
+def validate_error_details(value: Mapping[str, Any] | None) -> dict[str, JsonValue] | None:
+    """Snapshot an optional JSON object without coercing non-JSON values."""
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise ValueError("rejection details must be a JSON object")
+    return _ERROR_DETAILS.validate_python(dict(value), strict=True)
+
+
 class InvocationError(StrictModel):
     code: str
     message: str
+    details: dict[str, JsonValue] | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
+
+    @field_validator("details", mode="before")
+    @classmethod
+    def _validate_details(cls, value):
+        return validate_error_details(value)
 
 
 class InvocationResponse(StrictModel):
