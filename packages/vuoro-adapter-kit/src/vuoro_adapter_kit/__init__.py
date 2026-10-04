@@ -20,4 +20,18 @@ __all__ = [
     "operation_spec",
 ]
 
-__version__ = "0.1.0"
+from .catalog_v2 import build_operation_spec_v2, operation_spec_v2
+from .admission import (
+    ARGUMENT_BYTES_LIMIT, CATALOG_REQUIRED_PROFILE, TRUSTED_REVIEW_INGRESS_PROFILE,
+    AdmissionIdentity, AdmissionResponse, OwnerAdmission, OwnerAdmissionContext,
+    OwnerAdmissionRequest, PrincipalIdentity, TrustedIngressProvenance,
+)
+
+__all__ += [
+    "ARGUMENT_BYTES_LIMIT", "CATALOG_REQUIRED_PROFILE", "TRUSTED_REVIEW_INGRESS_PROFILE",
+    "AdmissionIdentity", "AdmissionResponse", "OwnerAdmission", "OwnerAdmissionContext",
+    "OwnerAdmissionRequest", "PrincipalIdentity", "TrustedIngressProvenance",
+    "build_operation_spec_v2", "operation_spec_v2",
+]
+
+__version__ = "0.2.0"
