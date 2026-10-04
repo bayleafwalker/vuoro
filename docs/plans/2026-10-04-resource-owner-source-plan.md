@@ -137,7 +137,7 @@ compact, Unicode-preserving JSON canonical command bytes (not the catalog JCS
 algorithm). Decoded equivalent strings use the same UTF-8 output without Unicode
 normalization; JSON quotes/backslashes are escaped, short JSON control escapes
 are fixed and remaining control characters use lowercase four-hex escapes.
-Integer -0 canonicalizes to0; arbitrary bounded integer tokens remain
+Integer -0 canonicalizes to 0; arbitrary bounded integer tokens remain
 integers without float conversion. Semantically invalid but canonicalizable
 arguments use the same canonical class. Other bounded valid outer requests with
 noncanonicalizable argument bytes use domain-separated `raw-json/v1` exact raw
@@ -177,7 +177,8 @@ structured triple as well as the canonical string. No issuer case-folding/URL re
 identity issuance must pin its canonical issuer string. Epoch equality is exact. Gateway resolver already verifies
 signed `subject` and integer `principal_epoch` and composes the triple; epoch
 cannot be replaced with iat, actor or zero. Static identities must supply the
-owner-issued triple; `None` and reserved system principals are ineligible for
+owner-issued triple for disposable fixtures only; the released authoritative core
+uses a real issuer carrier with current credential/epoch/repository checks; `None` and reserved system principals are ineligible for
 this resource's human/end-principal ownership/review path. Epoch zero is valid
 only when actually asserted by the issuer. Creator remains the exact immutable
 triple. Review separation compares issuer/subject excluding epoch, so reissue
@@ -242,7 +243,7 @@ Proposed logical tables, all repository/environment scoped:
 
 - resource projection (opaque minted ID, immutable creator, revision/state,
   final journal digest); immutable resource changes with unique position and
-  predecessor digest, positions exactly1..revision;
+  predecessor digest, positions exactly 1..revision;
 - retained typed edges/references (unverified pointers, never evidence-recorded by themselves) and immutable evidence/review/settlement
   binding facts tied to resource journal mutations;
 - first command binding keyed by environment/repo/principal/op/key, immutable
@@ -257,7 +258,8 @@ One transaction acquires graph advisory lock first for parent/dependency command
 (PG READ COMMITTED; later statements read the graph), then aggregate/principal
 quota locks, first binding, source row. SQLite starts BEGIN IMMEDIATE before
 admission reads. Replay lookup precedes capacity rejection after applicable
-locks, so exhaustion cannot hide committed results. Missing capability, stale
+locks, so exhaustion cannot hide committed results, including previously recorded
+conflicting-digest refusals. Missing capability, stale
 CAS, invalid state/graph/evidence and noncreator failure commit an immutable
 private refusal but no projection/change. Capacity exhaustion returns visible
 service-unavailable before a new decision/effect; it is an availability failure,
@@ -307,7 +309,8 @@ environment/repository membership: retain the original operation's complete narr
 mutation + resource.read authority set, OR hold explicit work.resource.read-decisions.
 The first path preserves ordinary lost-reply recovery without a new grant. The
 second grants access to the caller's original public historic receipt after original
-mutation/read grants are removed, not a current snapshot or execution. Mutation
+mutation/read grants are removed, not a current snapshot or execution. The original-operation path covers same-key receipt replay only, never private
+decision enumeration/get operations. Mutation
 grants never imply read-decisions and general resource.read alone is insufficient.
 This is a proposed qualification-sensitive policy, not already deployed/ratified.
 
@@ -325,7 +328,7 @@ compare immutable digest before any resource/remote verifier call. An already
 recorded conflicting-digest refusal returns exactly its bytes through either
 receipt access path. An unrecorded conflict uses ordinary first-attempt admission
 with the current original operation capability set and quota; decision-read alone
-cannot create a new command decision. If those grants are absent, refuse transport
+cannot create a new command decision. If those grants are absent, return transport decision-access-required
 without changing the original or existing conflict bindings. Original-capable
 conflicts permanently bind their refusal and never invoke the verifier/handler.
 This rule's post-revocation qualification limit is explicit for joint owner review.
@@ -364,7 +367,11 @@ admits its conflict under the policy above; it never calls the verifier. For a n
 binding, first check relevant capabilities and byte-only command shape from the
 authenticated context without resource reads; failures go directly into the owner
 admission transaction and permanent refusal, with zero verifier calls regardless
-of owner availability. Eligible remote verification holds no owner locks; then the mutation transaction follows the declared lock
+of owner availability. Eligible remote verification holds no owner locks; it can precede a later
+visibility/ownership/CAS refusal, so the configured protected owner may observe
+a scoped verification request. That owner must enforce its own reference scope;
+no caller-selected arbitrary URL/bytes are fetched. The zero-call promise applies
+to known conflicts and failed capability/shape admission, not all later refusals; then the mutation transaction follows the declared lock
 order, re-looks up the binding (a concurrent committed winner takes precedence),
 checks quota and rechecks capabilities, release-pinned domain shape (no resource
 read), visibility/ownership and exact CAS in the declared order. The verifier
@@ -418,13 +425,13 @@ outcome carrier and is not supplied by local settlement facts.
 | D | real protected verifier and end-principal reviewer ingress, exact evidence/review/settlement operations | Requires owner-published carriers and pins; no full workflow claim or support until real disposable integration receipts pass; deploy none |
 | E | completed consumer inventory + strict-only immutable composition | Retire v1 only after every relevant consumer migrated; separate owner rollout and measured rediscovery/refusal windows; no deployment in this task |
 
-Current measured pins: kit0.1.1 SHA
+Current measured pins: kit 0.1.1 SHA
 `0dac880d790857fbed1085906f0e2ffd151c509ab61d527a351b68f3775ee16f`,
-Sprintctl0.12.0 SHA
+Sprintctl 0.12.0 SHA
 `e669d47f698b6d9509132e2f3dae17323d7b6c17b3c446a66b8172c026c4c5af`,
-client0.1.1 SHA
+client 0.1.1 SHA
 `b5fb6bad174abd00d67504398690bcfb8c3cc3be891e5465983827e5a1740f6d`.
-Canonical service source0.1.84 and edge0.1.6 are not future version reservations
+Canonical service source 0.1.84 and edge 0.1.6 are not future version reservations
 or all-tenant deployment receipts. New kit/client/Sprintctl/service/edge releases receive their next free versions
 under existing release policy; do not reserve patch/minor numbers here or assume
 the CLI migration and resource store share a single owner release. Final contract identifiers may appear in immutable artifacts only after root's
@@ -436,8 +443,8 @@ experimental artifact uses distinct provisional identifiers never silently treat
 as final. Source review/publication cannot assign different semantics to one final
 identifier. Every new pin records source SHA, immutable wheel URL and SHA, descriptor API/schema version,
 transitive release locks and installed-composition attestation. Current remote
-compatibility has a bounded minimum/maximum and maximum20; it is not a promise
-that old binaries tolerate21. Before any later migration/rollout, independently
+compatibility has a bounded minimum/maximum and maximum 20; it is not a promise
+that old binaries tolerate 21. Before any later migration/rollout, independently
 prove an additive compatibility release that permits the new schema without
 changing old semantics, or use a separately authorized stop/migrate/roll sequence
 with explicit downtime and rollback refusal. Never assume migrate-then-roll is
@@ -455,7 +462,7 @@ assertion issuer/subject/epoch forwarding, proof-consumption boundary, partial-f
 recovery, low-level proxy retry settings and agent-loop behavior. Private source
 or credentials are not part of this public document. The public assertion
 contract requires signed real subject/epoch; wrappers cannot replace them with
-an actor or epoch0. New resource capabilities default absent in every existing
+an actor or epoch 0. New resource capabilities default absent in every existing
 mapping; a separate Cloud owner change must enumerate narrow grants and denial
 tests. #2600 effects mapping is a different capability/release cause; it does not
 authorize resource grants or this profile rollout. No G2 deployment window is
@@ -476,13 +483,13 @@ tests, not claims that the proposed code already exists.
 | Stale/timeout/502 through SDK, edge, proxy, agent loop and dropped poll | Mixed-revision pods surface bounded/visible configured rollout refusal window (not hidden guaranteed success); one invocation attempt, explicit partial-flow receipt, no automatic resend/re-sign/reconnect. Retry outside SDK still fails |
 | Missing narrow capability after authenticated same-repo admission | One permanent private refusal; later grant cannot change same-key result; foreign-repo/auth failures charge nothing. Shell early denial or handler-only ledger fails |
 | Parser/schema upgrade replay | Same argument bytes preserve digest class and original refusal across relaxed/tightened schema; duplicates/surrogates/floats/raw whitespace vectors are stable. Schema-dependent digest selection fails |
-| Revocation and lost-reply replay | Zero-capability first denial then no receipt grant yields transport denial with original binding/no new quota intact; original full operation caps + no decision-read still recover lost reply; decision-read returns exact bytes after mutation/read grant removal; decision-read removal refuses privately without new decision/quota; regrant restores bytes; revoked epoch and membership refuse before disclosure; new epoch cannot access old binding. Unconditional disclosure or replacement-capability-denial fails |
+| Revocation and lost-reply replay | Zero-capability first denial then no receipt grant yields transport denial with original binding/no new quota intact; original full operation caps + no decision-read still recover lost reply; decision-read returns exact bytes after mutation/read grant removal; with original mutation/read grants absent too, decision-read removal returns transport decision-access-required without new decision/quota; regrant restores bytes; revoked epoch and membership refuse before disclosure; new epoch cannot access old binding. Unconditional disclosure or replacement-capability-denial fails |
 | Create response loss and two concurrent equal/conflicting bindings | One minted resource/effect/change, exact public replay; conflicts preserve first decision; forced ID collision refuses. New timestamp/body on replay fails |
 | Counter/effect/decision insert failures and admission exhaustion | Full rollback on infrastructure failure; bounded aggregate/principal counters; original replay available at capacity, other new commands visibly unavailable. Eviction or unlimited default fails |
 | Zero-capability lifetime exhaustion | Independent principals can reach the configured aggregate refusal cap; later capable new command is visibly unavailable, original replay remains. Claiming authorized admission is unaffected fails |
 | Two independent PG graph actors after blocked advisory lock | READ COMMITTED lock first statement; opposing/mixed edges yield one acceptance; SQLite equivalent. Pre-lock snapshot or per-edge-only locks fail |
 | Source supersede races and retained superseded target paths | Source CAS one loser; target unchanged; retained edges still prevent mixed cycle. Delete-edge or target-absence shortcut fails |
-| Epoch reissue and creator self-review | Old/new epoch cannot mutate each other's ownership; same issuer/subject across epochs cannot review. Actor equality or epoch0 default fails |
+| Epoch reissue and creator self-review | Old/new epoch cannot mutate each other's ownership; same issuer/subject across epochs cannot review. Actor equality or epoch 0 default fails |
 | Journal corruption/truncation and derived ownership | Rebuild catches gap/digest/creator/final-anchor mismatch; ownership derived from immutable creator. Silent old snapshot/side ownership table fails |
 | Missing-capability verifier boundary | Missing read/mutation grant or invalid shape produces zero remote calls whether verifier is up/down; verifier-down plus stale CAS/noncreator refusal commits the earlier permanent refusal; conflicts never verify; current CAS/capability precedence preserved. Remote-first evaluation fails |
 | Real protected evidence mismatch/unavailability and changed reviewed revision | Real owner verification and CAS refuse without resource advance; cached/self-reported receipt or fake-only evidence fails; unsupported carriers explicitly remain absent |
@@ -512,9 +519,9 @@ Partial operation outcome mapping: create/relate/reference/supersede preserve
 frozen immutable creator/CAS/typed reference/retained mixed-graph invariants;
 get/changes preserve authoritative contiguous projection/derived ownership;
 private decision reads preserve independent permanent replay authority. Each
-still depends on Version1 explicit contract/schema versions, Version2 capability
-separation, Version3 strict guard, Version4 immutable pins; Version5 package
-boundaries and Version6/7 later rollback/import fences remain distinct owner
+still depends on Version 1 explicit contract/schema versions, Version 2 capability
+separation, Version 3 strict guard, Version 4 immutable pins; Version 5 package
+boundaries and Version 6/7 later rollback/import fences remain distinct owner
 requirements. None fabricates evidence-recorded/accepted/settled states. General
 resource workflow acceptance remains blocked on D. Front-door abuse rate limiting
 is shell/edge-owned and separate from permanent owner admission capacity; no
