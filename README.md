@@ -12,12 +12,19 @@ capabilities through one versioned runtime.
 
 | | Status |
 | --- | --- |
-| **Current operational system** | The existing domain tools and agent-cockpit documented in [agentops](https://github.com/bayleafwalker/agentops). |
-| **This repository** | The target transport-neutral client and deployable service composition layer. It packages capabilities without taking authority from their domain repositories. |
-| **Works today** | Versioned handshake, catalog, and generic invocation protocol; enforced client/service packaging boundary; FastAPI service and transport-only client bootstrap; neutral Compose and Kustomize packaging checks. |
-| **Still to complete** | Production-ready released adapters, environment deployment composition, and deliberate migration of request routing—not domain authority—behind the service boundary. |
+| **What it is** | A coordination and settlement substrate: leases, takeover, stale-result rejection with evidence retention, restart, and dependency release, served over a public MCP route. Domain authority stays with the owner repositories. |
+| **Evidence it works** | The [settlement scenario](docs/evidence/2026-09-29-m1-4-settlement-scenario/README.md) (local 34/34; live: every scenario case passed, one cleanup expectation failed on a harness environment gap, since corrected) and the provider-neutral [conformance suite](packages/vuoro-service/tests/conformance/). The scenario used two scripted processes, not two commercial harnesses. |
+| **Not yet established** | That two different commercial harnesses can continue real work from durable records, that accepted results are reconstructible end to end, and that legacy Auditctl records are imported (S4). Merged is not deployed: see the deployment record in vuoro-cloud `IMPLEMENTATION-STATUS.md`. |
+| **Next milestone** | [Market integration milestone MI-1](docs/plans/2026-10-05-market-integration-milestone.md): an end-to-end proof across real harnesses, provider evidence ingestion, a reconstruction view, and an evidence-completeness measure. |
+| **Where current truth lives** | Target state: agentops `docs/plans/2026-09-17-target-state.md`. Component status: [disposition register](docs/direction/disposition-register.yaml). Estate shape (a 2026-09-12 snapshot): [The agentic estate](docs/architecture/agentic-estate.md). Where older plans conflict, those win. |
 | **Project overview** | [Vuoro on kotona.app](https://kotona.app/projects/vuoro/) |
-| **Current implementation** | [agentops system map, cockpit, contracts, and operating walkthrough](https://github.com/bayleafwalker/agentops) |
+
+Vuoro is one product with three surfaces and unchanged internal owners: **work
+and evidence** (Sprintctl authority), **connectors** (MCP and thin
+observation/import adapters), and **protected operations** (customer-controlled
+acceptance and effect reconciliation). Native harnesses and providers execute;
+Vuoro keeps work identity, authority and history intact when a worker changes
+or is lost halfway through.
 
 This repository deliberately publishes five distributions:
 

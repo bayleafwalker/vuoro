@@ -9,6 +9,9 @@
 **Audience:** future planner, architect, reviewer, and implementer sessions  
 **Scope:** intended product and architecture direction; not an implementation authorization  
 **Plan of record for implementation:** `2026-08-22-extended-sprint-plan.md` (composition v4 candidate, four weeks). This document sits above it and after it — see §0.  
+**Subsequent planning (2026-10-05):** `2026-10-05-market-integration-milestone.md` positions the
+product against current market capabilities and plans the MI-1 integration milestone. It adds no
+non-goal exception and does not change ownership.  
 **Subsequent correction:** `2026-08-27-effect-intent-projection.md` rejects a
 cluster-granularity single-writer reading, retains native DevOps fencing, and
 limits new work to an advisory resource-graph projection for imperative effects.  

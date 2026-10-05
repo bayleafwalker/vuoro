@@ -5,6 +5,11 @@ recorded here.
 
 ## Unreleased
 
+- docs: market integration milestone MI-1 plan (reconstruction view, provider
+  evidence ingestion, conformance coverage matrix, evidence completeness) and a
+  README status table that states what is proven, what is not, and where current
+  truth lives. Documentation only; no behaviour change.
+
 - vuoro-service 0.1.83: pins the verified attested Sprintctl 0.12.0 owner wheel
   and enables accepted-effect restart proof against that published owner. Remote
   schema remains 20; Cloud OAuth mapping and deployment are separate prerequisites.
