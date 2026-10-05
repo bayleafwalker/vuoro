@@ -7,6 +7,7 @@ members = [
     "vuoro-adapter-kit",
     "vuoro-client",
     "vuoro-evidence",
+    "vuoro-knowledge",
     "vuoro-mcp-edge",
     "vuoro-reconciler",
     "vuoro-schema-runtime",
@@ -809,6 +810,26 @@ test = [
 
 [package.metadata]
 requires-dist = [{ name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" }]
+provides-extras = ["test"]
+
+[[package]]
+name = "vuoro-knowledge"
+version = "0.1.0"
+source = { editable = "packages/vuoro-knowledge" }
+dependencies = [
+    { name = "pyyaml" },
+]
+
+[package.optional-dependencies]
+test = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" },
+    { name = "pyyaml", specifier = ">=6,<7" },
+]
 provides-extras = ["test"]
 
 [[package]]

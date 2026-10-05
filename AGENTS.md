@@ -17,6 +17,11 @@ their domain repositories.
   belong here.
 - Sprintctl, actionq, kctl, and auditctl retain their respective work,
   execution, knowledge, and audit semantics.
+- `packages/vuoro-knowledge/` resolves Git-authored documentation and records
+  which sources were supplied to work. Git owns the documents, the catalog is
+  a rebuildable projection, and manifests bind through the existing evidence
+  path. It holds no review, approval or publication state, and its metadata
+  grants no authority (`docs/architecture/knowledge-resolution.md`).
 
 ## Runtime invariants
 
@@ -37,6 +42,8 @@ uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests
 uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests
 uv run --package vuoro-mcp-edge --extra test pytest packages/vuoro-mcp-edge/tests
 uv run --package vuoro-reconciler --extra test pytest packages/vuoro-reconciler/tests
+uv run --package vuoro-knowledge --extra test pytest packages/vuoro-knowledge/tests
+uv run --package vuoro-knowledge vuoro-knowledge validate --root . --errors-only
 uv build --package vuoro-client --wheel --out-dir dist/vuoro-client
 uv build --package vuoro-service --wheel --out-dir dist/vuoro-service
 uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime

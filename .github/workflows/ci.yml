@@ -22,6 +22,9 @@ jobs:
       - run: uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests
       - run: uv run --package vuoro-mcp-edge --extra test pytest packages/vuoro-mcp-edge/tests
       - run: uv run --package vuoro-reconciler --extra test pytest packages/vuoro-reconciler/tests
+      - run: uv run --package vuoro-knowledge --extra test pytest packages/vuoro-knowledge/tests
+      - name: Validate authored knowledge metadata
+        run: uv run --package vuoro-knowledge vuoro-knowledge validate --root . --errors-only
       - run: uv build --package vuoro-client --wheel --out-dir dist/vuoro-client
       - run: uv build --package vuoro-service --wheel --out-dir dist/vuoro-service
       - run: uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime
