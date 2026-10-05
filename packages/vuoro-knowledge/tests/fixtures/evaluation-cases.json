@@ -1,0 +1,56 @@
+{
+  "schema": "vuoro-knowledge-evaluation-cases/v1",
+  "corpus": "fixtures/estate",
+  "as_of": "2026-10-05",
+  "note": "Shared by the resolver-level check (test_evaluation_cases.py) and the A/B agent protocol in docs/plans/2026-10-05-knowledge-resolution-evaluation.md. `expect` is what a correct answer must contain; `wrong` is the plausible wrong answer each case exists to catch.",
+  "cases": [
+    {
+      "id": "intended-vs-implemented",
+      "question": "Should new knowledge-review work extend kctl, and has the kctl migration happened?",
+      "request": {"subjects": ["knowledge-resolution"]},
+      "expect": {
+        "conflicts": ["disposition-changed"],
+        "unresolved": ["transition-not-evidenced"],
+        "governing": ["kctl-vuoro-served-knowledge-alignment"],
+        "proposals": ["agentops-s4-evidence-home-preparation"],
+        "intended": {"kctl": "retiring"}
+      },
+      "wrong": "Extend kctl (the July plan is ratified), or: kctl has been retired (the October note discusses its migration)."
+    },
+    {
+      "id": "follow-supersession-in-part",
+      "question": "Do the long-term direction's component dispositions still apply?",
+      "request": {"topic": "long-term direction component dispositions"},
+      "expect": {"warnings": ["superseded-in-part"], "governing": ["vuoro-long-term-direction"]},
+      "wrong": "Yes, it is ratified; or: no, the whole document is superseded."
+    },
+    {
+      "id": "version-specific-guidance",
+      "question": "Which runbook applies to publishing kctl knowledge on vuoro-dev running vuoro-service 0.1.59?",
+      "request": {"components": ["kctl"], "environments": ["vuoro-dev"], "versions": {"vuoro-service": "0.1.59"}, "require": ["runbook"]},
+      "expect": {"excluded": ["vuoro-runbook-kctl-publish"], "unresolved": ["missing-guidance"]},
+      "wrong": "Follow the 0.1.40-0.1.49 publish runbook."
+    },
+    {
+      "id": "cross-repository-context",
+      "question": "Which sources, across repositories, govern knowledge-resolution work?",
+      "request": {"subjects": ["knowledge-resolution"]},
+      "expect": {"repos": ["agentops", "kctl", "vuoro"], "authorities": {"component-status": "vuoro-disposition-register"}},
+      "wrong": "Only the documents in the repository being edited."
+    },
+    {
+      "id": "no-authoritative-answer",
+      "question": "Which source governs the knowledge interface contract?",
+      "request": {"subjects": ["knowledge-resolution"], "questions": ["interface-contract"]},
+      "expect": {"unresolved": ["no-authority"]},
+      "wrong": "Whichever document describes an interface most confidently."
+    },
+    {
+      "id": "point-in-time-observation",
+      "question": "Is the 2026-09-12 estate record a reliable statement of current state?",
+      "request": {"subjects": ["knowledge-resolution"]},
+      "expect": {"warnings": ["stale-observation"], "observations": ["vuoro-agentic-estate"]},
+      "wrong": "Yes, it is ratified."
+    }
+  ]
+}

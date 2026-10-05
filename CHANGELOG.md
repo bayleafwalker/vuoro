@@ -5,6 +5,13 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-knowledge 0.1.0 (new, proposed): documentation resolution and provenance
+  over Git-authored knowledge. Adds the `vuoro-knowledge/v1` metadata contract
+  (frontmatter or `knowledge.toml` sidecar), a validator, a rebuildable
+  catalog, `search`/`get`/`resolve_context`, and reproducible context manifests
+  bound through Sprintctl's existing evidence refs. No served catalog operation
+  is added (docs/architecture/knowledge-resolution.md).
+
 - vuoro-service 0.1.83: pins the verified attested Sprintctl 0.12.0 owner wheel
   and enables accepted-effect restart proof against that published owner. Remote
   schema remains 20; Cloud OAuth mapping and deployment are separate prerequisites.

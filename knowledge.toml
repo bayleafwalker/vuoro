@@ -1,0 +1,70 @@
+# Authored knowledge metadata for this repository (vuoro-knowledge-repo/v1).
+#
+# Contract: docs/architecture/knowledge-resolution.md. This file is reviewed
+# like code. It declares sidecar metadata for documents that do not carry
+# frontmatter (ratified records are not rewritten to add it), the subjects that
+# span repositories, and question-scoped authority. Everything derived
+# (headings, digests, revisions, backlinks) belongs to the rebuildable catalog.
+# Nothing here grants runtime authority.
+schema = "vuoro-knowledge-repo/v1"
+repo = "vuoro"
+include = ["docs/**/*.md"]
+
+[[subjects]]
+id = "knowledge-resolution"
+title = "Knowledge resolution, review and provenance"
+# Component keys are disposition-register keys. The vuoro-knowledge package
+# is part of vuoro-core; it has no row of its own.
+components = ["kctl", "knowledge-base", "vuoro-core"]
+
+[[subjects]]
+id = "evidence-home"
+title = "Evidence home and S4 import"
+components = ["auditctl", "sprintctl", "vuoro-core", "hostproto-consumer-vuoro-evidence"]
+
+# The portfolio status authority. Its lifecycle records that v3 is in force as
+# decided under delegation (owner decision D1, 2026-09-17); the owner should
+# confirm that reading.
+[[documents]]
+path = "docs/direction/disposition-register.yaml"
+doc_id = "vuoro-disposition-register"
+title = "Disposition register"
+purpose = "decision"
+lifecycle = "ratified"
+effective = "2026-09-17"
+subjects = ["knowledge-resolution", "evidence-home"]
+supersedes = [
+  { doc = "vuoro-long-term-direction", in_part = true, scope = "component and ledger-object dispositions (sections 5, 7.3)" },
+]
+facts = { extractor = "status-register/v1", question = "component-status", items = "items", key = "key", status = "status", decided = "goal_state.reviewed" }
+
+# A ratified record of the estate's shape as observed on 2026-09-12. It is an
+# observation: accurate for its date, not a statement about later state. It
+# delegates component status to the register ("the register decides status
+# and this record decides shape").
+[[documents]]
+path = "docs/architecture/agentic-estate.md"
+doc_id = "vuoro-agentic-estate"
+title = "The agentic estate"
+purpose = "observation"
+lifecycle = "ratified"
+observed = "2026-09-12"
+delegates = [
+  { question = "component-status", source = "vuoro-disposition-register", scope = { repos = ["*"] } },
+]
+
+[[documents]]
+path = "docs/plans/2026-08-22-long-term-direction.md"
+doc_id = "vuoro-long-term-direction"
+title = "Vuoro long-term direction"
+purpose = "decision"
+lifecycle = "ratified"
+effective = "2026-08-22"
+
+[[documents]]
+path = "docs/direction/disposition-corrections.md"
+doc_id = "vuoro-disposition-corrections"
+title = "Disposition register corrections"
+purpose = "observation"
+lifecycle = "ratified"
+observed = "2026-09-01"

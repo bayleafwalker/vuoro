@@ -22,6 +22,7 @@ members = [
   "packages/vuoro-worker",
   "packages/vuoro-mcp-edge",
   "packages/vuoro-reconciler",
+  "packages/vuoro-knowledge",
 ]
 
 [tool.pytest.ini_options]
@@ -35,5 +36,6 @@ testpaths = [
   "packages/vuoro-worker/tests",
   "packages/vuoro-mcp-edge/tests",
   "packages/vuoro-reconciler/tests",
+  "packages/vuoro-knowledge/tests",
   "tests",
 ]
