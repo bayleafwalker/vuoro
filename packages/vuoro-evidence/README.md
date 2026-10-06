@@ -12,3 +12,8 @@ The EvidenceSet consumer built for the HostProto validation phase
 
 `EffectGrant` is input from ActionQ/federation. Grant use is a projection
 of effect state in the reducer; no ingress edge can assert it.
+
+MI-1/P2 adds a pure, explicit provider observation decoder and append-owner draft
+builder in `ingress/provider.py`. It does not register a runtime capability,
+automatically ingest, verify a signature or convert verdicts to Decisions. See
+[the current increment and acceptance boundary](../../docs/architecture/provider-observation-ingress.md).
