@@ -1,0 +1,18 @@
+{
+  "schema": "provider-response-capture/v1",
+  "provider": "github",
+  "family": "check-run-rest-get",
+  "request": {
+    "method": "GET",
+    "url": "https://api.github.com/repos/bayleafwalker/vuoro/check-runs/112364306246",
+    "repository": "bayleafwalker/vuoro"
+  },
+  "capture_tool": "gh api",
+  "persisted_at": "2026-10-06T16:03:48.122276+00:00",
+  "bytes_domain": "unaltered gh API output body bytes; original HTTP framing/headers not captured",
+  "body_sha256": "71eac1c5fd8ae801fdedf61ee0862d699ba962880a578d13de8b9a8752d8250b",
+  "capture_id": "mi1-capture-20261006-71eac1c5fd8ae801fdedf61ee0862d699ba962880a578d13de8b9a8752d8250b",
+  "response_headers": "unknown",
+  "signature_verification": "not performed",
+  "assurance": "collector-observed provider API response, not provider signature or protected verification"
+}
