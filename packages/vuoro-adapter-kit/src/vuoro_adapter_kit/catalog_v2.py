@@ -6,9 +6,42 @@ import re
 from typing import Any, Literal
 
 from .admission import CATALOG_REQUIRED_PROFILE, _AUTHORITY
-from .catalog import SCHEMA_FEATURES, operation_spec
+from .catalog import SCHEMA_FEATURES, _copy_mapping, _schema, operation_spec
 
 _CONTRACT = re.compile(r"^[a-z][a-z0-9.-]*/v[1-9][0-9]*$")
+
+
+def _schema_v2(value: Mapping[str, Any], label: str) -> dict[str, Any]:
+    """V1 object authoring vocabulary plus root oneOf, with isolated branches.
+
+    This structural builder is not a complete JSON Schema evaluator. The owner
+    registry still validates the complete Draft 2020-12 schema. Branch order is
+    semantic metadata and must never be sorted or normalized.
+    """
+    copied = _copy_mapping(value, label)
+    if "oneOf" not in copied:
+        return _schema(copied, label)
+    branches = copied.pop("oneOf")
+    base = _schema(copied, label)
+    if isinstance(branches, (str, bytes)) or not isinstance(branches, Sequence):
+        raise TypeError(f"{label}.oneOf must be a sequence of schemas")
+    if not branches:
+        raise ValueError(f"{label}.oneOf must not be empty")
+    for branch in branches:
+        if type(branch) is bool:
+            continue
+        if not isinstance(branch, Mapping):
+            raise TypeError(f"{label}.oneOf branches must be schema mappings or booleans")
+        if any(type(key) is not str or not key for key in branch):
+            raise ValueError(f"{label}.oneOf branch keys must be non-empty strings")
+        if "required" in branch:
+            names = branch["required"]
+            if isinstance(names, (str, bytes)) or not isinstance(names, Sequence):
+                raise TypeError(f"{label}.oneOf required must be a sequence")
+            if any(type(name) is not str or not name for name in names) or len(names) != len(set(names)):
+                raise ValueError(f"{label}.oneOf required must contain unique non-empty strings")
+    base["oneOf"] = branches
+    return base
 
 
 def operation_spec_v2(
@@ -63,14 +96,22 @@ def operation_spec_v2(
             or not authorities
         ):
             raise ValueError("owner admission requires strict-only repo-scoped required-key mutation metadata")
+    # Validate complete v2 schemas here. The unchanged v1 metadata builder sees
+    # its original vocabulary; the v2 result retains the complete validated
+    # schema snapshots, including oneOf, rather than publishing substitutes.
+    input_snapshot = _schema_v2(input_schema, "input_schema")
+    result_snapshot = _schema_v2(result_schema, "result_schema")
     spec = operation_spec(
-        name, owning_domain=owning_domain, input_schema=input_schema,
-        result_schema=result_schema, execution_semantics=execution_semantics,
+        name, owning_domain=owning_domain,
+        input_schema={key: value for key, value in input_snapshot.items() if key != "oneOf"},
+        result_schema={key: value for key, value in result_snapshot.items() if key != "oneOf"}, execution_semantics=execution_semantics,
         idempotency=idempotency, repo_scoped=repo_scoped,
         required_client_schema_features=required_client_schema_features,
         deprecation=deprecation, result_contract=result_contract,
         failure_disclosure=failure_disclosure,
     )
+    spec["input_schema"] = input_snapshot
+    spec["result_schema"] = result_snapshot
     del spec["required_authority"]
     spec.update(
         schema_version="operation-definition/v2",
