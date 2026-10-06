@@ -5,6 +5,12 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service 0.1.85 release candidate: mounted native identities may carry an
+  explicit issuer-controlled workspace partition. Omitted bindings remain
+  unbound; invalid metadata and caller-supplied headers cannot mint a binding.
+  No capability, repository scope or migration change. Native commissioning
+  and runtime rollout remain separately verified deployment-owner work.
+
 - docs: market integration milestone MI-1 plan (reconstruction view, provider
   evidence ingestion, conformance coverage matrix, evidence completeness) and a
   README status table that states what is proven, what is not, and where current
