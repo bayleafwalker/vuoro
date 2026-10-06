@@ -99,3 +99,71 @@ class SprintctlIntentSource:
         # Accepted intents are immutable; the owner has no failed transition.
         # Keep it accepted and propagate so the caller records failure evidence.
         raise RuntimeError("owner has no failed transition; accepted intent remains retryable")
+
+    async def preflight_proposed(self, intent):
+        """Observe the exact proposed candidate and current bound work basis."""
+        row = (await self.invoke("work.effect.get-v1", {"intent_id": intent.intent_id}))["intent"]
+        if (row["state"] != "proposed" or self._intent(row) != intent
+                or canonical_digest(intent) != intent.canonical_intent_digest
+                or intent.acceptor is not None or intent.acceptance is not None
+                or intent.release_digest is None
+                or intent.proposer_principal == self.principal_id):
+            raise PreflightRefused("invalid-proposed-intent")
+        release = (await self.invoke("work.read.release", {"item_id": intent.item_id}))["release"]
+        if type(release["acceptance_contract"].get("effect_verification_required", False)) is not bool:
+            raise PreflightRefused("invalid-verification-requirement")
+        item = (await self.invoke("work.read.item", {"item_id": intent.item_id}))["item"]
+        if (release["release_digest"] != intent.release_digest
+                or release["work_item_id"] != intent.item_id or item["id"] != intent.item_id
+                or release["item_revision"].rsplit("@revise:", 1)[0] != item["edit_revision"]):
+            raise PreflightRefused("effect-release-mismatch")
+
+    async def verification_request(self, intent, runtime, *, run_id, item_id, observed_at):
+        """Execute checks and prepare existing durable intake arguments; no write.
+
+        Preserve the returned request/binding before capture. Native append and
+        its retries belong to Sprintctl's existing evidence queue/sync.
+        """
+        import hashlib
+        import json
+        import re
+        if (not isinstance(item_id, str) or not re.fullmatch(r"[A-Za-z0-9._:-]{8,128}", item_id)
+                or observed_at.tzinfo is None or observed_at.utcoffset() is None):
+            raise PreflightRefused("invalid-verification-capture")
+        resolved = await self.invoke("work.run.resolve-v1", {"run_id": run_id})
+        binding = {key: resolved[key] for key in ("repo_id", "run_id", "principal_id", "workspace_id", "client_id", "grant_id")}
+        if (binding["run_id"] != run_id or binding["principal_id"] != self.principal_id
+                or binding["workspace_id"] != self.workspace_id or intent.workspace_id != self.workspace_id):
+            raise PreflightRefused("verifier-run-binding-mismatch")
+        await self.preflight_proposed(intent)
+        checks = runtime.verify_proposed(intent)
+        await self.preflight_proposed(intent)
+        detail = {"schema": "sprintctl-protected-artifact-verification/v1", "intent_id": intent.intent_id,
+                  "intent_revision": intent.revision, "canonical_intent_digest": intent.canonical_intent_digest,
+                  "release_digest": intent.release_digest,
+                  "artifact": {"domain": "utf8-unified-diff/v1",
+                               "digest": "sha256:" + hashlib.sha256(intent.unified_diff.encode("utf-8")).hexdigest()},
+                  "checks": checks}
+        digest = "sha256:" + hashlib.sha256(json.dumps(detail, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False).encode("utf-8")).hexdigest()
+        tail_result = await self.invoke("work.evidence.tail-v1", {"run_id": run_id})
+        if tail_result["run_id"] != run_id or tail_result["repo_id"] != binding["repo_id"]:
+            raise PreflightRefused("verifier-tail-binding-mismatch")
+        tail = tail_result["item"]
+        if tail is None:
+            seq, prev = 0, None
+        else:
+            # Shared chain wire contract: identity/content/position/predecessor.
+            payload = {key: tail[key] for key in ("item_id", "digest", "chain_seq", "chain_prev_digest")}
+            prev = "sha256:" + hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            seq = tail["chain_seq"] + 1
+        request = {"run_id": run_id, "item_id": item_id, "idempotency_key": item_id,
+                   "kind": "protected-artifact-verification", "ref": "effect-intent:" + intent.intent_id,
+                   "digest": digest, "collector": "vuoro-reconciler-artifact-checks/v1",
+                   "validity": {"basis": "indefinite", "valid_from": observed_at.isoformat(),
+                                "valid_until": None, "component_digests": {}},
+                   "claims": [{"claim_type": "observation", "subject": intent.intent_id, "grant_id": None,
+                               "freshness": None, "confirms": None, "detail": detail}],
+                   "provenance": {"assurance": "trusted-local-check-execution"},
+                   "chain_seq": seq, "chain_prev_digest": prev}
+        return {"request": request, "run_binding": binding}

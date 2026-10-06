@@ -16,6 +16,9 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 import logging
+import hashlib
+import json
+from pathlib import Path
 import re
 import shutil
 import tempfile
@@ -401,10 +404,8 @@ class Reconciler:
         ):
             raise _Refused("branch-exists-with-different-change")
 
-    def _prepare_commit(self, intent: EffectIntent, acceptor: Acceptor, workdir: str) -> str:
-        """Validate, checkout, apply, re-validate and sign; the commit exists
-        only in `workdir` until something pushes it."""
-
+    def _prepare_checkout(self, intent: EffectIntent, workdir: str):
+        """Run the same artifact checks before verification or signing."""
         # Before anything is applied: no NUL byte, no binary hunk (by line
         # and by git's own parse -- git apply cannot be told to refuse
         # binary itself), and no path git would read as configuration (a
@@ -437,6 +438,45 @@ class Reconciler:
             check_staged_content(workdir, changes)
         except DiffPolicyViolation as violation:
             raise _Refused(f"diff-policy-refused: {violation.code}") from None
+        return changes
+
+    def _check_revision(self, repository: str) -> str:
+        from .gitenv import run_git
+        policy = self.config.diff_policy_for(repository)
+        sources = {name: hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
+                   for name in ("reconciler.py", "diff_policy.py", "git_ops.py", "gitenv.py")}
+        version = run_git("--version", text=True)
+        if version.returncode:
+            raise PreflightRefused("git-version-unavailable")
+        basis = {"schema": "vuoro-reconciler-artifact-checks/v1", "sources": sources,
+                 "git_version": version.stdout.strip(),
+                 "policy": {"path_allowlist": sorted(policy.path_allowlist),
+                            "protected_path_patterns": sorted(policy.protected_path_patterns)}}
+        encoded = json.dumps(basis, sort_keys=True, separators=(",", ":")).encode()
+        return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+    def verify_proposed(self, intent: EffectIntent) -> list[dict[str, str]]:
+        """Execute local artifact checks without acceptance, signing or publication."""
+        if intent.repository not in self.config.repository_allowlist:
+            raise PreflightRefused("repository-not-allowlisted")
+        if (intent.acceptor is not None or intent.acceptance is not None
+                or canonical_digest(intent) != intent.canonical_intent_digest):
+            raise PreflightRefused("invalid-proposed-intent")
+        revision = self._check_revision(intent.repository)
+        try:
+            with tempfile.TemporaryDirectory(prefix="vuoro-verify-", dir=self._workdir_root) as workdir:
+                self._prepare_checkout(intent, workdir)
+        except _Refused as refused:
+            raise PreflightRefused(refused.reason) from None
+        if self._check_revision(intent.repository) != revision:
+            raise PreflightRefused("check-revision-changed")
+        return [{"name": name, "revision": revision, "status": "passed"}
+                for name in ("patch-text-and-path-safety", "clean-checkout-and-patch-application",
+                             "staged-content-and-diff-policy")]
+
+    def _prepare_commit(self, intent: EffectIntent, acceptor: Acceptor, workdir: str) -> str:
+        """Validate the artifact with the shared checks, then sign locally."""
+        changes = self._prepare_checkout(intent, workdir)
         if isinstance(acceptor, PolicyAcceptor) and not scope_admits(
             acceptor.scope, intent, [change.path for change in changes]
         ):

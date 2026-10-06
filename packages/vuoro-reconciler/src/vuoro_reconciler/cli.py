@@ -25,6 +25,10 @@ import argparse
 import asyncio
 import importlib
 import sys
+import json
+from datetime import datetime, timezone
+
+from .verification import PreflightRefused
 
 from .acceptance import AcceptanceRefused, OperatorAcceptance
 from .intents import EffectIntent, IntentSource
@@ -77,6 +81,12 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument("--verification-item-id", help="protected verifier evidence item")
         if name == "reject":
             command.add_argument("--reason", required=True)
+    verify = commands.add_parser("verify", help="execute trusted artifact checks and prepare native evidence capture")
+    verify.add_argument("intent_id")
+    verify.add_argument("--intent-source", help="module:factory returning a protected native source")
+    verify.add_argument("--validation-runtime", help="module:factory returning the configured trusted reconciler")
+    verify.add_argument("--run-id", required=True, help="already registered verifier-owned native run")
+    verify.add_argument("--receipt-id", required=True, help="stable evidence item and idempotency key")
     return parser
 
 
@@ -123,8 +133,23 @@ def _show(intent: EffectIntent, out: TextIO) -> None:
 
 
 async def _run(
-    arguments: argparse.Namespace, source: IntentSource, stdin: TextIO, stdout: TextIO
+    arguments: argparse.Namespace, source: IntentSource, stdin: TextIO, stdout: TextIO, validation_runtime=None
 ) -> int:
+    if arguments.command == "verify":
+        if validation_runtime is None or not hasattr(source, "verification_request"):
+            stdout.write("refused: protected validation runtime and native source required\n")
+            return 1
+        try:
+            matches = [intent for intent in await source.poll_proposed() if intent.intent_id == arguments.intent_id]
+            if len(matches) != 1:
+                raise PreflightRefused("proposed-intent-not-found")
+            packet = await source.verification_request(matches[0], validation_runtime,
+                run_id=arguments.run_id, item_id=arguments.receipt_id, observed_at=datetime.now(timezone.utc))
+        except PreflightRefused as refused:
+            stdout.write(f"refused: {visible(str(refused))}\n")
+            return 1
+        stdout.write(json.dumps(packet, sort_keys=True, indent=2) + "\n")
+        return 0
     acceptance = OperatorAcceptance(source)
     verification_ref = None
     if arguments.command == "accept":
@@ -168,14 +193,17 @@ def main(
     intent_source: IntentSource | None = None,
     stdin: TextIO | None = None,
     stdout: TextIO | None = None,
+    validation_runtime=None,
 ) -> int:
     arguments = _parser().parse_args(argv)
     if intent_source is None:
         if not arguments.intent_source:
             raise SystemExit("--intent-source is required")
         intent_source = _load_source(arguments.intent_source)
+    if arguments.command == "verify" and validation_runtime is None and arguments.validation_runtime:
+        validation_runtime = _load_source(arguments.validation_runtime)
     return asyncio.run(
-        _run(arguments, intent_source, stdin or sys.stdin, stdout or sys.stdout)
+        _run(arguments, intent_source, stdin or sys.stdin, stdout or sys.stdout, validation_runtime)
     )
 
 

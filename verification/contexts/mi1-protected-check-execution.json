@@ -1,0 +1,111 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.mi1.protected-check-execution",
+  "owner_repo": "vuoro",
+  "subject": "trusted-artifact-check-execution-to-native-durable-intake",
+  "contract_ref": {
+    "doc_id": "vuoro-mi1-market-integration",
+    "revision": "git:f9cadd85b35cd28717c5ab3fc24409bcb0f7b98f"
+  },
+  "source_of_truth": "immutable native owner acceptance/Release/evidence and signed external Git state",
+  "depth": 2,
+  "backends": [
+    "real-local-Git-and-fake-owner",
+    "released-sprintctl-0.13.1-postgresql16-and-native-producer"
+  ],
+  "actors": [
+    "public-proposer",
+    "protected-verifier",
+    "protected-applier",
+    "work-editor",
+    "custom-intent-source"
+  ],
+  "initial_state": [
+    "proposed canonical artifact bound to current work Release",
+    "registered verifier-owned native run",
+    "no verification receipt or external publication"
+  ],
+  "operations": [
+    {
+      "name": "execute existing shared artifact validation",
+      "actors": [
+        "protected-verifier"
+      ],
+      "synchronization": "clean disposable checkout; shared checks before signing; no forge writes"
+    },
+    {
+      "name": "observe proposed intent/work basis before and after validation",
+      "actors": [
+        "protected-verifier",
+        "work-editor"
+      ],
+      "synchronization": "fresh native API reads; owner acceptance rechecks separately"
+    },
+    {
+      "name": "capture/sync exact request and retry committed reply loss",
+      "actors": [
+        "protected-verifier"
+      ],
+      "synchronization": "existing durable producer; native append is owner transaction"
+    },
+    {
+      "name": "accept and reconnect protected applier",
+      "actors": [
+        "protected-verifier",
+        "protected-applier"
+      ],
+      "synchronization": "existing private accept and native discovery after new connection"
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "success receipt only after actual trusted artifact checks, exact current basis and owned-run resolution"
+  },
+  "assumptions": {
+    "isolation": "owner READ COMMITTED; fresh API reads do not lock across Git",
+    "clock": "not used to grant authority",
+    "fairness": "none"
+  },
+  "bounds": {
+    "local_cases": 17,
+    "actual_owner_histories": 4,
+    "named_checks": 3,
+    "lost_reply_per_success_history": 1,
+    "concurrent_operations": 0
+  },
+  "invariants": [
+    "failed artifact check emits no success packet",
+    "verification never accepts/signs/pushes/opens PR",
+    "changed work or run binding refuses success packet",
+    "check revision includes installed implementation, trusted policy and observed Git version",
+    "durable retry after committed reply loss preserves exact receipt/tail",
+    "actual generated receipt can be accepted and reconstructed by fresh applier"
+  ],
+  "faults": [
+    "nonapplicable/binary/control/delete-policy patch",
+    "unlisted repository",
+    "wrong run principal/workspace",
+    "changed work during checkout",
+    "changed check revision",
+    "committed append reply loss",
+    "skip-validation mutant"
+  ],
+  "oracles": [
+    "real local Git patch/application/staged content",
+    "independent raw and body SHA256",
+    "published native owner API state/tail after durable retry",
+    "no signing key and empty forge publication state",
+    "nonapplicable patch oracle detects skipped validation mutant"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-reconciler/src/vuoro_reconciler/reconciler.py",
+    "packages/vuoro-reconciler/src/vuoro_reconciler/sprintctl_source.py",
+    "packages/vuoro-reconciler/src/vuoro_reconciler/cli.py",
+    "packages/vuoro-reconciler/tests/test_protected_check_execution.py",
+    "packages/vuoro-reconciler/tests/test_protected_source_pg.py"
+  ],
+  "expansions": [
+    "semantic-doc",
+    "fault-scenario"
+  ]
+}

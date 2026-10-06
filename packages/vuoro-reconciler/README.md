@@ -154,3 +154,35 @@ takes its `IntentSource`, `ProviderClient` and signing key as constructor
 arguments and makes no assumption about its deployment: no Kubernetes
 manifest, no credential material and no network call to a real provider
 lives in this repository.
+
+### Protected check execution and native capture
+
+`verify` uses the same artifact checks as the trusted reconciler, without
+signing, publication or acceptance. Supply a trusted runtime factory with the
+repository mapping and local diff policy, and a native source authenticated as
+the separately scoped verifier. Register its native run first. These checks
+establish patch safety/application, not project test success.
+
+```bash
+vuoro-reconciler verify "$intent_id" \
+  --intent-source trusted_config:verifier_source \
+  --validation-runtime trusted_config:validation_runtime \
+  --run-id "$verifier_run_id" --receipt-id "$receipt_id" > protected-capture.json
+```
+
+A successful command emits `request` and `run_binding`. Preserve that exact
+packet, extract each object into its own JSON file, then use the existing native
+producer with the verifier's profile:
+
+```bash
+sprintctl authority evidence-queue --request request.json --run-binding run-binding.json
+sprintctl authority evidence-sync
+```
+
+After confirmed delivery, the operator may use the existing `accept` command
+with `--verification-run-id` and `--verification-item-id`. Verification and
+evidence delivery grant no acceptance. Retry the captured request after unknown
+delivery; regenerating a timestamp or chain position is a different request.
+An explicit confirmed chain conflict uses the producer's existing correction
+procedure. The owner rechecks the current Release at acceptance; a stale capture
+can remain evidence while being ineligible to authorize the changed work.

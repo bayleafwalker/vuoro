@@ -34,3 +34,12 @@ the release/raw-artifact/protected-verifier link at its real owner boundary,
 then the actual different-commercial-harness Track B case. No matrix row above
 claims whole-milestone completion, production rollout, formal verification or
 concurrency qualification from sequential examples.
+
+Protected check execution continuation: the shared trusted reconciler now has a
+source path that executes patch text/path, clean application, and staged content
+checks before preparing native evidence intake arguments. The isolated released
+owner proof uses the generated request, existing durable capture/sync and a
+committed reply-loss retry, then protected acceptance and fresh applier discovery.
+These are local artifact safety checks, not functional project tests or remote
+execution attestation. Scripted native contexts remain distinct from commissioned
+HTTP roles and real commercial harness qualification; no deployed horizon changes.
