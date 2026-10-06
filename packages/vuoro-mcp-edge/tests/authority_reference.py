@@ -20,11 +20,11 @@ class ReferenceEffects:
         self.applications = {}
         self.work_item = {"status": "pending"}
 
-    def propose(self, *, title="Change", key=None):
+    def propose(self, *, title="Change", unified_diff="diff", key=None):
         self.counter += 1
         intent = EffectIntent("effect_" + f"{self.counter:026d}", "run_" + "0" * 26,
             RunBinding("proposer", "workspace", "repo"), "repo", "a" * 40,
-            title, "Why", "diff", item_id=1)
+            title, "Why", unified_diff, item_id=1)
         digest = request_digest("propose_effect", {"item_id": intent.item_id, "run_id": intent.run_id,
             "repository": intent.repository, "base_commit": intent.base_commit, "title": intent.title,
             "rationale": intent.rationale, "unified_diff": intent.unified_diff})
