@@ -1,0 +1,11 @@
+{
+  "schema_version": "protected-work-owner-pin/v1",
+  "source_repository": "https://github.com/bayleafwalker/sprintctl",
+  "source_revision": "208abe080ed2331eb6bf7c1a16774b5721fd0d66",
+  "source_ref": "refs/tags/v0.13.1",
+  "signer_workflow": "bayleafwalker/sprintctl/.github/workflows/release-sprintctl.yaml",
+  "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/v0.13.1/sprintctl-0.13.1-py3-none-any.whl",
+  "artifact_sha256": "4d8c4c334c15c65a81c2a89b34cfdf760eeff6ea7061f60e22bbe8a82de4260a",
+  "distribution_version": "0.13.1",
+  "remote_schema_version": 21
+}

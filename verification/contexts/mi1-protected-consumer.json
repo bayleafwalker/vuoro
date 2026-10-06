@@ -1,0 +1,115 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.mi1.protected-consumer",
+  "owner_repo": "vuoro",
+  "subject": "protected-receipt-consumption-and-external-publication-preflight",
+  "contract_ref": {
+    "doc_id": "vuoro-mi1-market-integration",
+    "revision": "git:f9cadd85b35cd28717c5ab3fc24409bcb0f7b98f"
+  },
+  "source_of_truth": "immutable native owner acceptance/Release/evidence and signed external Git state",
+  "depth": 2,
+  "backends": [
+    "fake-owner-replies-and-real-local-Git",
+    "released-sprintctl-0.13.1-postgresql16-and-real-local-Git"
+  ],
+  "actors": [
+    "public-proposer",
+    "protected-verifier",
+    "protected-applier",
+    "work-editor",
+    "custom-intent-source"
+  ],
+  "initial_state": [
+    "pending work with required protected verification",
+    "accepted immutable artifact intent with explicit Release/receipt binding",
+    "no external branch or PR"
+  ],
+  "operations": [
+    {
+      "name": "forward receipt reference through protected accept",
+      "actors": [
+        "protected-verifier"
+      ],
+      "synchronization": "existing private owner acceptance operation; no principal wire argument"
+    },
+    {
+      "name": "restart and discover accepted intent",
+      "actors": [
+        "protected-applier"
+      ],
+      "synchronization": "new native owner connection and source with no cached proposal IDs"
+    },
+    {
+      "name": "verify raw receipt and fresh owner basis",
+      "actors": [
+        "protected-applier"
+      ],
+      "synchronization": "before checkout, publication lookup, branch push and PR creation; owner and forge are not one transaction"
+    },
+    {
+      "name": "edit work around external effect",
+      "actors": [
+        "work-editor"
+      ],
+      "synchronization": "deterministic edit during checkout/lookup or after push"
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "fresh protected approval binding before each irreversible publication request"
+  },
+  "assumptions": {
+    "isolation": "owner READ COMMITTED; fresh API reads do not lock across Git",
+    "clock": "not used to grant authority",
+    "fairness": "none"
+  },
+  "bounds": {
+    "verifiers": 1,
+    "appliers": 1,
+    "work_editors": 1,
+    "restart_connections": 2,
+    "wrong_binding_variants": 13,
+    "edit_boundaries": 3,
+    "actual_owner_histories": 3
+  },
+  "invariants": [
+    "every present proof matches actual raw UTF8 patch and frozen intent/Release",
+    "custom preflight cannot bypass kernel proof validation",
+    "bound source without preflight cannot publish",
+    "current owner approval and current work revision are observed before external writes",
+    "changed work before push leaves no branch",
+    "changed work after push refuses PR and exposes partial effect",
+    "native proof survives restart/application while work remains pending",
+    "public proposal and protected verifier/applier authority are distinct"
+  ],
+  "faults": [
+    "stale or missing Release",
+    "changed raw artifact domain/hash or intent binding",
+    "failed/unknown-revision checks",
+    "wrong verifier/body digest",
+    "malformed required flag",
+    "edit during checkout or lookup",
+    "edit after committed push",
+    "custom source has absent or no-op preflight",
+    "partial CLI native receipt reference"
+  ],
+  "oracles": [
+    "independent fixture SHA256 of raw diff and receipt JSON",
+    "native owner get/read APIs after fresh connection",
+    "real signed local Git branch and fake forge PR state",
+    "work status remains pending",
+    "old baseline returns applied on stale-Release case"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-reconciler/src/vuoro_reconciler/verification.py",
+    "packages/vuoro-reconciler/src/vuoro_reconciler/sprintctl_source.py",
+    "packages/vuoro-reconciler/src/vuoro_reconciler/reconciler.py",
+    "packages/vuoro-reconciler/tests/test_protected_preflight.py",
+    "packages/vuoro-reconciler/tests/test_protected_source_pg.py"
+  ],
+  "expansions": [
+    "semantic-doc",
+    "fault-scenario"
+  ]
+}

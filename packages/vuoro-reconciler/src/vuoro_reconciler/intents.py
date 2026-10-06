@@ -109,6 +109,7 @@ class EffectIntent:
     acceptance: Mapping[str, Any] | None = None
     effect_kind: str = "diff"
     acceptor: Acceptor | None = field(default=None)
+    release_digest: str | None = None
 
 
 class IntentSource(Protocol):
@@ -123,7 +124,8 @@ class IntentSource(Protocol):
         """Intents ready to reconcile. An empty list means none are ready --
         never an error; a source that cannot answer raises instead."""
 
-    async def accept(self, intent_id: str, acceptor: Acceptor, *, revision: int, canonical_intent_digest: str) -> None:
+    async def accept(self, intent_id: str, acceptor: Acceptor, *, revision: int, canonical_intent_digest: str,
+                     verification_ref: Mapping[str, str] | None = None) -> None:
         """`proposed -> accepted`, recording `acceptor`. Compare-and-set: an
         intent no longer in `proposed` is not transitioned (raise)."""
 
