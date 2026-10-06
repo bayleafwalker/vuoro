@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
 
 [manifest]
@@ -886,7 +886,7 @@ provides-extras = ["test"]
 
 [[package]]
 name = "vuoro-service"
-version = "0.1.84"
+version = "0.1.85"
 source = { editable = "packages/vuoro-service" }
 dependencies = [
     { name = "cryptography" },
