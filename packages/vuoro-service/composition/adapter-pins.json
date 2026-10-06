@@ -5,21 +5,21 @@
       "lock_id": "work-adapter",
       "lock_kind": "adapter",
       "source_repository": "https://github.com/bayleafwalker/sprintctl",
-      "source_revision": "f6936f410f41a7dfaf7e5a1390c552eb90954874",
-      "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/v0.12.0/sprintctl-0.12.0-py3-none-any.whl",
-      "artifact_sha256": "e669d47f698b6d9509132e2f3dae17323d7b6c17b3c446a66b8172c026c4c5af",
+      "source_revision": "208abe080ed2331eb6bf7c1a16774b5721fd0d66",
+      "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/v0.13.1/sprintctl-0.13.1-py3-none-any.whl",
+      "artifact_sha256": "4d8c4c334c15c65a81c2a89b34cfdf760eeff6ea7061f60e22bbe8a82de4260a",
       "distribution": "sprintctl",
-      "distribution_version": "0.12.0"
+      "distribution_version": "0.13.1"
     },
     {
       "lock_id": "vuoro-adapter-kit",
       "lock_kind": "shared-dependency",
       "source_repository": "https://github.com/bayleafwalker/vuoro",
-      "source_revision": "1b6a51397e693c5e1d37ca71658dd3a5d5d0dd77",
-      "artifact_url": "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.1.1/vuoro_adapter_kit-0.1.1-py3-none-any.whl",
-      "artifact_sha256": "0dac880d790857fbed1085906f0e2ffd151c509ab61d527a351b68f3775ee16f",
+      "source_revision": "686039a9dafaa454b2db8323c795ba91a1f59cbf",
+      "artifact_url": "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.2.0/vuoro_adapter_kit-0.2.0-py3-none-any.whl",
+      "artifact_sha256": "4bdf13bd09c8ea0c889f5cfb479327885163413a64ed690a9ba1b8d82dfaa163",
       "distribution": "vuoro-adapter-kit",
-      "distribution_version": "0.1.1"
+      "distribution_version": "0.2.0"
     },
     {
       "lock_id": "vuoro-schema-runtime",
@@ -35,11 +35,11 @@
       "lock_id": "audit-adapter",
       "lock_kind": "adapter",
       "source_repository": "https://github.com/bayleafwalker/auditctl",
-      "source_revision": "5f45f120a88039fb707d5ff0137c9c9e866d812c",
-      "artifact_url": "https://github.com/bayleafwalker/auditctl/releases/download/auditctl-v0.1.6/auditctl-0.1.6-py3-none-any.whl",
-      "artifact_sha256": "285c59bedac2982ed4ccd2d679d073198b3c0e208369ecb377aa987cf7d8f51a",
+      "source_revision": "8fd32c1a1d75db055d09b00ee464874d402213ac",
+      "artifact_url": "https://github.com/bayleafwalker/auditctl/releases/download/auditctl-v0.1.9/auditctl-0.1.9-py3-none-any.whl",
+      "artifact_sha256": "7efb9992bc23e1d2bd747dcb8204ff9452487e3bd6d1b43206ba4976f5a9c5cf",
       "distribution": "auditctl",
-      "distribution_version": "0.1.6"
+      "distribution_version": "0.1.9"
     }
   ],
   "runtime_descriptors": [

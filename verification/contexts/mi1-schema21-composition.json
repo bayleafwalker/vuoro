@@ -1,0 +1,102 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.mi1.schema21-composition",
+  "owner_repo": "vuoro",
+  "subject": "released-two-owner-composition-for-protected-artifact-binding",
+  "contract_ref": {
+    "doc_id": "vuoro-mi1-market-integration",
+    "revision": "git:f9cadd85b35cd28717c5ab3fc24409bcb0f7b98f"
+  },
+  "source_of_truth": "immutable tagged owner/shared wheels, composition manifest and installed catalog",
+  "depth": 2,
+  "backends": [
+    "installed-released-service-and-owner-wheels",
+    "disposable-loopback-PostgreSQL16",
+    "source-workspace"
+  ],
+  "actors": [
+    "service-runtime",
+    "protected-verifier",
+    "protected-applier",
+    "unprivileged-reader",
+    "work-editor"
+  ],
+  "initial_state": [
+    "candidate service0.1.86 with SHA-pinned work0.13.1/audit0.1.9/kit0.2.0/schema-runtime0.1.0",
+    "disposable work schema21 for protected histories",
+    "live schema20 unchanged"
+  ],
+  "operations": [
+    {
+      "name": "verify actual dependency closure and catalog",
+      "actors": [
+        "service-runtime"
+      ],
+      "synchronization": "isolated installed wheels; exact metadata fingerprints and pip consistency"
+    },
+    {
+      "name": "invoke released work/audit through service shell",
+      "actors": [
+        "service-runtime",
+        "unprivileged-reader"
+      ],
+      "synchronization": "existing real HTTP invocation conformance and refusal cases"
+    },
+    {
+      "name": "capture native verification and reconcile after owner reconnect",
+      "actors": [
+        "protected-verifier",
+        "protected-applier",
+        "work-editor"
+      ],
+      "synchronization": "existing generated-receipt disposable PG histories"
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "installed service consumes compatible immutable owner/dependency artifacts; no automatic migration"
+  },
+  "assumptions": {
+    "isolation": "sequential API histories and deterministic edit hooks; no forge/owner transaction",
+    "clock": "not authority",
+    "fairness": "none"
+  },
+  "bounds": {
+    "released_catalog_operations_without_resource_storage": 76,
+    "work_operations": 71,
+    "audit_operations": 5,
+    "actual_pg_histories": 4,
+    "concurrent_operations": 0
+  },
+  "invariants": [
+    "installed wheel hashes/versions match immutable manifest",
+    "both owners use the same released kit",
+    "catalog fingerprint reflects reviewed optional proof metadata",
+    "unprivileged invocation refuses and malformed input refuses",
+    "generated native proof and stale-edit protections operate on released owner closure",
+    "startup migration remains separate operator action"
+  ],
+  "faults": [
+    "stale kit/metadata/catalog release expectations",
+    "shared filename/differing digest rejection",
+    "unprivileged and malformed invoke",
+    "failed patch check, committed append reply loss and work edits before/after publication"
+  ],
+  "oracles": [
+    "SHA256 and exact tagged-source GitHub attestations",
+    "pip check and immutable owner metadata/catalog snapshots",
+    "released invocation guards",
+    "native owner API tail/state and signed local Git in four PG histories"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-service/composition/adapter-pins.json",
+    "scripts/validate_released_work_adapter.py",
+    "scripts/validate_released_audit_adapter.py",
+    "scripts/validate_released_catalog_composition.py",
+    "packages/vuoro-reconciler/tests/test_protected_source_pg.py"
+  ],
+  "expansions": [
+    "semantic-doc",
+    "fault-scenario"
+  ]
+}

@@ -204,28 +204,28 @@ def test_checked_in_work_pin_is_the_release_actor_binding_release() -> None:
         pin.api_version,
         pin.schema_version,
     ) == (
-        "f6936f410f41a7dfaf7e5a1390c552eb90954874",
-        "0.12.0",
+        "208abe080ed2331eb6bf7c1a16774b5721fd0d66",
+        "0.13.1",
         "work-api/v1",
         "work-schema/v1",
     )
     assert pin.artifact_url.endswith(
-        "/v0.12.0/sprintctl-0.12.0-py3-none-any.whl"
+        "/v0.13.1/sprintctl-0.13.1-py3-none-any.whl"
     )
     assert pin.artifact_sha256 == (
-        "e669d47f698b6d9509132e2f3dae17323d7b6c17b3c446a66b8172c026c4c5af"
+        "4d8c4c334c15c65a81c2a89b34cfdf760eeff6ea7061f60e22bbe8a82de4260a"
     )
     assert [
         (item.lock_id, item.lock_kind, item.distribution, item.distribution_version)
         for item in pin.dependencies
-    ] == [("vuoro-adapter-kit", "shared-dependency", "vuoro-adapter-kit", "0.1.1")]
+    ] == [("vuoro-adapter-kit", "shared-dependency", "vuoro-adapter-kit", "0.2.0")]
     assert (pin.adapter_module, pin.register) == (
         "sprintctl.vuoro_adapter",
         "register_work_catalog",
     )
 
 
-def test_checked_in_audit_pin_is_auditctl_016_with_released_shared_dependencies() -> None:
+def test_checked_in_audit_pin_is_auditctl_019_with_released_shared_dependencies() -> None:
     manifest = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json")
     pin = manifest.pin("audit")
     assert (
@@ -237,11 +237,11 @@ def test_checked_in_audit_pin_is_auditctl_016_with_released_shared_dependencies(
         pin.artifact_sha256,
     ) == (
         "https://github.com/bayleafwalker/auditctl",
-        "5f45f120a88039fb707d5ff0137c9c9e866d812c",
+        "8fd32c1a1d75db055d09b00ee464874d402213ac",
         "auditctl",
-        "0.1.6",
-        "https://github.com/bayleafwalker/auditctl/releases/download/auditctl-v0.1.6/auditctl-0.1.6-py3-none-any.whl",
-        "285c59bedac2982ed4ccd2d679d073198b3c0e208369ecb377aa987cf7d8f51a",
+        "0.1.9",
+        "https://github.com/bayleafwalker/auditctl/releases/download/auditctl-v0.1.9/auditctl-0.1.9-py3-none-any.whl",
+        "7efb9992bc23e1d2bd747dcb8204ff9452487e3bd6d1b43206ba4976f5a9c5cf",
     )
     assert (pin.adapter_module, pin.register, pin.api_version, pin.schema_version) == (
         "auditctl.vuoro_adapter",
@@ -257,10 +257,10 @@ def test_checked_in_audit_pin_is_auditctl_016_with_released_shared_dependencies(
             "vuoro-adapter-kit",
             "shared-dependency",
             "vuoro-adapter-kit",
-            "1b6a51397e693c5e1d37ca71658dd3a5d5d0dd77",
-            "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.1.1/vuoro_adapter_kit-0.1.1-py3-none-any.whl",
-            "0dac880d790857fbed1085906f0e2ffd151c509ab61d527a351b68f3775ee16f",
-            "0.1.1",
+            "686039a9dafaa454b2db8323c795ba91a1f59cbf",
+            "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.2.0/vuoro_adapter_kit-0.2.0-py3-none-any.whl",
+            "4bdf13bd09c8ea0c889f5cfb479327885163413a64ed690a9ba1b8d82dfaa163",
+            "0.2.0",
         ),
         (
             "vuoro-schema-runtime",
@@ -638,7 +638,7 @@ def test_load_and_verify_accept_a_shared_filename_with_an_identical_digest(tmp_p
 
     source = ROOT / "composition" / "adapter-pins.json"
     raw = json.loads(source.read_text(encoding="utf-8"))
-    artifact = tmp_path / "sprintctl-0.12.0-py3-none-any.whl"
+    artifact = tmp_path / "sprintctl-0.13.1-py3-none-any.whl"
     artifact.write_bytes(b"same-filename-same-digest")
     digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
     work_lock = next(lock for lock in raw["release_locks"] if lock["lock_id"] == "work-adapter")
@@ -655,7 +655,7 @@ def test_load_and_verify_accept_a_shared_filename_with_an_identical_digest(tmp_p
     manifest = CompositionManifest.load(path)
     filenames = {lock.artifact_url.rsplit("/", 1)[-1] for lock in manifest.release_locks
                  if lock.lock_id in ("work-adapter", "work-adapter-dup")}
-    assert filenames == {"sprintctl-0.12.0-py3-none-any.whl"}
+    assert filenames == {"sprintctl-0.13.1-py3-none-any.whl"}
 
     # verify_adapter_artifacts checks every lock in the manifest, so isolate
     # the two colliding locks (rather than staging real wheels for the whole
@@ -674,7 +674,7 @@ def test_load_and_verify_reject_a_shared_filename_with_a_differing_digest(tmp_pa
 
     source = ROOT / "composition" / "adapter-pins.json"
     raw = json.loads(source.read_text(encoding="utf-8"))
-    artifact = tmp_path / "sprintctl-0.12.0-py3-none-any.whl"
+    artifact = tmp_path / "sprintctl-0.13.1-py3-none-any.whl"
     artifact.write_bytes(b"same-filename-differing-digest")
     digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
     work_lock = next(lock for lock in raw["release_locks"] if lock["lock_id"] == "work-adapter")

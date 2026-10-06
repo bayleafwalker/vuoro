@@ -26,11 +26,11 @@ from vuoro_service.identity import Identity, StaticBearerIdentityResolver
 
 _EXPECTED_ADAPTER_KIT = (
     "https://github.com/bayleafwalker/vuoro/releases/download/"
-    "vuoro-adapter-kit-v0.1.1/vuoro_adapter_kit-0.1.1-py3-none-any.whl"
+    "vuoro-adapter-kit-v0.2.0/vuoro_adapter_kit-0.2.0-py3-none-any.whl"
 )
 _EXPECTED_WORK_OPERATION_COUNT = 71
 _EXPECTED_WORK_METADATA_SHA256 = (
-    "a6154f173fb132032e868ac910a64f19ecead24ef606f0e8ac7bf94274ac4c00"
+    "ad812ff2d383640fe658a5ae81ffc5a312b86a48d04949b14eee01efce9525fe"
 )
 
 
