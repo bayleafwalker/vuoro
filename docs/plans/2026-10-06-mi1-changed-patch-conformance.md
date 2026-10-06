@@ -37,6 +37,13 @@ and runs this same test with `VUORO_AUTHORITY_TEST_PG_URL` on a disposable
 loopback database. The owner qualifies only when that exact-head job succeeds;
 a reference pass or an unconfigured owner skip cannot qualify it.
 
+CI run [37501544792](https://github.com/bayleafwalker/vuoro/actions/runs/37501544792)
+succeeded at test implementation `fdaed58ae318c05953065fa5b319cc98f032aa26`.
+Its ledger/effect step passed 73 tests with the published owner configured.
+The versioned [context](../../verification/contexts/mi1-changed-patch.json)
+and [result](../../verification/results/mi1-changed-patch-2026-10-06.json)
+record that bounded qualification and the remaining unknowns.
+
 ## Remaining coverage
 
 | Milestone behaviour | Evidence | Scope / remaining work |

@@ -1,0 +1,71 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.mi1.changed-patch",
+  "contract_ref": {
+    "doc_id": "market-integration-milestone/P3",
+    "revision": "vuoro:f9cadd85b35cd28717c5ab3fc24409bcb0f7b98f"
+  },
+  "implementation_sha": "fdaed58ae318c05953065fa5b319cc98f032aa26",
+  "depth": 0,
+  "environment": {
+    "backend": "local reference plus GitHub CI published owner PostgreSQL 16",
+    "isolation": "sequential invocations; isolated CI loopback lease_conformance_ci; no shared state or network effects",
+    "tool_versions": {
+      "python": "3.12",
+      "pytest": "8.4.2",
+      "sprintctl": "0.12.0"
+    }
+  },
+  "execution": {
+    "seed": null,
+    "histories": 3,
+    "bounds": {
+      "proposals_per_case": 2,
+      "local_reference_tests": 19,
+      "local_full_suite_tests": 1542,
+      "local_owner_configuration_skips": 4,
+      "ci_ledger_and_effect_tests": 73
+    },
+    "faults_exercised": [
+      "old acceptance digest substituted into changed proposal",
+      "apply without independent acceptance",
+      "digest-ignoring reference mutant"
+    ]
+  },
+  "claims": [
+    {
+      "property": "changed patch cannot reuse old canonical approval at reference and published owner boundaries",
+      "result": "example-tested",
+      "evidence": [
+        "same neutral changed-patch case executes on both mandatory configured bindings in CI",
+        "old digest accept/mark-applied refused, original and new state preserved, independent acceptance succeeds"
+      ]
+    },
+    {
+      "property": "oracle detects a reference that ignores the supplied acceptance digest",
+      "result": "example-tested",
+      "evidence": [
+        "test_changed_patch_oracle_detects_ignored_acceptance_digest catches DID NOT RAISE"
+      ]
+    },
+    {
+      "property": "released raw artifact binds protected verifier and resulting bytes",
+      "result": "unknown",
+      "evidence": [
+        "canonical intent digest is a separate domain; no protected verifier receipt or release-artifact binding established"
+      ]
+    }
+  ],
+  "counterexamples": [
+    {
+      "summary": "digest-ignoring reference mutant accepts changed proposal with old digest; the unchanged contract oracle fails",
+      "trace_ref": "packages/vuoro-mcp-edge/tests/test_effect_authority_contract.py:test_changed_patch_oracle_detects_ignored_acceptance_digest"
+    }
+  ],
+  "notes": [
+    "CI run https://github.com/bayleafwalker/vuoro/actions/runs/37501544792 at exact implementation SHA; all four jobs green; settlement-scenario ledger/effect step 73 passed.",
+    "Published owner source f6936f410f41a7dfaf7e5a1390c552eb90954874; verified wheel e669d47f698b6d9509132e2f3dae17323d7b6c17b3c446a66b8172c026c4c5af.",
+    "Local full suite 1542 passed / four unconfigured PG skips; CI explicitly configures owner binding.",
+    "No concurrency, actual external application, whole-milestone or runtime deployment claim."
+  ]
+}

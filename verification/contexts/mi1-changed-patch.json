@@ -1,0 +1,86 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.mi1.changed-patch",
+  "owner_repo": "vuoro",
+  "subject": "changed-patch-cannot-reuse-frozen-intent-approval",
+  "contract_ref": {
+    "doc_id": "market-integration-milestone/P3",
+    "revision": "vuoro:f9cadd85b35cd28717c5ab3fc24409bcb0f7b98f"
+  },
+  "source_of_truth": "existing frozen effect-intent owner contract; no raw artifact or verifier assumption",
+  "depth": 0,
+  "backends": [
+    "InMemoryIntentStore-reference",
+    "published-sprintctl-0.12.0-postgresql-16"
+  ],
+  "actors": [
+    "proposer",
+    "trusted-acceptor"
+  ],
+  "initial_state": [
+    "pending work; no effect intent"
+  ],
+  "operations": [
+    {
+      "name": "propose",
+      "actors": [
+        "proposer"
+      ],
+      "synchronization": "sequential committed owner API calls"
+    },
+    {
+      "name": "accept",
+      "actors": [
+        "trusted-acceptor"
+      ],
+      "synchronization": "sequential committed owner API calls"
+    },
+    {
+      "name": "mark-applied",
+      "actors": [
+        "trusted-acceptor"
+      ],
+      "synchronization": "sequential committed owner API calls"
+    },
+    {
+      "name": "get",
+      "actors": [
+        "trusted-acceptor"
+      ],
+      "synchronization": "sequential committed owner API calls"
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "acceptance binds the canonical digest of immutable patch-bearing intent"
+  },
+  "bounds": {
+    "proposals": 2,
+    "patches": 2,
+    "stale_digest_requests": 2,
+    "independent_connections": false
+  },
+  "invariants": [
+    "changed patch creates unaccepted intent with new canonical digest",
+    "old digest cannot accept or mark changed intent applied",
+    "refusal leaves original acceptance and new proposal unchanged",
+    "independent acceptance does not settle work"
+  ],
+  "faults": [
+    "old acceptance digest substituted into changed proposal",
+    "apply without independent acceptance",
+    "digest-ignoring reference mutant"
+  ],
+  "oracles": [
+    "effect-digest-mismatch plus unchanged-state equality",
+    "effect-invalid-transition before acceptance",
+    "positive control independent acceptance",
+    "same oracle rejects digest-ignoring mutant"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-mcp-edge/tests/test_effect_authority_contract.py:test_changed_patch_cannot_reuse_approval",
+    "packages/vuoro-mcp-edge/tests/test_effect_authority_contract.py:test_changed_patch_oracle_detects_ignored_acceptance_digest",
+    "packages/vuoro-mcp-edge/tests/authority_reference.py:ReferenceEffects.propose",
+    "packages/vuoro-mcp-edge/tests/authority_pg_binding.py:PgEffectsBinding.propose"
+  ]
+}
