@@ -71,7 +71,7 @@
   "counterexamples": [
     {
       "summary": "baseline 1e947bbb accepts stale Release and returns applied; new preflight refusal oracle fails on that baseline",
-      "trace_ref": "packages/vuoro-reconciler/tests/test_protected_preflight.py:test_stale_release_refused_before_git"
+      "trace_ref": "packages/vuoro-reconciler/tests/test_protected_preflight.py:test_stale_release_is_refused_before_git"
     }
   ],
   "notes": [
