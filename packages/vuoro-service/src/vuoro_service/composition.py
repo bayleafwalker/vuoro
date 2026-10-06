@@ -603,7 +603,7 @@ def load_identities(path: Path, *, environment: str) -> StaticBearerIdentityReso
     for token, identity in raw["identities"].items():
         if not isinstance(token, str) or len(token) < 32 or not isinstance(identity, dict):
             raise CompositionError("identity registry contains an invalid identity")
-        allowed_fields = {"actor", "environment", "authorities", "repo_ids", "principal_id"}
+        allowed_fields = {"actor", "environment", "authorities", "repo_ids", "principal_id", "workspace_id"}
         # principal_id is required, not optional-with-a-fallback. Falling back to
         # actor is exactly the failure the field exists to prevent: ownership in
         # the federation authority binds this string forever and has no transfer
@@ -612,6 +612,16 @@ def load_identities(path: Path, *, environment: str) -> StaticBearerIdentityReso
         required_fields = {"actor", "environment", "authorities", "principal_id"}
         if not required_fields <= set(identity) <= allowed_fields:
             raise CompositionError("identity registry contains unsupported identity fields")
+        # Native private deployments may issue an explicit workspace partition.
+        # Its issuer owns this binding; request/actor/environment fields cannot
+        # infer it. Absence retains the existing unbound identity behavior.
+        workspace_id = identity.get("workspace_id")
+        if "workspace_id" in identity and (
+            not isinstance(workspace_id, str)
+            or not workspace_id
+            or any(character.isspace() for character in workspace_id)
+        ):
+            raise CompositionError("identity registry workspace_id must be nonempty and contain no whitespace")
         actor = identity["actor"]
         bound_environment = identity["environment"]
         authorities = identity["authorities"]
@@ -637,6 +647,7 @@ def load_identities(path: Path, *, environment: str) -> StaticBearerIdentityReso
                 authorities=frozenset(authorities),
                 repo_ids=frozenset(repo_ids),
                 principal_id=identity["principal_id"],
+                workspace_id=workspace_id,
             )
         except IdentityResolutionError as error:
             raise CompositionError(f"identity registry: {error}") from error
