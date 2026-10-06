@@ -1,0 +1,90 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.mi1.provider-ingestion",
+  "contract_ref": {
+    "doc_id": "market-integration-milestone/P3",
+    "revision": "vuoro:f9cadd85b35cd28717c5ab3fc24409bcb0f7b98f"
+  },
+  "implementation_sha": "b4f58f0292b462abe68a5a76c5a86832cc704939",
+  "depth": 0,
+  "environment": {
+    "backend": "reference primitives plus published native owner on disposable PostgreSQL16",
+    "isolation": "sequential API calls; fresh loopback lease_conformance database, non-superuser role; fresh owner connection after lost reply; cluster stopped and removed",
+    "tool_versions": {
+      "python": "3.12.14",
+      "pytest": "8.4.2",
+      "sprintctl": "0.12.0",
+      "PostgreSQL": "16.15"
+    }
+  },
+  "execution": {
+    "seed": null,
+    "histories": 26,
+    "bounds": {
+      "provider_event_families": 4,
+      "contract_histories_per_family_per_binding": 3,
+      "reference_mutants": 2,
+      "reference_focused_passed": 14,
+      "reference_and_pg_focused_passed": 26,
+      "full_suite_passed": 1559,
+      "existing_unconfigured_pg_skips": 4,
+      "concurrent_operations": 0
+    },
+    "faults_exercised": [
+      "lost reply after committed append",
+      "fresh owner connection after unknown response",
+      "same delivery with changed artifact content",
+      "old exact replay after new delivery",
+      "duplicate replay mutant",
+      "forgotten delivery content binding mutant"
+    ]
+  },
+  "claims": [
+    {
+      "property": "provider exact retry after committed reply loss and fresh owner connection returns first receipt and preserves run/tail",
+      "result": "example-tested",
+      "evidence": [
+        "three portable histories on four event families execute on reference and published native owner; no table-name/count oracle",
+        "retry after newer delivery returns old receipt and leaves newer tail unchanged"
+      ]
+    },
+    {
+      "property": "changed observation artifact content under one delivery key is refused without changing native history, run identity or ordinary work",
+      "result": "example-tested",
+      "evidence": [
+        "same key/different content digest returns idempotency-conflict; original receipt/tail/run retained and pending work unchanged"
+      ]
+    },
+    {
+      "property": "absent provider fields stay unknown and imported observation confers no grant or acceptance",
+      "result": "example-tested",
+      "evidence": [
+        "null grant_id/confirms, unverified assurance and unknown build/session/check/instruction fields; pending owner work remains pending"
+      ]
+    },
+    {
+      "property": "protected verification of released raw artifact and actual cross-harness outcome",
+      "result": "unknown",
+      "evidence": [
+        "synthetic supplied payloads, observed artifact hash and native append API are not a protected verifier or Track B proof"
+      ]
+    }
+  ],
+  "counterexamples": [
+    {
+      "summary": "forgetting first delivery binding duplicates exact replay; receipt-equality oracle rejects the reference mutant",
+      "trace_ref": "packages/vuoro-mcp-edge/tests/test_provider_ingestion_contract.py:test_reply_loss_oracle_detects_duplicate_append_mutant"
+    },
+    {
+      "summary": "forgetting first content binding allows conflicting content; expected idempotency-conflict oracle rejects reference mutant",
+      "trace_ref": "packages/vuoro-mcp-edge/tests/test_provider_ingestion_contract.py:test_conflict_oracle_detects_missing_delivery_binding_mutant"
+    }
+  ],
+  "notes": [
+    "Published Sprintctl0.12.0 source f6936f410f41a7dfaf7e5a1390c552eb90954874 and SHA-verified wheel e669d47f698b6d9509132e2f3dae17323d7b6c17b3c446a66b8172c026c4c5af, unchanged composition pin.",
+    "Focused native owner command: VUORO_AUTHORITY_TEST_PG_URL=<isolated loopback lease_conformance database> .venv/bin/pytest packages/vuoro-mcp-edge/tests/test_provider_ingestion_contract.py -q;26passed.",
+    "Full local suite1559passed/four existing unconfigured PG skips; all four distribution boundary wheels built.",
+    "PG reconnect is an actual new connection/WorkApplication. Reference reconnect retains test state and makes no persistence claim.",
+    "Existing settlement-scenario CI now mandates this test file on published owner; no production schema, state, release pin, transport or authority changed. No concurrency, whole-milestone or runtime deployment claim."
+  ]
+}
