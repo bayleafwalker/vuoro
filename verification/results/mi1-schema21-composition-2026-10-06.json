@@ -1,0 +1,90 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.mi1.schema21-composition",
+  "contract_ref": {
+    "doc_id": "vuoro-mi1-market-integration",
+    "revision": "git:f9cadd85b35cd28717c5ab3fc24409bcb0f7b98f"
+  },
+  "implementation_sha": "02c7f17a90bb2877f46661a546e93e7a2085a7c3",
+  "depth": 2,
+  "environment": {
+    "backend": "candidate installed service0.1.86 and actual SHA-verified released owner/shared wheels; source workspace; disposable PostgreSQL16",
+    "isolation": "sequential conformance and deterministic fault histories; nonprivileged loopback lease_conformance database, removed after test",
+    "tool_versions": {
+      "sprintctl": "0.13.1",
+      "auditctl": "0.1.9",
+      "vuoro-adapter-kit": "0.2.0",
+      "vuoro-schema-runtime": "0.1.0",
+      "PostgreSQL": "16.15"
+    }
+  },
+  "execution": {
+    "seed": null,
+    "histories": 4,
+    "bounds": {
+      "targeted_service_passed": 317,
+      "targeted_unconfigured_pg_skips": 1,
+      "full_suite_passed": 1600,
+      "full_unconfigured_pg_skips": 8,
+      "released_work_operations": 71,
+      "released_audit_operations": 5,
+      "released_wheel_gates": 3,
+      "actual_pg_histories": 4,
+      "concurrent_operations": 0
+    },
+    "faults_exercised": [
+      "old kit and metadata/catalog guards refuse new composition until reviewed expectations updated",
+      "shared filename conflicting digest",
+      "real service shell authority/schema refusals",
+      "nonapplicable patch, committed native append reply loss, current work edit before/after push"
+    ]
+  },
+  "claims": [
+    {
+      "property": "candidate manifest closes both released owners over one compatible immutable shared kit and schema runtime",
+      "result": "example-tested",
+      "evidence": [
+        "all four downloaded hashes match manifest and exact tagged-source GitHub attestations verified",
+        "isolated candidate service wheel plus released closure installs with pip check success; work/audit/combined invocation gates pass"
+      ]
+    },
+    {
+      "property": "reviewed catalog retains 71 work/five audit operations while exposing optional protected proof fields on existing operations",
+      "result": "example-tested",
+      "evidence": [
+        "reviewed Sprintctl adapter diff f6936f410f41a7dfaf7e5a1390c552eb90954874..208abe080ed2331eb6bf7c1a16774b5721fd0d66; no new operation",
+        "work metadataSHAad812ff2d383640fe658a5ae81ffc5a312b86a48d04949b14eee01efce9525fe; complete no-resource catalog revision095e9835c8252932620185907f07d0d38104435148541a2a0ef86a512429dbb8"
+      ]
+    },
+    {
+      "property": "generated protected receipt and existing durable retry/application checks function with the actual released dependency closure",
+      "result": "example-tested",
+      "evidence": [
+        "four actual PG histories pass in candidate composition environment with installed work0.13.1/kit0.2.0; no source shared-kit substitution"
+      ]
+    },
+    {
+      "property": "live schema21 cutover, commissioned protected HTTP roles and commercial cross-harness acceptance",
+      "result": "unknown",
+      "evidence": [
+        "read-only live preflight confirms schema20 and healthy single writer; this increment does not migrate live state or commission actors"
+      ]
+    }
+  ],
+  "counterexamples": [
+    {
+      "summary": "old exact release guards reject new kit URL and new catalog revision; refreshed only after measuring released artifacts and reviewing optional proof wire changes",
+      "trace_ref": "scripts/validate_released_work_adapter.py:_work_pin"
+    },
+    {
+      "summary": "old hard-coded shared filename fixtures refer to0.12.0 and fail availability/filename assertions with the new manifest; fixtures updated to0.13.1 without weakening digest conflict oracle",
+      "trace_ref": "packages/vuoro-service/tests/test_composition.py:test_load_and_verify_reject_a_shared_filename_with_a_differing_digest"
+    }
+  ],
+  "notes": [
+    "All four boundary wheels built, source fullsuite1600passed8expectedPGskips, knowledge/artifact validation passed.",
+    "Service source0.1.86, work0.13.1 requires exactlyschema21; audit0.1.9 declares schemas2..3. Source workspace kit0.2.1 is a separate release horizon from installed kit0.2.0.",
+    "Strict image provenance/installed closure and MCP CI remain required before publication. Native PG history proof is not commissioned HTTP or functional project check proof.",
+    "No automatic migration, new runner, public apply rights or production schema change. Appservice owns the concrete maintenance cutover and recovery procedure."
+  ]
+}
