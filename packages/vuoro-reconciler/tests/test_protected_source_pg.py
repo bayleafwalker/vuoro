@@ -1,14 +1,15 @@
 """Released schema-21 owner to protected preflight to real local signed Git.
 
-Synthetic verifier assertions are distinct from execution attestations. The
-separate disposable DB is mandatory when configured, never a shared backend.
+The verifier executes shared real Git checks and captures through the existing
+native producer. Scripted principals do not prove issuer-authenticated runtime
+commissioning. The disposable database is mandatory when configured.
 """
 import asyncio
 from copy import deepcopy
 from dataclasses import replace
-import hashlib
 import json
 import os
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from urllib.parse import urlsplit
 import uuid
@@ -30,9 +31,9 @@ def context(principal, authorities):
         idempotency_key=None, idempotency_requirement="not-allowed")
 
 
-@pytest.mark.parametrize("stage", ["unchanged", "before-push", "after-push"])
+@pytest.mark.parametrize("stage", ["unchanged", "before-push", "after-push", "failed-check"])
 def test_verified_owner_acceptance_is_reconstructed_and_rechecked_before_forge_writes(
-    bare_remote, reconciler_signing_key, stage
+    bare_remote, reconciler_signing_key, stage, tmp_path
 ):
     from sprintctl import pg
     from sprintctl.application import WorkApplication
@@ -61,23 +62,52 @@ def test_verified_owner_acceptance_is_reconstructed_and_rechecked_before_forge_w
             "base_commit": base_commit_of(bare_remote), "title": "Fix typo", "rationale": "Protected proof",
             "unified_diff": "diff --git a/docs/readme.md b/docs/readme.md\n--- a/docs/readme.md\n+++ b/docs/readme.md\n@@ -1 +1 @@\n-old\n+new\n",
             "idempotency_key": uuid.uuid4().hex}, public)["intent"]
-        detail = {"schema": "sprintctl-protected-artifact-verification/v1", "intent_id": proposal["intent_id"],
-            "intent_revision": proposal["revision"], "canonical_intent_digest": proposal["canonical_intent_digest"],
-            "release_digest": release["release_digest"], "artifact": {"domain": "utf8-unified-diff/v1",
-                "digest": "sha256:" + hashlib.sha256(proposal["unified_diff"].encode()).hexdigest()},
-            "checks": [{"name": "fixture-protected-patch-check", "revision": "sha256:" + "b" * 64, "status": "passed"}]}
+        if stage == "failed-check":
+            # Re-propose a syntactically valid patch which cannot apply to base.
+            proposal = app.invoke("work.effect.propose-v1", {"item_id": item, "run_id": register(public),
+                "repository": "repo-a", "base_commit": base_commit_of(bare_remote), "title": "Wrong base",
+                "rationale": "Must fail artifact check", "unified_diff": proposal["unified_diff"].replace("-old", "-missing"),
+                "idempotency_key": uuid.uuid4().hex}, public)["intent"]
         receipt_id = "verification-" + uuid.uuid4().hex
         verifier_run = register(verifier)
-        app.invoke("work.evidence.append-v1", {"run_id": verifier_run, "item_id": receipt_id,
-            "kind": "protected-artifact-verification", "ref": "fixture:protected-check", "collector": "synthetic-verifier/v1",
-            "digest": "sha256:" + hashlib.sha256(json.dumps(detail, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest(),
-            "validity": {"basis": "indefinite", "valid_from": "2026-10-06T00:00:00+00:00", "valid_until": None, "component_digests": {}},
-            "claims": [{"claim_type": "observation", "subject": proposal["intent_id"], "grant_id": None,
-                "freshness": None, "confirms": None, "detail": detail}], "provenance": {},
-            "chain_seq": 0, "chain_prev_digest": None, "idempotency_key": receipt_id}, verifier)
         async def verifier_invoke(operation, arguments): return app.invoke(operation, arguments, verifier)
         from vuoro_reconciler.intents import OperatorAcceptor
         trusted = SprintctlIntentSource(verifier_invoke, workspace_id="protected-pg", principal_id=verifier.identity.principal_id)
+        validator_provider = FakeProviderClient(repositories={"repo-a": bare_remote})
+        validator = Reconciler(intent_source=trusted, provider=validator_provider, signing_key=None,
+            config=ReconcilerConfig(repository_allowlist=frozenset({"repo-a"})))
+        candidate = trusted._intent(proposal)
+        if stage == "failed-check":
+            from vuoro_reconciler.verification import PreflightRefused
+            with pytest.raises(PreflightRefused, match="diff-does-not-apply"):
+                asyncio.run(trusted.verification_request(candidate, validator, run_id=verifier_run,
+                    item_id=receipt_id, observed_at=datetime.now(timezone.utc)))
+            assert app.invoke("work.evidence.tail-v1", {"run_id": verifier_run}, verifier)["item"] is None
+            assert app.invoke("work.effect.get-v1", {"intent_id": candidate.intent_id}, verifier)["intent"]["state"] == "proposed"
+            assert validator_provider.pushed_branches == validator_provider.pull_requests == []
+            return
+        packet = asyncio.run(trusted.verification_request(candidate, validator, run_id=verifier_run,
+            item_id=receipt_id, observed_at=datetime.now(timezone.utc)))
+        from sprintctl import evidence_intake
+        queue = tmp_path / "producer.sqlite"
+        captured = evidence_intake.capture(queue, json.dumps(packet["request"]).encode(),
+            json.dumps(packet["run_binding"]).encode(), repo_id=store.repo_id)
+        lost = []
+        def delivery(operation, arguments):
+            result = app.invoke(operation, arguments, verifier)
+            if operation == "work.evidence.append-v1" and not lost:
+                lost.append(result)
+                raise TimeoutError("injected committed reply loss")
+            return result
+        class Rejected(Exception): pass
+        first = evidence_intake.synchronize(queue, repo_id=store.repo_id, invoke=delivery, rejection_type=Rejected)
+        assert first["pending_evidence_request_ids"] == [captured["request_id"]]
+        tail = app.invoke("work.evidence.tail-v1", {"run_id": verifier_run}, verifier)
+        second = evidence_intake.synchronize(queue, repo_id=store.repo_id, invoke=delivery, rejection_type=Rejected)
+        assert second["confirmed_evidence_request_ids"] == [captured["request_id"]]
+        assert app.invoke("work.evidence.tail-v1", {"run_id": verifier_run}, verifier) == tail
+        assert len(packet["request"]["claims"][0]["detail"]["checks"]) == 3
+        assert validator_provider.pushed_branches == validator_provider.pull_requests == []
         asyncio.run(trusted.accept(proposal["intent_id"], OperatorAcceptor(verifier.identity.principal_id),
             revision=proposal["revision"], canonical_intent_digest=proposal["canonical_intent_digest"],
             verification_ref={"run_id": verifier_run, "item_id": receipt_id}))

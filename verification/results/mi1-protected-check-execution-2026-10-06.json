@@ -1,0 +1,92 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.mi1.protected-check-execution",
+  "contract_ref": {
+    "doc_id": "vuoro-mi1-market-integration",
+    "revision": "git:f9cadd85b35cd28717c5ab3fc24409bcb0f7b98f"
+  },
+  "implementation_sha": "ca507609be521e9785fdb9195a48e2cf121934fd",
+  "depth": 2,
+  "environment": {
+    "backend": "real local Git, fake owner fixtures and published Sprintctl 0.13.1 on disposable PostgreSQL16 with existing durable native producer",
+    "isolation": "deterministic sequential API calls; loopback nonprivileged lease_conformance database; fresh applier connection; no lock across Git/owner",
+    "tool_versions": {
+      "python": "3.12",
+      "sprintctl": "0.13.1",
+      "PostgreSQL": "16.15"
+    }
+  },
+  "execution": {
+    "seed": null,
+    "histories": 21,
+    "bounds": {
+      "local_execution_cases": 17,
+      "actual_owner_histories": 4,
+      "named_checks": 3,
+      "targeted_passed": 219,
+      "targeted_unconfigured_pg_skips": 5,
+      "full_suite_passed": 1600,
+      "full_unconfigured_pg_skips": 8,
+      "lost_append_reply_per_success_history": 1,
+      "concurrent_operations": 0
+    },
+    "faults_exercised": [
+      "binary/control/delete-policy/nonapplicable patch",
+      "unlisted repository, wrong native principal/workspace and canonical digest",
+      "malformed requirement, changed work during checkout, changed check revision",
+      "committed native append reply loss and exact durable retry",
+      "skip-actual-validation mutant; absent CLI runtime"
+    ]
+  },
+  "claims": [
+    {
+      "property": "native success request is generated only after the shared trusted artifact checks execute on the exact proposed patch and current Release",
+      "result": "example-tested",
+      "evidence": [
+        "17 local cases execute real Git; failed safety/application check or stale work emits no packet",
+        "three check revisions hash installed validation source, normalized trusted policy and observed Git version; no proposer commands executed",
+        "Exact source/policy/Git-version revision basis is preserved in native provenance; independent test hashing reconstructs each named check revision."
+      ]
+    },
+    {
+      "property": "verification prepares a durable native request without acceptance, signing or publication",
+      "result": "example-tested",
+      "evidence": [
+        "verification runtime has no signing key; fixture rejects every owner write operation; no branch/PR writes",
+        "CLI emits existing append request and six-field registered binding; actual native resolve wire shape exercised"
+      ]
+    },
+    {
+      "property": "generated receipt survives committed reply loss, owner acceptance and fresh applier discovery",
+      "result": "example-tested",
+      "evidence": [
+        "four cases on published schema21 owner: three generated-request successful captures use actual existing evidence_intake.capture/synchronize with injected committed append reply loss; exact retry confirms without extending tail",
+        "protected receipt accepted on owner; fresh source/connection applies unchanged artifact or refuses work changes before/after push",
+        "nonapplicable patch leaves native evidence tail empty and intent proposed"
+      ]
+    },
+    {
+      "property": "issuer-authenticated commissioned verifier/applier, deployed runtime upgrade, functional project checks and commercial cross-harness continuation",
+      "result": "unknown",
+      "evidence": [
+        "scripted contexts and local artifact safety checks do not establish those runtime or functional properties; P2 and TrackB remain open"
+      ]
+    }
+  ],
+  "counterexamples": [
+    {
+      "summary": "skipping actual clean checkout/application emits passed checks for a nonapplicable patch; the same expected-refusal oracle detects the mutant with DID NOT RAISE",
+      "trace_ref": "packages/vuoro-reconciler/tests/test_protected_check_execution.py:test_fault_oracle_detects_skipped_patch_application"
+    },
+    {
+      "summary": "initial run.resolve fixture incorrectly nested run; published owner integration failed with KeyError run in all four cases. Adapter and fixture now use the actual flat six-field binding.",
+      "trace_ref": "packages/vuoro-reconciler/tests/test_protected_source_pg.py:test_verified_owner_acceptance_is_reconstructed_and_rechecked_before_forge_writes"
+    }
+  ],
+  "notes": [
+    "Published owner source208abe080ed2331eb6bf7c1a16774b5721fd0d66 / v0.13.1 / wheel SHA2564d8c4c334c15c65a81c2a89b34cfdf760eeff6ea7061f60e22bbe8a82de4260a, unchanged test fixture pin.",
+    "All four boundary wheels built; knowledge validation and artifact validation passed. Existing CI released-owner step now exercises generated check requests and durable capture/retry rather than synthetic passed-check assertions.",
+    "No new queue/runner/evaluator, acceptance path or domain migration; no publication during verification. Preserve exact capture for delivery retry; a later Release change can make retained evidence ineligible for acceptance.",
+    "Native evidence remains a protected local execution assertion, not cryptographic remote execution attestation. No owner/forge atomicity or general concurrency proof."
+  ]
+}
