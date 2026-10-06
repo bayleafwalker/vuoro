@@ -112,3 +112,37 @@ def test_terminal_effect_cannot_be_reaccepted_or_applied(authority, terminal, ne
         row = authority.transition("mark-applied", authority.transition("accept", row))
     refused("effect-invalid-transition", lambda: authority.transition(next_operation, row))
     assert authority.get(row["intent_id"])["state"] == terminal
+
+
+PATCH = "--- a/readme.txt\n+++ b/readme.txt\n@@ -1 +1 @@\n-old\n+accepted\n"
+
+
+def test_changed_patch_cannot_reuse_approval(authority):
+    accepted = authority.transition("accept", authority.propose(unified_diff=PATCH))
+    # Change only the patch bytes: title, rationale, repository and base stay fixed.
+    changed = authority.propose(unified_diff=PATCH.replace("+accepted", "+changed"))
+    assert changed["intent_id"] != accepted["intent_id"]
+    assert changed["canonical_intent_digest"] != accepted["canonical_intent_digest"]
+    assert changed["state"] == "proposed" and changed["acceptance"] is None
+    before = authority.get(changed["intent_id"])
+    stale_binding = {**changed, "canonical_intent_digest": accepted["canonical_intent_digest"]}
+    refused("effect-digest-mismatch", lambda: authority.transition("accept", stale_binding))
+    refused("effect-digest-mismatch", lambda: authority.transition("mark-applied", stale_binding))
+    refused("effect-invalid-transition", lambda: authority.transition("mark-applied", changed))
+    assert authority.get(changed["intent_id"]) == before
+    assert authority.get(accepted["intent_id"]) == accepted
+    assert authority.item_status() == "pending"
+    # Positive control: an independent acceptance of the new digest is possible.
+    newly_accepted = authority.transition("accept", changed)
+    assert newly_accepted["acceptance"]["canonical_intent_digest"] == changed["canonical_intent_digest"]
+    assert authority.item_status() == "pending"
+
+
+def test_changed_patch_oracle_detects_ignored_acceptance_digest():
+    class IgnoringDigest(ReferenceEffects):
+        def transition(self, operation, row, **kwargs):
+            row = {**row, "canonical_intent_digest": self.get(row["intent_id"])["canonical_intent_digest"]}
+            return super().transition(operation, row, **kwargs)
+
+    with pytest.raises(pytest.fail.Exception, match="DID NOT RAISE"):
+        test_changed_patch_cannot_reuse_approval(IgnoringDigest())

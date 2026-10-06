@@ -89,10 +89,10 @@ class PgEffectsBinding:
                   request_id=uuid.uuid4().hex, basis_revision=None, catalog_revision="test", idempotency_key=None,
                   idempotency_requirement="not-allowed")
 
-    def propose(self, *, title="Change", key=None):
+    def propose(self, *, title="Change", unified_diff="diff", key=None):
         return self.app.invoke("work.effect.propose-v1", {"item_id": self.item, "run_id": self.run,
             "repository": "repo", "base_commit": "a" * 40, "title": title, "rationale": "Why",
-            "unified_diff": "diff", "idempotency_key": key or uuid.uuid4().hex},
+            "unified_diff": unified_diff, "idempotency_key": key or uuid.uuid4().hex},
             self.context("proposer", {"work.effect.propose"}))["intent"]
 
     def get(self, intent_id):
