@@ -1,0 +1,73 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.mi1.public-effect-boundary",
+  "contract_ref": {
+    "doc_id": "market-integration-milestone/P3",
+    "revision": "vuoro:f9cadd85b35cd28717c5ab3fc24409bcb0f7b98f"
+  },
+  "implementation_sha": "a44fecd37a4c2ae1c913530a6e1249cc02261d13",
+  "depth": 0,
+  "environment": {
+    "backend": "real-service-ASGI-HTTP-reference-and-published-owner-PostgreSQL-16",
+    "isolation": "new local loopback cluster and lease_conformance_mi1 database; non-superuser owner role; sequential requests; cluster stopped and removed",
+    "tool_versions": {
+      "python": "3.12.14",
+      "pytest": "8.4.2",
+      "PostgreSQL": "16.15",
+      "sprintctl": "0.12.0"
+    }
+  },
+  "execution": {
+    "seed": null,
+    "histories": 5,
+    "bounds": {
+      "protected_operations": 2,
+      "reference_focus_passed": 22,
+      "reference_and_pg_focus_passed": 41,
+      "full_suite_passed": 1545,
+      "existing_full_suite_owner_configuration_skips": 4,
+      "external_effects": 0
+    },
+    "faults_exercised": [
+      "public protected-operation request",
+      "forged X-Vuoro-Authorities header",
+      "missing service pre-owner authority gate mutant"
+    ]
+  },
+  "claims": [
+    {
+      "property": "public HTTP accept and mark-applied cannot reach protected owner handlers under declared public authority sets",
+      "result": "example-tested",
+      "evidence": [
+        "HTTP403 authority-required, zero observed owner invocations, exact intent preserved and work pending on both bindings",
+        "forged X-Vuoro-Authorities header cannot widen identity; same registered path succeeds for separate protected identity"
+      ]
+    },
+    {
+      "property": "oracle distinguishes pre-owner refusal from later owner refusal",
+      "result": "example-tested",
+      "evidence": [
+        "mutant removes service catalog authority requirement; owner still refuses but zero-invocation assertion fails"
+      ]
+    },
+    {
+      "property": "live OAuth issuer, runtime deployment, protected raw-artifact verification and actual effect execution",
+      "result": "unknown",
+      "evidence": [
+        "static test identities represent declared authority sets; application receipt is synthetic; no deployment or external effect performed"
+      ]
+    }
+  ],
+  "counterexamples": [
+    {
+      "summary": "missing service pre-owner gate reaches the owner despite its independent authority refusal; contract oracle rejects this mutant",
+      "trace_ref": "packages/vuoro-mcp-edge/tests/test_effect_authority_contract.py:test_public_http_oracle_detects_missing_pre_owner_gate"
+    }
+  ],
+  "notes": [
+    "Published owner source f6936f410f41a7dfaf7e5a1390c552eb90954874; wheel SHA-256 e669d47f698b6d9509132e2f3dae17323d7b6c17b3c446a66b8172c026c4c5af verified against unchanged composition pin.",
+    "PG test command: VUORO_AUTHORITY_TEST_PG_URL=<isolated loopback lease_conformance database> .venv/bin/pytest packages/vuoro-mcp-edge/tests/test_effect_authority_contract.py -q; final result41 passed.",
+    "Full suite1545 passed/four existing unconfigured-owner skips; four distribution boundary wheels built. Published-owner targeted run separately configures PostgreSQL.",
+    "Existing settlement-scenario CI job already runs this same portable test file against the pinned owner. No new CI service, runtime store, authority, release pin or product semantics."
+  ]
+}
