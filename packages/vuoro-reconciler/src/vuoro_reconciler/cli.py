@@ -72,6 +72,9 @@ def _parser() -> argparse.ArgumentParser:
         command.add_argument("--operator", required=True, help="the operator's subject")
         command.add_argument("--intent-source", help="module:factory returning an IntentSource")
         command.add_argument("--yes", action="store_true", help="skip the confirmation prompt")
+        if name == "accept":
+            command.add_argument("--verification-run-id", help="protected verifier native run")
+            command.add_argument("--verification-item-id", help="protected verifier evidence item")
         if name == "reject":
             command.add_argument("--reason", required=True)
     return parser
@@ -123,6 +126,13 @@ async def _run(
     arguments: argparse.Namespace, source: IntentSource, stdin: TextIO, stdout: TextIO
 ) -> int:
     acceptance = OperatorAcceptance(source)
+    verification_ref = None
+    if arguments.command == "accept":
+        if bool(arguments.verification_run_id) != bool(arguments.verification_item_id):
+            stdout.write("refused: verification reference requires both run and item IDs\n")
+            return 1
+        if arguments.verification_run_id:
+            verification_ref = {"run_id": arguments.verification_run_id, "item_id": arguments.verification_item_id}
     try:
         intent = await acceptance.pending(arguments.intent_id)
     except AcceptanceRefused as refused:
@@ -138,7 +148,8 @@ async def _run(
     try:
         if arguments.command == "accept":
             acceptor = await acceptance.accept_interactive(intent.intent_id, arguments.operator,
-                expected_revision=intent.revision, expected_digest=intent.canonical_intent_digest)
+                expected_revision=intent.revision, expected_digest=intent.canonical_intent_digest,
+                verification_ref=verification_ref)
         else:
             acceptor = await acceptance.reject_interactive(
                 intent.intent_id, arguments.operator, arguments.reason,

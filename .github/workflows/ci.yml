@@ -182,6 +182,28 @@ jobs:
           uv run --no-sync python scripts/settlement_scenario.py run
           --pg-url postgresql://m14:m14-ci-only@127.0.0.1:5432/m14_scenario
           --out _artifacts/m1-4-settlement-scenario
+      - name: Protected effect binding on the released schema-21 owner
+        env:
+          PGPASSWORD: m14-ci-only
+          VUORO_PROTECTED_EFFECT_TEST_PG_URL: postgresql://m14:m14-ci-only@127.0.0.1:5432/lease_conformance_protected_ci
+        run: |
+          # This runs after the old composition's scenarios and uses a
+          # separate database. It does not change the service's runtime pin.
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          from urllib.request import urlopen
+          pin = json.loads(Path("packages/vuoro-reconciler/tests/fixtures/protected-work-owner.json").read_text())
+          with urlopen(pin["artifact_url"]) as response:
+              wheel = response.read()
+          assert hashlib.sha256(wheel).hexdigest() == pin["artifact_sha256"]
+          target = Path("dist/protected-owner/sprintctl-0.13.1-py3-none-any.whl")
+          target.parent.mkdir(parents=True, exist_ok=True)
+          target.write_bytes(wheel)
+          PY
+          uv pip install --no-deps dist/protected-owner/sprintctl-0.13.1-py3-none-any.whl
+          createdb -h 127.0.0.1 -U m14 lease_conformance_protected_ci
+          uv run --no-sync pytest packages/vuoro-reconciler/tests/test_protected_source_pg.py -q
       - name: Upload the evidence packet
         if: always()
         uses: actions/upload-artifact@v4

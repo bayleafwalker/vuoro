@@ -22,6 +22,7 @@ import tempfile
 import time
 
 from .acceptance import AutoAcceptConfig, apply_auto_accept, scope_admits
+from .verification import PreflightRefused, validate_verification
 from .diff_policy import (
     DiffPolicy,
     DiffPolicyViolation,
@@ -243,6 +244,8 @@ class Reconciler:
         if intent.repository not in self.config.repository_allowlist:
             raise _Refused("repository-not-allowlisted")
 
+        await self._preflight(intent)
+
         branch = self.config.branch_for(intent)
         default_branch = self.provider.default_branch(intent.repository)
         try:
@@ -254,6 +257,7 @@ class Reconciler:
         try:
             commit_sha = self._prepare_commit(intent, acceptor, workdir)
             try:
+                await self._preflight(intent)
                 result = await self._publish(intent, branch, default_branch, commit_sha, workdir)
             except ProviderCredentialRejected:
                 raise _Refused("provider-credential-rejected") from None
@@ -270,6 +274,24 @@ class Reconciler:
             # The branch and PR exist; a re-run finds them and reports again.
             _log.exception("report_applied failed for intent %s", intent.intent_id)
         return Outcome(intent.intent_id, "applied", commit_sha=commit_sha, pr_url=pr.url, acceptor=acceptor)
+
+    async def _preflight(self, intent: EffectIntent) -> None:
+        try:
+            validate_verification(intent, required=False)
+        except PreflightRefused as refused:
+            raise _Refused(str(refused)) from None
+        check = getattr(self.intent_source, "preflight", None)
+        if check is None:
+            # Older/custom sources may continue their visibly unbound legacy
+            # intents. They cannot carry a new protected binding without the
+            # current-state check implemented by the native owner source.
+            if intent.release_digest is not None or intent.acceptance.get("verification") is not None:
+                raise _Refused("protected-preflight-unavailable")
+            return
+        try:
+            await check(intent)
+        except PreflightRefused as refused:
+            raise _Refused(str(refused)) from None
 
     async def _publish(
         self, intent: EffectIntent, branch: str, default_branch: str, commit_sha: str, workdir: str
@@ -321,6 +343,7 @@ class Reconciler:
             return commit_sha, pr
 
         if existing is None:
+            await self._preflight(intent)
             try:
                 await self.provider.push_branch(repository, branch, local_path=workdir)
             except BranchAlreadyExists:
@@ -341,6 +364,7 @@ class Reconciler:
             title=intent.title,
             body=intent.rationale,
         )
+        await self._preflight(intent)
         try:
             opened = await self.provider.open_pull_request(request)
         except PullRequestAlreadyExists:

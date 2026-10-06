@@ -1,0 +1,82 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.mi1.protected-consumer",
+  "contract_ref": {
+    "doc_id": "vuoro-mi1-market-integration",
+    "revision": "git:f9cadd85b35cd28717c5ab3fc24409bcb0f7b98f"
+  },
+  "implementation_sha": "4f270cc6b5bd6de4b9fba1a42eebba66a7ea1531",
+  "depth": 2,
+  "environment": {
+    "backend": "fake owner and published Sprintctl 0.13.1 on disposable PostgreSQL16; real signed local Git and fake forge",
+    "isolation": "sequential native API calls and deterministic edit hooks; separate loopback lease_conformance database and fresh owner connection; no lock across forge",
+    "tool_versions": {
+      "sprintctl": "0.13.1",
+      "PostgreSQL": "16.15"
+    }
+  },
+  "execution": {
+    "seed": null,
+    "histories": 27,
+    "bounds": {
+      "fixture_cases": 24,
+      "published_owner_cases": 3,
+      "preflight_boundaries": 4,
+      "edit_boundaries": 3,
+      "targeted_passed": 202,
+      "targeted_unconfigured_pg_skips": 4,
+      "full_suite_passed": 1583,
+      "full_unconfigured_pg_skips": 7,
+      "concurrent_operations": 0
+    },
+    "faults_exercised": [
+      "wrong raw artifact domain/hash, intent, revision, canonical or Release binding",
+      "failed or unknown-revision checks; wrong verifier or receipt digest",
+      "missing proof, stale/missing Release, edited work and malformed required flag",
+      "edit during checkout or lookup and after committed push",
+      "absent or no-op custom preflight; partial CLI receipt reference"
+    ]
+  },
+  "claims": [
+    {
+      "property": "present proof matches actual patch and immutable owner acceptance before publication",
+      "result": "example-tested",
+      "evidence": [
+        "24 fixture cases include independent raw UTF8 and canonical receipt SHA256; kernel validation cannot be bypassed by no-op custom source"
+      ]
+    },
+    {
+      "property": "released native owner proof survives a fresh connection and protected consumer publication",
+      "result": "example-tested",
+      "evidence": [
+        "three cases against SHA-verified published Sprintctl 0.13.1 wheel; distinct proposer/verifier/applier native contexts and actual signed local Git",
+        "unchanged case opens PR and reports application while ordinary work remains pending"
+      ]
+    },
+    {
+      "property": "observed work edit before push prevents branch; edit after push prevents PR and leaves visible partial effect",
+      "result": "example-tested",
+      "evidence": [
+        "deterministic edits at checkout/lookup/after-push boundaries, including actual owner API edits; accepted intent/proof retained on refusal"
+      ]
+    },
+    {
+      "property": "declared checks actually executed by commissioned protected actor, deployed service acceptance and cross-commercial-harness outcome",
+      "result": "unknown",
+      "evidence": [
+        "supplied check assertions and scripted native contexts do not attest execution or commissioned issuer authority; no runtime upgrade in this increment"
+      ]
+    }
+  ],
+  "counterexamples": [
+    {
+      "summary": "baseline 1e947bbb accepts stale Release and returns applied; new preflight refusal oracle fails on that baseline",
+      "trace_ref": "packages/vuoro-reconciler/tests/test_protected_preflight.py:test_stale_release_is_refused_before_git"
+    }
+  ],
+  "notes": [
+    "Owner source 208abe080ed2331eb6bf7c1a16774b5721fd0d66; immutable tag v0.13.1; wheel SHA256 4d8c4c334c15c65a81c2a89b34cfdf760eeff6ea7061f60e22bbe8a82de4260a; GitHub build attestation verified against tagged source and release workflow.",
+    "All four distribution boundary wheels built; knowledge and verification-artifact validation passed. Existing old-owner CI scenario remains before isolated new-owner cases.",
+    "No forge/database atomicity, concurrency, cryptographic check-execution attestation, production schema migration or whole-milestone acceptance claim."
+  ]
+}

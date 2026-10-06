@@ -5,7 +5,8 @@ and workspace. Credentials never cross to the public edge. Accepted discovery
 requires work.effect.list-accepted-v1 and its separate capability; an older
 owner must refuse rather than masquerade as an empty work list.
 """
-from .intents import EffectIntent, OperatorAcceptor, PolicyAcceptor
+from .intents import EffectIntent, OperatorAcceptor, PolicyAcceptor, canonical_digest
+from .verification import PreflightRefused, validate_verification
 
 
 class SprintctlIntentSource:
@@ -23,6 +24,7 @@ class SprintctlIntentSource:
             repository=row["repository"], base_commit=row["base_commit"], title=row["title"],
             rationale=row["rationale"], unified_diff=row["unified_diff"], workspace_id=self.workspace_id,
             proposer_principal=row["proposer_principal"], acceptance=acceptance,
+            release_digest=row.get("release_digest"),
             acceptor=OperatorAcceptor(acceptance["acceptor_principal"]) if acceptance else None)
 
     async def poll_proposed(self):
@@ -34,11 +36,14 @@ class SprintctlIntentSource:
             raise ValueError("accepted discovery returned a nonaccepted or unbound intent")
         return [self._intent(row) for row in rows]
 
-    async def accept(self, intent_id, acceptor, *, revision, canonical_intent_digest):
+    async def accept(self, intent_id, acceptor, *, revision, canonical_intent_digest, verification_ref=None):
         if isinstance(acceptor, PolicyAcceptor) or acceptor.subject != self.principal_id:
             raise ValueError("owner policy acceptance is not available")
-        row = (await self.invoke("work.effect.accept-v1", {"intent_id": intent_id,
-            "revision": revision, "canonical_intent_digest": canonical_intent_digest}))["intent"]
+        arguments = {"intent_id": intent_id, "revision": revision,
+                     "canonical_intent_digest": canonical_intent_digest}
+        if verification_ref is not None:
+            arguments["verification_ref"] = dict(verification_ref)
+        row = (await self.invoke("work.effect.accept-v1", arguments))["intent"]
         if row["acceptance"]["acceptor_principal"] != acceptor.subject:
             raise ValueError("authenticated acceptor differs from operator attribution")
 
@@ -47,6 +52,43 @@ class SprintctlIntentSource:
             raise ValueError("operator attribution must match the authenticated transport principal")
         await self.invoke("work.effect.reject-v1", {"intent_id": intent_id,
             "revision": revision, "canonical_intent_digest": canonical_intent_digest, "reason": reason})
+
+    async def preflight(self, intent):
+        """Read the actual approval and current Release before external effects.
+
+        This is a fresh observation, not a lock across Git or a publication
+        grant. The owner still rechecks its Release when recording application.
+        """
+        row = (await self.invoke("work.effect.get-v1", {"intent_id": intent.intent_id}))["intent"]
+        if (row["state"] not in {"accepted", "applied"}
+                or row["revision"] != intent.revision
+                or row["canonical_intent_digest"] != intent.canonical_intent_digest
+                or canonical_digest(self._intent(row)) != intent.canonical_intent_digest
+                or row.get("release_digest") != intent.release_digest
+                or row["acceptance"] != intent.acceptance):
+            raise PreflightRefused("owner-acceptance-changed")
+        try:
+            release = (await self.invoke("work.read.release", {"item_id": intent.item_id}))["release"]
+        except Exception as error:
+            if getattr(error, "code", None) == "release-not-found":
+                if intent.release_digest is None:
+                    validate_verification(intent, required=False)
+                    return
+                raise PreflightRefused("effect-release-mismatch") from None
+            raise
+        if not isinstance(release, dict):
+            raise PreflightRefused("release-unavailable")
+        required = release["acceptance_contract"].get("effect_verification_required", False)
+        if type(required) is not bool:
+            raise PreflightRefused("invalid-verification-requirement")
+        if intent.release_digest is not None or required:
+            if release["release_digest"] != intent.release_digest or release["work_item_id"] != intent.item_id:
+                raise PreflightRefused("effect-release-mismatch")
+            item = (await self.invoke("work.read.item", {"item_id": intent.item_id}))["item"]
+            if (item["id"] != intent.item_id
+                    or release["item_revision"].rsplit("@revise:", 1)[0] != item["edit_revision"]):
+                raise PreflightRefused("effect-release-mismatch")
+        validate_verification(intent, required=required)
 
     async def report_applied(self, intent_id, *, commit_sha, pr_url, acceptor, revision, canonical_intent_digest):
         await self.invoke("work.effect.mark-applied-v1", {"intent_id": intent_id,
