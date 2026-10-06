@@ -973,3 +973,53 @@ def test_a_reserved_system_principal_is_exempt_from_minting(tmp_path: Path) -> N
     }), encoding="utf-8")
     resolver = load_identities(path, environment="vuoro-dev")
     assert resolver._identities["1" * 40].principal_id == "federation-backfill/v1"
+
+
+def _native_identity_registry(**extra):
+    return {"schema_version": "vuoro-identities/v1", "identities": {"n" * 40: {
+        "actor": "native-reader", "environment": "vuoro-dev",
+        "principal_id": "test-issuer:native-reader:0", "authorities": ["work:read", "work:evidence"],
+        "repo_ids": ["agentops"], **extra}}}
+
+
+def test_native_registry_workspace_binding_is_explicit_and_does_not_add_authority(tmp_path):
+    path = tmp_path / "identities.json"
+    path.write_text(json.dumps(_native_identity_registry(workspace_id="issuer:native-workspace")))
+    identity = load_identities(path, environment="vuoro-dev")._identities["n" * 40]
+    assert identity.workspace_id == "issuer:native-workspace"
+    assert identity.principal_id == "test-issuer:native-reader:0"
+    assert identity.authorities == frozenset({"work:read", "work:evidence"})
+    assert identity.repo_ids == frozenset({"agentops"})
+    assert identity.client_id is None and identity.grant_id is None
+
+
+def test_native_registry_does_not_infer_workspace_from_actor_environment_or_repository(tmp_path):
+    path = tmp_path / "identities.json"
+    path.write_text(json.dumps(_native_identity_registry()))
+    identity = load_identities(path, environment="vuoro-dev")._identities["n" * 40]
+    assert identity.workspace_id is None
+
+
+@pytest.mark.parametrize("workspace", [None, "", " ", "native workspace", " native", "native\n", 42, True, [], {}])
+def test_native_registry_refuses_invalid_explicit_workspace_binding(tmp_path, workspace):
+    path = tmp_path / "identities.json"
+    path.write_text(json.dumps(_native_identity_registry(workspace_id=workspace)))
+    with pytest.raises(CompositionError, match="workspace_id"):
+        load_identities(path, environment="vuoro-dev")
+
+
+@pytest.mark.parametrize("workspace", [None, "issuer:native-workspace"])
+def test_native_bearer_caller_cannot_assert_a_workspace_header(tmp_path, workspace):
+    from starlette.requests import Request
+    path = tmp_path / "identities.json"
+    registry = _native_identity_registry(**({"workspace_id": workspace} if workspace else {}))
+    path.write_text(json.dumps(registry))
+    resolver = load_identities(path, environment="vuoro-dev")
+    request = Request({"type": "http", "headers": [
+        (b"authorization", ("Bearer " + "n" * 40).encode()),
+        (b"x-vuoro-workspace-id", b"caller-selected-workspace"),
+        (b"x-vuoro-principal-id", b"caller:selected:0"),
+    ]})
+    identity = resolver(request)
+    assert identity.workspace_id == workspace
+    assert identity.principal_id == "test-issuer:native-reader:0"
