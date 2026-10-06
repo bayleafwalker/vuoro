@@ -280,6 +280,25 @@ def test_size_and_content_type_refusals_omit_id(client, auth, headers, content, 
     assert response.json()["error"]["code"] == -32600
 
 
+def test_replay_capacity_refusal_omits_id(auth) -> None:
+    from fastapi.testclient import TestClient
+    from vuoro_mcp_edge.server import create_edge_app
+    from vuoro_mcp_edge.work_source import ShellWorkSource
+    from vuoro_service.identity import IdentityReplayCapacityError
+
+    def full(_request):
+        raise IdentityReplayCapacityError("replay cache is full")
+
+    app = create_edge_app(
+        identity_resolver=full,
+        work_source=ShellWorkSource(base_url="http://127.0.0.1:8080"),
+    )
+    response = TestClient(app).post(MCP_PATH, headers=auth, json=rpc("tools/list"))
+    assert response.status_code == 503
+    assert "id" not in response.json()
+    assert response.json()["error"]["code"] == -32004
+
+
 def test_batch_is_invalid_request_over_http_200(client, auth) -> None:
     response = client.post(MCP_PATH, headers=auth, json=[rpc("tools/list")])
     assert response.status_code == 200

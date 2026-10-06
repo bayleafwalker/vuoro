@@ -1,6 +1,9 @@
 ---
 doc_id: vuoro-kctl-served-hardening-promotion
 status: draft
+purpose: proposal
+applies_to:
+  components: [kctl, vuoro-core]
 supersedes: []
 ---
 

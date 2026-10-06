@@ -1,0 +1,26 @@
+# Fixture: a reduced replica of the estate records behind the Kctl case.
+schema = "vuoro-knowledge-repo/v1"
+repo = "vuoro"
+include = ["docs/**/*.md"]
+
+[[subjects]]
+id = "knowledge-resolution"
+title = "Knowledge resolution and provenance"
+components = ["kctl", "knowledge-base", "vuoro-core"]
+
+[[documents]]
+path = "docs/direction/disposition-register.yaml"
+doc_id = "vuoro-disposition-register"
+purpose = "decision"
+lifecycle = "ratified"
+effective = "2026-09-17"
+supersedes = [{ doc = "vuoro-long-term-direction", in_part = true, scope = "component dispositions" }]
+facts = { extractor = "status-register/v1", question = "component-status", items = "items", key = "key", status = "status", decided = "goal_state.reviewed" }
+
+[[documents]]
+path = "docs/architecture/agentic-estate.md"
+doc_id = "vuoro-agentic-estate"
+purpose = "observation"
+lifecycle = "ratified"
+observed = "2026-09-12"
+delegates = [{ question = "component-status", source = "vuoro-disposition-register", scope = { repos = ["*"] } }]
