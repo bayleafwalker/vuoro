@@ -109,3 +109,27 @@ def evidence_item_draft(observation, *, ref, collected_at):
                         "detail": observation}],
             "provenance": {"payload_digest": observation["payload_digest"],
                            "assurance": "unverified-supplied-payload"}}
+
+
+def normalize_github_check_response(payload, *, repository, capture_id, observed=None):
+    """A supplied REST GET response, explicitly distinct from webhook delivery.
+
+Repository is captured request scope, not inferred from an external URL. The
+capture ID names one immutable response capture, not the recurring check ID.
+"""
+    if (type(payload) is not dict or not _text(repository)
+            or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository)
+            or any(part in {".", ".."} for part in repository.split("/"))
+            or payload.get("status") not in {"queued", "in_progress", "completed"}):
+        raise ValueError("check response and captured repository scope required")
+    # Reuse documented check fields without claiming a webhook was received.
+    result = normalize("github", "check_run", {
+        "action": payload["status"], "repository": {"full_name": repository},
+        "check_run": payload,
+    }, delivery_id=capture_id, observed=observed)
+    result.update(event="check_run_response", capture_source="supplied-rest-get-response",
+                  repository_source="captured-request-scope",
+                  payload_digest="sha256:" + hashlib.sha256(canonical(payload)).hexdigest())
+    identity = {k: result[k] for k in ("provider", "repository", "event", "delivery_id")}
+    result["idempotency_key"] = "provider-observation:" + hashlib.sha256(canonical(identity)).hexdigest()
+    return result

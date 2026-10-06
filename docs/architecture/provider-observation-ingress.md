@@ -79,3 +79,18 @@ it does not authorize effects. This is not full P2 acceptance: durable
 owner-ingestion/replay histories, a real captured provider case and the neutral
 P3 proof still need to be bound through the actual append owner. No deployment,
 published package or hosted reachability is claimed by this source increment.
+
+## Supplied GitHub REST check responses
+
+`normalize_github_check_response(payload, repository=..., capture_id=...)`
+handles a captured [GET check-run response](https://docs.github.com/en/rest/checks/runs#get-a-check-run)
+(primary source rechecked 2026-10-06). It labels the record
+`check_run_response` and `supplied-rest-get-response`, with repository scope from
+the captured request. It does not manufacture a webhook delivery or signature
+verification. A capture ID names one immutable response capture; the recurring
+check object ID cannot serve as its retry key. The canonical payload digest
+binds the original response object, without a synthetic webhook wrapper.
+Missing build, artifact and check-definition digests remain unknown. The result
+still carries unverified supplied-payload assurance; a collector's actual
+transport observation must be recorded separately and cannot turn this decoder
+into an attestor or protected verifier.

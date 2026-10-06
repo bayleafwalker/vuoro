@@ -113,3 +113,40 @@ def test_draft_refuses_a_supplied_record_that_promotes_its_own_assurance():
     value["assurance"] = "verified"
     with pytest.raises(ValueError):
         evidence_item_draft(value, ref="git:payload", collected_at=AT)
+
+
+def test_rest_response_is_explicitly_distinct_from_webhook_identity_and_digest():
+    import hashlib
+    from vuoro_evidence.ingress.provider import canonical, normalize_github_check_response
+    payload = {**github()["check_run"], "status": "completed"}
+    result = normalize_github_check_response(payload, repository="example/project", capture_id="capture1")
+    webhook = normalize("github", "check_run", github(), delivery_id="capture1")
+    assert result["event"] == "check_run_response"
+    assert result["capture_source"] == "supplied-rest-get-response"
+    assert result["repository_source"] == "captured-request-scope"
+    assert result["idempotency_key"] != webhook["idempotency_key"]
+    assert result["payload_digest"] == "sha256:" + hashlib.sha256(canonical(payload)).hexdigest()
+    assert result["artifact_digest"] == UNKNOWN and result["assurance"] == "unverified-supplied-payload"
+
+
+@pytest.mark.parametrize("repository,status", [("../project", "completed"), ("example/project", "invented"), ("example/project/other", "queued")])
+def test_invalid_rest_scope_or_status_is_refused(repository, status):
+    from vuoro_evidence.ingress.provider import normalize_github_check_response
+    with pytest.raises(ValueError):
+        normalize_github_check_response({**github()["check_run"], "status": status}, repository=repository, capture_id="capture1")
+
+
+def test_real_captured_public_check_stays_provider_evidence_with_unknown_artifact():
+    import hashlib
+    import json
+    from pathlib import Path
+    from vuoro_evidence.ingress.provider import normalize_github_check_response
+    folder = Path(__file__).resolve().parents[3] / "docs" / "evidence" / "2026-10-06-mi1-provider-api-capture"
+    raw = (folder / "github-check-run.json").read_bytes()
+    metadata = json.loads((folder / "capture.json").read_text())
+    assert hashlib.sha256(raw).hexdigest() == metadata["body_sha256"]
+    value = normalize_github_check_response(json.loads(raw), repository=metadata["request"]["repository"], capture_id=metadata["capture_id"])
+    assert value["event_reference"] == "112364306246" and value["verdict"] == "success"
+    assert value["commit_reference"] == "ef636fcfa02f00fb8e96488da5b65e31e99c8c5d"
+    assert value["artifact_digest"] == UNKNOWN and value["rubric_or_check_revision"] == UNKNOWN
+    assert value["assurance"] == "unverified-supplied-payload"
