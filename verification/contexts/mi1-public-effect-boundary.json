@@ -1,0 +1,75 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.mi1.public-effect-boundary",
+  "owner_repo": "vuoro",
+  "subject": "public-http-cannot-reach-protected-effect-accept-or-mark-applied",
+  "contract_ref": {
+    "doc_id": "market-integration-milestone/P3",
+    "revision": "vuoro:f9cadd85b35cd28717c5ab3fc24409bcb0f7b98f"
+  },
+  "source_of_truth": "TS-16 no public apply scope and existing distinct protected effect capabilities; published owner catalog drives PG binding",
+  "depth": 0,
+  "backends": [
+    "real-service-http-reference-intent-store",
+    "real-service-http-published-sprintctl-0.12.0-postgresql-16"
+  ],
+  "actors": [
+    "public-proposer",
+    "protected-acceptor-or-reconciler"
+  ],
+  "initial_state": [
+    "pending work",
+    "proposed intent for accept case; independently accepted intent for mark-applied case"
+  ],
+  "operations": [
+    {
+      "name": "accept",
+      "actors": [
+        "public-proposer",
+        "protected-acceptor-or-reconciler"
+      ],
+      "synchronization": "HTTP response after real service authority gate and committed owner transition"
+    },
+    {
+      "name": "mark-applied",
+      "actors": [
+        "public-proposer",
+        "protected-acceptor-or-reconciler"
+      ],
+      "synchronization": "HTTP response after real service authority gate and committed owner transition"
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "public authority denial precedes protected owner invocation; independently held protected capability remains usable"
+  },
+  "bounds": {
+    "protected_operations": 2,
+    "identities": 2,
+    "forged_authority_header": true,
+    "external_effects": 0,
+    "independent_connections": false
+  },
+  "invariants": [
+    "ordinary public authority union never grants protected effect acceptance or mark-applied",
+    "public HTTP refusal invokes no owner handler and preserves intent and work",
+    "protected positive control uses same registered HTTP path successfully without settling work"
+  ],
+  "faults": [
+    "public protected-operation request",
+    "forged X-Vuoro-Authorities header",
+    "missing service pre-owner authority gate mutant"
+  ],
+  "oracles": [
+    "HTTP403 authority-required and zero observed owner invokes",
+    "exact before/after intent equality and pending work",
+    "HTTP200 protected control with exactly one owner invocation",
+    "same oracle catches removed pre-owner gate despite second owner refusal"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-mcp-edge/tests/test_effect_authority_contract.py:test_public_http_cannot_reach_protected_effect_transition",
+    "packages/vuoro-mcp-edge/tests/test_effect_authority_contract.py:test_public_http_oracle_detects_missing_pre_owner_gate",
+    "packages/vuoro-mcp-edge/tests/effect_public_binding.py:EffectHttpBinding.transition",
+    "packages/vuoro-service/src/vuoro_service/app.py:create_app"
+  ]
+}

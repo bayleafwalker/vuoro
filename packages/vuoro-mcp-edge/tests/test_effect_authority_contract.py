@@ -146,3 +146,47 @@ def test_changed_patch_oracle_detects_ignored_acceptance_digest():
 
     with pytest.raises(pytest.fail.Exception, match="DID NOT RAISE"):
         test_changed_patch_cannot_reuse_approval(IgnoringDigest())
+
+
+@pytest.mark.parametrize("operation", ["accept", "mark-applied"])
+def test_public_http_cannot_reach_protected_effect_transition(authority, operation):
+    from effect_public_binding import EffectHttpBinding
+
+    row = authority.propose()
+    if operation == "mark-applied":
+        row = authority.transition("accept", row)
+    before = authority.get(row["intent_id"])
+    boundary = EffectHttpBinding(authority)
+    assert "work.effect." + operation not in boundary.public_authorities
+    denied = boundary.transition(operation, row)
+    assert denied.status_code == 403, denied.text
+    assert denied.json()["error"]["code"] == "authority-required"
+    assert boundary.calls == [], "public refusal must precede any owner invocation"
+    assert authority.get(row["intent_id"]) == before
+    assert authority.item_status() == "pending"
+    # Positive control proves that the registered path works for protected rights.
+    allowed = boundary.transition(operation, row, public=False)
+    assert allowed.status_code == 200, allowed.text
+    assert boundary.calls == ["work.effect." + operation + "-v1"]
+    assert authority.get(row["intent_id"])["state"] == (
+        "accepted" if operation == "accept" else "applied")
+    assert authority.item_status() == "pending"
+
+
+def test_public_http_oracle_detects_missing_pre_owner_gate(monkeypatch):
+    from dataclasses import replace
+    from effect_public_binding import EffectHttpBinding
+
+    original_init = EffectHttpBinding.__init__
+
+    def without_shell_authority(self, authority):
+        original_init(self, authority)
+        for name, registered in list(self.registry._operations.items()):
+            if name == "work.effect.mark-applied-v1":
+                self.registry._operations[name] = replace(registered, definition=
+                    registered.definition.model_copy(update={"required_authority": ""}))
+
+    monkeypatch.setattr(EffectHttpBinding, "__init__", without_shell_authority)
+    # The owner still refuses; the oracle detects the earlier horizon was skipped.
+    with pytest.raises(AssertionError, match="public refusal must precede"):
+        test_public_http_cannot_reach_protected_effect_transition(ReferenceEffects(), "mark-applied")
