@@ -170,12 +170,13 @@ jobs:
         env:
           VUORO_EFFECT_TEST_PG_URL: postgresql://m14:m14-ci-only@127.0.0.1:5432/lease_conformance_ci
         run: uv run --no-sync pytest packages/vuoro-reconciler/tests/test_sprintctl_source_pg.py -q
-      - name: Ledger and effect authority contracts (reference and published owner)
+      - name: Ledger, effect and provider ingestion contracts (reference and published owner)
         env:
           VUORO_AUTHORITY_TEST_PG_URL: postgresql://m14:m14-ci-only@127.0.0.1:5432/lease_conformance_ci
         run: >-
           uv run --no-sync pytest packages/vuoro-mcp-edge/tests/test_ledger_behaviour.py
-          packages/vuoro-mcp-edge/tests/test_effect_authority_contract.py -q
+          packages/vuoro-mcp-edge/tests/test_effect_authority_contract.py
+          packages/vuoro-mcp-edge/tests/test_provider_ingestion_contract.py -q
       - name: Run the scenario (lease TTL 30 s)
         run: >-
           uv run --no-sync python scripts/settlement_scenario.py run

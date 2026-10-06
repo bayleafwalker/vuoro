@@ -1,0 +1,111 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.mi1.provider-ingestion",
+  "owner_repo": "vuoro",
+  "subject": "portable-provider-delivery-content-replay-and-history-preservation",
+  "contract_ref": {
+    "doc_id": "market-integration-milestone/P3",
+    "revision": "vuoro:f9cadd85b35cd28717c5ab3fc24409bcb0f7b98f"
+  },
+  "source_of_truth": "existing native append idempotency and chain contracts; pure provider normalization is observation-only",
+  "depth": 0,
+  "backends": [
+    "existing-reference-chain-and-ledger-primitives",
+    "published-sprintctl-0.12.0-postgresql-16-native-api"
+  ],
+  "actors": [
+    "evidence-only-producer"
+  ],
+  "initial_state": [
+    "registered owned run, empty evidence tail, pending fixture work"
+  ],
+  "operations": [
+    {
+      "name": "normalize-provider-event",
+      "actors": [
+        "evidence-only-producer"
+      ],
+      "synchronization": "sequential native API observations and committed append replies"
+    },
+    {
+      "name": "append-evidence",
+      "actors": [
+        "evidence-only-producer"
+      ],
+      "synchronization": "sequential native API observations and committed append replies"
+    },
+    {
+      "name": "resolve-run",
+      "actors": [
+        "evidence-only-producer"
+      ],
+      "synchronization": "sequential native API observations and committed append replies"
+    },
+    {
+      "name": "read-tail",
+      "actors": [
+        "evidence-only-producer"
+      ],
+      "synchronization": "sequential native API observations and committed append replies"
+    },
+    {
+      "name": "reconnect",
+      "actors": [
+        "evidence-only-producer"
+      ],
+      "synchronization": "sequential native API observations and committed append replies"
+    },
+    {
+      "name": "exact-retry",
+      "actors": [
+        "evidence-only-producer"
+      ],
+      "synchronization": "sequential native API observations and committed append replies"
+    },
+    {
+      "name": "conflicting-replay",
+      "actors": [
+        "evidence-only-producer"
+      ],
+      "synchronization": "sequential native API observations and committed append replies"
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "provider delivery first content binding, stable receipt and chain position, unchanged identity/ordinary work"
+  },
+  "bounds": {
+    "provider_event_families": 4,
+    "delivery_ids_per_case": 2,
+    "fault_histories_per_family": 3,
+    "external_effects": 0,
+    "concurrent_operations": 0
+  },
+  "invariants": [
+    "same delivery and content retains first receipt after committed reply loss and reconnect",
+    "changed artifact observation under same delivery refuses and preserves history and run identity",
+    "new delivery extends chain; retry older delivery preserves newer tail",
+    "missing provider fields remain unknown; evidence claim confers no grant or confirmation; work stays pending"
+  ],
+  "faults": [
+    "lost reply after committed append",
+    "fresh owner connection after unknown response",
+    "same delivery with changed artifact content",
+    "old exact replay after new delivery",
+    "duplicate replay mutant",
+    "forgotten delivery content binding mutant"
+  ],
+  "oracles": [
+    "exact receipt and tail equality at API horizon",
+    "idempotency-conflict plus unchanged tail/resolve/work",
+    "second delivery chain_seq1 and nonempty predecessor; old replay does not change tail",
+    "reference mutants fail the same portable assertions"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-mcp-edge/tests/test_provider_ingestion_contract.py:test_committed_provider_reply_loss_reconnect_and_exact_retry",
+    "packages/vuoro-mcp-edge/tests/test_provider_ingestion_contract.py:test_same_provider_delivery_changed_artifact_refuses_without_history_or_identity_change",
+    "packages/vuoro-mcp-edge/tests/test_provider_ingestion_contract.py:test_distinct_provider_delivery_extends_chain_and_old_retry_preserves_new_tail",
+    "packages/vuoro-mcp-edge/tests/provider_ingestion_binding.py:PgProviderIngestion.reconnect",
+    "packages/vuoro-evidence/src/vuoro_evidence/ingress/provider.py:evidence_item_draft"
+  ]
+}
