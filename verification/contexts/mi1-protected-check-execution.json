@@ -79,7 +79,8 @@
     "changed work or run binding refuses success packet",
     "check revision includes installed implementation, trusted policy and observed Git version",
     "durable retry after committed reply loss preserves exact receipt/tail",
-    "actual generated receipt can be accepted and reconstructed by fresh applier"
+    "actual generated receipt can be accepted and reconstructed by fresh applier",
+    "check revision can be independently reconstructed from recorded provenance basis"
   ],
   "faults": [
     "nonapplicable/binary/control/delete-policy patch",

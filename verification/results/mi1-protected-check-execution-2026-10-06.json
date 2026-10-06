@@ -5,7 +5,7 @@
     "doc_id": "vuoro-mi1-market-integration",
     "revision": "git:f9cadd85b35cd28717c5ab3fc24409bcb0f7b98f"
   },
-  "implementation_sha": "2882220f6fc11cec791da2c02459377e9088bacb",
+  "implementation_sha": "ca507609be521e9785fdb9195a48e2cf121934fd",
   "depth": 2,
   "environment": {
     "backend": "real local Git, fake owner fixtures and published Sprintctl 0.13.1 on disposable PostgreSQL16 with existing durable native producer",
@@ -44,7 +44,8 @@
       "result": "example-tested",
       "evidence": [
         "17 local cases execute real Git; failed safety/application check or stale work emits no packet",
-        "three check revisions hash installed validation source, normalized trusted policy and observed Git version; no proposer commands executed"
+        "three check revisions hash installed validation source, normalized trusted policy and observed Git version; no proposer commands executed",
+        "Exact source/policy/Git-version revision basis is preserved in native provenance; independent test hashing reconstructs each named check revision."
       ]
     },
     {
