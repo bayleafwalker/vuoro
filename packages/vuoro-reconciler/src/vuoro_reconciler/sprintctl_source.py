@@ -137,6 +137,10 @@ class SprintctlIntentSource:
             raise PreflightRefused("verifier-run-binding-mismatch")
         await self.preflight_proposed(intent)
         checks = runtime.verify_proposed(intent)
+        check_basis = runtime.check_revision_basis(intent.repository)
+        check_revision = "sha256:" + hashlib.sha256(json.dumps(check_basis, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        if not checks or any(check["revision"] != check_revision for check in checks):
+            raise PreflightRefused("check-revision-changed")
         await self.preflight_proposed(intent)
         detail = {"schema": "sprintctl-protected-artifact-verification/v1", "intent_id": intent.intent_id,
                   "intent_revision": intent.revision, "canonical_intent_digest": intent.canonical_intent_digest,
@@ -164,6 +168,6 @@ class SprintctlIntentSource:
                                 "valid_until": None, "component_digests": {}},
                    "claims": [{"claim_type": "observation", "subject": intent.intent_id, "grant_id": None,
                                "freshness": None, "confirms": None, "detail": detail}],
-                   "provenance": {"assurance": "trusted-local-check-execution"},
+                   "provenance": {"assurance": "trusted-local-check-execution", "check_revision_basis": check_basis},
                    "chain_seq": seq, "chain_prev_digest": prev}
         return {"request": request, "run_binding": binding}

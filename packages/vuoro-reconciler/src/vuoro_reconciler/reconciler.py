@@ -440,7 +440,7 @@ class Reconciler:
             raise _Refused(f"diff-policy-refused: {violation.code}") from None
         return changes
 
-    def _check_revision(self, repository: str) -> str:
+    def check_revision_basis(self, repository: str) -> dict:
         from .gitenv import run_git
         policy = self.config.diff_policy_for(repository)
         sources = {name: hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
@@ -452,7 +452,10 @@ class Reconciler:
                  "git_version": version.stdout.strip(),
                  "policy": {"path_allowlist": sorted(policy.path_allowlist),
                             "protected_path_patterns": sorted(policy.protected_path_patterns)}}
-        encoded = json.dumps(basis, sort_keys=True, separators=(",", ":")).encode()
+        return basis
+
+    def _check_revision(self, repository: str) -> str:
+        encoded = json.dumps(self.check_revision_basis(repository), sort_keys=True, separators=(",", ":")).encode()
         return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
     def verify_proposed(self, intent: EffectIntent) -> list[dict[str, str]]:

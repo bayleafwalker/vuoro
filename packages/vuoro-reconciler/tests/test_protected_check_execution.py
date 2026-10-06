@@ -56,6 +56,11 @@ def test_real_checks_emit_native_capture_without_acceptance_signing_or_publicati
         "clean-checkout-and-patch-application", "staged-content-and-diff-policy"]
     assert all(check["status"] == "passed" and len(check["revision"]) == 71 for check in detail["checks"])
     assert detail["artifact"]["digest"] == "sha256:" + hashlib.sha256(state.row["unified_diff"].encode()).hexdigest()
+    basis = request["provenance"]["check_revision_basis"]
+    expected_revision = "sha256:" + hashlib.sha256(json.dumps(basis, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    assert {check["revision"] for check in detail["checks"]} == {expected_revision}
+    assert set(basis["sources"]) == {"reconciler.py", "diff_policy.py", "git_ops.py", "gitenv.py"}
+    assert basis["policy"] == {"path_allowlist": [], "protected_path_patterns": []}
     assert request["digest"] == body_digest(detail)
     assert request["chain_seq"] == 0 and request["chain_prev_digest"] is None
     assert packet["run_binding"] == {"repo_id": "agentops", **state.run}

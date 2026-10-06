@@ -11,7 +11,8 @@ Reuse one validation path for verification and application. Verification does
 not sign, push, open a PR, accept an intent or finish work. A trusted runtime
 factory supplies repository mapping and policy. Its revision hashes installed
 validation source bytes, normalized per-repository policy and observed Git
-version. This records which checks ran; it is not remote execution attestation.
+version. The capture preserves that exact basis in provenance so its hash can
+be reconstructed independently. This records which checks ran; it is not remote execution attestation.
 The source authenticates the verifier through its existing transport, checks a
 proposed exact canonical intent and current Release/work edit before and after
 execution, and resolves the verifier-owned native run. It emits the existing
