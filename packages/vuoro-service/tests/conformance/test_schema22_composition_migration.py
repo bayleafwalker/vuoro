@@ -11,9 +11,13 @@ import uuid
 from urllib.parse import parse_qs, urlsplit
 
 from fastapi.testclient import TestClient
-import psycopg
-from psycopg import sql
 import pytest
+
+if os.environ.get('VUORO_SCHEMA22_COMPOSITION_PROOF') == '1':
+    import psycopg
+else:
+    psycopg = pytest.importorskip('psycopg', reason='requires the PostgreSQL conformance extra')
+from psycopg import sql
 
 from vuoro_service.composition import CompositionError, create_composed_app
 from .test_bound_proposal_http import assert_installed_composition
