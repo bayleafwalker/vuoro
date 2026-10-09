@@ -1,5 +1,13 @@
 # Market integration milestone: end-to-end proof, evidence ingestion, current-state surface
 
+Current delivery (2026-10-09): P1–P4 and the real Track B proof are accepted in
+the served work owner. The operator explicitly retired Track A's comparison
+requirement from MI-1. The accepted scope is the bounded proof and deliverables;
+no comparative vendor result, whole-estate coverage or hardware execution is
+established. See the [actual proof and boundaries](https://github.com/bayleafwalker/agentops/blob/main/docs/evidence/2026-10-09-mi1-bindery/README.md).
+
+The initial proposal status and landscape assessment below remain historical.
+
 Status: proposed plan (2026-10-05). It authorizes no build, deployment, repin or
 publication. Agent-tooling claims it adds are `proposed` TS-17..TS-20 in
 `agentops docs/plans/2026-09-17-target-state.md`; this document holds the
@@ -163,10 +171,14 @@ with the sample size stated beside every percentage.
 
 ## 7. The milestone: MI-1
 
-One bounded milestone, two comparison tracks. Use real harnesses for Track B; the
-scripted settlement scenario is the lower layer and stays green.
+The original design below had two comparison tracks. On 2026-10-09 the operator
+instructed: “Retire the comparison requirement from MI-1.” Track A is retired and
+its comparison remains unexecuted; the original measures and kill rule are kept
+as history. P1–P4 and the real Track B proof remain the milestone's acceptance
+scope. The scripted settlement scenario is the lower layer, not a commercial
+harness result. No new execution driver or paid API inference is introduced.
 
-**Track A: ordinary repository work.** Compare the existing native-harness
+**Track A: ordinary repository work (retired by operator 2026-10-09).** Compare the existing native-harness
 workflow with GitHub Agentic Workflows on suitable GitHub repositories.
 Measure: operator minutes, accepted-result quality, recovery effort, total cost.
 Kill rule: if Agentic Workflows meets the need for GitHub-contained work, the
@@ -208,6 +220,10 @@ No new Vuoro execution driver is required or permitted by this milestone.
   pointers in actionq and kctl.
 
 ## 9. Falsifiers
+
+The Track A vendor-comparison falsifier below is historical after the operator
+retirement. Its outcome remains unestablished; the other falsifiers and all
+external/hardware qualification boundaries remain in force.
 
 - Track A shows Agentic Workflows equals or beats the native path on all four
   measures for GitHub-contained work: Vuoro adds no dispatch machinery there.
