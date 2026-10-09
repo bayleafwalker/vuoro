@@ -1,0 +1,146 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.s4.evidence-evaluation-composition",
+  "owner_repo": "vuoro",
+  "subject": "released-readonly-evaluator-in-installed-http-shell",
+  "contract_ref": {
+    "doc_id": "s4-evidence-evaluation-composition",
+    "revision": "git:58810dfdc51bfd214d9be888b8c57a7c357f3a4c; October9 evaluator composition"
+  },
+  "source_of_truth": "immutable tagged owner/shared wheels, composition manifest and installed catalog",
+  "depth": 2,
+  "backends": [
+    "installed-released-service-and-owner-wheels",
+    "disposable-loopback-PostgreSQL16",
+    "source-workspace"
+  ],
+  "actors": [
+    "service-runtime",
+    "dual-scope-reader",
+    "single-scope-reader",
+    "foreign-binding-caller",
+    "independent-editor"
+  ],
+  "initial_state": [
+    "candidate service0.1.90 with SHA-pinned work0.16.0/audit0.1.9/kit0.2.0/schema-runtime0.1.0",
+    "disposable work schema21",
+    "authenticated run, native reserve and empty or complete evidence chain"
+  ],
+  "operations": [
+    {
+      "name": "verify immutable closure and catalog",
+      "actors": [
+        "service-runtime",
+        "dual-scope-reader"
+      ]
+    },
+    {
+      "name": "evaluate empty and populated chain",
+      "actors": [
+        "service-runtime",
+        "dual-scope-reader"
+      ]
+    },
+    {
+      "name": "resolve full authenticated run binding",
+      "actors": [
+        "service-runtime",
+        "dual-scope-reader"
+      ]
+    },
+    {
+      "name": "refuse missing scope or wrong binding",
+      "actors": [
+        "service-runtime",
+        "dual-scope-reader"
+      ]
+    },
+    {
+      "name": "refuse extra arguments, envelope key and foreign repository",
+      "actors": [
+        "service-runtime",
+        "dual-scope-reader"
+      ]
+    },
+    {
+      "name": "report exact-tail conflict and stale Release basis",
+      "actors": [
+        "service-runtime",
+        "dual-scope-reader"
+      ]
+    },
+    {
+      "name": "evaluate expired, missing-input and malformed legacy validity",
+      "actors": [
+        "service-runtime",
+        "dual-scope-reader"
+      ]
+    },
+    {
+      "name": "preserve forged claims as authored assertions",
+      "actors": [
+        "service-runtime",
+        "dual-scope-reader"
+      ]
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "installed service consumes compatible immutable owner/dependency artifacts; no automatic migration"
+  },
+  "assumptions": {
+    "isolation": "sequential API histories and deterministic edit hooks; no forge/owner transaction",
+    "clock": "not authority",
+    "fairness": "none"
+  },
+  "bounds": {
+    "released_catalog_operations_without_resource_storage": 78,
+    "work_operations": 73,
+    "audit_operations": 5,
+    "new_http_bound_cases": 13,
+    "installed_conformance_cases": 52,
+    "concurrent_operations": 0
+  },
+  "invariants": [
+    "existing73resource-disabled descriptors byte-identical; exactlyone additive evaluator",
+    "both work:read and work:evidence required; no write/effect authority required",
+    "full authenticated principal/workspace/client/grant and repository binding",
+    "complete rows in eight relevant tables unchanged by successful/refused reads",
+    "authored claims cannot supply execution authority; execution coverage unsupported",
+    "full frozen Release basis remains stale beside newer caller revision",
+    "resource-enabled/disabled evaluator descriptors identical"
+  ],
+  "faults": [
+    "missing read or evidence scope",
+    "changed principal/workspace/client/grant",
+    "foreign repository",
+    "extra supplied identity/trust/execution facts",
+    "forbidden envelope key",
+    "wrong expected tail",
+    "description edit and newer revision with old Release",
+    "expired window",
+    "missing current input",
+    "malformed legacy validity",
+    "schema-valid forged trusted claims",
+    "wrong catalog fingerprint"
+  ],
+  "oracles": [
+    "actual installed module versions and site-packages origins",
+    "actual installed0.15.1 versus0.16.0 descriptor byte comparison",
+    "actual full HTTP result versus published owner schema",
+    "complete selected authoritative rows before/after read/refusal",
+    "three released artifact/catalog gates and forced bad fingerprint",
+    "configured current-owner consumer histories"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-service/composition/adapter-pins.json",
+    "packages/vuoro-service/tests/conformance/test_evidence_evaluation_http.py",
+    "scripts/validate_released_work_adapter.py",
+    "scripts/validate_released_catalog_composition.py",
+    ".github/workflows/ci.yml"
+  ],
+  "expansions": [
+    "semantic-doc",
+    "fault-scenario"
+  ]
+}
