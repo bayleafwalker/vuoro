@@ -158,7 +158,7 @@ jobs:
         env:
           PGPASSWORD: m14-ci-only
         run: createdb -h 127.0.0.1 -U m14 lease_conformance_ci
-      - name: Bound proposal and evidence evaluation through isolated released-wheel composition
+      - name: Bound proposal, evidence evaluation and attempt facts through isolated released-wheel composition
         shell: bash
         run: |
           set -euo pipefail
@@ -173,7 +173,8 @@ jobs:
           VUORO_BOUND_COMPOSITION_PROOF=1 /tmp/vuoro-bound-released-composition/bin/python \
             -m pytest --import-mode=importlib \
             packages/vuoro-service/tests/conformance/test_bound_proposal_http.py \
-            packages/vuoro-service/tests/conformance/test_evidence_evaluation_http.py -q \
+            packages/vuoro-service/tests/conformance/test_evidence_evaluation_http.py \
+            packages/vuoro-service/tests/conformance/test_effect_attempt_http.py -q \
             --lease-pg-url postgresql://m14:m14-ci-only@127.0.0.1:5432/lease_conformance_ci
       - name: Provider-neutral lease contract (reference and pinned owner)
         run: >-
@@ -199,6 +200,42 @@ jobs:
           uv run --no-sync python scripts/settlement_scenario.py run
           --pg-url postgresql://m14:m14-ci-only@127.0.0.1:5432/m14_scenario
           --out _artifacts/m1-4-settlement-scenario
+      - name: Actual schema-21 closure to explicit schema-22 migration
+        shell: bash
+        env:
+          PGPASSWORD: m14-ci-only
+          VUORO_BOUND_COMPOSITION_PROOF: "1"
+          VUORO_SCHEMA22_COMPOSITION_PROOF: "1"
+          VUORO_SCHEMA22_MIGRATION_PG_URL: postgresql://schema22_work_migration:schema22-ci-only@127.0.0.1:5432/lease_conformance_schema22_ci?options=-csearch_path%3Dwork%2Cpg_catalog
+          VUORO_SCHEMA22_RUNTIME_PG_URL: postgresql://schema22_work_runtime:schema22-ci-only@127.0.0.1:5432/lease_conformance_schema22_ci?options=-csearch_path%3Dwork%2Cpg_catalog
+          VUORO_SCHEMA22_AUDIT_MIGRATION_PG_URL: postgresql://schema22_audit_migration:schema22-ci-only@127.0.0.1:5432/lease_conformance_schema22_ci
+          VUORO_SCHEMA22_AUDIT_RUNTIME_PG_URL: postgresql://schema22_audit_runtime:schema22-ci-only@127.0.0.1:5432/lease_conformance_schema22_ci
+        run: |
+          set -euo pipefail
+          # Separate roles and database; no production endpoint or inherited schema.
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U m14 -d m14_scenario <<'SQL'
+          CREATE ROLE schema22_work_migration LOGIN PASSWORD 'schema22-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          CREATE ROLE schema22_work_runtime LOGIN PASSWORD 'schema22-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          CREATE ROLE schema22_audit_migration LOGIN PASSWORD 'schema22-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          CREATE ROLE schema22_audit_runtime LOGIN PASSWORD 'schema22-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          CREATE DATABASE lease_conformance_schema22_ci;
+          GRANT CONNECT,CREATE ON DATABASE lease_conformance_schema22_ci TO schema22_work_migration,schema22_audit_migration;
+          GRANT CONNECT ON DATABASE lease_conformance_schema22_ci TO schema22_work_runtime,schema22_audit_runtime;
+          SQL
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U m14 -d lease_conformance_schema22_ci \
+            -c 'CREATE SCHEMA work AUTHORIZATION schema22_work_migration'
+          python scripts/prepare_schema21_upgrade_fixture.py /tmp/vuoro-schema21-upgrade
+          /tmp/vuoro-bound-released-composition/bin/python -I scripts/attest_installed_composition.py \
+            packages/vuoro-service/composition/adapter-pins.json dist/adapters /tmp/vuoro-schema22-installed.json
+          export VUORO_SCHEMA21_OWNER_PYTHON=/tmp/vuoro-schema21-upgrade/venv/bin/python
+          export VUORO_SCHEMA21_MANIFEST="$PWD/packages/vuoro-service/tests/fixtures/schema21-adapter-pins.json"
+          export VUORO_SCHEMA21_WHEEL_DIR=/tmp/vuoro-schema21-upgrade/wheels
+          export VUORO_SCHEMA21_ATTESTATION=/tmp/vuoro-schema21-upgrade/installed.json
+          export VUORO_SCHEMA22_MANIFEST="$PWD/packages/vuoro-service/composition/adapter-pins.json"
+          export VUORO_SCHEMA22_WHEEL_DIR="$PWD/dist/adapters"
+          export VUORO_SCHEMA22_ATTESTATION=/tmp/vuoro-schema22-installed.json
+          /tmp/vuoro-bound-released-composition/bin/python -m pytest --import-mode=importlib \
+            packages/vuoro-service/tests/conformance/test_schema22_composition_migration.py -q
       - name: Protected effect binding on the released schema-21 owner
         env:
           PGPASSWORD: m14-ci-only

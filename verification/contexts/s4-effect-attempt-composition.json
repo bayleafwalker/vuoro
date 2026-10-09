@@ -1,0 +1,144 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.s4.effect-attempt-composition",
+  "owner_repo": "vuoro",
+  "subject": "released-attempt-ledger-in-installed-http-shell-and-explicit-schema22-upgrade",
+  "contract_ref": {
+    "doc_id": "effect-attempt-composition",
+    "revision": "git:977d417368ecca2a35ec3572eec87e972a14e5de; October9 additive attempt composition"
+  },
+  "source_of_truth": "immutable tagged owner/shared wheels, composition manifest and installed catalog",
+  "depth": 2,
+  "backends": [
+    "installed-released-service-and-owner-wheels",
+    "disposable-loopback-PostgreSQL16",
+    "source-workspace"
+  ],
+  "actors": [
+    "service-runtime",
+    "proposer",
+    "verifier",
+    "applier",
+    "reader",
+    "migration-role",
+    "old-service-runtime"
+  ],
+  "initial_state": [
+    "candidate service0.1.91 with released owner0.17.0/audit0.1.9/kit0.2.0/schema-runtime0.1.0",
+    "actual old service0.1.90/owner0.16.0 closure initializes schema21",
+    "preserved accepted intent, evidence and audit rows"
+  ],
+  "operations": [
+    {
+      "name": "open exact accepted authorization",
+      "actors": [
+        "service-runtime",
+        "applier"
+      ]
+    },
+    {
+      "name": "redeem once and retry historical receipt",
+      "actors": [
+        "service-runtime",
+        "applier"
+      ]
+    },
+    {
+      "name": "seal unused authorization",
+      "actors": [
+        "service-runtime",
+        "applier"
+      ]
+    },
+    {
+      "name": "report immutable PR claim",
+      "actors": [
+        "service-runtime",
+        "applier"
+      ]
+    },
+    {
+      "name": "get complete event history",
+      "actors": [
+        "service-runtime",
+        "applier"
+      ]
+    },
+    {
+      "name": "refuse foreign binding/target/authority",
+      "actors": [
+        "service-runtime",
+        "applier"
+      ]
+    },
+    {
+      "name": "explicit schema21-to22 migration and startup refusal",
+      "actors": [
+        "service-runtime",
+        "applier"
+      ]
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "installed service consumes compatible immutable owner/dependency artifacts; no automatic migration"
+  },
+  "assumptions": {
+    "isolation": "sequential API histories and deterministic edit hooks; no forge/owner transaction",
+    "clock": "not authority",
+    "fairness": "none"
+  },
+  "bounds": {
+    "new_attempt_http_histories": 16,
+    "upgrade_and_guard_tests": 8,
+    "work_operations_without_resource_storage": 79,
+    "composed_operations_without_resource_storage": 84,
+    "previous_work_descriptors_preserved": 74,
+    "concurrent_operations": 0
+  },
+  "invariants": [
+    "existing74work descriptors byte-identical; exactly5additions",
+    "existing mark-applied authority only",
+    "complete authenticated binding and exact frozen Release/target",
+    "fresh dispatch permission delivered once; retry historical permission false",
+    "attempt histories append-only; legacy intent/evidence immutable",
+    "startup never migrates; old factory refuses22 and new factory refuses21",
+    "all4roles nonprivileged; runtime has noDDL or migration membership",
+    "all legacy work/audit rows preserved through explicit migration"
+  ],
+  "faults": [
+    "missing scope",
+    "changed principal/workspace/client/grant",
+    "foreign repository",
+    "changed closed target",
+    "wrong authorization digest",
+    "different redemption key after consumption",
+    "basis drift",
+    "forbidden envelope key",
+    "missing mandatory fixture",
+    "libpq endpoint/search-path overrides",
+    "runtime DDL",
+    "wrong catalog fingerprint"
+  ],
+  "oracles": [
+    "actual installed artifact hashes and versions",
+    "old/new released descriptor byte comparison",
+    "actual HTTP history and full authoritative rows",
+    "actual full old/new factories around explicit migration22",
+    "runtime SQLSTATE42501 and nonmembership",
+    "three installed release gates and forced fingerprint refusal",
+    "mandatory CI proof refuses incomplete fixture"
+  ],
+  "implementation_anchors": [
+    "docs/architecture/effect-attempt-composition.md",
+    "packages/vuoro-service/composition/adapter-pins.json",
+    "packages/vuoro-service/tests/conformance/test_effect_attempt_http.py",
+    "packages/vuoro-service/tests/conformance/test_schema22_composition_migration.py",
+    "scripts/prepare_schema21_upgrade_fixture.py",
+    ".github/workflows/ci.yml"
+  ],
+  "expansions": [
+    "semantic-doc",
+    "fault-scenario"
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.s4.effect-attempt-composition",
+  "contract_ref": {
+    "doc_id": "effect-attempt-composition",
+    "revision": "git:977d417368ecca2a35ec3572eec87e972a14e5de; October9 additive attempt composition"
+  },
+  "implementation_sha": "b659e539f0b1ea9689403204ce2138254f327d9c",
+  "depth": 2,
+  "environment": {
+    "backend": "installed candidate service and actual released owner/shared wheels on disposable loopback PostgreSQL16; source regression and settlement",
+    "isolation": "generated nonprivileged disposable cluster destroyed on every run; static synthetic identities; no production effects",
+    "tool_versions": {
+      "python": "3.12.14",
+      "PostgreSQL": "16.15",
+      "vuoro-service": "0.1.91",
+      "sprintctl": "0.17.0",
+      "auditctl": "0.1.9",
+      "adapter-kit": "0.2.0",
+      "schema-runtime": "0.1.0"
+    }
+  },
+  "execution": {
+    "histories": 16,
+    "bounds": {
+      "new_attempt_http_histories": 16,
+      "installed_conformance_passed_before_dedicated_upgrade_addition": 85,
+      "dedicated_upgrade_and_guard_passed": 8,
+      "source_full_passed": 1607,
+      "source_unconfigured_pg_and_optional_skips": 60,
+      "source_service_passed_before_dedicated_upgrade_addition": 317,
+      "configured_resource_observations_passed": 6,
+      "configured_discovery_passed": 1,
+      "configured_ledger_effect_provider_passed": 104,
+      "local_settlement": "GREEN including killed process, stale lease and cleanup",
+      "released_artifact_gates": 3,
+      "forced_bad_catalog_refusals": 1,
+      "old_descriptors_byte_identical": 74,
+      "work_operations": 79,
+      "composed_operations": 84
+    },
+    "faults_exercised": [
+      "missing scope",
+      "changed principal/workspace/client/grant",
+      "foreign repository",
+      "changed closed target",
+      "wrong authorization digest",
+      "different redemption key after consumption",
+      "basis drift",
+      "forbidden envelope key",
+      "missing mandatory fixture",
+      "libpq endpoint/search-path overrides",
+      "runtime DDL",
+      "wrong catalog fingerprint"
+    ]
+  },
+  "claims": [
+    {
+      "property": "immutable actual release composition and exact old descriptor preservation",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/composition/adapter-pins.json",
+        "scripts/validate_released_catalog_composition.py"
+      ]
+    },
+    {
+      "property": "exact authorization/binding and one-use permission; immutable attempt histories and legacy no-write oracle",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/tests/conformance/test_effect_attempt_http.py"
+      ]
+    },
+    {
+      "property": "actual schema21 closure, startup refusal, explicit22 migration, row preservation and runtime DDL denial",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/tests/conformance/test_schema22_composition_migration.py",
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "property": "published candidate wheel/image, coordinated production migration, provider invocation tracking, independent completion, evaluate-v2, inventory/import/attribution and soak",
+      "result": "unknown"
+    }
+  ],
+  "counterexamples": [],
+  "notes": [
+    "implementation_sha is staged authored source tree before verification receipts, not a deployed artifact.",
+    "Astra independently approved final source after fixing mandatory CI skip and libpq routing override guards.",
+    "Actual old closure bootstrap verifies five wheel hashes and separately attests four owner/shared pins.",
+    "Mandatory fixture absence deliberately failed before connection; seven pure override refusal cases plus actual upgrade passed.",
+    "The disposable database uses four nonprivileged roles and migration-owned schemas; teardown completed.",
+    "Static synthetic identities qualify production HTTP shell mechanics, not deployed OAuth or provider execution.",
+    "Redeemed authorization does not prove provider invocation; PR report remains an authored claim. Existing evaluator v1 preserves unsupported execution coverage."
+  ]
+}
