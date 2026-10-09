@@ -158,7 +158,7 @@ jobs:
         env:
           PGPASSWORD: m14-ci-only
         run: createdb -h 127.0.0.1 -U m14 lease_conformance_ci
-      - name: Bound proposal through isolated released-wheel composition
+      - name: Bound proposal and evidence evaluation through isolated released-wheel composition
         shell: bash
         run: |
           set -euo pipefail
@@ -172,7 +172,8 @@ jobs:
           uv pip check --python /tmp/vuoro-bound-released-composition/bin/python
           VUORO_BOUND_COMPOSITION_PROOF=1 /tmp/vuoro-bound-released-composition/bin/python \
             -m pytest --import-mode=importlib \
-            packages/vuoro-service/tests/conformance/test_bound_proposal_http.py -q \
+            packages/vuoro-service/tests/conformance/test_bound_proposal_http.py \
+            packages/vuoro-service/tests/conformance/test_evidence_evaluation_http.py -q \
             --lease-pg-url postgresql://m14:m14-ci-only@127.0.0.1:5432/lease_conformance_ci
       - name: Provider-neutral lease contract (reference and pinned owner)
         run: >-
