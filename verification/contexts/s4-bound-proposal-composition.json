@@ -1,0 +1,139 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.s4.bound-proposal-composition",
+  "owner_repo": "vuoro",
+  "subject": "released-causal-proposal-owner-in-installed-http-shell",
+  "contract_ref": {
+    "doc_id": "s4-bound-proposal-composition",
+    "revision": "git:4836d2d6276b2b9e892f87d1d18156bc028988f9; October9 additive composition"
+  },
+  "source_of_truth": "immutable tagged owner/shared wheels, composition manifest and installed catalog",
+  "depth": 2,
+  "backends": [
+    "installed-released-service-and-owner-wheels",
+    "disposable-loopback-PostgreSQL16",
+    "source-workspace"
+  ],
+  "actors": [
+    "service-runtime",
+    "bound-proposer",
+    "ordinary-caller",
+    "foreign-binding-caller"
+  ],
+  "initial_state": [
+    "candidate service0.1.89 with SHA-pinned work0.15.1/audit0.1.9/kit0.2.0/schema-runtime0.1.0",
+    "disposable work schema21",
+    "registered authenticated run, native reserve receipt, precommitted trailer fixture and exact evidence tail"
+  ],
+  "operations": [
+    {
+      "name": "verify immutable dependency closure and fingerprints",
+      "actors": [
+        "service-runtime",
+        "bound-proposer"
+      ]
+    },
+    {
+      "name": "resolve authenticated run binding",
+      "actors": [
+        "service-runtime",
+        "bound-proposer"
+      ]
+    },
+    {
+      "name": "admit exact causal proposal",
+      "actors": [
+        "service-runtime",
+        "bound-proposer"
+      ]
+    },
+    {
+      "name": "replay after rejection/edit/chain advance/reservation release",
+      "actors": [
+        "service-runtime",
+        "bound-proposer"
+      ]
+    },
+    {
+      "name": "refuse authority and full-binding changes",
+      "actors": [
+        "service-runtime",
+        "bound-proposer"
+      ]
+    },
+    {
+      "name": "refuse causal prerequisite mismatch and stale full revision",
+      "actors": [
+        "service-runtime",
+        "bound-proposer"
+      ]
+    },
+    {
+      "name": "preserve legacy shared key collision",
+      "actors": [
+        "service-runtime",
+        "bound-proposer"
+      ]
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "installed service consumes compatible immutable owner/dependency artifacts; no automatic migration"
+  },
+  "assumptions": {
+    "isolation": "sequential API histories and deterministic edit hooks; no forge/owner transaction",
+    "clock": "not authority",
+    "fairness": "none"
+  },
+  "bounds": {
+    "released_catalog_operations_without_resource_storage": 78,
+    "work_operations": 73,
+    "audit_operations": 5,
+    "new_http_bound_cases": 13,
+    "installed_conformance_cases": 52,
+    "concurrent_operations": 0
+  },
+  "invariants": [
+    "installed module versions/origins and wheel hashes match immutable manifest",
+    "first admission correlates causal basis, full authenticated binding, reservation ID and Release",
+    "exact historical replay retains admission and returns current intent with one effect",
+    "authority/full-binding/causal refusals produce no intent or proposal ledger entry",
+    "legacy and bound proposals share one key namespace",
+    "schema21 and no automatic migration remain"
+  ],
+  "faults": [
+    "missing-authority",
+    "changed-principal",
+    "changed-workspace",
+    "changed-client",
+    "changed-grant",
+    "missing-reserve",
+    "wrong-commit",
+    "wrong-release",
+    "wrong-evidence-tail",
+    "forbidden-envelope-key",
+    "foreign-repository",
+    "legacy-key-collision",
+    "stale-full-revision",
+    "append-before-admission",
+    "lifecycle-changes-before-replay",
+    "wrong-catalog-fingerprint"
+  ],
+  "oracles": [
+    "actual downloaded immutable hashes and owner attestation",
+    "installed distribution versions and site-packages origins",
+    "dependency consistency and three adapter/catalog gates with two forced negative fingerprints",
+    "HTTP exact errors/results, full binding and PG effect/key counts"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-service/composition/adapter-pins.json",
+    "scripts/validate_released_work_adapter.py",
+    "scripts/validate_released_catalog_composition.py",
+    "packages/vuoro-service/tests/conformance/test_bound_proposal_http.py",
+    ".github/workflows/ci.yml"
+  ],
+  "expansions": [
+    "semantic-doc",
+    "fault-scenario"
+  ]
+}
