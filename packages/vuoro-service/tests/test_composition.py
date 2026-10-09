@@ -204,16 +204,16 @@ def test_checked_in_work_pin_is_the_release_actor_binding_release() -> None:
         pin.api_version,
         pin.schema_version,
     ) == (
-        "e7fc9e01e31d0637f4d160920e04b98fd2bf4d80",
-        "0.16.0",
+        "423eac60e02f8cc90719960e2dd4c76493c03077",
+        "0.17.0",
         "work-api/v1",
         "work-schema/v1",
     )
     assert pin.artifact_url.endswith(
-        "/v0.16.0/sprintctl-0.16.0-py3-none-any.whl"
+        "/v0.17.0/sprintctl-0.17.0-py3-none-any.whl"
     )
     assert pin.artifact_sha256 == (
-        "d74dff63da4bc9d75561d2d7ea731b7a509948abc9b485fcc2d1f9ca93a68d1a"
+        "8931e4f7df033254a196df83111ee8509d59627cb5aff928675fbe31d4724fcd"
     )
     assert [
         (item.lock_id, item.lock_kind, item.distribution, item.distribution_version)
@@ -638,7 +638,7 @@ def test_load_and_verify_accept_a_shared_filename_with_an_identical_digest(tmp_p
 
     source = ROOT / "composition" / "adapter-pins.json"
     raw = json.loads(source.read_text(encoding="utf-8"))
-    artifact = tmp_path / "sprintctl-0.16.0-py3-none-any.whl"
+    artifact = tmp_path / "sprintctl-0.17.0-py3-none-any.whl"
     artifact.write_bytes(b"same-filename-same-digest")
     digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
     work_lock = next(lock for lock in raw["release_locks"] if lock["lock_id"] == "work-adapter")
@@ -655,7 +655,7 @@ def test_load_and_verify_accept_a_shared_filename_with_an_identical_digest(tmp_p
     manifest = CompositionManifest.load(path)
     filenames = {lock.artifact_url.rsplit("/", 1)[-1] for lock in manifest.release_locks
                  if lock.lock_id in ("work-adapter", "work-adapter-dup")}
-    assert filenames == {"sprintctl-0.16.0-py3-none-any.whl"}
+    assert filenames == {"sprintctl-0.17.0-py3-none-any.whl"}
 
     # verify_adapter_artifacts checks every lock in the manifest, so isolate
     # the two colliding locks (rather than staging real wheels for the whole
@@ -674,7 +674,7 @@ def test_load_and_verify_reject_a_shared_filename_with_a_differing_digest(tmp_pa
 
     source = ROOT / "composition" / "adapter-pins.json"
     raw = json.loads(source.read_text(encoding="utf-8"))
-    artifact = tmp_path / "sprintctl-0.16.0-py3-none-any.whl"
+    artifact = tmp_path / "sprintctl-0.17.0-py3-none-any.whl"
     artifact.write_bytes(b"same-filename-differing-digest")
     digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
     work_lock = next(lock for lock in raw["release_locks"] if lock["lock_id"] == "work-adapter")
