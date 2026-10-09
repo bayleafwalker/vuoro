@@ -1,0 +1,92 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.s4.native-reserve-composition",
+  "contract_ref": {
+    "doc_id": "s4-native-reserve-composition",
+    "revision": "git:0d9ce525c27db4220e3f775fdebbd1a476a68342; October9 source composition"
+  },
+  "implementation_sha": "a78ef4326144c95008f3cbb4b73f97ad9a45a35a",
+  "depth": 2,
+  "environment": {
+    "backend": "source workspace; separate installed service/owner/shared wheels; disposable loopback PostgreSQL16",
+    "isolation": "nonprivileged generated ephemeral database and static fixture identities; destroyed cluster after scenarios; no production mutations",
+    "tool_versions": {
+      "python": "3.12.14",
+      "PostgreSQL": "16.15",
+      "sprintctl": "0.14.1",
+      "auditctl": "0.1.9",
+      "released-adapter-kit": "0.2.0",
+      "schema-runtime": "0.1.0"
+    }
+  },
+  "execution": {
+    "histories": 5,
+    "bounds": {
+      "targeted_service_passed": 317,
+      "targeted_unconfigured_pg_skips": 6,
+      "full_workspace_passed": 1600,
+      "full_unconfigured_owner_skips": 13,
+      "reserve_lease_pg_passed": 39,
+      "accepted_discovery_protected_pg_passed": 5,
+      "ledger_effect_provider_pg_passed": 104,
+      "released_wheel_gates": 3,
+      "four_built_wheel_contract": "passed",
+      "installed_dependency_check": "passed",
+      "work_operations": 72,
+      "audit_operations": 5
+    },
+    "faults_exercised": [
+      "missing-key",
+      "missing-authority",
+      "identity-unbound",
+      "changed-content-under-accepted-key",
+      "different-principal-same-key",
+      "mixed-source-and-released-contract-environments"
+    ]
+  },
+  "claims": [
+    {
+      "property": "immutable work/shared/audit composition matches verified release artifacts and exact catalog fingerprints",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/composition/adapter-pins.json",
+        "scripts/validate_released_work_adapter.py",
+        "scripts/validate_released_audit_adapter.py",
+        "scripts/validate_released_catalog_composition.py"
+      ]
+    },
+    {
+      "property": "real HTTP shell forwards envelope key and native owner exactly replays, refuses before effects and preserves principal namespaces",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/tests/conformance/test_native_reserve_http.py"
+      ]
+    },
+    {
+      "property": "existing lease, protected source, ledger, effect and provider contracts continue on actual pinned owner and released kit",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/tests/conformance",
+        "packages/vuoro-reconciler/tests/test_protected_source_pg.py",
+        "packages/vuoro-reconciler/tests/test_sprintctl_source_pg.py",
+        "packages/vuoro-mcp-edge/tests/test_ledger_behaviour.py",
+        "packages/vuoro-mcp-edge/tests/test_effect_authority_contract.py",
+        "packages/vuoro-mcp-edge/tests/test_provider_ingestion_contract.py"
+      ]
+    },
+    {
+      "property": "OCI publication/provenance, deployed runtime pin and native caller enrollment",
+      "result": "unknown"
+    }
+  ],
+  "counterexamples": [],
+  "notes": [
+    "implementation_sha is the final staged Git implementation tree before this result packet; it is not a commit or deployment receipt.",
+    "Independent Astra read-only review approved the bounded source and verified all four downloaded artifact hashes.",
+    "Source workspace tests use current editable shared-contract sources. The separate released-wheel environment uses actual immutable kit0.2.0/schema-runtime0.1.0; all three adapter gates and pip consistency pass.",
+    "PG scenarios ran with released kit0.2.0 and actual Sprintctl0.14.1; static HTTP fixture identities are not deployed authentication proof.",
+    "Initial mixed contract environment failed two source extension tests; restoring editable workspace contracts and separating immutable artifact gates resolved them. Sandboxed signature HTTP tests stalled; bounded escalated runs passed immediately.",
+    "The missing-key case first expected422; existing shell contract400 was preserved and exact status oracle corrected before final rerun.",
+    "No runtime deployment, automatic migration, identity/grant change, live outage, import, hook cutover or S4 soak performed."
+  ]
+}

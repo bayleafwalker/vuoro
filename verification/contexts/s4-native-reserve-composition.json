@@ -1,0 +1,122 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.s4.native-reserve-composition",
+  "owner_repo": "vuoro",
+  "subject": "released-native-reserve-owner-in-real-http-shell",
+  "contract_ref": {
+    "doc_id": "s4-native-reserve-composition",
+    "revision": "git:0d9ce525c27db4220e3f775fdebbd1a476a68342; October9 source composition"
+  },
+  "source_of_truth": "immutable tagged owner/shared wheels, composition manifest and installed catalog",
+  "depth": 2,
+  "backends": [
+    "installed-released-service-and-owner-wheels",
+    "disposable-loopback-PostgreSQL16",
+    "source-workspace"
+  ],
+  "actors": [
+    "service-runtime",
+    "bound-reserve-caller",
+    "second-principal",
+    "unprivileged-reader"
+  ],
+  "initial_state": [
+    "candidate service0.1.88 with SHA-pinned work0.14.1/audit0.1.9/kit0.2.0/schema-runtime0.1.0",
+    "disposable work schema21",
+    "empty reserve replay namespace"
+  ],
+  "operations": [
+    {
+      "name": "verify immutable dependency closure and fingerprints",
+      "actors": [
+        "service-runtime",
+        "bound-reserve-caller"
+      ]
+    },
+    {
+      "name": "invoke native reserve with envelope key",
+      "actors": [
+        "service-runtime",
+        "bound-reserve-caller"
+      ]
+    },
+    {
+      "name": "retry exact key",
+      "actors": [
+        "service-runtime",
+        "bound-reserve-caller"
+      ]
+    },
+    {
+      "name": "read correlated Release",
+      "actors": [
+        "service-runtime",
+        "bound-reserve-caller"
+      ]
+    },
+    {
+      "name": "refuse unbound or unauthorized caller",
+      "actors": [
+        "service-runtime",
+        "bound-reserve-caller"
+      ]
+    },
+    {
+      "name": "isolate different principal namespace",
+      "actors": [
+        "service-runtime",
+        "bound-reserve-caller"
+      ]
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "installed service consumes compatible immutable owner/dependency artifacts; no automatic migration"
+  },
+  "assumptions": {
+    "isolation": "sequential API histories and deterministic edit hooks; no forge/owner transaction",
+    "clock": "not authority",
+    "fairness": "none"
+  },
+  "bounds": {
+    "released_catalog_operations_without_resource_storage": 77,
+    "work_operations": 72,
+    "audit_operations": 5,
+    "new_http_reserve_cases": 5,
+    "disposable_pg_cases": 148,
+    "concurrent_operations": 0
+  },
+  "invariants": [
+    "installed artifacts match immutable composition hashes and versions",
+    "both owners consume releasedkit0.2.0",
+    "HTTP envelope key reaches native owner replay namespace",
+    "native replay does not duplicate effects or mutate activity",
+    "authority/binding/missing-key refusals precede effects",
+    "principal replay namespaces remain distinct",
+    "schema21 compatibility and no-automatic-migration remain"
+  ],
+  "faults": [
+    "missing-key",
+    "missing-authority",
+    "identity-unbound",
+    "changed-content-under-accepted-key",
+    "different-principal-same-key",
+    "mixed-source-and-released-contract-environments"
+  ],
+  "oracles": [
+    "actual downloaded wheel hashes and owner attestation",
+    "isolated installed dependency check and three adapter/catalog gates",
+    "HTTP status/error/result and PG reservation/event/key counts",
+    "Release basis/contract and retained principal namespace"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-service/composition/adapter-pins.json",
+    "scripts/validate_released_work_adapter.py",
+    "scripts/validate_released_catalog_composition.py",
+    "packages/vuoro-service/tests/conformance/test_native_reserve_http.py"
+  ],
+  "expansions": [
+    "semantic-doc",
+    "fault-scenario"
+  ]
+}
