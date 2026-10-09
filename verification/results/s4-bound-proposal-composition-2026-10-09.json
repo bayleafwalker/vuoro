@@ -1,0 +1,115 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.s4.bound-proposal-composition",
+  "contract_ref": {
+    "doc_id": "s4-bound-proposal-composition",
+    "revision": "git:4836d2d6276b2b9e892f87d1d18156bc028988f9; October9 additive composition"
+  },
+  "implementation_sha": "ee56ef4dbe212f0bf9073858fd575621771a8912",
+  "depth": 2,
+  "environment": {
+    "backend": "separate installed candidate/released wheels on disposable loopback PostgreSQL16; source workspace for regression",
+    "isolation": "generated nonprivileged disposable database destroyed after each run; static fixture identities; no production effects",
+    "tool_versions": {
+      "python": "3.12.14",
+      "PostgreSQL": "16.15",
+      "vuoro-service": "0.1.89",
+      "sprintctl": "0.15.1",
+      "auditctl": "0.1.9",
+      "adapter-kit": "0.2.0",
+      "schema-runtime": "0.1.0"
+    }
+  },
+  "execution": {
+    "histories": 13,
+    "bounds": {
+      "installed_full_conformance_passed": 52,
+      "installed_conformance_skipped": 0,
+      "source_targeted_passed": 323,
+      "source_targeted_unconfigured_pg_skips": 19,
+      "source_full_passed": 1600,
+      "source_full_unconfigured_pg_skips": 26,
+      "current_owner_resource_observations_passed": 6,
+      "current_owner_accepted_discovery_passed": 1,
+      "current_owner_ledger_effect_provider_passed": 104,
+      "local_settlement_scenario": "GREEN: takeover, killed-process restart and stale-lease restart",
+      "released_wheel_gates": 3,
+      "forced_bad_fingerprint_refusals": 2,
+      "installed_dependency_consistency": "passed",
+      "work_operations": 73,
+      "composed_operations": 78
+    },
+    "faults_exercised": [
+      "missing-authority",
+      "changed-principal",
+      "changed-workspace",
+      "changed-client",
+      "changed-grant",
+      "missing-reserve",
+      "wrong-commit",
+      "wrong-release",
+      "wrong-evidence-tail",
+      "forbidden-envelope-key",
+      "foreign-repository",
+      "legacy-key-collision",
+      "stale-full-revision",
+      "append-before-admission",
+      "lifecycle-changes-before-replay",
+      "wrong-catalog-fingerprint"
+    ]
+  },
+  "claims": [
+    {
+      "property": "immutable composition hashes, module origins and exact catalog fingerprints agree",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/composition/adapter-pins.json",
+        "scripts/validate_released_work_adapter.py",
+        "scripts/validate_released_catalog_composition.py"
+      ]
+    },
+    {
+      "property": "first bound admission correlates authenticated run, submitted guards, reserve receipt and Release; historical replay retains admission with current intent",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/tests/conformance/test_bound_proposal_http.py"
+      ]
+    },
+    {
+      "property": "binding, authority, causal and shared-key refusals are checked with exact errors and zero new effects",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/tests/conformance/test_bound_proposal_http.py"
+      ]
+    },
+    {
+      "property": "current-owner accepted discovery and ledger/effect/provider consumers regress without skips; settlement takeover/restart passes",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-reconciler/tests/test_sprintctl_source_pg.py",
+        "packages/vuoro-mcp-edge/tests/test_ledger_behaviour.py",
+        "packages/vuoro-mcp-edge/tests/test_effect_authority_contract.py",
+        "packages/vuoro-mcp-edge/tests/test_provider_ingestion_contract.py",
+        "scripts/settlement_scenario.py"
+      ]
+    },
+    {
+      "property": "resource-owner invariant qualification",
+      "result": "unknown"
+    },
+    {
+      "property": "publication, OCI provenance, deployed writer binding and full S4 offline pipeline",
+      "result": "unknown"
+    }
+  ],
+  "counterexamples": [],
+  "notes": [
+    "implementation_sha is the staged implementation tree before this result; it is neither commit nor deployment receipt.",
+    "Astra independently approved corrected bounded source after final installed conformance52 passed.",
+    "Installed artifact proof uses candidate service and four immutable pins with site-packages assertions. Editable source regressions are separately classified.",
+    "Static in-process TestClient is HTTP-shell proof, not network TCP or deployed authentication. Precommitted trailer relation is an explicit fixture, not ingestion proof.",
+    "Local consumer harness first combined conflicting top-level conftest imports; separate CI-equivalent invocations passed without product changes.",
+    "Resource gap receipts remain observations and do not establish resource-owner invariants.",
+    "No production mutation, automatic migration, writer enrollment, historical import, hook cutover or soak performed."
+  ]
+}
