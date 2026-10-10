@@ -276,6 +276,21 @@ def test_malformed_checkpoint_timestamp_is_omitted() -> None:
     assert SECRET not in str(report)
 
 
+def test_checkpoint_timestamp_requires_exact_iso_separator_and_normalizes_utc() -> None:
+    records = owner_records()
+    records[NEXT]["checkpointed_unacked"][0]["created_at"] = "2026-10-10T10:00:00+03:00"
+    report = run(OwnerSource(records), "read_work_delta", DELTA_ARGS)
+    assert report["unacknowledged_checkpoint"]["created_at"] == "2026-10-10T07:00:00Z"
+
+    records[NEXT]["checkpointed_unacked"][0]["created_at"] = "2026-10-10X07:00:00+00:00"
+    malformed = run(OwnerSource(records), "read_work_delta", DELTA_ARGS)
+    assert malformed["unacknowledged_checkpoint"]["created_at"] is None
+
+    records[NEXT]["checkpointed_unacked"][0]["created_at"] = "2026-10-10T07:00:00"
+    naive = run(OwnerSource(records), "read_work_delta", DELTA_ARGS)
+    assert naive["unacknowledged_checkpoint"]["created_at"] is None
+
+
 def test_ordinary_delta_omits_decision_evidence_digests() -> None:
     report = run(OwnerSource(), "read_work_delta", DELTA_ARGS)
     assert "evidence_digests" not in str(report)

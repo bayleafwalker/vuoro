@@ -34,6 +34,7 @@ HEX = re.compile(r"^[0-9a-f]{64}$")
 SHA = re.compile(r"^sha256:[0-9a-f]{64}$")
 EDIT_REVISION = re.compile(r"^item:[0-9a-fA-F-]{36}@description:v[0-9]+@sha256:[0-9a-f]{64}$")
 RELEASE_REVISION = re.compile(r"^item:[0-9a-fA-F-]{36}@description:v[0-9]+@sha256:[0-9a-f]{64}@revise:[0-9]+$")
+CHECKPOINT_TIME = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$")
 DECISION_KINDS = frozenset({"accept", "reject", "withdraw", "supersede", "revise"})
 INTENT_CONTENT = ("item_id", "repository", "base_commit", "title", "rationale", "unified_diff")
 MAX_DECISIONS = 20
@@ -287,13 +288,15 @@ def _reference_count(item_value: dict[str, Any]) -> int:
 
 
 def _checkpoint_time(value: Any) -> str | None:
-    if type(value) is not str or len(value) > 40:
+    if type(value) is not str or CHECKPOINT_TIME.fullmatch(value) is None:
         return None
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
-    return value if parsed.tzinfo is not None and parsed.utcoffset() is not None else None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _verify_intent_content(intent: dict[str, Any]) -> None:
