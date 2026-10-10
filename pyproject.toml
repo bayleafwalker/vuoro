@@ -13,6 +13,7 @@ dev = [
 package = false
 
 [tool.uv.workspace]
+exclude = ["packages/vuoro-demo"]
 members = [
   "packages/vuoro-client",
   "packages/vuoro-service",
