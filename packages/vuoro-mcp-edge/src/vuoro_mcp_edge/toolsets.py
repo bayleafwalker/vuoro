@@ -43,6 +43,7 @@ __all__ = [
 #: granted and no edge tool may execute an effect.
 BUCKET_AUTHORITIES: dict[str, str] = {
     "read": "work:read",
+    "effect-read": "work.effect.get",
     "record": "work:evidence",
     "coordinate": "work:claim",
     "propose": "effect:propose",
@@ -112,12 +113,18 @@ class ToolSpec:
     parse: Parse
     run: Run
     describe: Describe | None = None
+    # A tool that joins separately authorized owner reads must carry every
+    # authority. The bucket still names its primary scope and remains the
+    # default for existing one-authority tools.
+    required_authorities: frozenset[str] = field(default_factory=frozenset)
 
     def __post_init__(self) -> None:
         if self.definition.get("name") != self.name:
             raise ValueError(f"tool {self.name}: definition name must match")
         if self.bucket not in BUCKET_AUTHORITIES:
             raise ValueError(f"tool {self.name}: unknown bucket {self.bucket!r}")
+        if any(not isinstance(value, str) or not value for value in self.required_authorities):
+            raise ValueError(f"tool {self.name}: invalid required authority")
 
 
 @dataclass(frozen=True)

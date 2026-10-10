@@ -28,7 +28,7 @@ from vuoro_service.composition import (
     load_gateway_assertion_resolver,
 )
 
-from . import claim_tools, effect_tools, record_tools
+from . import claim_tools, effect_tools, read_tools, record_tools
 from .edge_proof_auth import EdgeProofAuth
 from .runs import UnavailableRunRegistry
 from .server import create_edge_app
@@ -131,5 +131,6 @@ def build_toolsets(context: ToolsetContext) -> tuple[ToolSet, ...]:
         record_tools.build_toolset(context),
         claim_tools.build_toolset(context),
         effect_tools.build_toolset(context),
+        read_tools.build_toolset(context),
     )
     return tuple(toolset for toolset in built if toolset is not None)
