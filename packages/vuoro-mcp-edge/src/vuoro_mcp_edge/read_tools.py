@@ -21,6 +21,7 @@ import httpx
 from .errors import WorkSourceUnavailable
 from .toolsets import ToolFailure, ToolSet, ToolSpec, ToolsetContext
 from .work_source import ForwardedIdentity, ShellWorkSource
+from .acceptance_explanation import build_spec as build_explanation_spec
 
 EFFECT = "work.effect.get-v1"
 ITEM = "work.read.item"
@@ -511,6 +512,7 @@ def build_toolset(context: ToolsetContext) -> ToolSet:
         return report
 
     return ToolSet("owner-read-projections", (
+        build_explanation_spec(context.work_source),
         ToolSpec("preview_acceptance", "effect-read", _PREVIEW, _parse_preview, preview,
                  describe=describe_preview, required_authorities=frozenset({"work:read"})),
         ToolSpec("read_work_delta", "read", _DELTA, _parse_delta, delta,

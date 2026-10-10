@@ -106,6 +106,7 @@ class ShellWorkSource:
         self._catalog_revision: str | None = None
         self._catalog_checked = False
         self._catalog_fetch: asyncio.Future[None] | None = None
+        self._read_operations: frozenset[str] = frozenset()
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -169,10 +170,16 @@ class ShellWorkSource:
             ) from exc
         if not isinstance(catalog, dict) or not isinstance(catalog.get("revision"), str):
             raise WorkSourceUnavailable("invalid-response", "catalog body has no revision")
+        operations = catalog.get("operations")
+        if not isinstance(operations, list) or any(not isinstance(row, dict) for row in operations):
+            raise WorkSourceUnavailable("invalid-response", "catalog operation list is malformed")
+        names = [row.get("name") for row in operations]
+        if any(not isinstance(name, str) or not name for name in names) or len(set(names)) != len(names):
+            raise WorkSourceUnavailable("invalid-response", "catalog operation names are malformed")
         advertised = {
             operation.get("name")
-            for operation in catalog.get("operations") or ()
-            if isinstance(operation, dict)
+            for operation in operations
+            if isinstance(operation.get("name"), str)
         }
         missing = [name for name in REQUIRED_OPERATIONS if name not in advertised]
         if missing:
@@ -181,22 +188,35 @@ class ShellWorkSource:
                 f"the runtime catalog does not advertise {', '.join(missing)}",
             )
         self._catalog_revision = catalog["revision"]
+        self._read_operations = frozenset(
+            row["name"] for row in operations
+            if isinstance(row.get("name"), str)
+            and row.get("execution_semantics") == "read"
+        )
         self._catalog_checked = True
 
     async def _invoke(
-        self, operation: str, arguments: dict[str, Any], identity: ForwardedIdentity
+        self, operation: str, arguments: dict[str, Any], identity: ForwardedIdentity,
+        *, require_read: bool = False,
     ) -> Any:
         await self._ensure_catalog()
-        response = await self._post(operation, arguments, identity)
+        if require_read and operation not in self._read_operations:
+            raise WorkSourceUnavailable("catalog-mismatch", "required owner read unavailable")
+        read_basis = {"catalog_revision": self._catalog_revision} if require_read else {}
+        response = await self._post(operation, arguments, identity, **read_basis)
         if response.status_code == 409 and _error_code(response) == "stale-catalog":
             # Retry exactly once against the refreshed catalog, then surface
             # whatever comes back.  The assertion's 30 s lifetime covers it.
             await self._ensure_catalog(force_refresh=True)
-            response = await self._post(operation, arguments, identity)
+            if require_read and operation not in self._read_operations:
+                raise WorkSourceUnavailable("catalog-mismatch", "required owner read unavailable")
+            read_basis = {"catalog_revision": self._catalog_revision} if require_read else {}
+            response = await self._post(operation, arguments, identity, **read_basis)
         return _unwrap(response, operation)
 
     async def _post(
-        self, operation: str, arguments: dict[str, Any], identity: ForwardedIdentity
+        self, operation: str, arguments: dict[str, Any], identity: ForwardedIdentity,
+        *, catalog_revision: str | None = None,
     ) -> httpx.Response:
         envelope = {
             "schema_version": "invocation/v1",
@@ -205,7 +225,7 @@ class ShellWorkSource:
             "request_id": identity.request_id,
             "operation": operation,
             "arguments": arguments,
-            "catalog_revision": self._catalog_revision,
+            "catalog_revision": catalog_revision if catalog_revision is not None else self._catalog_revision,
             "basis_revision": None,
             "idempotency_key": None,
             "repo_id": identity.repo_id,

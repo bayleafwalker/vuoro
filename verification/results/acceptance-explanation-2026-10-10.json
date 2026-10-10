@@ -1,0 +1,105 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.acceptance-explanation",
+  "contract_ref": {
+    "doc_id": "acceptance-explanation-v1",
+    "revision": "sha256:b7c4663a11769842c23fa4bf4909566ee077ae112d76097dd3d00cc89082115a"
+  },
+  "implementation_sha": "2d770035a12bdf319871f6408ac71ec851ba3812",
+  "depth": 2,
+  "environment": {
+    "backend": "actual ASGI shell with synthetic owners; actual production Docker image",
+    "isolation": "disposable fixtures and image only; no customer or Cloud state mutated",
+    "tool_versions": {
+      "python": "3.12.14",
+      "pytest": "8.4.2"
+    }
+  },
+  "execution": {
+    "seed": null,
+    "histories": 3,
+    "bounds": {
+      "new_transport_tests_passed": 32,
+      "full_workspace_passed": 1671,
+      "full_workspace_skipped": 61,
+      "strict_image_checks_passed": 38,
+      "installed_projection_modules_compared": 18,
+      "owner_reads": 4
+    },
+    "faults_exercised": [
+      "denied owner reads",
+      "missing receipt",
+      "changed Release digest",
+      "foreign repository or intent binding",
+      "unbounded or boolean owner item ID",
+      "malformed or duplicate catalog operations",
+      "operation changes from read to write after stale-catalog response",
+      "concurrent catalog refresh before POST",
+      "replayed proof or absent proof on OAuth-bound call",
+      "foreign workspace"
+    ]
+  },
+  "claims": [
+    {
+      "property": "Caller-bound read sequence, conjunctive authority, foreign workspace and OAuth proof/replay refusal",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-mcp-edge/tests/test_acceptance_explanation.py"
+      ]
+    },
+    {
+      "property": "Concurrent catalog refresh cannot substitute a newer revision for checked read semantics; stale write/missing operation is never retried",
+      "result": "concurrency-tested",
+      "evidence": [
+        "packages/vuoro-mcp-edge/tests/test_acceptance_explanation.py:test_concurrent_refresh_cannot_replace_the_checked_read_revision",
+        "packages/vuoro-mcp-edge/tests/test_acceptance_explanation.py:test_stale_catalog_cannot_retry_an_operation_that_is_no_longer_read"
+      ]
+    },
+    {
+      "property": "Redacted P1 projection preserves missing/conflicting links and explicit unavailable sources without upstream messages or private owner content",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-mcp-edge/tests/test_acceptance_explanation.py",
+        "docs/plans/acceptance-explanation-v1.md"
+      ]
+    },
+    {
+      "property": "Actual production resolution installs published projection025 and immutable client012; all18 projection Python modules match the published wheel",
+      "result": "example-tested",
+      "evidence": [
+        "Dockerfile",
+        "packages/vuoro-mcp-edge/pyproject.toml",
+        "scripts/validate_service_image.py"
+      ]
+    },
+    {
+      "property": "Strict MCP protocol and two-workspace isolation against built production image",
+      "result": "example-tested",
+      "evidence": [
+        "scripts/mcp_strict_client.sh"
+      ]
+    },
+    {
+      "property": "Live Cloud scopes and refreshed grants; real Claude/ChatGPT presentation and usability",
+      "result": "unknown",
+      "evidence": [
+        "docs/plans/acceptance-explanation-v1.md"
+      ]
+    }
+  ],
+  "counterexamples": [
+    {
+      "summary": "Malformed or duplicate catalog operations formerly raised TypeError or allowed ambiguous read/write names; repaired parser refuses before POST.",
+      "trace_ref": "packages/vuoro-mcp-edge/tests/test_acceptance_explanation.py:test_malformed_or_ambiguous_catalog_fails_closed"
+    }
+  ],
+  "notes": [
+    "Source and disposable qualification only; full agentops2637 deployment and client acceptance remain open.",
+    "Five wheel builds preceded the full workspace suite and distribution checks; knowledge metadata gate had zero errors.",
+    "61 skips require unconfigured PostgreSQL owner fixtures; this change does not modify domain SQL or migration assets.",
+    "Production image local qualification manifest digest sha256:e9db3a7e28f73cff0efcae11e34553dab609efccaaf12937369d20014c11b2e6; not a published release.",
+    "Projection wheel SHA2566ebd68e0ac9bd13efc19273375b4b10b024832ae85903fc36a2c26a3afbe7b84; installed direct URL and18 module bytes verified separately, not inferred from build logs.",
+    "Independent exact-source review repeated32 targeted tests and verified contracts and installed dependency metadata.",
+    "Concurrency test injects a catalog refresh between semantics checking and POST; it is a deterministic interleaving, not a production load benchmark."
+  ]
+}
