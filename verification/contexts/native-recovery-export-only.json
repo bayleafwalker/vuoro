@@ -1,0 +1,95 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.native-recovery-export-only",
+  "owner_repo": "vuoro",
+  "subject": "incident-local stable-ID append and export boundary",
+  "contract_ref": {
+    "doc_id": "native-recovery",
+    "revision": "sha256:f469e15e5d9300eec0c1a83d9a3247306cb2b818d78c6781535e006b955e081e"
+  },
+  "source_of_truth": "Authored records.jsonl is the incident-local observation history only; owner authority and normal outbox/sync remain in Sprintctl",
+  "depth": 2,
+  "backends": [
+    "POSIX local regular file"
+  ],
+  "actors": [
+    "offline recorder",
+    "concurrent recorder",
+    "explicit exporter"
+  ],
+  "initial_state": [
+    "empty private incident namespace or valid authored prior history",
+    "no service endpoint, credential or owner state"
+  ],
+  "operations": [
+    {
+      "name": "begin or resume private namespace",
+      "actors": [
+        "offline recorder"
+      ]
+    },
+    {
+      "name": "append stable-ID record or retry exact authored payload",
+      "actors": [
+        "offline recorder",
+        "concurrent recorder"
+      ],
+      "synchronization": "flock exclusive around history scan and fsynced append"
+    },
+    {
+      "name": "export preserved history",
+      "actors": [
+        "explicit exporter"
+      ],
+      "synchronization": "flock shared; no owner invocation"
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "one incident-local append-only file with stable authored record identity"
+  },
+  "assumptions": {
+    "isolation": "cooperating processes using flock; current-user regular singly linked file; no hostile same-user inode replacement",
+    "clock": "created_at authored by caller and retained across exact retries; no lease or authority clock",
+    "fairness": "no availability guarantee after corrupt/incomplete history; preserve and inspect"
+  },
+  "bounds": {
+    "concurrent_processes": 2,
+    "lost_reply_exit_code": 73,
+    "partial_write_exit_code": 74
+  },
+  "invariants": [
+    "exact same-ID authored retry adds no row",
+    "changed payload under existing ID refuses without changing authored bytes",
+    "incomplete/corrupt/foreign/duplicate-ID history remains unchanged and cannot append/export",
+    "only current-user private regular singly linked store accepted",
+    "export cannot submit, apply, settle or create a generic outbox"
+  ],
+  "faults": [
+    "concurrent same-ID retry",
+    "process exit after fsync before reply",
+    "process exit during partial write",
+    "symlink or hardlink/FIFO/directory store",
+    "malformed/foreign/duplicate history",
+    "JSON type drift and invalid authored JSON",
+    "POSIX locking unavailable at use"
+  ],
+  "oracles": [
+    "vuoro.client.tests: history bytes unchanged on retry/refusal and exactly one row for concurrent retry",
+    "vuoro.boundaries: client wheel remains transport-only with no domain adapter, driver, authority or migration",
+    "test_crash_after_fsync_before_reply_retries_original_record",
+    "test_crash_during_write_preserves_incomplete_tail_and_refuses_retry"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-client/src/vuoro_client/recovery.py:RecoveryLog.begin",
+    "packages/vuoro-client/src/vuoro_client/recovery.py:RecoveryLog.append",
+    "packages/vuoro-client/src/vuoro_client/recovery.py:RecoveryLog._read_records",
+    "packages/vuoro-client/src/vuoro_client/recovery.py:RecoveryLog.export",
+    "packages/vuoro-client/tests/test_recovery_log.py"
+  ],
+  "expansions": [
+    "semantic-doc",
+    "concurrent-history",
+    "fault-scenario"
+  ]
+}

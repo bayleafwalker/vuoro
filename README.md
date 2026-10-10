@@ -128,6 +128,10 @@ $ uv run --package vuoro-client vuoro-client --help
 usage: vuoro [-h] [--version] {recovery} ...
 ```
 
+The retained offline recovery namespace is export-only. See the
+[native incident recovery runbook](docs/architecture/native-recovery.md) for
+private local storage, interrupted append handling and explicit owner review.
+
 `vuoro-service mcp-serve --port 8081` runs the MCP protocol server for hosted
 runtimes; it needs `packages/vuoro-mcp-edge` installed (the image has it) and
 is described in [`packages/vuoro-mcp-edge/README.md`](packages/vuoro-mcp-edge/README.md).
