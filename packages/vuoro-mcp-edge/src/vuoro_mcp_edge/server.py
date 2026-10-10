@@ -322,6 +322,11 @@ def create_edge_app(
     def _bucket_authority(bucket: str) -> str | None:
         return SCOPE_AUTHORITIES.get(bucket) or BUCKET_AUTHORITIES.get(bucket)
 
+    def _required_authorities(name: str) -> frozenset[str]:
+        primary = _bucket_authority(_tool_bucket(name) or "")
+        additional = toolset_specs[name].required_authorities if name in toolset_specs else frozenset()
+        return frozenset({primary} if primary is not None else ()) | additional
+
     def _app_callable_tools() -> list[str]:
         return [
             name
@@ -351,7 +356,7 @@ def create_edge_app(
 
         listed: list[dict[str, Any]] = []
         for name in _app_callable_tools():
-            if _bucket_authority(_tool_bucket(name) or "") not in identity.authorities:
+            if not _required_authorities(name) <= identity.authorities:
                 continue
             definition = await _served_definition(name)
             if definition is not None:
@@ -359,12 +364,7 @@ def create_edge_app(
         return listed
 
     def _app_allowed_authorities() -> frozenset[str]:
-        buckets = {_tool_bucket(name) for name in _app_callable_tools()}
-        return frozenset(
-            authority
-            for authority in (_bucket_authority(bucket) for bucket in buckets if bucket)
-            if authority
-        )
+        return frozenset().union(*(_required_authorities(name) for name in _app_callable_tools()))
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -541,7 +541,7 @@ def create_edge_app(
         # authority learns nothing about the tool's arguments.
         scope = _tool_bucket(name) or ""
         authority = _bucket_authority(scope)
-        if authority is None or authority not in identity.authorities:
+        if authority is None or not _required_authorities(name) <= identity.authorities:
             raise _ToolFailure(
                 "authority-required",
                 f"the caller's assertion lacks the {scope} scope authority",
