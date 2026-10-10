@@ -223,11 +223,11 @@ else:
         response=client.get('/api/meta/v1/handshake',headers={'X-Vuoro-Client-Protocol':'1'})
         assert response.status_code==200,response.json()
         handshake=response.json()
-        assert handshake['service_version']=='0.1.91' and handshake['compatibility']['state']=='compatible'
+        assert handshake['service_version']=='0.1.92' and handshake['compatibility']['state']=='compatible'
         assert all(x['state']=='compatible' for x in handshake['compatibility']['domains'].values())
         catalog=client.get('/api/catalog/v1',headers={'X-Vuoro-Client-Protocol':'1'}).json()
-        assert len(catalog['operations'])==84
-        assert handshake['catalog_revision']=='34bfecbd111479f4663f2c0b0baa42ebb3596f985491271a613785b227861652'
+        assert len(catalog['operations'])==85
+        assert handshake['catalog_revision']=='4230516fcb775d72e14dfa774c8395a9f50ad5b640ccd9134648a8c659f22af3'
         response=client.get('/health/ready')
         assert response.status_code==200
     with psycopg.connect(runtime) as conn:
@@ -257,7 +257,7 @@ else:
             response=client.post('/api/invoke/v1',headers={'X-Vuoro-Client-Protocol':'1',
                 'Authorization':'Bearer '+'a'*40},json={'schema_version':'invocation/v1',
                 'request_id':uuid.uuid4().hex,'repo_id':'agentops',
-                'catalog_revision':'34bfecbd111479f4663f2c0b0baa42ebb3596f985491271a613785b227861652',
+                'catalog_revision':'4230516fcb775d72e14dfa774c8395a9f50ad5b640ccd9134648a8c659f22af3',
                 'operation':operation,'arguments':arguments})
             assert response.status_code==200,response.json()
             return response.json()['result']

@@ -53,7 +53,7 @@ def attempt_owner(request):
         assert_installed_composition()
     from importlib.metadata import version
     from sprintctl.vuoro_adapter import catalog_operation_specs, register_work_catalog, WORK_OPERATION_CONTRACTS
-    assert version('sprintctl') == '0.17.0'
+    assert version('sprintctl') == '0.18.0'
     enabled = {x['name']:x for x in catalog_operation_specs(resource_schema_available=True)}
     disabled = {x['name']:x for x in catalog_operation_specs(resource_schema_available=False)}
     assert all(enabled[op] == disabled[op] for op in OPERATIONS)
