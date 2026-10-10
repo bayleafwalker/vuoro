@@ -21,7 +21,9 @@ Catalog availability requires all four operation names with read execution
 semantics. The invocation transport checks those semantics before sending a
 read, including after its existing one stale-catalog refresh. A refreshed
 catalog that omits the operation or marks it as a write refuses before a
-retry POST. Existing ordinary invocation behavior is unchanged.
+retry POST. Each POST carries the exact catalog revision whose semantics were
+checked, even if another request refreshes shared catalog metadata while that
+POST is in flight. Existing ordinary invocation behavior is unchanged.
 
 The edge builds an in-memory P1 capture, invokes the released owner's
 `reconstruct(..., live=True)`, and emits only `portable_acceptance.present`
