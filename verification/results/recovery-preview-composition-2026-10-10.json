@@ -1,0 +1,94 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.recovery-preview-composition",
+  "contract_ref": {
+    "doc_id": "recovery-preview-composition",
+    "revision": "sha256:8c7a04c3d7fdd73f74bb6f62d3111f958763fb979949e7a600b43042e1343dcc"
+  },
+  "implementation_sha": "45b3e82b254265e9fea4e86eaa20d1c21cd77035",
+  "depth": 2,
+  "environment": {
+    "backend": "actual immutable installed owner/shared wheels and locally built service/client wheels; disposable PostgreSQL16",
+    "isolation": "loopback disposable roles/databases; no production endpoint or state",
+    "tool_versions": {
+      "python": "3.12.14",
+      "pytest": "8.4.2"
+    }
+  },
+  "execution": {
+    "seed": null,
+    "histories": 3,
+    "bounds": {
+      "installed_http_passed": 47,
+      "schema21_upgrade_passed": 8,
+      "full_workspace_passed": 1622,
+      "full_workspace_skipped": 61,
+      "four_wheels_built": true
+    },
+    "faults_exercised": [
+      "missing authority",
+      "idempotency key on read",
+      "stale composition expectations",
+      "invalid input and role-separated migration refusal"
+    ]
+  },
+  "claims": [
+    {
+      "property": "Exact owner release closure with unchanged79 previous work definitions and additive read preview; 80work/5audit catalog",
+      "result": "example-tested",
+      "evidence": [
+        "scripts/validate_released_work_adapter.py",
+        "scripts/validate_released_catalog_composition.py",
+        "packages/vuoro-service/composition/adapter-pins.json"
+      ]
+    },
+    {
+      "property": "Actual installed service preview defaults redacted, accepts explicit paths, refuses missing authority/idempotency key, and preserves observed intent",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/tests/conformance/test_bound_proposal_http.py:test_released_preview_is_read_only_redacted_and_authority_scoped"
+      ]
+    },
+    {
+      "property": "Published owner bound proposal, evidence and attempt guards pass through installed shell",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/tests/conformance/test_bound_proposal_http.py",
+        "packages/vuoro-service/tests/conformance/test_evidence_evaluation_http.py",
+        "packages/vuoro-service/tests/conformance/test_effect_attempt_http.py"
+      ]
+    },
+    {
+      "property": "Existing explicit role-separated schema21 to22 migration retains runtime DDL refusal and compatible installed85operation catalog",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/tests/conformance/test_schema22_composition_migration.py"
+      ]
+    },
+    {
+      "property": "Client recovery protocol, wheel boundaries and neutral client/service HTTP gates retain compatibility",
+      "result": "example-tested",
+      "evidence": [
+        "verification/results/native-recovery-export-only-2026-10-10.json",
+        "tests/test_distribution_boundaries.py",
+        "scripts/validate_served_conformance.py",
+        "scripts/validate_release_contract.py"
+      ]
+    },
+    {
+      "property": "Production deployment or owner completion under this candidate",
+      "result": "unknown",
+      "evidence": [
+        "docs/architecture/recovery-preview-composition.md"
+      ]
+    }
+  ],
+  "counterexamples": [],
+  "notes": [
+    "Actual anonymous downloaded owner wheel SHA matches immutable pin; installed pip check passes with owner-required kit0.2.0 rather than workspacekit0.2.1.",
+    "All79 prior owner operation specifications compared against prior installed0.17wheel; no removals or changes, exactly one read addition.",
+    "Full workspace skips are unconfigured PostgreSQL extras; separate installed47HTTP and8upgrade tests executed against disposablePG.",
+    "No production, served, deployment or task closure action performed.",
+    "implementation_sha identifies source/context commit; result is a subsequent evidence-only commit."
+  ]
+}
