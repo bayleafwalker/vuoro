@@ -1,5 +1,12 @@
 FROM python:3.12-slim
 
+# The released work owner's declared-change preview parses an untrusted diff
+# with `git apply --numstat` in an isolated temporary directory. The slim base
+# omits Git; without it the read safely reports unavailable for every intent.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     VUORO_COMPOSITION_MANIFEST=/opt/vuoro/composition/adapter-pins.json \
@@ -10,6 +17,7 @@ WORKDIR /srv/vuoro
 
 COPY scripts/fetch_pinned_adapters.py /usr/local/bin/fetch-pinned-adapters
 COPY scripts/attest_installed_composition.py /usr/local/bin/attest-installed-composition
+COPY scripts/validate_service_image_preview.py /usr/local/bin/validate-service-image-preview
 COPY packages/vuoro-service/composition/adapter-pins.json /opt/vuoro/composition/adapter-pins.json
 COPY packages/vuoro-service/composition/project-bindings.json /opt/vuoro/composition/project-bindings.json
 RUN python /usr/local/bin/fetch-pinned-adapters /opt/vuoro/composition/adapter-pins.json /opt/vuoro/adapters
@@ -40,6 +48,9 @@ RUN python -m pip install --no-cache-dir "psycopg[binary]>=3.2,<4" "click>=8.1" 
         /opt/vuoro/composition/installed-composition.json
 
 USER 65532:65532
+# Build-time qualification also runs as the service UID. A missing Git binary
+# or a parser that stops redacting/refusing malformed input fails the image.
+RUN python /usr/local/bin/validate-service-image-preview
 EXPOSE 8080
 ENTRYPOINT ["vuoro-service"]
 CMD ["serve", "--host", "0.0.0.0", "--port", "8080"]

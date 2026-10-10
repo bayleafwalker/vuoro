@@ -317,6 +317,8 @@ jobs:
             - check "${names[@]}" < scripts/validate_service_image.py
       - name: Check installed dependencies are consistent
         run: docker run --rm --entrypoint python vuoro-service:ci -m pip check
+      - name: Check installed declared-change preview under the service UID
+        run: docker run -i --rm --entrypoint python vuoro-service:ci - < scripts/validate_service_image_preview.py
       - name: Check the image serves the MCP edge
         run: docker run --rm vuoro-service:ci mcp-serve --help
 
