@@ -32,6 +32,10 @@ PREVIEW_OPS = frozenset({EFFECT, ITEM, RELEASE, DECISIONS, LEASES})
 DELTA_OPS = frozenset({ITEM, RELEASE, DECISIONS, NEXT})
 HEX = re.compile(r"^[0-9a-f]{64}$")
 SHA = re.compile(r"^sha256:[0-9a-f]{64}$")
+EDIT_REVISION = re.compile(r"^item:[0-9a-fA-F-]{36}@description:v[0-9]+@sha256:[0-9a-f]{64}$")
+RELEASE_REVISION = re.compile(r"^item:[0-9a-fA-F-]{36}@description:v[0-9]+@sha256:[0-9a-f]{64}@revise:[0-9]+$")
+DECISION_KINDS = frozenset({"accept", "reject", "withdraw", "supersede", "revise"})
+INTENT_CONTENT = ("item_id", "repository", "base_commit", "title", "rationale", "unified_diff")
 MAX_DECISIONS = 20
 MAX_REFS = 100
 MAX_OBLIGATIONS = 64
@@ -64,7 +68,7 @@ _DELTA = {
         "Read-only, currently authorized owner facts for an ordinary work "
         "identifier. A supplied baseline is comparison data, not proof or a "
         "capability. Shows changed work revision, Decision, Release and "
-        "reference identities, plus an owner-derived unacknowledged checkpoint "
+        "reference count, plus an owner-derived unacknowledged checkpoint "
         "when available. Source content and revision remain unknown without "
         "a pinned source manifest. Does not claim, settle or suggest action."
     ),
@@ -77,7 +81,7 @@ _DELTA = {
             "terminal_decision_id": {"type": ["integer", "null"]},
             "latest_decision_id": {"type": ["integer", "null"]},
             "release_digest": {"type": ["string", "null"]},
-            "reference_ids": {"type": "array", "items": {"type": "string"}},
+            "reference_count": {"type": "integer", "minimum": 0, "maximum": MAX_REFS},
         }, "additionalProperties": False},
     }, "required": ["work_link"], "additionalProperties": False},
     "annotations": _READ_ONLY,
@@ -128,9 +132,10 @@ def _parse_delta(args: dict[str, Any]) -> dict[str, Any]:
         raise ToolFailure("invalid-arguments", "work_link must be an ordinary work id")
     baseline = args.get("baseline")
     if baseline is not None:
-        if type(baseline) is not dict or set(baseline) - {"item_revision", "terminal_decision_id", "latest_decision_id", "release_digest", "reference_ids"}:
+        if type(baseline) is not dict or set(baseline) - {"item_revision", "terminal_decision_id", "latest_decision_id", "release_digest", "reference_count"}:
             raise ToolFailure("invalid-arguments", "invalid baseline")
-        if "item_revision" in baseline and not _safe_text(baseline["item_revision"], limit=256):
+        if "item_revision" in baseline and (type(baseline["item_revision"]) is not str
+                or EDIT_REVISION.fullmatch(baseline["item_revision"]) is None):
             raise ToolFailure("invalid-arguments", "invalid baseline item revision")
         for field in ("terminal_decision_id", "latest_decision_id"):
             decision = baseline.get(field)
@@ -139,11 +144,9 @@ def _parse_delta(args: dict[str, Any]) -> dict[str, Any]:
         release = baseline.get("release_digest")
         if "release_digest" in baseline and release is not None and not _digest(release):
             raise ToolFailure("invalid-arguments", "invalid baseline Release digest")
-        refs = baseline.get("reference_ids")
-        if "reference_ids" in baseline and (type(refs) is not list or len(refs) > MAX_REFS
-                or any(type(ref) is not str or SHA.fullmatch(ref) is None for ref in refs)
-                or len(refs) != len(set(refs))):
-            raise ToolFailure("invalid-arguments", "invalid baseline reference ids")
+        refs = baseline.get("reference_count")
+        if "reference_count" in baseline and (type(refs) is not int or not 0 <= refs <= MAX_REFS):
+            raise ToolFailure("invalid-arguments", "invalid baseline reference count")
     return {"work_id": link["id"], "baseline": baseline}
 
 
@@ -171,11 +174,15 @@ class _OwnerReads:
         return self._advertised is not None and operations <= self._advertised
 
     async def read(self, operation: str, args: dict[str, Any], caller: ForwardedIdentity,
-                   *, optional_missing: bool = False) -> dict[str, Any] | None:
+                   *, optional_missing: bool = False,
+                   trace: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
         try:
             value = await self.source._invoke(operation, args, caller)
         except WorkSourceUnavailable as error:
             if optional_missing and error.code == "release-not-found":
+                if trace is not None:
+                    trace.append({"operation": operation, "status": "missing",
+                                  "received_at": datetime.now(timezone.utc).isoformat()})
                 return None
             if error.code in {"item-not-found", "effect-not-found", "work-not-found"}:
                 raise ToolFailure("work-not-found", "no authorized owner record was found") from error
@@ -187,15 +194,45 @@ class _OwnerReads:
         if operation == NEXT:
             # This owner aggregate is already scoped by the invocation's
             # repo_id, but its published result schema has no repo_id field.
-            if type(value) is not dict or type(value.get("sprint")) is not dict or value["sprint"].get("id") != args["sprint_id"]:
+            if (type(value) is not dict or type(value.get("sprint")) is not dict
+                    or type(value["sprint"].get("id")) is not int
+                    or value["sprint"]["id"] != args["sprint_id"]):
                 raise _bad_owner()
-            return value
-        return _object(value, repo_id=caller.repo_id)
+        else:
+            value = _object(value, repo_id=caller.repo_id)
+        if trace is not None:
+            entry: dict[str, Any] = {"operation": operation, "status": "observed",
+                                     "received_at": datetime.now(timezone.utc).isoformat()}
+            if operation == EFFECT and type(value.get("intent")) is dict:
+                effect = value["intent"]
+                if _positive(effect.get("revision")):
+                    entry["effect_revision"] = effect["revision"]
+                if _digest(effect.get("canonical_intent_digest")):
+                    entry["effect_digest"] = effect["canonical_intent_digest"]
+            elif operation == ITEM and type(value.get("item")) is dict:
+                revision = value["item"].get("edit_revision")
+                if type(revision) is str and EDIT_REVISION.fullmatch(revision):
+                    entry["item_edit_revision"] = revision
+            elif operation == RELEASE and type(value.get("release")) is dict:
+                release = value["release"]
+                revision = release.get("item_revision")
+                if type(revision) is str and RELEASE_REVISION.fullmatch(revision):
+                    entry["release_item_revision"] = revision
+                if _digest(release.get("release_digest")):
+                    entry["release_digest"] = release["release_digest"]
+            elif operation == DECISIONS and type(value.get("decisions")) is list:
+                rows = value["decisions"]
+                if rows and type(rows[-1]) is dict and _positive(rows[-1].get("id")):
+                    entry["latest_decision_id"] = rows[-1]["id"]
+            trace.append(entry)
+        return value
 
 
 def _item(value: dict[str, Any], work_id: int) -> dict[str, Any]:
     item = value.get("item")
-    if type(item) is not dict or item.get("id") != work_id or not _safe_text(item.get("edit_revision"), limit=256):
+    revision = item.get("edit_revision") if type(item) is dict else None
+    if (type(item) is not dict or type(item.get("id")) is not int or item["id"] != work_id
+            or type(revision) is not str or EDIT_REVISION.fullmatch(revision) is None):
         raise _bad_owner()
     return item
 
@@ -204,15 +241,17 @@ def _release(value: dict[str, Any] | None, work_id: int) -> dict[str, Any] | Non
     if value is None:
         return None
     release = value.get("release")
-    if (type(release) is not dict or release.get("work_item_id") != work_id
+    if (type(release) is not dict or type(release.get("work_item_id")) is not int
+            or release["work_item_id"] != work_id
             or not _digest(release.get("release_digest"))
-            or not _safe_text(release.get("item_revision"), limit=256)):
+            or type(release.get("item_revision")) is not str
+            or RELEASE_REVISION.fullmatch(release["item_revision"]) is None):
         raise _bad_owner()
     return release
 
 
 def _decisions(value: dict[str, Any], work_id: int) -> dict[str, Any]:
-    if value.get("item_id") != work_id or type(value.get("decisions")) is not list:
+    if type(value.get("item_id")) is not int or value["item_id"] != work_id or type(value.get("decisions")) is not list:
         raise _bad_owner()
     return value
 
@@ -224,7 +263,7 @@ def _decision_rows(value: dict[str, Any]) -> tuple[list[dict[str, Any]], int]:
         if type(row) is not dict or not _positive(row.get("id")):
             raise _bad_owner()
         kind = row.get("kind")
-        if not _safe_text(kind, limit=50):
+        if type(kind) is not str or kind not in DECISION_KINDS:
             raise _bad_owner()
         digests = row.get("evidence_digests") or []
         if type(digests) is not list or len(digests) > MAX_OBLIGATIONS or any(not _digest(d) for d in digests):
@@ -235,23 +274,42 @@ def _decision_rows(value: dict[str, Any]) -> tuple[list[dict[str, Any]], int]:
     return selected, len(rows)
 
 
-def _references(item_value: dict[str, Any]) -> list[str]:
+def _reference_count(item_value: dict[str, Any]) -> int:
     # A Release freezes older refs; current item refs are the continuation
     # input. The Release digest remains a separate frozen checkpoint.
     refs = item_value.get("refs")
     if type(refs) is not list or len(refs) > MAX_REFS:
         raise ToolFailure("owner-result-too-large", "the reference set exceeds this read contract")
-    identities = []
     for ref in refs:
         if type(ref) is not dict or any(type(ref.get(key)) is not str for key in ("ref_type", "url")):
             raise _bad_owner()
-        identities.append(_sha({"type": ref["ref_type"], "url": ref["url"], "label": ref.get("label") or ""}))
-    return sorted(set(identities))
+    return len(refs)
 
 
-def _observed_sources(operations: list[tuple[str, str]]) -> list[dict[str, str]]:
-    # The owner operations do not expose a common transaction timestamp.
-    return [{"operation": op, "status": status} for op, status in operations]
+def _checkpoint_time(value: Any) -> str | None:
+    if type(value) is not str or len(value) > 40:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return value if parsed.tzinfo is not None and parsed.utcoffset() is not None else None
+
+
+def _verify_intent_content(intent: dict[str, Any]) -> None:
+    """Check the frozen Sprintctl digest domain, not an acceptance verdict."""
+    if (not _positive(intent.get("item_id"))
+            or any(type(intent.get(key)) is not str for key in INTENT_CONTENT if key != "item_id")):
+        raise _bad_owner()
+    try:
+        content = {"schema": "sprintctl-effect-intent/v1",
+                   **{key: intent[key] for key in INTENT_CONTENT}}
+        computed = hashlib.sha256(json.dumps(content, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False).encode("utf-8")).hexdigest()
+    except (TypeError, ValueError, UnicodeError):
+        raise _bad_owner() from None
+    if computed != intent.get("canonical_intent_digest"):
+        raise _bad_owner()
 
 
 def build_toolset(context: ToolsetContext) -> ToolSet:
@@ -265,29 +323,39 @@ def build_toolset(context: ToolsetContext) -> ToolSet:
 
     async def preview(args: dict[str, Any], caller: ForwardedIdentity) -> dict[str, Any]:
         read_started_at = datetime.now(timezone.utc).isoformat()
-        effect_value = await owner.read(EFFECT, {"intent_id": args["intent_id"]}, caller)
+        trace: list[dict[str, Any]] = []
+        effect_value = await owner.read(EFFECT, {"intent_id": args["intent_id"]}, caller, trace=trace)
         intent = effect_value.get("intent") if effect_value else None
         if (type(intent) is not dict or intent.get("intent_id") != args["intent_id"]
                 or not _positive(intent.get("item_id")) or not _positive(intent.get("revision"))
                 or not _digest(intent.get("canonical_intent_digest"))):
             raise _bad_owner()
+        _verify_intent_content(intent)
         work_id = intent["item_id"]
-        item_value = await owner.read(ITEM, {"item_id": work_id}, caller)
+        item_value = await owner.read(ITEM, {"item_id": work_id}, caller, trace=trace)
         item = _item(item_value, work_id)
-        release_value = await owner.read(RELEASE, {"item_id": work_id}, caller, optional_missing=True)
+        release_value = await owner.read(RELEASE, {"item_id": work_id}, caller,
+                                         optional_missing=True, trace=trace)
         release = _release(release_value, work_id)
-        decision_value = _decisions(await owner.read(DECISIONS, {"item_id": work_id}, caller), work_id)
-        lease_value = await owner.read(LEASES, {"item_id": work_id}, caller)
+        decision_value = _decisions(await owner.read(DECISIONS, {"item_id": work_id}, caller,
+                                                     trace=trace), work_id)
+        lease_value = await owner.read(LEASES, {"item_id": work_id}, caller, trace=trace)
         if lease_value.get("item_id") != work_id:
             raise _bad_owner()
         # A second exact owner read catches common mid-read moves. This is
         # still a read sequence, never an atomic transaction.
-        effect_after = await owner.read(EFFECT, {"intent_id": args["intent_id"]}, caller)
-        item_after = _item(await owner.read(ITEM, {"item_id": work_id}, caller), work_id)
+        effect_after = await owner.read(EFFECT, {"intent_id": args["intent_id"]}, caller,
+                                        trace=trace)
+        if type(effect_after.get("intent")) is not dict:
+            raise _bad_owner()
+        _verify_intent_content(effect_after["intent"])
+        item_after = _item(await owner.read(ITEM, {"item_id": work_id}, caller,
+                                            trace=trace), work_id)
         release_after = _release(await owner.read(RELEASE, {"item_id": work_id}, caller,
-                                                   optional_missing=True), work_id)
-        decision_after = _decisions(await owner.read(DECISIONS, {"item_id": work_id}, caller), work_id)
-        lease_after = await owner.read(LEASES, {"item_id": work_id}, caller)
+                                                   optional_missing=True, trace=trace), work_id)
+        decision_after = _decisions(await owner.read(DECISIONS, {"item_id": work_id}, caller,
+                                                     trace=trace), work_id)
+        lease_after = await owner.read(LEASES, {"item_id": work_id}, caller, trace=trace)
         owner_basis = {"intent_id": intent["intent_id"], "revision": intent["revision"],
                        "canonical_intent_digest": intent["canonical_intent_digest"],
                        "item_id": work_id, "item_revision": item["edit_revision"],
@@ -318,10 +386,10 @@ def build_toolset(context: ToolsetContext) -> ToolSet:
         if checks is not None and (type(checks) is not list or len(checks) > MAX_CHECKS):
             raise _bad_owner()
         check_revisions = []
-        for check in checks or []:
+        for index, check in enumerate(checks or [], 1):
             if type(check) is not dict or not _safe_text(check.get("name")) or type(check.get("revision")) is not str or SHA.fullmatch(check["revision"]) is None:
                 raise _bad_owner()
-            check_revisions.append({"name_id": _sha(check["name"]), "revision": check["revision"],
+            check_revisions.append({"index": index, "revision": check["revision"],
                                     "owner_reported_status": check.get("status") if check.get("status") in ("passed", "failed") else "unknown"})
         observed_digests = sorted({digest for row in rows for digest in row["evidence_digests"]})
         evidence_digest = verification.get("evidence_digest") if verification else None
@@ -331,6 +399,8 @@ def build_toolset(context: ToolsetContext) -> ToolSet:
             observed_digests.append(evidence_digest)
         report = {"schema": "vuoro-acceptance-preview/v1", "authority": "sprintctl-owner-reads",
                   "authorizes_acceptance": False, "snapshot_is_permit": False,
+                  "snapshot_domain": "redacted-owner-projection/v1",
+                  "intent_content_integrity": "matches-frozen-owner-digest-domain",
                   "consistency": "non-atomic-owner-read-sequence",
                   "basis_status": "unstable" if not stable else "historical" if not matches or (release and (not release_revision_current or not release_bound)) else "matching" if release else "unknown",
                   "requested_basis": expected, "owner_basis": owner_basis,
@@ -346,26 +416,24 @@ def build_toolset(context: ToolsetContext) -> ToolSet:
                   "lease_verification_record": "present" if lease_value.get("verification") is not None else "missing",
                   "read_started_at": read_started_at,
                   "read_completed_at": datetime.now(timezone.utc).isoformat(),
-                  "sources": _observed_sources([(EFFECT, "observed"), (ITEM, "observed"),
-                      (RELEASE, "observed" if release else "missing"), (DECISIONS, "observed"),
-                      (LEASES, "observed"), (EFFECT, "observed"), (ITEM, "observed"),
-                      (RELEASE, "observed" if release_after else "missing"),
-                      (DECISIONS, "observed"), (LEASES, "observed")])}
+                  "sources": trace}
         report["snapshot_id"] = _sha({k: v for k, v in report.items() if k not in {"sources", "snapshot_id", "read_started_at", "read_completed_at"}})
         return report
 
     async def delta(args: dict[str, Any], caller: ForwardedIdentity) -> dict[str, Any]:
         read_started_at = datetime.now(timezone.utc).isoformat()
+        trace: list[dict[str, Any]] = []
         work_id = args["work_id"]
-        item_value = await owner.read(ITEM, {"item_id": work_id}, caller)
+        item_value = await owner.read(ITEM, {"item_id": work_id}, caller, trace=trace)
         item = _item(item_value, work_id)
-        decisions = _decisions(await owner.read(DECISIONS, {"item_id": work_id}, caller), work_id)
+        decisions = _decisions(await owner.read(DECISIONS, {"item_id": work_id}, caller,
+                                                trace=trace), work_id)
         release = _release(await owner.read(RELEASE, {"item_id": work_id}, caller,
-                                            optional_missing=True), work_id)
+                                            optional_missing=True, trace=trace), work_id)
         sprint_id = item.get("sprint_id")
         if not _positive(sprint_id):
             raise _bad_owner()
-        explain = await owner.read(NEXT, {"sprint_id": sprint_id}, caller)
+        explain = await owner.read(NEXT, {"sprint_id": sprint_id}, caller, trace=trace)
         checkpoints = explain.get("checkpointed_unacked") if explain else None
         if type(checkpoints) is not list:
             raise _bad_owner()
@@ -377,7 +445,7 @@ def build_toolset(context: ToolsetContext) -> ToolSet:
             row = selected[0]
             if not _positive(row.get("checkpoint_note_id")):
                 raise _bad_owner()
-            checkpoint = {"note_id": row["checkpoint_note_id"], "created_at": row.get("created_at"),
+            checkpoint = {"note_id": row["checkpoint_note_id"], "created_at": _checkpoint_time(row.get("created_at")),
                           "release_digest": row.get("release_digest") if _digest(row.get("release_digest")) else None,
                           "git_sha": row.get("sha") if type(row.get("sha")) is str and re.fullmatch(r"[0-9a-f]{40}", row["sha"]) else None,
                           "state": "owner-derived-unacknowledged", "source_content": "not-disclosed"}
@@ -386,53 +454,56 @@ def build_toolset(context: ToolsetContext) -> ToolSet:
                    "terminal_decision_id": decisions.get("terminal_decision_id"),
                    "latest_decision_id": rows[-1]["id"] if rows else None,
                    "release_digest": release["release_digest"] if release else None,
-                   "reference_ids": _references(item_value)}
+                   "reference_count": _reference_count(item_value)}
         if current["terminal_decision_id"] is not None and not _positive(current["terminal_decision_id"]):
             raise _bad_owner()
         baseline = args["baseline"]
         comparison = {key: "unknown" if baseline is None or key not in baseline
                       else "changed" if baseline[key] != current[key] else "unchanged"
                       for key in ("item_revision", "terminal_decision_id", "latest_decision_id", "release_digest")}
-        if baseline is not None and "reference_ids" in baseline:
-            before = set(baseline["reference_ids"])
-            after = set(current["reference_ids"])
-            comparison["reference_ids"] = "changed" if before != after else "unchanged"
-            reference_delta = {"added": sorted(after - before), "removed": sorted(before - after)}
-        else:
-            comparison["reference_ids"] = "unknown"
-            reference_delta = {"added": [], "removed": []}
+        # Equal counts cannot prove equal refs; private URLs and labels stay
+        # opaque until an owner-minted safe reference identifier exists.
+        comparison["reference_count"] = (
+            "changed" if baseline is not None and "reference_count" in baseline
+            and baseline["reference_count"] != current["reference_count"] else "unknown"
+        )
         # Reread item and Decisions: a moving owner cannot become a stable
         # "no change" answer simply because one read preceded a Decision.
-        item_after = _item(await owner.read(ITEM, {"item_id": work_id}, caller), work_id)
-        decisions_after = _decisions(await owner.read(DECISIONS, {"item_id": work_id}, caller), work_id)
+        item_after = _item(await owner.read(ITEM, {"item_id": work_id}, caller,
+                                            trace=trace), work_id)
+        decisions_after = _decisions(await owner.read(DECISIONS, {"item_id": work_id}, caller,
+                                                      trace=trace), work_id)
         release_after = _release(await owner.read(RELEASE, {"item_id": work_id}, caller,
-                                                  optional_missing=True), work_id)
-        explain_after = await owner.read(NEXT, {"sprint_id": sprint_id}, caller)
+                                                  optional_missing=True, trace=trace), work_id)
+        explain_after = await owner.read(NEXT, {"sprint_id": sprint_id}, caller, trace=trace)
         stable = (item_after == item and decisions_after == decisions and release_after == release
                   and explain_after == explain)
+        if not stable:
+            comparison = {key: "unknown" for key in comparison}
+            if checkpoint is not None:
+                checkpoint["state"] = "provisional-owner-read"
         report = {"schema": "vuoro-work-delta/v1", "authority": "sprintctl-owner-reads",
                   "authorizes_action": False, "consistency": "non-atomic-owner-read-sequence",
+                  "snapshot_domain": "redacted-owner-projection/v1",
                   "read_state": "stable-sequence" if stable else "changed-during-read",
+                  "observed_facts_freshness": "read-sequence-stable-not-currentness-proof" if stable else "provisional",
                   "work_link": {"kind": "work", "id": work_id},
                   "work": {"title": item.get("title") if _safe_text(item.get("title")) else None,
                            "status": item.get("status") if item.get("status") in ("pending", "active", "blocked", "done") else "unknown",
                            "revision": current["item_revision"],
                            "intention_detail": "not-disclosed; title and revision only"},
                   "current": current, "baseline_provenance": "caller-supplied" if baseline is not None else "absent",
-                  "release_item_revision": "matching" if release and release["item_revision"].startswith(item["edit_revision"] + "@revise:") else "missing" if not release else "stale",
-                  "latest_decision": rows[-1] if rows else None,
+                  "release_item_revision": "unknown" if not stable else "matching" if release and release["item_revision"].startswith(item["edit_revision"] + "@revise:") else "missing" if not release else "stale",
+                  "latest_decision": {key: rows[-1][key] for key in ("id", "kind", "release_digest")} if rows else None,
                   "decision_count": decision_count,
                   "decision_rows_truncated": decision_count > len(rows),
-                  "changed": comparison, "reference_delta": reference_delta,
+                  "changed": comparison,
                   "source_revisions": "unknown; no pinned source manifest in owner refs",
-                  "source_content": "not-read", "reference_state": "owner-refs-observed" if current["reference_ids"] else "none-recorded",
+                  "source_content": "not-read", "reference_state": "owner-ref-count-observed" if current["reference_count"] else "none-recorded",
                   "unacknowledged_checkpoint": checkpoint,
                   "read_started_at": read_started_at,
                   "read_completed_at": datetime.now(timezone.utc).isoformat(),
-                  "sources": _observed_sources([(ITEM, "observed"), (DECISIONS, "observed"),
-                      (RELEASE, "observed" if release else "missing"), (NEXT, "observed"),
-                      (ITEM, "observed"), (DECISIONS, "observed"),
-                      (RELEASE, "observed" if release_after else "missing"), (NEXT, "observed")])}
+                  "sources": trace}
         report["snapshot_id"] = _sha({k: v for k, v in report.items() if k not in {"sources", "snapshot_id", "read_started_at", "read_completed_at"}})
         return report
 
