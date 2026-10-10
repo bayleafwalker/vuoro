@@ -1,0 +1,97 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.recovery-preview-composition",
+  "owner_repo": "vuoro",
+  "subject": "published preview adapter and recovery client release compatibility",
+  "contract_ref": {
+    "doc_id": "recovery-preview-composition",
+    "revision": "sha256:8c7a04c3d7fdd73f74bb6f62d3111f958763fb979949e7a600b43042e1343dcc"
+  },
+  "source_of_truth": "immutable owner/shared release wheels and installed service catalog",
+  "depth": 2,
+  "backends": [
+    "installed immutable wheel closure",
+    "disposable PostgreSQL16",
+    "source workspace"
+  ],
+  "actors": [
+    "preview reader",
+    "unprivileged reader",
+    "service runtime",
+    "explicit migration operator"
+  ],
+  "initial_state": [
+    "client0.1.2/service0.1.92 source release candidate",
+    "published Sprintctl0.18.0 with immutable kit0.2.0",
+    "no production state or endpoint"
+  ],
+  "operations": [
+    {
+      "name": "attest and verify released composition",
+      "actors": [
+        "service runtime"
+      ]
+    },
+    {
+      "name": "invoke preview and refusals",
+      "actors": [
+        "preview reader",
+        "unprivileged reader"
+      ],
+      "synchronization": "sequential disposable PostgreSQL history with intent observation before and after"
+    },
+    {
+      "name": "explicit schema21 to22 migration",
+      "actors": [
+        "explicit migration operator"
+      ],
+      "synchronization": "separate runtime and migration roles; existing migration conformance"
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "release identity, read authority and unchanged owner intent"
+  },
+  "assumptions": {
+    "isolation": "disposable loopback PostgreSQL; sequential API histories",
+    "clock": "no new authority clock",
+    "fairness": "none"
+  },
+  "bounds": {
+    "work_operations": 80,
+    "audit_operations": 5,
+    "previous_unchanged_operations": 79,
+    "concurrent_operations": 0
+  },
+  "invariants": [
+    "actual wheel hashes and installed versions match pins",
+    "all previous work operation definitions unchanged",
+    "preview paths redacted by default and explicitly disclosed on request",
+    "preview requires work.effect.get and forbids idempotency key",
+    "preview cannot accept or execute and leaves observed intent unchanged",
+    "service startup owns no domain DDL"
+  ],
+  "faults": [
+    "missing authority",
+    "idempotency key on read",
+    "stale composition expectations",
+    "invalid input and role-separated migration refusal"
+  ],
+  "oracles": [
+    "installed pip check and exact metadata/catalog fingerprints",
+    "test_released_preview_is_read_only_redacted_and_authority_scoped",
+    "existing released bound-proposal/evidence/attempt HTTP conformance",
+    "existing schema21 to22 migration conformance"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-service/composition/adapter-pins.json",
+    "scripts/validate_released_work_adapter.py",
+    "scripts/validate_released_catalog_composition.py",
+    "packages/vuoro-service/tests/conformance/test_bound_proposal_http.py:test_released_preview_is_read_only_redacted_and_authority_scoped",
+    "packages/vuoro-service/tests/conformance/test_schema22_composition_migration.py"
+  ],
+  "expansions": [
+    "semantic-doc",
+    "fault-scenario"
+  ]
+}
