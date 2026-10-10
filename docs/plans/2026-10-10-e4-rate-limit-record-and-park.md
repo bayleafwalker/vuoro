@@ -138,7 +138,22 @@ Accept two optional arguments, passed to the owner as received:
 | Argument | Rule |
 |---|---|
 | `disposition` | Only `"parked"`. Owner enforces: requires `outcome: failed` and `reason_ref`. |
-| `reason_ref` | 1-512 chars, no surrounding whitespace (owner rule). Rate-limit parks use `vuoro-evidence:<run_id>/<entry_digest>`. |
+| `reason_ref` | 1-512 chars, no surrounding whitespace (owner rule). Rate-limit parks use `vuoro-evidence:<run_id>/seq/<chain_seq>` (§4.2.1). |
+
+#### 4.2.1 Evidence reference form
+
+`vuoro-evidence:<run_id>/seq/<chain_seq>`. `chain_seq` is the position the
+owner assigned to the appended entry in that run's evidence chain. It is
+returned in the `append_evidence` result's evidence item, and it is unique
+per run.
+
+Two other values were considered and rejected as the key:
+
+- The entry's `digest` field (the sha256 of the observation, §4.1).
+  Identical observations, such as a retried denial in the same second,
+  would collide.
+- The chain hash `entry_digest`. The edge computes it but never returns it
+  to a caller (`record_tools.py:24-29`), so a worker could not cite it.
 
 Edge-side check: if `reason_ref` starts with `vuoro-evidence:`, the named
 entry must exist in the reporting run's chain with `kind:
@@ -196,9 +211,25 @@ table is a code review, not a runtime switch.
 
 ### 4.6 `parked_reclaim` observation
 
-On a successful `claim_work` for an item whose owner lease read showed a
-parking that cites a `rate_limit_event`, the edge appends to the claiming
-run's chain:
+A parked item cannot be claimed (`work-parked`, 409) until a release to
+pending supersedes the newest `work.parked`. After that release,
+`work.lease.read-v1.parked` is `null`. The trigger therefore reads
+**history**, not the current parking.
+
+The trigger fires on a successful `claim_work` for item I when I's event
+history, read through the owner's item event read, shows all of the
+following:
+
+- an `item-released` (release to pending) event that is the newest release
+  before this claim's lease began
+- that release superseded a `work.parked` event, meaning the `work.parked`
+  is the newest parking older than the release
+- the `work.parked` event's `reason_ref` uses the `vuoro-evidence:` form and
+  resolves to a `rate_limit_event`
+
+If any of these is missing, nothing is recorded: the claim is an ordinary
+claim. Only the most recent park-then-release pair is considered. When the
+trigger fires, the edge appends to the claiming run's chain:
 
 | Field | Value |
 |---|---|
@@ -234,17 +265,28 @@ with the shipped 0.18.0 contract:
 3. **Unresolved ref.** `reason_ref` naming a missing entry, an entry of another
    kind, or another run's entry: `reason-ref-unresolved` / `-foreign-run`, and
    the owner is not called.
-4. **Re-claim by another family.** Release to pending, claim from a run whose
+4. **Re-claim by another family.** Seed the history as `work.parked` (citing
+   a `rate_limit_event` from a `claude-opus-…` run) followed by
+   `item-released` to pending. Claim from a run whose
    `model_id` is `claude-sonnet-…` after a parked `claude-opus-…` run: one
    `parked_reclaim` entry with both families and `same_family: false`; no
-   second active lease exists (owner reports one lease).
+   second active lease exists (owner reports one lease). Negative cases:
+   - a claim whose newest release did not supersede a parking records
+     nothing
+   - a parking whose `reason_ref` is not a `rate_limit_event` ref records
+     nothing
 5. **No selection path.** A static test asserts no module under
    `vuoro_mcp_edge` imports the family table outside the two record writers,
    and that no tool argument or return value names a recommended family.
 6. **No prediction.** `git grep -n 'used_percent\|oauth/usage\|headroom'
-   packages/` returns nothing; a doc lint check that this document and the
-   tool descriptions do not contain "failover", "route" or "predict" outside
-   §2-§3 quoting.
+   packages/` returns nothing. A wording check covers the shipped tool
+   descriptions and their code strings: the `claim_work`, `report_outcome`
+   and `append_evidence` descriptions in `packages/vuoro-mcp-edge/src`. They
+   must not contain "failover", "route", "routing" or "predict".
+
+   The check is scoped to shipped surfaces. Design records, this document
+   included, are out of scope, because they have to name what they rule
+   out.
 
 Cold run: `uv run --package vuoro-mcp-edge --extra test pytest
 packages/vuoro-mcp-edge/tests` and `uv run pytest`.

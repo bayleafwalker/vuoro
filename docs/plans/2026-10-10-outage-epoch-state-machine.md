@@ -47,10 +47,13 @@ Facts that shape the contract:
 - **Clients have one endpoint.** A client profile names exactly one endpoint
   and has no mode or fallback field
   (`vuoro-client/src/vuoro_client/profile.py:30-56`).
-- **Freeze exists.** vuoro.cloud has a global `mutations_frozen` switch; reads
-  stay allowed (`vuoro-cloud:src/vuoro_cloud/gateway.py:203-213`). A freeze
-  set on the tunnel plane is lifted only on the tunnel plane
-  (admin-identity design C2).
+- **Freeze exists, and this design does not use it.** vuoro.cloud's
+  `mutations_frozen` is a single global `service_controls` row
+  (`vuoro-cloud:src/vuoro_cloud/gateway.py:202-211`, `lifecycle.py:706-722`).
+  It sits under "OIDC + explicit operator step-up" (split-horizon Q2), with a
+  tunnel-plane twin that requires a touch and is lifted only on the tunnel
+  plane (admin-identity design C2, A3). No workload identity holds it.
+  Freezing it would also freeze every tenant for one homelab island.
 - **Import surface.** vuoro.cloud has no import or bulk-ingest surface today.
 - **Today is not NORMAL.** Until the Q1(b) cutover, vuoro-shared is
   authoritative for work items (split-horizon §3.3 "Transition"). The state
@@ -58,10 +61,17 @@ Facts that shape the contract:
 
 ## 2. Decision
 
-1. **The authority over work records is single-valued at every instant**:
-   `vuoro.cloud` in NORMAL, the island in DEGRADED LOCAL, and nobody during
-   the RECOVERY seal (reads only on the island). The mode record on the
-   protected side is the source of that value.
+1. **No change is ever written to both stores, and none is merged
+   silently.**
+   - In NORMAL, vuoro.cloud is the only writable store for work records.
+   - In DEGRADED LOCAL, the island accepts epoch-tagged writes.
+   - vuoro.cloud is not fenced: hosted runtimes that can still reach it may
+     keep writing.
+   - At import, an island change reaches vuoro.cloud only as a CAS write
+     against the `base_revision` it was made on. Whenever the cloud moved in
+     the meantime, the cloud value stays and the island change becomes a
+     conflict record.
+   - The mode record on the protected side says which state holds.
 2. **Entering DEGRADED LOCAL is an explicit operator act**, as the frozen
    architecture requires.
    - It is a declaration, not an approval gate. One protected-side command
@@ -74,18 +84,35 @@ Facts that shape the contract:
    - Every work and audit write accepted in DEGRADED LOCAL carries
      `outage_epoch` and the `base_revision` it was written against (the
      cached cloud revision of the item, or `null` for a new item).
-4. **Best-effort freeze of the cloud side.** On entry, if the tunnel plane
-   is reachable, the island sets `mutations_frozen` on vuoro.cloud and
-   records the outcome. Records written on vuoro.cloud during the epoch are
-   not prevented when the freeze fails. They are caught at import as
-   conflicts.
-5. **RECOVERY is automatic once the operator ends the epoch.**
+4. **No cloud-side freeze.** Island mode never sets or lifts
+   `mutations_frozen`.
+   - That switch is global and operator-only by a recorded decision (§1).
+     Using it would either put the operator back into the recovery path or
+     amend #255 Q2.
+   - Neither is needed. The `base_revision` CAS at import already catches
+     every cloud write made during the epoch, item by item.
+   - An epoch-scoped work-write fence, settable by `vuoro-ops`, is a
+     possible later hardening. It would need a recorded amendment to Q2 and
+     the admin-identity design, and it is not part of this contract.
+5. **Exit is a declaration, like entry, and RECOVERY is automatic after
+   it.**
+   - The architecture fixes only that entry is an explicit operator act
+     (§3.3). Exit is made one too, for the same flap reason: if exit fired
+     on a recovered health probe, a flapping probe would seal the epoch while
+     vuoro.cloud is still unusable, and each flap would cut a new epoch with
+     its own import.
+   - Exit is one protected-side command. The island keeps working until it
+     runs, so leaving it to a declaration costs nothing.
+   - A cheap check stands in for an approval: while an epoch is open and the
+     recorded cloud probe has been healthy for more than 6 h, the island
+     appends an `island.overdue` notice to its mode record and readiness
+     view. The notice blocks nothing.
    - The command `island exit` seals the epoch: island work writes stop, and
      a digest-bound export bundle is produced.
    - The protected side pushes the bundle outbound to vuoro.cloud. Pull-only
      direction is preserved: the protected side opens the connection.
    - vuoro.cloud imports it idempotently by `epoch_id` and `bundle_digest`.
-   - The tunnel-plane freeze is lifted, and authority returns to vuoro.cloud.
+   - Authority returns to vuoro.cloud. There is no freeze to lift.
    - No step after `exit` waits on the operator.
 6. **Conflicts are surfaced, never silently merged, and never block the
    import.**
@@ -103,6 +130,8 @@ Facts that shape the contract:
 |---|---|
 | Active-active dual writing, or automatic failover to vuoro-shared | Rejected by the operator decision (§3.3, Q1(c)). It produces two histories with no defined merge. |
 | Automatic entry on failed health probes | Contradicts the frozen "explicit operator act". A flapping probe would split history. |
+| Automatic exit on a recovered health probe | It has the same flap problem in reverse (§2.5). The `island.overdue` notice covers a forgotten exit without acting on it. |
+| Freeze vuoro.cloud (`mutations_frozen`) during the epoch | It is global across tenants and held only by the operator with step-up or touch (#255 Q2, admin-identity C2/A3). An automatic freeze or unfreeze would contradict that placement, and a manual one would put the operator into recovery. The CAS at import makes it unnecessary. |
 | Last-writer-wins merge at import | It is a silent merge, which the architecture forbids. |
 | Block the whole import until every conflict is resolved | That would make the operator, or a resolver, a gate on returning authority. Per-item conflict records cost nothing, and authority can return immediately. |
 | Integer item ids as import keys | They collide across deployments. The aggregate UUID is the key, and integer ids are remapped. |
@@ -126,8 +155,8 @@ NORMAL ────────────────────────�
 | State | vuoro.cloud work writes | vuoro-shared work writes | Reads |
 |---|---|---|---|
 | `NORMAL` | authoritative | refused `island-not-active` (409) | both. The island serves its cached read model and labels it as cached. |
-| `DEGRADED_LOCAL` | best-effort frozen. Any accepted write is a conflict candidate at import. | accepted, tagged `outage_epoch`, `base_revision` | both |
-| `RECOVERY` | frozen until import completes | refused `island-sealed` (409) | both |
+| `DEGRADED_LOCAL` | not fenced. Writes from callers that can reach it are accepted, and each one is a conflict candidate for island changes to the same item. | accepted, tagged `outage_epoch`, `base_revision` | both |
+| `RECOVERY` | not fenced. Writes accepted before the import reaches an item are conflict candidates exactly as in DEGRADED_LOCAL. After the import, the cloud is authoritative. | refused `island-sealed` (409) | both |
 
 RECOVERY has sub-phases: `sealed` (writes stopped, export bundle written),
 `exported` (bundle pushed, awaiting receipt), and `imported` (receipt
@@ -140,12 +169,11 @@ push retries with backoff. No phase waits on a person.
 
 | Field | Type | Notes |
 |---|---|---|
-| `event` | `entered` \| `sealed` \| `exported` \| `imported` \| `returned` | |
+| `event` | `entered` \| `overdue` \| `sealed` \| `exported` \| `imported` \| `returned` | |
 | `epoch_id` | `oe:<ULID>` | Fixed at `entered`. |
 | `actor_principal` | principal_id | Operator principal for `entered` and `sealed`; `vuoro-ops` workload principal for the rest. |
 | `reason` | string | Required on `entered`. |
 | `cloud_probe` | `{url, status, observed_at}` | Recorded on `entered`; never a refusal condition. |
-| `cloud_freeze` | `set` \| `unreachable` \| `failed` | Outcome of the best-effort freeze. |
 | `base_watermark` | `{cloud_cursor, cached_at}` | Age of the island's cached read model at entry. |
 | `bundle_digest` | `sha256:` | On `sealed` and `exported`. |
 | `receipt` | `{import_id, bundle_digest, applied, conflicts}` | On `imported`. |
@@ -153,8 +181,8 @@ push retries with backoff. No phase waits on a person.
 Who may act: `entered` and `sealed` are protected-only operator acts
 (admin-identity design C3: recovery operations are protected-only). They run
 as `vuoro-service island enter|exit` from the workstation or tunnel plane,
-never through a public sign-in. The remaining transitions run as the
-`vuoro-ops` workload identity.
+never through a public sign-in. The remaining transitions, including
+`overdue`, run as the `vuoro-ops` workload identity.
 
 ### 4.3 Epoch-tagged record fields (owner: sprintctl)
 
@@ -252,8 +280,10 @@ Automated:
   3. `exit` → `island-sealed`, and the bundle digest is stable across two
      exports.
   4. **No dual write**: during DEGRADED_LOCAL no request leaves the island
-     for vuoro.cloud other than the freeze call. A test transport asserts
-     this.
+     for vuoro.cloud. A test transport asserts this; the island makes no
+     cloud write calls at all, not even a freeze.
+  5. An open epoch with a cloud probe healthy for more than 6 h → one
+     `overdue` event. Writes are still accepted.
 - sprintctl, `work.island.import-v1` against a seeded "cloud" database:
   1. One untouched item → `apply`.
   2. One item edited on the cloud side during the epoch → `conflict`. The
@@ -287,7 +317,7 @@ Automated:
        CLI in vuoro-service
      - `island_endpoint` routing in vuoro-client
    - **vuoro-cloud:** the protected-origin import route, scope
-     `vuoro:island.import`, and the tunnel-plane freeze call.
+     `vuoro:island.import`.
    - **appservice:** the `vuoro-ops` credential for import and the drill
      wiring.
 3. **The cached read model** on vuoro-shared (needed for `base_revision`)
