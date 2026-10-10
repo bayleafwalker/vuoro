@@ -88,13 +88,29 @@ a reissued principal cannot be told apart from rows its predecessor wrote.
 
 **Authority keyed on the `actor` string (fails falsifier 5):**
 
-- The work-resource observation grant authorizer allows by
-  `(identity.actor, repo_id)` (`vuoro_service/composition.py:555-564`). An
-  observation grant issued while actor `workstation-vuoro` was principal P1
-  is usable by any later principal that carries the same string.
-- The record-actor check (`work_application.py:3058`) and the maintenance
-  envelope identity (`:1280`) compare strings. They are self-attribution
-  checks, and they identify "the same caller" only by string.
+- **Work-resource observation policy.** The policy is static. It is loaded
+  from an immutable `vuoro-work-resource-observers/v1` file whose entries
+  are `{actor, repo_ids}`, and the authorizer allows by
+  `(identity.actor, repo_id)` (`vuoro_service/composition.py:525-564`).
+
+  The authorizer's answer feeds a non-disclosing visibility guard for
+  `work.maintenance-capability` resources
+  (`composition.py:582-588`; owner half
+  `sprintctl:work_application.py:1335-1337`). An unauthorized caller gets
+  no 403; the resource is simply not visible.
+
+  An entry written for actor `workstation-vuoro` while that string was
+  principal P1 makes the resources visible to any later principal that
+  carries the same string.
+- **Maintenance envelope operator.** `_maintenance_prepare` requires the
+  frozen envelope's `operator.identity` to equal `identity.actor`
+  (`work_application.py:1280`; refusal `maintenance-actor-mismatch`, 403).
+  This is a real author check against a previously frozen envelope. A
+  reissued principal with the same string passes it.
+- **Not an authority surface.** `_validate_record`'s check at
+  `work_application.py:3058` is self-attribution on a submitted record:
+  the record's `actor` must equal the caller's `identity.actor`. It is
+  covered by the attribution rule below.
 
 **Principal minting:**
 
@@ -123,14 +139,17 @@ a reissued principal cannot be told apart from rows its predecessor wrote.
 
 **What a reissued actor name inherits today:**
 
-| Reissue form | Runs, leases, idempotency, intents, evidence | Observation grants | Reservations | Event and reservation attribution |
+| Reissue form | Runs, leases, idempotency, intents, evidence | Maintenance-resource visibility (observation policy) and envelope operator | Reservations | Event and reservation attribution |
 |---|---|---|---|---|
 | New token, same actor, **new** principal_id | nothing | **everything** (actor-keyed) | nothing to inherit (advisory) | indistinguishable from the predecessor's rows |
 | New token, same actor, **copied** principal_id | **everything** | **everything** | nothing to inherit | indistinguishable |
 
-**Verdict on current behaviour: fails falsifier 5.** It fails on two
-surfaces: the observation grant authorizer, and the static registry's
-ability to rebind a copied principal_id. Attribution rows are also
+**Verdict on current behaviour: fails falsifier 5.** It fails on three
+surfaces:
+
+- the actor-keyed observation policy
+- the maintenance envelope operator check
+- the static registry's ability to rebind a copied principal_id Attribution rows are also
 ambiguous. That ambiguity is not an authority failure, but it does stop the
 historical record from separating the predecessor from its successor.
 
@@ -146,7 +165,8 @@ historical record from separating the predecessor from its successor.
      from the display string
    - `epoch` is a monotonic integer per `(issuer, subject)`, starting at 0
 
-   Every grant, lease, run, intent and observation grant binds to
+   Every grant, lease, run, intent, observation policy entry and maintenance
+   envelope operator binds to
    `principal_id`.
 2. **The actor string is attribution only.** `actor` is a display label. It
    is recorded alongside `principal_id` and is never compared for
@@ -160,9 +180,13 @@ historical record from separating the predecessor from its successor.
    - Where a caller supplies `actor` today, the check stays: the argument
      must equal `identity.actor`. The written row also records
      `identity.principal_id`, which the caller cannot supply.
-   - Where a check asks whether the caller is the author of an existing
-     record (record-actor :3058, maintenance envelope :1280), it compares
-     `principal_id`, not the string.
+   - Where a check asks whether the caller is the operator named in a
+     previously frozen record, it compares `principal_id`, not the string.
+     Today that is the maintenance envelope (:1280). The envelope's
+     `operator` therefore carries `principal_id`.
+   - `_validate_record` (:3058) stays a self-attribution check. The
+     submitted record's `actor` must equal `identity.actor`, and the stored
+     record also carries `identity.principal_id`.
 5. **External identity binds once to a subject.**
    - vuoro.cloud binds the GitHub numeric id UNIQUE to one `users.id`
      subject. A login rename changes nothing.
@@ -187,7 +211,8 @@ cannot acquire historical ownership or authority. Three mechanisms
 guarantee it:
 
 - a non-reusable `principal_id`, distinct from the display string, is the
-  only authority key, and that includes observation grants
+  only authority key, and that includes observation policy entries and
+  maintenance envelope operators
 - reissue is an explicit `principal.retired` record plus a new epoch
 - the loader refuses to rebind a retired or differently fingerprinted
   principal
@@ -213,14 +238,16 @@ scopes:
 
 | # | Change | Owner repo | Must land before |
 |---|---|---|---|
-| C1 | Add a nullable `principal_id` to `reservation` and `event`, and `previous_principal` to the reassignment payload. New rows record `identity.principal_id`. The record-actor and maintenance-envelope author checks compare `principal_id`. No reservation holder enforcement is added. | sprintctl | Any second credential bearing an existing actor string is issued. |
-| C2 | The observation grant authorizer keys on `(principal_id, repo_id)`. | vuoro (vuoro-service) | Same as C1. |
-| C3 | A static registry principal ledger: append-only `principal_binding {principal_id, actor, credential_fingerprint (sha256 of the token), bound_at, retired_at}`. The loader refuses `principal-rebind-refused` and `principal-epoch-regressed`. A rotation retires the old row and requires the next epoch. | vuoro (vuoro-service) | Same as C1. |
+| C1 | Add a nullable `principal_id` to `reservation` and `event`, and `previous_principal` to the reassignment payload. New rows record `identity.principal_id`. The maintenance envelope's `operator` carries `principal_id`, and `_maintenance_prepare` compares it with `identity.principal_id`. Submitted records (`_validate_record`) store `identity.principal_id` alongside `actor`. No reservation holder enforcement is added. | sprintctl | Any second credential bearing an existing actor string is issued. |
+| C2 | The observation policy schema becomes `vuoro-work-resource-observers/v2` with entries `{principal_id, repo_ids}`. The authorizer keys on `(identity.principal_id, repo_id)`, and the loader refuses a v1 file. | vuoro (vuoro-service) | Same as C1. |
+| C3 | A static registry principal ledger: append-only `principal_binding {principal_id, actor, credential_fingerprint (sha256 of the token), bound_at, retired_at}`. The loader refuses `principal-rebind-refused` and `principal-epoch-regressed`. A rotation retires the old row and requires the next epoch. It also requires the observation policy to be updated to the new `principal_id`, or the rotated principal sees no maintenance resources. The loader cross-checks this: a policy entry naming a retired principal is refused at load (`observation-policy-retired-principal`). | vuoro (vuoro-service) | Same as C1. |
 | C4 | `work.identity.current` and `sprintctl doctor` print `principal_id`, so the evidence in §2 is re-derivable from the handshake. | sprintctl + vuoro-service | With C1. |
 
 **Relation to #2466 (E2).** E2 shipped, and its claim path is already
-principal-keyed, so nothing there needs reverting. C2 and C3 close the two
-authority gaps, and C1 and C4 close the attribution gap. C1-C3 must land:
+principal-keyed, so nothing there needs reverting. C2 closes the
+observation-policy gap, C1 closes the envelope-operator gap and the
+attribution gap, C3 closes the rebind gap, and C4 makes the result
+observable. C1-C3 must land:
 
 - before the `workstation-mi1-native` commissioning issues another
   credential. `docs/plans/2026-10-06-native-record-identity.md:36-41`
@@ -271,7 +298,9 @@ today:
 |---|---|---|
 | `principal-rebind-refused` | load-time refusal (service does not start) | The registry binds a retired principal_id, or a live principal_id with a different credential fingerprint. |
 | `principal-epoch-regressed` | load-time refusal | The epoch for `(issuer, subject)` is lower than the recorded maximum. |
-| `observation-grant-refused` | 403 (existing authorizer refusal) | The caller's `principal_id` is not the one the grant names, whatever the actor string. |
+| `observation-policy-retired-principal` | load-time refusal | An observation policy entry names a retired principal_id. |
+| `maintenance-actor-mismatch` | 403 (existing code) | The caller's `principal_id` is not the frozen envelope operator's `principal_id`, whatever the actor string. |
+| (no error) | non-disclosing | A caller whose `principal_id` has no observation policy entry for the repo gets no 403. Maintenance resources are not visible, so a read reports them absent, exactly as today for an unlisted actor. |
 | `run-not-found` | 404 (unchanged) | Another principal's run. |
 
 A retired principal's token is absent from the registry. It is refused as
@@ -287,8 +316,9 @@ SPRINTCTL_BACKEND=served SPRINTCTL_VUORO_PROFILE=<workstation profile> sprintctl
 ```
 
 It prints `identity: actor=workstation-vuoro` and no principal. Then read
-`vuoro_service/composition.py:555-564`. The observation grant authorizer
-allows by `(identity.actor, repo_id)`.
+`vuoro_service/composition.py:525-564`: the observation policy entries are
+`{actor, repo_ids}`, and the authorizer allows by
+`(identity.actor, repo_id)`.
 
 **Test T-reissue.** This falsifier must fail on today's code and pass after
 C1-C4. It runs in `packages/vuoro-service/tests` against a disposable
@@ -297,22 +327,31 @@ distinguishes and today's code does not.
 
 1. Registry R1: token A has actor `workstation-vuoro` and principal
    `vuoro-static:ws01:0`. With A:
-   - issue an observation grant G for repo `sprintctl`
+   - before start, the observation policy has an entry naming A (today
+     `{actor: "workstation-vuoro", repo_ids: ["sprintctl"]}`; after C2
+     `{principal_id: "vuoro-static:ws01:0", ...}`)
+   - with A, create a maintenance capability M whose frozen envelope names
+     A as operator, and confirm that M is visible to A
    - register run r1
    - claim item Y, which creates lease L1
    - reserve item X
 2. Registry R2 is a proper reissue: retire `vuoro-static:ws01:0`, and give
    token B the **same actor** `workstation-vuoro` and principal
-   `vuoro-static:ws01:1`. Restart on R2.
-3. **Observation grant.** B reads through G and must be refused
-   (`observation-grant-refused`). **Today this fails**: the authorizer is
-   actor-keyed and B passes.
+   `vuoro-static:ws01:1`. The observation policy is left unchanged. Restart
+   on R2.
+
+   After C3, restart refuses with `observation-policy-retired-principal`
+   until the policy names the new principal or drops the entry. The test
+   asserts that refusal, then restarts with the entry dropped.
+3. **Observation visibility.** B reads M and must find it not visible.
+   The read reports it absent, with no disclosure and no 403. **Today this
+   fails**: the policy is actor-keyed, so M is visible to B.
 4. **Retired token.** A's token must be refused as unauthenticated.
    Regression check: this passes today when R2 omits A.
 5. **Bad reissue.** Registry R3 maps token B to the **copied** principal
    `vuoro-static:ws01:0`. Service start must refuse with
    `principal-rebind-refused`. **Today this fails**: R3 loads, and B
-   inherits r1, L1 and G.
+   inherits r1, L1 and M's visibility.
 6. **Self-attribution separates principals.** B releases or reassigns X.
    This must succeed, because reservations are advisory and no holder check
    is added. The resulting `reservation.released` or
@@ -321,9 +360,10 @@ distinguishes and today's code does not.
    `previous_principal = vuoro-static:ws01:0`. **Today this fails**:
    neither row has a principal, so B's event is indistinguishable from
    one A wrote.
-7. **Author check.** A record-actor check at `:3058` against a record A
-   authored, made by B with the same actor string, must treat B as
-   a different author. **Today this fails**: the string matches.
+7. **Maintenance envelope operator.** B calls prepare on M, whose frozen
+   envelope names A as operator. This must be refused with
+   `maintenance-actor-mismatch` (403). **Today this fails**: the
+   `operator.identity` string equals B's actor.
 8. **Ownership regression.** B resuming r1 gets `run-not-found`, and B
    heartbeating L1 gets a lease refusal. Both pass today; this step guards
    them.
@@ -335,7 +375,7 @@ this item before the fix lands is the evidence that the test discriminates.
 ## 8. Verification plan
 
 - T-reissue (§7) in the vuoro-service suite, plus sprintctl unit tests for
-  C1's principal recording and author comparison.
+  C1's principal recording and the envelope operator comparison.
 - After C4, `sprintctl doctor` shows `principal_id`. A second profile with
   the same actor string shows a different one.
 - A cheap static check on done work: a test greps that no authority path
@@ -352,6 +392,6 @@ this item before the fix lands is the evidence that the test discriminates.
    be 0. Every later change goes through it.
 3. The vuoro.cloud gateway path already mints conforming principals
    (`<environment_id>:<users.id>:<epoch>`, with epoch ≥ 0). It needs only
-   C2 when the edge serves observation grants there.
+   C2 when the edge serves maintenance resources there.
 4. The schema follows this decision. This document changes no ledger
    schema.

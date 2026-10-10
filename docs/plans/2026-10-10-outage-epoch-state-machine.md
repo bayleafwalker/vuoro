@@ -105,8 +105,8 @@ Facts that shape the contract:
      runs, so leaving it to a declaration costs nothing.
    - A cheap check stands in for an approval: while an epoch is open and the
      recorded cloud probe has been healthy for more than 6 h, the island
-     appends an `island.overdue` notice to its mode record and readiness
-     view. The notice blocks nothing.
+     appends an `island_notice` of kind `overdue` and shows it in its
+     readiness view. The notice blocks nothing.
    - The command `island exit` seals the epoch: island work writes stop, and
      a digest-bound export bundle is produced.
    - The protected side pushes the bundle outbound to vuoro.cloud. Pull-only
@@ -130,7 +130,7 @@ Facts that shape the contract:
 |---|---|
 | Active-active dual writing, or automatic failover to vuoro-shared | Rejected by the operator decision (§3.3, Q1(c)). It produces two histories with no defined merge. |
 | Automatic entry on failed health probes | Contradicts the frozen "explicit operator act". A flapping probe would split history. |
-| Automatic exit on a recovered health probe | It has the same flap problem in reverse (§2.5). The `island.overdue` notice covers a forgotten exit without acting on it. |
+| Automatic exit on a recovered health probe | It has the same flap problem in reverse (§2.5). The `overdue` notice (`island_notice`) covers a forgotten exit without acting on it. |
 | Freeze vuoro.cloud (`mutations_frozen`) during the epoch | It is global across tenants and held only by the operator with step-up or touch (#255 Q2, admin-identity C2/A3). An automatic freeze or unfreeze would contradict that placement, and a manual one would put the operator into recovery. The CAS at import makes it unnecessary. |
 | Last-writer-wins merge at import | It is a silent merge, which the architecture forbids. |
 | Block the whole import until every conflict is resolved | That would make the operator, or a resolver, a gate on returning authority. Per-item conflict records cost nothing, and authority can return immediately. |
@@ -165,11 +165,26 @@ push retries with backoff. No phase waits on a person.
 
 ### 4.2 Mode record (protected side, append-only)
 
-`island_mode` events on vuoro-shared. The current mode is the newest event.
+`island_mode` events on vuoro-shared. The **current mode** is the newest
+`island_mode` event. Notices are a separate, non-mode event type,
+`island_notice`, and never change the mode.
+
+Mode events and the state each one establishes:
+
+| Event | State |
+|---|---|
+| `entered` | `DEGRADED_LOCAL` |
+| `sealed`, `exported` | `RECOVERY` |
+| `imported` | `RECOVERY`; the transition to NORMAL is pending |
+| `returned` | `NORMAL` |
+
+`island_notice` fields: `kind` (only `overdue` today), `epoch_id`, and
+`cloud_probe` (`{url, status, observed_at}`, the same shape as on
+`entered`).
 
 | Field | Type | Notes |
 |---|---|---|
-| `event` | `entered` \| `overdue` \| `sealed` \| `exported` \| `imported` \| `returned` | |
+| `event` | `entered` \| `sealed` \| `exported` \| `imported` \| `returned` | Mode events only. `overdue` is an `island_notice`. |
 | `epoch_id` | `oe:<ULID>` | Fixed at `entered`. |
 | `actor_principal` | principal_id | Operator principal for `entered` and `sealed`; `vuoro-ops` workload principal for the rest. |
 | `reason` | string | Required on `entered`. |
@@ -182,7 +197,7 @@ Who may act: `entered` and `sealed` are protected-only operator acts
 (admin-identity design C3: recovery operations are protected-only). They run
 as `vuoro-service island enter|exit` from the workstation or tunnel plane,
 never through a public sign-in. The remaining transitions, including
-`overdue`, run as the `vuoro-ops` workload identity.
+the `overdue` notice, run as the `vuoro-ops` workload identity.
 
 ### 4.3 Epoch-tagged record fields (owner: sprintctl)
 
@@ -282,8 +297,9 @@ Automated:
   4. **No dual write**: during DEGRADED_LOCAL no request leaves the island
      for vuoro.cloud. A test transport asserts this; the island makes no
      cloud write calls at all, not even a freeze.
-  5. An open epoch with a cloud probe healthy for more than 6 h → one
-     `overdue` event. Writes are still accepted.
+  5. An open epoch with a cloud probe healthy for more than 6 h produces
+     one `island_notice` of kind `overdue`. The current mode stays
+     `DEGRADED_LOCAL`, and writes are still accepted.
 - sprintctl, `work.island.import-v1` against a seeded "cloud" database:
   1. One untouched item → `apply`.
   2. One item edited on the cloud side during the epoch → `conflict`. The
