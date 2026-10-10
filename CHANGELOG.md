@@ -5,6 +5,15 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service 0.1.93 candidate: packages the already merged MCP edge
+  `preview_acceptance` and `read_work_delta` reads with the service, and adds
+  Git to the service image so the pinned Sprintctl preview parser can report
+  declared diff paths. The reads remain advisory and authority-scoped; they
+  do not accept an EffectIntent or write owner state. Client 0.1.2 and the
+  immutable Sprintctl 0.18.0, auditctl 0.1.9, adapter-kit 0.2.0 and
+  schema-runtime 0.1.0 dependencies stay pinned. Runtime activation and an
+  entitled live preview require separate rollout verification.
+
 - vuoro-service 0.1.85 release candidate: mounted native identities may carry an
   explicit issuer-controlled workspace partition. Omitted bindings remain
   unbound; invalid metadata and caller-supplied headers cannot mint a binding.
