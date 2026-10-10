@@ -3,9 +3,9 @@
   "context_id": "vuoro.native-recovery-export-only",
   "contract_ref": {
     "doc_id": "native-recovery",
-    "revision": "sha256:f469e15e5d9300eec0c1a83d9a3247306cb2b818d78c6781535e006b955e081e"
+    "revision": "sha256:b089c0335f372cc1f0f3aac434da7f1c8e71faa7ca91b7852ceec1028555d881"
   },
-  "implementation_sha": "1ab7efcd3da4671bd33dbf73bb19c9ca21eaf7ed",
+  "implementation_sha": "96a4c6cea7fb7df6dcfbc5009fbc1aca4a93ee65",
   "depth": 2,
   "environment": {
     "backend": "POSIX local regular files; Python multiprocessing fork with deterministic process-exit fault injection",
@@ -20,9 +20,9 @@
     "histories": 3,
     "bounds": {
       "concurrent_processes": 2,
-      "recovery_tests": 26,
-      "client_and_boundary_passed": 69,
-      "full_workspace_passed": 1619,
+      "recovery_tests": 29,
+      "client_and_boundary_passed": 72,
+      "full_workspace_passed": 1622,
       "full_workspace_skipped": 60,
       "four_distributions_built": true
     },
@@ -104,6 +104,7 @@
     "Executed vuoro.client.tests and vuoro.boundaries command components, plus vuoro.suite workspace checks. Four wheel builds preceded distribution checks.",
     "Full suite skips are unconfigured PostgreSQL owner conformance extras; outside this local-file/client change.",
     "Faults are child-process exit injections, not measured power loss.",
-    "implementation_sha identifies the code/context commit; this result is added in a subsequent evidence-only commit."
+    "implementation_sha identifies the code/context commit; this result is added in a subsequent evidence-only commit.",
+    "Independent review fixed missing authored fields being synthesized on read and runbook executable name; final affected tests and full suite rerun after code repair."
   ]
 }
