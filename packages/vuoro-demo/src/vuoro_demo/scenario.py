@@ -80,7 +80,8 @@ def git_command(root: Path, *arguments: str) -> str:
 
 
 async def artifact(caller: Caller, verifier: Caller, item: int, root: Path,
-        run: str, verifier_run: str, *, omit_verification: bool) -> dict:
+        run: str, verifier_run: str, *, omit_verification: bool,
+        wrong_artifact_digest: bool) -> dict:
     from sprintctl import outbox, pg, release_trailers
     from sprintctl.application import batch_idempotency_key, record_to_dict
 
@@ -150,6 +151,9 @@ async def artifact(caller: Caller, verifier: Caller, item: int, root: Path,
         "checks": [{"name": "fixture-content", "revision": digest("fixture-content/v1"),
             "status": "passed" if (checkout / "fixture.txt").read_text() == "after\n" else "failed"},
             {"name": "patch-and-scope", "revision": digest("patch-and-scope/v1"), "status": "passed"}]}
+    if wrong_artifact_digest:
+        # Corrupt only the literal patch digest; preserve intent and Release.
+        body["artifact"]["digest"] = "sha256:" + "0" * 64
     proof = dict(evidence, run_id=verifier_run, item_id="artifact-verification",
         kind="protected-artifact-verification", digest=digest(body),
         claims=[{"claim_type": "observation", "subject": intent["intent_id"],
@@ -158,6 +162,14 @@ async def artifact(caller: Caller, verifier: Caller, item: int, root: Path,
     if omit_verification:
         raise AssertionError("required artifact verification deliberately omitted; acceptance refused")
     await verifier.call("work.evidence.append-v1", proof)
+    if wrong_artifact_digest:
+        await verifier.refuse("work.effect.accept-v1", dict(binding,
+            verification_ref={"run_id": verifier_run, "item_id": proof["item_id"]}),
+            "effect-verification-refused")
+        unchanged = (await verifier.call("work.effect.get-v1", {"intent_id": intent["intent_id"]}))["intent"]
+        assert unchanged == intent
+        assert not (await verifier.call("work.read.item-decisions", {"item_id": item}))["decisions"]
+        raise AssertionError("wrong literal artifact digest; protected owner acceptance refused")
     accepted = (await verifier.call("work.effect.accept-v1", dict(binding,
         verification_ref={"run_id": verifier_run, "item_id": proof["item_id"]})))["intent"]
     assert accepted["acceptance"]["verification"]["receipt"] == body
@@ -183,7 +195,8 @@ async def worker(endpoint: str, token: str, item: int):
 
 
 async def scenario(endpoint: str, tokens: dict[str, str], root: Path, receipts: list[dict],
-        *, omit_verification: bool = False, omit_check: bool = False) -> dict:
+        *, omit_verification: bool = False, omit_check: bool = False,
+        wrong_artifact_digest: bool = False) -> dict:
     callers = {name: Caller(endpoint, token, receipts) for name, token in tokens.items()}
     b, verifier, a = callers["B"], callers["verifier"], callers["A"]
     child = None
@@ -197,8 +210,15 @@ async def scenario(endpoint: str, tokens: dict[str, str], root: Path, receipts: 
         x, y = items
         await b.call("work.item.dep.add", {"item_id": x, "blocked_item_id": y})
         run_b, verifier_run = await register(b, "B"), await register(verifier, "verifier")
-        source = await artifact(b, verifier, x, root, run_b, verifier_run,
-            omit_verification=omit_verification)
+        try:
+            source = await artifact(b, verifier, x, root, run_b, verifier_run,
+                omit_verification=omit_verification, wrong_artifact_digest=wrong_artifact_digest)
+        except AssertionError:
+            if wrong_artifact_digest:
+                assert not (await b.call("work.read.item-decisions", {"item_id": x}))["decisions"]
+                assert all(row["id"] != y for row in (await b.call("work.read.next-work",
+                    {"sprint_id": sprint}))["ready_items"])
+            raise
         assert not (await b.call("work.read.item-decisions", {"item_id": x}))["decisions"]
         assert all(row["id"] != y for row in (await b.call("work.read.next-work",
             {"sprint_id": sprint}))["ready_items"])

@@ -43,11 +43,20 @@ reported; fixture data and bearer credentials are deleted. Receipts are created
 exclusively with mode 0600. Reusing an output path refuses before startup.
 If owned process shutdown cannot be confirmed, the command reports incomplete
 and retains private scratch diagnostics instead of deleting a running cluster.
+Normal parent SIGTERM and SIGINT cancel the native consumer, clean up owned
+worker/service/database processes and record an incomplete receipt. Previous
+signal handlers are restored. SIGKILL cannot be handled and is outside this
+cleanup guarantee. After a hard kill, identify only this run's private
+`/tmp/vuoro-demo-*/owner.json` by its process ID and receipt path, verify the
+`postgres/postmaster.pid` belongs to that exact cluster, and stop it with
+`pg_ctl -D /tmp/vuoro-demo-EXACT/postgres -m immediate -w stop` before removing
+that exact scratch directory. Do not use a broad process or directory cleanup.
 
 ```sh
 # Both commands must fail honestly and produce status=incomplete receipts.
 vuoro demo --pg-bin /path/to/postgresql16/bin --receipt missing-proof.json --omit-required-verification
 vuoro demo --pg-bin /path/to/postgresql16/bin --receipt missing-check.json --omit-required-check
+vuoro demo --pg-bin /path/to/postgresql16/bin --receipt wrong-artifact.json --wrong-artifact-digest
 ```
 
 This proves client/process interruption and existing owner settlement on a
