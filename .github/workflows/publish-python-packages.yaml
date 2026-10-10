@@ -7,6 +7,7 @@ on:
       - "vuoro-service-v*"
       - "vuoro-schema-runtime-v*"
       - "vuoro-adapter-kit-v*"
+      - "vuoro-demo-v*"
 
 permissions:
   attestations: write
@@ -29,7 +30,7 @@ jobs:
           tag="${GITHUB_REF_NAME}"
           package="${tag%-v*}"
           case "$package" in
-            vuoro-client|vuoro-service|vuoro-schema-runtime|vuoro-adapter-kit) ;;
+            vuoro-client|vuoro-service|vuoro-schema-runtime|vuoro-adapter-kit|vuoro-demo) ;;
             *) echo "unsupported package tag: $tag" >&2; exit 1 ;;
           esac
           echo "name=$package" >> "$GITHUB_OUTPUT"
@@ -42,6 +43,7 @@ jobs:
           uv build --package vuoro-service --wheel --out-dir dist/vuoro-service
           uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime
           uv build --package vuoro-adapter-kit --wheel --out-dir dist/vuoro-adapter-kit
+          uv build --project packages/vuoro-demo --wheel --out-dir dist/vuoro-demo
       - name: Run the complete repository test suite
         run: uv run pytest
       - name: Exercise the complete release candidate
@@ -56,6 +58,18 @@ jobs:
             "${wheels[@]}" 'httpx>=0.27,<1'
           /tmp/vuoro-release-conformance/bin/python \
             scripts/validate_served_conformance.py
+      - name: Qualify optional demo against its published owner closure
+        if: steps.package.outputs.name == 'vuoro-demo'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-16
+          uv venv --python 3.12 /tmp/vuoro-demo-release
+          uv pip install --python /tmp/vuoro-demo-release/bin/python dist/vuoro-demo/*.whl 'pytest>=8,<10'
+          uv pip check --python /tmp/vuoro-demo-release/bin/python
+          VUORO_DEMO_TEST_PG_BIN=/usr/lib/postgresql/16/bin \
+            /tmp/vuoro-demo-release/bin/python -m pytest packages/vuoro-demo/tests -q
       - name: Select the gated wheel for publication
         id: publication
         shell: bash
