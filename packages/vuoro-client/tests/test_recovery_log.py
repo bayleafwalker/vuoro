@@ -237,6 +237,20 @@ def test_historical_duplicate_ids_are_not_implicitly_deduplicated(tmp_path: Path
     assert log.path.read_bytes() == row + row
 
 
+@pytest.mark.parametrize("field", ["basis_revision", "detail", "requested_command"])
+def test_missing_authored_fields_are_not_synthesized_on_export(tmp_path: Path, field: str) -> None:
+    import json
+    log = RecoveryLog(tmp_path, "incident-1").begin()
+    payload = log.append(**_authored()).to_json()
+    del payload[field]
+    before = (json.dumps(payload) + "\n").encode()
+    log.path.write_bytes(before)
+    for operation in (log.export, lambda: log.append(**_authored())):
+        with pytest.raises(ValueError, match="preserve"):
+            operation()
+    assert log.path.read_bytes() == before
+
+
 def test_crash_after_fsync_before_reply_retries_original_record(tmp_path: Path) -> None:
     import multiprocessing
     import os

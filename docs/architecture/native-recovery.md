@@ -25,15 +25,15 @@ an explicit alternative. Choose one incident name of at most 128 characters,
 starting with a letter or digit and containing letters, digits, `.`, `_` or `-`.
 
 ```sh
-vuoro recovery begin --incident service-outage-20261010
-vuoro recovery observe --incident service-outage-20261010 \
+vuoro-client recovery begin --incident service-outage-20261010
+vuoro-client recovery observe --incident service-outage-20261010 \
   --summary 'Owner read unavailable; last observed revision recorded' \
   --basis-revision observed-revision
-vuoro recovery request-command --incident service-outage-20261010 \
+vuoro-client recovery request-command --incident service-outage-20261010 \
   --summary 'Ask the owner to inspect before any recovery action' \
   --basis-revision observed-revision \
   --command '{"command_type":"inspect","params":{}}'
-vuoro recovery export --incident service-outage-20261010
+vuoro-client recovery export --incident service-outage-20261010
 ```
 
 The namespace directory is mode `0700` and its `records.jsonl` is mode `0600`.

@@ -5,7 +5,7 @@
   "subject": "incident-local stable-ID append and export boundary",
   "contract_ref": {
     "doc_id": "native-recovery",
-    "revision": "sha256:f469e15e5d9300eec0c1a83d9a3247306cb2b818d78c6781535e006b955e081e"
+    "revision": "sha256:b089c0335f372cc1f0f3aac434da7f1c8e71faa7ca91b7852ceec1028555d881"
   },
   "source_of_truth": "Authored records.jsonl is the incident-local observation history only; owner authority and normal outbox/sync remain in Sprintctl",
   "depth": 2,

@@ -254,7 +254,7 @@ class RecoveryLog:
             try:
                 payload = json.loads(line, object_pairs_hook=_unique_object,
                                      parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)))
-                if not isinstance(payload, dict) or set(payload) - set(RecoveryRecordEntry.__dataclass_fields__):
+                if not isinstance(payload, dict) or set(payload) != set(RecoveryRecordEntry.__dataclass_fields__):
                     raise ValueError("unexpected recovery record fields")
                 entry = RecoveryRecordEntry.from_json(payload)
                 self._validate_entry(entry)
