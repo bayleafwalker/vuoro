@@ -15,6 +15,7 @@ members = [
     "vuoro-worker",
     "vuoro-workspace",
 ]
+overrides = [{ name = "vuoro-client", editable = "packages/vuoro-client" }]
 
 [[package]]
 name = "annotated-doc"
@@ -354,6 +355,28 @@ sdist = { url = "https://files.pythonhosted.org/packages/19/74/a633ee74eb36c44aa
 wheels = [
     { url = "https://files.pythonhosted.org/packages/41/45/1a4ed80516f02155c51f51e8cedb3c1902296743db0bbc66608a0db2814f/jsonschema_specifications-2025.9.1-py3-none-any.whl", hash = "sha256:98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe", size = 18437, upload-time = "2025-09-08T01:34:57.871Z" },
 ]
+
+[[package]]
+name = "operator-projection"
+version = "0.2.5"
+source = { url = "https://github.com/bayleafwalker/agentops/releases/download/operator-projection-v0.2.5/operator_projection-0.2.5-py3-none-any.whl" }
+dependencies = [
+    { name = "httpx" },
+    { name = "pyyaml" },
+    { name = "vuoro-client" },
+]
+wheels = [
+    { url = "https://github.com/bayleafwalker/agentops/releases/download/operator-projection-v0.2.5/operator_projection-0.2.5-py3-none-any.whl", hash = "sha256:6ebd68e0ac9bd13efc19273375b4b10b024832ae85903fc36a2c26a3afbe7b84" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.27,<1" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
+    { name = "pyyaml", specifier = ">=6" },
+    { name = "vuoro-client", marker = "python_full_version >= '3.12'", url = "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-client-v0.1.2/vuoro_client-0.1.2-py3-none-any.whl" },
+]
+provides-extras = ["dev"]
 
 [[package]]
 name = "packaging"
@@ -784,11 +807,6 @@ dependencies = [
     { name = "pydantic" },
 ]
 
-[package.optional-dependencies]
-test = [
-    { name = "pytest" },
-]
-
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.27,<1" },
@@ -838,6 +856,7 @@ version = "0.1.6"
 source = { editable = "packages/vuoro-mcp-edge" }
 dependencies = [
     { name = "httpx" },
+    { name = "operator-projection" },
     { name = "vuoro-evidence" },
     { name = "vuoro-service" },
 ]
@@ -850,6 +869,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.27,<1" },
+    { name = "operator-projection", url = "https://github.com/bayleafwalker/agentops/releases/download/operator-projection-v0.2.5/operator_projection-0.2.5-py3-none-any.whl" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" },
     { name = "vuoro-evidence", editable = "packages/vuoro-evidence" },
     { name = "vuoro-service", editable = "packages/vuoro-service" },

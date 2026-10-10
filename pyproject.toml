@@ -11,6 +11,14 @@ dev = [
 
 [tool.uv]
 package = false
+# Development workspace only; the released projection wheel and Docker retain
+# the immutable published client URL. Match its exact client version here.
+override-dependencies = [
+  "vuoro-client==0.1.2",
+]
+
+[tool.uv.sources]
+vuoro-client = { workspace = true }
 
 [tool.uv.workspace]
 exclude = ["packages/vuoro-demo"]
