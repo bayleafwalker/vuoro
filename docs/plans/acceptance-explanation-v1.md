@@ -40,8 +40,12 @@ published client URL and hash. The workspace resolver and a clean Docker
 build must both pass; no dependency-free installation is a substitute.
 See [uv's scoped overrides](https://docs.astral.sh/uv/concepts/resolution/).
 
-Denied or unavailable owner reads become generic unavailable observations and
-explicit missing links, never a claim that owner state is absent. Malformed,
+Denied or unavailable owner reads become generic unavailable observations,
+never a claim that owner state is absent. P1 determines missing links from the
+remaining observed records: a protected proof can establish its evidence link
+even when the Decision-list read is unavailable. Source-read availability stays
+explicit alongside P1 link completeness. Malformed catalog operation lists
+fail closed as unavailable. Malformed,
 foreign-repository or foreign-item responses refuse generically. Private raw
 captures, reports, intent bytes, principals, contracts, histories and upstream
 messages never leave in tool output, logs or errors. A complete P1 explanation
