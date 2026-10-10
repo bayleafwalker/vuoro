@@ -33,8 +33,8 @@ is permitted. The normal MCP success wrapper is retained, with nested text.
 
 For development only, uv must compose the existing editable Vuoro client
 workspace member with the projection wheel's direct client URL requirement.
-A version-scoped dependency override for operator-projection 0.2.5 selects
-the same client version 0.1.2 from the workspace. This does not alter either
+Uv's scoped override refuses a workspace path, so one development-only client
+override selects the same client version 0.1.2 from the workspace. This does not alter either
 wheel's metadata or Docker's production resolution, which retains the
 published client URL and hash. The workspace resolver and a clean Docker
 build must both pass; no dependency-free installation is a substitute.
