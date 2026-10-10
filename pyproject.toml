@@ -13,6 +13,8 @@ dev = [
 package = false
 # Development workspace only; the released projection wheel and Docker retain
 # the immutable published client URL. Match its exact client version here.
+# Wheel conformance installs use `uv pip install --no-config` so this
+# override cannot replace their local wheel requirements.
 override-dependencies = [
   "vuoro-client==0.1.2",
 ]

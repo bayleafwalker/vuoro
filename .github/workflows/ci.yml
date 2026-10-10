@@ -26,7 +26,7 @@ jobs:
         run: |
           set -euo pipefail
           uv venv --python 3.12 /tmp/vuoro-demo-conformance
-          uv pip install --python /tmp/vuoro-demo-conformance/bin/python dist/vuoro-demo/*.whl 'pytest>=8,<10'
+          uv pip install --no-config --python /tmp/vuoro-demo-conformance/bin/python dist/vuoro-demo/*.whl 'pytest>=8,<10'
           uv pip check --python /tmp/vuoro-demo-conformance/bin/python
           VUORO_DEMO_TEST_PG_BIN=/usr/lib/postgresql/16/bin \
             /tmp/vuoro-demo-conformance/bin/python -m pytest packages/vuoro-demo/tests -q
@@ -62,7 +62,7 @@ jobs:
         run: |
           set -euo pipefail
           uv venv --python 3.11 /tmp/vuoro-shared-wheel-python311
-          uv pip install --python /tmp/vuoro-shared-wheel-python311/bin/python \
+          uv pip install --no-config --python /tmp/vuoro-shared-wheel-python311/bin/python \
             dist/vuoro-schema-runtime/*.whl dist/vuoro-adapter-kit/*.whl
           /tmp/vuoro-shared-wheel-python311/bin/python -c \
             'from vuoro_schema_runtime import migration_asset, render_schema_sql; from vuoro_adapter_kit import object_schema, operation_spec; a=migration_asset(1, "initial", "CREATE SCHEMA __SCHEMA__"); assert render_schema_sql(a.sql, "central") == '"'"'CREATE SCHEMA "central"'"'"'; s=object_schema({"value": {"type": "string"}}, required=("value",)); assert operation_spec("work.read.items", input_schema=s, result_schema=object_schema({}), execution_semantics="read", idempotency="not-allowed")["owning_domain"] == "work"'
@@ -70,7 +70,7 @@ jobs:
         shell: bash
         run: |
           uv venv --python 3.12 /tmp/vuoro-served-conformance
-          uv pip install --python /tmp/vuoro-served-conformance/bin/python \
+          uv pip install --no-config --python /tmp/vuoro-served-conformance/bin/python \
             dist/vuoro-client/*.whl dist/vuoro-service/*.whl \
             'httpx>=0.27,<1'
           /tmp/vuoro-served-conformance/bin/python \
@@ -85,13 +85,13 @@ jobs:
         shell: bash
         run: |
           uv venv --python 3.12 /tmp/vuoro-released-wheel
-          uv pip install --python /tmp/vuoro-released-wheel/bin/python \
+          uv pip install --no-config --python /tmp/vuoro-released-wheel/bin/python \
             dist/vuoro-service/*.whl \
             'httpx>=0.27,<1' 'click>=8.1'
           # Install the owner and its immutable shared dependency explicitly.
           # Sprintctl metadata names the same adapter-kit release; --no-deps
           # keeps this gate from resolving a different artifact.
-          uv pip install --python /tmp/vuoro-released-wheel/bin/python \
+          uv pip install --no-config --python /tmp/vuoro-released-wheel/bin/python \
             --no-deps \
             dist/adapters/vuoro_adapter_kit-*.whl \
             dist/adapters/sprintctl-*.whl
@@ -104,10 +104,10 @@ jobs:
         shell: bash
         run: |
           uv venv --python 3.12 /tmp/vuoro-released-audit-wheel
-          uv pip install --python /tmp/vuoro-released-audit-wheel/bin/python \
+          uv pip install --no-config --python /tmp/vuoro-released-audit-wheel/bin/python \
             dist/vuoro-service/*.whl \
             'httpx>=0.27,<1'
-          uv pip install --python /tmp/vuoro-released-audit-wheel/bin/python \
+          uv pip install --no-config --python /tmp/vuoro-released-audit-wheel/bin/python \
             --no-deps \
             dist/adapters/vuoro_adapter_kit-*.whl \
             dist/adapters/vuoro_schema_runtime-*.whl \
@@ -121,10 +121,10 @@ jobs:
         shell: bash
         run: |
           uv venv --python 3.12 /tmp/vuoro-released-two-domain-wheel
-          uv pip install --python /tmp/vuoro-released-two-domain-wheel/bin/python \
+          uv pip install --no-config --python /tmp/vuoro-released-two-domain-wheel/bin/python \
             dist/vuoro-service/*.whl \
             'httpx>=0.27,<1' 'click>=8.1'
-          uv pip install --python /tmp/vuoro-released-two-domain-wheel/bin/python \
+          uv pip install --no-config --python /tmp/vuoro-released-two-domain-wheel/bin/python \
             --no-deps \
             dist/adapters/vuoro_adapter_kit-*.whl \
             dist/adapters/vuoro_schema_runtime-*.whl \
@@ -173,8 +173,8 @@ jobs:
           dist/adapters
       - name: Install the pinned work owner with its PostgreSQL driver
         run: |
-          uv pip install --no-deps dist/adapters/sprintctl-*.whl
-          uv pip install 'psycopg[binary]>=3.1,<4'
+          uv pip install --no-config --no-deps dist/adapters/sprintctl-*.whl
+          uv pip install --no-config 'psycopg[binary]>=3.1,<4'
       - name: Create an isolated lease conformance database
         env:
           PGPASSWORD: m14-ci-only
@@ -185,10 +185,10 @@ jobs:
           set -euo pipefail
           uv build --package vuoro-service --wheel --out-dir dist/bound-service
           uv venv --python 3.12 /tmp/vuoro-bound-released-composition
-          uv pip install --python /tmp/vuoro-bound-released-composition/bin/python \
+          uv pip install --no-config --python /tmp/vuoro-bound-released-composition/bin/python \
             dist/bound-service/*.whl \
             'httpx>=0.27,<1' 'pytest>=8.3,<9' 'psycopg[binary]>=3.1,<4' 'click>=8.1'
-          uv pip install --python /tmp/vuoro-bound-released-composition/bin/python \
+          uv pip install --no-config --python /tmp/vuoro-bound-released-composition/bin/python \
             --no-deps dist/adapters/*.whl
           uv pip check --python /tmp/vuoro-bound-released-composition/bin/python
           VUORO_BOUND_COMPOSITION_PROOF=1 /tmp/vuoro-bound-released-composition/bin/python \
@@ -276,7 +276,7 @@ jobs:
           target.parent.mkdir(parents=True, exist_ok=True)
           target.write_bytes(wheel)
           PY
-          uv pip install --no-deps dist/protected-owner/sprintctl-0.13.1-py3-none-any.whl
+          uv pip install --no-config --no-deps dist/protected-owner/sprintctl-0.13.1-py3-none-any.whl
           createdb -h 127.0.0.1 -U m14 lease_conformance_protected_ci
           uv run --no-sync pytest packages/vuoro-reconciler/tests/test_protected_source_pg.py -q
       - name: Upload the evidence packet
