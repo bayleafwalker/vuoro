@@ -1,6 +1,6 @@
 # vuoro-mcp-edge
 
-The vuoro MCP protocol server. It serves two read tools to hosted runtimes
+The vuoro MCP protocol server. It serves governed tools to hosted runtimes
 (claude.ai, Cowork, Routines, cloud sessions) behind the vuoro.cloud gateway,
 and reads the sprintctl public-work contract through the runtime shell on
 localhost.
