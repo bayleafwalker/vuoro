@@ -31,6 +31,7 @@ SYSTEM_PRINCIPAL_ID = re.compile(r"^[a-z][a-z0-9-]*/v[1-9][0-9]*$")
 #: every repository, not an enumerated set. Matches how the two production
 #: identities today are bound to a host, not a single repository.
 ALL_REPOS = "*"
+MAX_SAFE_INTEGER = 9_007_199_254_740_991
 
 
 class IdentityResolutionError(ValueError):
@@ -74,6 +75,10 @@ class Identity:
     # These values are not authorities and are never minted by Vuoro.
     invocation_id: str | None = None
     attempt_id: str | None = None
+    #: The verified gateway principal issuance epoch.  This is deliberately a
+    #: separate field from ``principal_id`` so downstream owner adapters can
+    #: bind correlation metadata without parsing a display/binding string.
+    principal_epoch: int | None = None
 
     def __post_init__(self) -> None:
         if self.principal_id is not None and not (
@@ -83,6 +88,20 @@ class Identity:
             raise IdentityResolutionError(
                 "principal_id must be <issuer>:<subject>:<epoch> or a reserved system principal"
             )
+        if self.principal_epoch is not None and (
+            isinstance(self.principal_epoch, bool)
+            or not isinstance(self.principal_epoch, int)
+            or self.principal_epoch < 0
+            or self.principal_epoch > MAX_SAFE_INTEGER
+        ):
+            raise IdentityResolutionError(
+                "principal_epoch must be a safe non-negative integer"
+            )
+        if self.principal_epoch is not None and (
+            self.principal_id is None
+            or not self.principal_id.endswith(f":{self.principal_epoch}")
+        ):
+            raise IdentityResolutionError("principal_epoch disagrees with principal_id")
 
     @property
     def authorized_repositories(self) -> tuple[str, ...]:
