@@ -98,6 +98,7 @@ def _maker_checkpoint(response: dict, *, repo_id: str, item_id: int, run_id: str
     if (
         type(authorization) is not dict
         or authorization.get("run_id") != run_id
+        or authorization.get("repo_id") != repo_id
         or authorization.get("run_owned") is not True
         or type(current) is not dict
         or set(current) != checkpoint_fields
@@ -245,6 +246,7 @@ def test_uri_decoder_enforces_4096_ascii_byte_limit():
         lambda response: response.update(repo_id="other/repository"),
         lambda response: response["delta"].update(schema="wrong/v1"),
         lambda response: response["delta"]["authorization_scope"].update(run_id="another-run"),
+        lambda response: response["delta"]["authorization_scope"].update(repo_id="other/repository"),
         lambda response: response["delta"]["authorization_scope"].update(run_owned=False),
         lambda response: response["delta"]["current"].update(repo_id="other/repository"),
         lambda response: response["delta"]["current"].update(item_id=28),

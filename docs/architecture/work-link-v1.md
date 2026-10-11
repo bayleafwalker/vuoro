@@ -29,9 +29,10 @@ selected repository. It obtains the selected work item through the existing
 `read_work_delta` owner read, naming its own owned run and the item explicitly.
 Before creating a link, it checks the owner envelope's top-level `repo_id` and
 the exact delta schema. It also checks `authorization_scope.run_id` equals its
-own run and `run_owned` is true, `current.repo_id` and `current.item_id` match
-the selected repository and item, and `work.item_id` matches the item. Only
-then does it copy the complete seven-field `current` object into the link. The
+own run, `authorization_scope.repo_id` equals the selected repository, and
+`run_owned` is true. It checks `current.repo_id` and `current.item_id` match the
+selected repository and item, and `work.item_id` matches the item. Only then
+does it copy the complete seven-field `current` object into the link. The
 checkpoint is comparison input only; it does not make owner facts current and
 does not authorize an action. A reader without a checkpoint makes the next
 owner comparison unknown rather than inventing a baseline.
@@ -44,11 +45,11 @@ naming the link's `predecessor_run_id` through the existing
 requirements. The read-only link reader then calls the existing
 continuation-delta owner read with that successor run, the exact linked item,
 and the optional checkpoint. It accepts the unchanged owner response only
-when top-level `repo_id`, `current.repo_id`, `current.item_id`, and
-`work.item_id` match the link; `authorization_scope.run_id` matches the
-successor run and `run_owned` is true; and `predecessor_run_id` matches the
-link. An owner refusal remains a refusal; the reader does not synthesize a
-delta or write owner state.
+when top-level `repo_id`, `authorization_scope.repo_id`, `current.repo_id`,
+`current.item_id`, and `work.item_id` match the link;
+`authorization_scope.run_id` matches the successor run and `run_owned` is
+true; and `predecessor_run_id` matches the link. An owner refusal remains a
+refusal; the reader does not synthesize a delta or write owner state.
 
 The link does not transfer authority. Evidence registration, work claims,
 settlement, and every other mutation remain bound to the reader's own run and
