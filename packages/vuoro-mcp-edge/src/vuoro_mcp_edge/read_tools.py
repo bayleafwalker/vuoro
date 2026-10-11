@@ -127,7 +127,8 @@ def _parse_delta(args: dict[str, Any]) -> dict[str, Any]:
             or (checkpoint.get("current_release_digest") is not None
                 and (type(checkpoint["current_release_digest"]) is not str
                      or HEX.fullmatch(checkpoint["current_release_digest"]) is None))
-            or any(type(checkpoint.get(k)) is not str or SHA.fullmatch(checkpoint[k]) is None
+            or any(checkpoint.get(k) is not None and (type(checkpoint[k]) is not str
+                   or SHA.fullmatch(checkpoint[k]) is None)
                    for k in ("current_decision_digest", "current_reference_set_digest"))):
         raise ToolFailure("invalid-arguments", "checkpoint must use the complete owner checkpoint schema")
     cursor = args.get("cursor")

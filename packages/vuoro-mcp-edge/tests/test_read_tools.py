@@ -97,6 +97,18 @@ def test_bad_checkpoint_or_cursor_is_refused_before_owner_call():
     assert source.calls == []
 
 
+def test_delta_checkpoint_round_trips_unknown_collection_digests():
+    tool = _tool(OwnerSource(), "read_work_delta")
+    checkpoint = {
+        "repo_id": REPO, "item_id": 7, "work_edit_revision": "edit:4",
+        "status_revision": "status:2", "current_release_digest": None,
+        "current_decision_digest": None, "current_reference_set_digest": None,
+    }
+    parsed = tool.parse({"run_id": RUN_ID, "item_id": 7, "checkpoint": checkpoint})
+    assert parsed["checkpoint"] == checkpoint
+    assert parsed["limit"] == 32
+
+
 def test_catalog_exposes_only_atomic_owner_operations():
     source = OwnerSource({CONTINUATION_DELTA: source_delta()})
     preview = _tool(source, "preview_acceptance")
