@@ -34,4 +34,4 @@ __all__ += [
     "build_operation_spec_v2", "operation_spec_v2",
 ]
 
-__version__ = "0.2.0"
+__version__ = "0.2.2"

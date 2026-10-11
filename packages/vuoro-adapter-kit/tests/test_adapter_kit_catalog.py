@@ -1,6 +1,6 @@
-import pytest
 from typing import get_origin, get_type_hints
 
+import pytest
 from vuoro_adapter_kit import SCHEMA_DIALECT, object_schema, operation_spec
 
 
@@ -37,6 +37,39 @@ def test_operation_spec_is_exact_and_deeply_isolated() -> None:
     }
     input_schema["properties"]["value"]["type"] = "integer"
     assert spec["input_schema"]["properties"]["value"]["type"] == "string"
+
+
+def test_operation_spec_accepts_root_oneof_without_changing_legacy_schema_shape() -> None:
+    branches = [
+        {"properties": {"status": {"const": "bound"}}, "required": ["status"]},
+        {"properties": {"status": {"const": "legacy-unbound"}}, "required": ["status"]},
+    ]
+    schema = {**object_schema({"status": {"type": "string"}}), "oneOf": branches}
+    spec = operation_spec(
+        "work.read.receipt", input_schema=object_schema({}), result_schema=schema,
+        required_authority="work.read", execution_semantics="read",
+        idempotency="not-allowed",
+    )
+    assert spec["result_schema"]["oneOf"] == branches
+    assert spec["result_schema"]["type"] == "object"
+    branches[0]["required"].append("mutated")
+    assert spec["result_schema"]["oneOf"][0]["required"] == ["status"]
+
+
+@pytest.mark.parametrize(
+    "branches",
+    [None, "required", {}, [], [None], [3], [[]], [{1: "bad"}],
+     [{"required": "id"}], [{"required": [True]}],
+     [{"required": ["id", "id"]}]],
+)
+def test_operation_spec_rejects_invalid_root_oneof_shapes(branches) -> None:
+    schema = {**object_schema({}), "oneOf": branches}
+    with pytest.raises((TypeError, ValueError)):
+        operation_spec(
+            "work.read.receipt", input_schema=schema, result_schema=object_schema({}),
+            required_authority="work.read", execution_semantics="read",
+            idempotency="not-allowed",
+        )
 
 
 def test_operation_spec_type_hints_resolve_public_annotations() -> None:
