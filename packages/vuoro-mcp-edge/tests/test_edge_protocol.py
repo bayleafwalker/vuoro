@@ -165,9 +165,18 @@ def test_describe_work_takes_an_integer_work_id(client, auth) -> None:
         "minimum": 1,
         "description": "The work item id, as listed by list_ready_work.",
     }
+    assert describe["inputSchema"]["properties"]["repo_id"] == {
+        "type": "string",
+        "minLength": 1,
+        "description": (
+            "Authorized repository to read. Defaults to the only authorized "
+            "repository; required when multiple are authorized."
+        ),
+    }
     listing = next(tool for tool in tools if tool["name"] == "list_ready_work")
     limit = listing["inputSchema"]["properties"]["limit"]
     assert (limit["minimum"], limit["maximum"], limit["default"]) == (1, 50, 50)
+    assert listing["inputSchema"]["properties"]["repo_id"] == describe["inputSchema"]["properties"]["repo_id"]
 
 
 @pytest.mark.parametrize(

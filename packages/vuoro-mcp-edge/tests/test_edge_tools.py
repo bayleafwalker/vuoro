@@ -10,8 +10,10 @@ import pytest
 from edge_support import (
     FakeShell,
     accepted,
+    assertion,
     call,
     edge_client,
+    identity_headers,
     item_record,
     item_result,
     list_record,
@@ -111,6 +113,14 @@ def test_out_of_range_limit_is_an_invalid_params_tool_error(keys, auth, limit) -
 
 def test_unknown_argument_is_an_invalid_params_tool_error(keys, auth) -> None:
     _, result = _call(keys, auth, FakeShell(), "list_ready_work", {"sprint_id": 3})
+    _assert_tool_error(result, "invalid-params")
+
+
+@pytest.mark.parametrize("repo_id", [None, "", 1, [], True])
+def test_malformed_repo_id_is_an_invalid_params_tool_error(keys, auth, repo_id) -> None:
+    _, result = _call(
+        keys, auth, FakeShell(), "list_ready_work", {"repo_id": repo_id}
+    )
     _assert_tool_error(result, "invalid-params")
 
 
@@ -343,6 +353,21 @@ def test_describe_work_returns_the_item_verbatim(keys, auth) -> None:
     _, result = _call(keys, auth, shell, "describe_work", {"work_id": 4})
     assert result["structuredContent"]["item"] == record
     assert set(result["structuredContent"]["item"]) == ITEM_KEYS
+
+
+def test_describe_work_uses_the_selected_authorized_repository(keys) -> None:
+    shell = FakeShell(accepted(item_result(item_record(4)), "work.public.item-v1"))
+    response = edge_client(
+        keys[0], shell, allowed_repo_ids=frozenset({"repo-a", "repo-b"})
+    ).post(
+        MCP_PATH,
+        headers=identity_headers(assertion(keys[1], repo_ids=["repo-a", "repo-b"])),
+        json=call("describe_work", {"work_id": 4, "repo_id": "repo-b"}),
+    )
+    result = response.json()["result"]
+    assert result["isError"] is False
+    (envelope,) = shell.invocations
+    assert envelope["repo_id"] == "repo-b"
 
 
 # -- scope table ---------------------------------------------------------------

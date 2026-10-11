@@ -144,7 +144,7 @@ _TOOL_DEFS: dict[str, dict[str, Any]] = {
         "name": "list_ready_work",
         "title": "List ready work",
         "description": (
-            "Lists the workspace's ready work items: status pending and not "
+            "Lists ready work items from one repository in the workspace: status pending and not "
             "blocked by any unresolved dependency. Active, blocked and done "
             "items are not included. Order is the tracker's next-work order "
             "(priority 1 highest, unset last, then creation order). Each item "
@@ -156,7 +156,10 @@ _TOOL_DEFS: dict[str, dict[str, Any]] = {
             "reservation; an item listed here can stop being ready before you "
             "act on it. Cache it for at most ttlMs milliseconds. A failure is "
             "reported as a tool error, never as an empty list: an empty list "
-            "means there is no ready work."
+            "means there is no ready work. Pass repo_id to select one of the "
+            "repositories authorized by this request; it defaults to the "
+            "only authorized repository, and is required when there is more "
+            "than one."
         ),
         "inputSchema": {
             "type": "object",
@@ -167,7 +170,15 @@ _TOOL_DEFS: dict[str, dict[str, Any]] = {
                     "maximum": LIST_LIMIT_MAX,
                     "default": LIST_LIMIT_MAX,
                     "description": "Maximum number of items to return.",
-                }
+                },
+                "repo_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": (
+                        "Authorized repository to read. Defaults to the only "
+                        "authorized repository; required when multiple are authorized."
+                    ),
+                },
             },
             "additionalProperties": False,
         },
@@ -177,13 +188,17 @@ _TOOL_DEFS: dict[str, dict[str, Any]] = {
         "name": "describe_work",
         "title": "Describe a work item",
         "description": (
-            "Returns one work item by its integer work_id, in any status: "
+            "Returns one work item by its integer work_id from one repository "
+            "in the workspace, in any status: "
             "title, priority, status, blocked, blocked_by (the work_ids of "
             "unresolved blockers), resolution, created_at and updated_at. "
             "Read-only: it does not mark the item as seen, in progress or "
             "reserved for you. The answer reflects the record at read time; "
             "cache it for at most ttlMs milliseconds. An unknown work_id is a "
-            "tool error with code item-not-found."
+            "tool error with code item-not-found. Pass repo_id to select one "
+            "of the repositories authorized by this request; it defaults to "
+            "the only authorized repository, and is required when there is "
+            "more than one."
         ),
         "inputSchema": {
             "type": "object",
@@ -192,7 +207,15 @@ _TOOL_DEFS: dict[str, dict[str, Any]] = {
                     "type": "integer",
                     "minimum": 1,
                     "description": "The work item id, as listed by list_ready_work.",
-                }
+                },
+                "repo_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": (
+                        "Authorized repository to read. Defaults to the only "
+                        "authorized repository; required when multiple are authorized."
+                    ),
+                },
             },
             "required": ["work_id"],
             "additionalProperties": False,
@@ -463,44 +486,73 @@ def create_edge_app(
             return "Mcp-Name header disagrees with request body"
         return None
 
-    def _forwarded(identity: Identity, assertion: str, request_id: str) -> ForwardedIdentity:
+    def _forwarded(
+        identity: Identity,
+        assertion: str,
+        request_id: str,
+        repo_id: str | None = None,
+        *,
+        require_named_repo: bool = False,
+    ) -> ForwardedIdentity:
         repo_ids = sorted(identity.repo_ids)
         if not repo_ids:
             raise _ToolFailure(
                 "workspace-unbound", "the caller's assertion names no repository"
             )
-        if len(repo_ids) > 1:
+        if repo_id is None and len(repo_ids) > 1:
+            if require_named_repo:
+                raise _ToolFailure(
+                    "repo-id-required",
+                    "this request authorizes multiple repositories; pass repo_id to select one",
+                )
             raise _ToolFailure(
                 "workspace-ambiguous",
                 "the caller's assertion names more than one repository",
             )
+        selected_repo_id = repo_id if repo_id is not None else repo_ids[0]
+        if selected_repo_id not in identity.repo_ids:
+            raise _ToolFailure(
+                "repo-not-authorized",
+                "repo_id is not authorized by this request",
+            )
         return ForwardedIdentity(
             assertion=assertion,
             request_id=request_id,
-            repo_id=repo_ids[0],
+            repo_id=selected_repo_id,
             identity=identity,
         )
 
     def _invalid_params(message: str) -> _ToolFailure:
         return _ToolFailure("invalid-params", message)
 
-    def _list_arguments(arguments: dict[str, Any]) -> int:
-        if set(arguments) - {"limit"}:
-            raise _invalid_params("list_ready_work accepts only limit")
+    def _repo_argument(arguments: dict[str, Any]) -> str | None:
+        if "repo_id" not in arguments:
+            return None
+        repo_id = arguments["repo_id"]
+        if not isinstance(repo_id, str) or not repo_id:
+            raise _invalid_params("repo_id must be a non-empty string")
+        return repo_id
+
+    def _list_arguments(arguments: dict[str, Any]) -> tuple[int, str | None]:
+        if set(arguments) - {"limit", "repo_id"}:
+            raise _invalid_params("list_ready_work accepts only limit and repo_id")
         limit = arguments.get("limit", LIST_LIMIT_MAX)
         if not _is_int(limit) or not 1 <= limit <= LIST_LIMIT_MAX:
             raise _invalid_params(f"limit must be an integer from 1 to {LIST_LIMIT_MAX}")
-        return limit
+        return limit, _repo_argument(arguments)
 
-    def _describe_arguments(arguments: dict[str, Any]) -> int:
-        if set(arguments) - {"work_id"}:
-            raise _invalid_params("describe_work accepts only work_id")
+    def _describe_arguments(arguments: dict[str, Any]) -> tuple[int, str | None]:
+        if set(arguments) - {"work_id", "repo_id"}:
+            raise _invalid_params("describe_work accepts only work_id and repo_id")
         work_id = arguments.get("work_id")
         if not _is_int(work_id) or work_id < 1:
             raise _invalid_params("work_id must be an integer >= 1")
-        return work_id
+        return work_id, _repo_argument(arguments)
 
-    async def _list_ready_work(limit: int, forwarded: ForwardedIdentity) -> dict[str, Any]:
+    async def _list_ready_work(
+        parsed: tuple[int, str | None], forwarded: ForwardedIdentity
+    ) -> dict[str, Any]:
+        limit, _repo_id = parsed
         listing = await work_source.list_work(forwarded)
         # sprintctl's own ready rule: pending and not blocked.
         ready = [
@@ -514,7 +566,10 @@ def create_edge_app(
             "items": ready[:limit],
         }
 
-    async def _describe_work(work_id: int, forwarded: ForwardedIdentity) -> dict[str, Any]:
+    async def _describe_work(
+        parsed: tuple[int, str | None], forwarded: ForwardedIdentity
+    ) -> dict[str, Any]:
+        work_id, _repo_id = parsed
         return await work_source.describe_work(forwarded, work_id)
 
     tools = {
@@ -556,7 +611,14 @@ def create_edge_app(
         else:
             parse, run = tools[name]
             parsed = parse(arguments)
-        forwarded = _forwarded(identity, assertion, request_id)
+        selected_repo_id = parsed[1] if name in tools else None
+        forwarded = _forwarded(
+            identity,
+            assertion,
+            request_id,
+            selected_repo_id,
+            require_named_repo=name in tools,
+        )
         try:
             structured = await run(parsed, forwarded)
         except ToolFailure as failure:

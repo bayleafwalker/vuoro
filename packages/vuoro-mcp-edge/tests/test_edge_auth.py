@@ -141,7 +141,24 @@ def test_invocation_envelope_binds_request_id_and_single_repo(keys, auth) -> Non
     }
 
 
-def test_two_repositories_in_the_assertion_is_workspace_ambiguous(keys) -> None:
+def test_two_repositories_can_select_one_for_a_tool_call(keys) -> None:
+    shell = FakeShell(accepted(list_result(list_record(17))))
+    token = assertion(keys[1], repo_ids=["repo-a", "repo-b"])
+    response = edge_client(
+        keys[0], shell, allowed_repo_ids=frozenset({"repo-a", "repo-b"})
+    ).post(
+        MCP_PATH,
+        headers=identity_headers(token),
+        json=call("list_ready_work", {"repo_id": "repo-b"}),
+    )
+    result = response.json()["result"]
+    assert result["isError"] is False
+    assert [item["work_id"] for item in result["structuredContent"]["items"]] == [17]
+    (envelope,) = shell.invocations
+    assert envelope["repo_id"] == "repo-b"
+
+
+def test_multiple_repositories_require_a_named_selection(keys) -> None:
     shell = FakeShell()
     token = assertion(keys[1], repo_ids=["repo-a", "repo-b"])
     response = edge_client(
@@ -149,8 +166,25 @@ def test_two_repositories_in_the_assertion_is_workspace_ambiguous(keys) -> None:
     ).post(MCP_PATH, headers=identity_headers(token), json=call("list_ready_work"))
     result = response.json()["result"]
     assert result["isError"] is True
-    assert result["structuredContent"]["error"]["code"] == "workspace-ambiguous"
-    assert "items" not in result["structuredContent"]
+    error = result["structuredContent"]["error"]
+    assert error["code"] == "repo-id-required"
+    assert "pass repo_id" in error["message"]
+    assert shell.invoke_requests == []
+
+
+def test_selection_outside_the_assertion_is_refused_before_invocation(keys) -> None:
+    shell = FakeShell()
+    token = assertion(keys[1], repo_ids=["repo-a", "repo-b"])
+    response = edge_client(
+        keys[0], shell, allowed_repo_ids=frozenset({"repo-a", "repo-b"})
+    ).post(
+        MCP_PATH,
+        headers=identity_headers(token),
+        json=call("list_ready_work", {"repo_id": "repo-c"}),
+    )
+    result = response.json()["result"]
+    assert result["isError"] is True
+    assert result["structuredContent"]["error"]["code"] == "repo-not-authorized"
     assert shell.invoke_requests == []
 
 

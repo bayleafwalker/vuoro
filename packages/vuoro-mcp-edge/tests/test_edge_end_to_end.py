@@ -68,6 +68,10 @@ class _Sprintctl:
 
 @pytest.fixture
 def stack(keys):
+    return _build_stack(keys, frozenset({REPO_ID}))
+
+
+def _build_stack(keys, allowed_repo_ids: frozenset[str]):
     sprintctl = _Sprintctl()
     registry = CatalogRegistry()
     registry.register(
@@ -101,12 +105,15 @@ def stack(keys):
             },
         ),
         registry=registry,
-        identity_resolver=resolver(keys[0]),
+        identity_resolver=resolver(keys[0], allowed_repo_ids=allowed_repo_ids),
     )
     source = ShellWorkSource(
         base_url="http://127.0.0.1:8080", transport=httpx.ASGITransport(app=shell)
     )
-    edge = create_edge_app(identity_resolver=resolver(keys[0]), work_source=source)
+    edge = create_edge_app(
+        identity_resolver=resolver(keys[0], allowed_repo_ids=allowed_repo_ids),
+        work_source=source,
+    )
     return TestClient(edge), sprintctl
 
 
@@ -121,6 +128,20 @@ def test_forwarded_assertion_is_accepted_by_the_shell(stack, keys) -> None:
     (context,) = sprintctl.contexts
     assert context.repo_id == REPO_ID
     assert context.identity.actor == "github:123"
+
+
+def test_named_repository_selects_matching_shell_context(keys) -> None:
+    client, sprintctl = _build_stack(keys, frozenset({"repo-a", "repo-b"}))
+    token = assertion(keys[1], repo_ids=["repo-a", "repo-b"])
+    result = client.post(
+        MCP_PATH,
+        headers=identity_headers(token),
+        json=call("list_ready_work", {"repo_id": "repo-b"}),
+    ).json()["result"]
+    assert result["isError"] is False, result
+    assert [item["work_id"] for item in result["structuredContent"]["items"]] == [1]
+    (context,) = sprintctl.contexts
+    assert context.repo_id == "repo-b"
 
 
 def test_describe_blocked_item_through_the_shell(stack, auth) -> None:

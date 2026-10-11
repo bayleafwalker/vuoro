@@ -53,9 +53,13 @@ client --OAuth--> vuoro.cloud gateway --X-Vuoro-Identity + X-Request-Id--> POST 
   accepts each proof once, so one tool call can make several shell calls
   with one assertion while a captured call cannot be replayed),
   `X-Vuoro-Client-Protocol: 1`, the invocation `request_id` set to that
-  request id, and `repo_id` set to the single repository in the assertion
-  (zero is `workspace-unbound` and more than one is `workspace-ambiguous`,
-  both tool errors). The catalog is checked once per process and refetched
+  request id, and `repo_id` set to one repository in the assertion. The
+  `list_ready_work` and `describe_work` tools accept an optional `repo_id`:
+  omission defaults to the only authorized repository, while multiple
+  authorized repositories require an explicit selection (`repo-id-required`).
+  An unbound assertion is `workspace-unbound`; a selected repository outside
+  the assertion is `repo-not-authorized`. All are tool errors before an
+  upstream call. The catalog is checked once per process and refetched
   once on `stale-catalog`. Results are never cached, because authorization is
   per caller.
 
