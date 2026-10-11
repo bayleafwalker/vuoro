@@ -149,6 +149,9 @@ def test_gateway_assertion_resolver_accepts_cloud_contract(tmp_path: Path) -> No
         {"authorities": []},
         {"repo_ids": ["repo-c"]},
         {"invocation_id": "inv_01ARZ3NDEKTSV4RRFFQ69G5FAV"},
+        {"invocation_id": None, "attempt_id": None},
+        {"invocation_id": None, "attempt_id": "att_01ARZ3NDEKTSV4RRFFQ69G5FAV"},
+        {"invocation_id": "inv_01ARZ3NDEKTSV4RRFFQ69G5FAV", "attempt_id": None},
         {
             "invocation_id": "inv_bad",
             "attempt_id": "att_01ARZ3NDEKTSV4RRFFQ69G5FAV",

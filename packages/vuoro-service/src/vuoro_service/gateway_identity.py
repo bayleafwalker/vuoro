@@ -383,12 +383,22 @@ class GatewayAssertionIdentityResolver:
         # run handles bind to them.
         client_id = _optional_text(claims.get("client_id"), "client_id")
         grant_id = _optional_text(claims.get("grant_id"), "grant_id")
-        invocation_id = _optional_text(claims.get("invocation_id"), "invocation_id")
-        attempt_id = _optional_text(claims.get("attempt_id"), "attempt_id")
-        if (invocation_id is None) != (attempt_id is None):
+        invocation_present = "invocation_id" in claims
+        attempt_present = "attempt_id" in claims
+        if invocation_present != attempt_present:
             raise IdentityResolutionError(
                 "gateway identity invocation correlation claims must be paired"
             )
+        invocation_id = (
+            _required_text(claims["invocation_id"], "invocation_id")
+            if invocation_present
+            else None
+        )
+        attempt_id = (
+            _required_text(claims["attempt_id"], "attempt_id")
+            if attempt_present
+            else None
+        )
         if invocation_id is not None and (
             not _INVOCATION_ID.fullmatch(invocation_id)
             or not _ATTEMPT_ID.fullmatch(attempt_id or "")

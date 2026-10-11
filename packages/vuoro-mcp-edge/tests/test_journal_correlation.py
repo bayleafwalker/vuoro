@@ -162,3 +162,92 @@ async def test_multirepo_omission_and_client_correlation_ids_are_refused_before_
     assert forged["isError"] is True
     assert forged["structuredContent"]["error"]["code"] == "invalid-params"
     assert runs.registered == []
+
+
+@pytest.mark.anyio
+async def test_notifications_invalid_ids_and_header_mismatches_never_register(keys):
+    runs = _CapturingRuns()
+    app = _app(keys, frozenset({"repo-a"}), runs)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://edge"
+    ) as client:
+        notification = _call(_manifest())
+        notification.pop("id")
+        notification_response = await client.post(
+            MCP_PATH,
+            headers=identity_headers(
+                assertion(keys[1], authorities=["work:evidence"], repo_ids=["repo-a"])
+            ),
+            json=notification,
+        )
+        invalid_id_responses = []
+        for invalid_id in (None, True, False, 1.0, {"nested": 1}, [1]):
+            invalid_id_responses.append(
+                await client.post(
+                    MCP_PATH,
+                    headers=identity_headers(
+                        assertion(
+                            keys[1], authorities=["work:evidence"], repo_ids=["repo-a"]
+                        )
+                    ),
+                    json={**_call(_manifest()), "id": invalid_id},
+                )
+            )
+        method_mismatch = await client.post(
+            MCP_PATH,
+            headers={
+                **identity_headers(
+                    assertion(
+                        keys[1], authorities=["work:evidence"], repo_ids=["repo-a"]
+                    )
+                ),
+                "Mcp-Method": "tools/list",
+            },
+            json=_call(_manifest()),
+        )
+        name_mismatch = await client.post(
+            MCP_PATH,
+            headers={
+                **identity_headers(
+                    assertion(
+                        keys[1], authorities=["work:evidence"], repo_ids=["repo-a"]
+                    )
+                ),
+                "Mcp-Name": "list_ready_work",
+            },
+            json=_call(_manifest()),
+        )
+        protocol_mismatch = await client.post(
+            MCP_PATH,
+            headers={
+                **identity_headers(
+                    assertion(
+                        keys[1], authorities=["work:evidence"], repo_ids=["repo-a"]
+                    )
+                ),
+                "MCP-Protocol-Version": "2024-11-05",
+            },
+            json={
+                **_call(_manifest()),
+                "params": {
+                    "name": "register_run",
+                    "arguments": _manifest(),
+                    "protocolVersion": "2026-07-28",
+                },
+            },
+        )
+        null_repo = await client.post(
+            MCP_PATH,
+            headers=identity_headers(
+                assertion(keys[1], authorities=["work:evidence"], repo_ids=["repo-a"])
+            ),
+            json=_call(_manifest(), repo_id=None),
+        )
+    assert notification_response.status_code == 202
+    assert [response.status_code for response in invalid_id_responses] == [200] * 6
+    assert method_mismatch.status_code == 400
+    assert name_mismatch.status_code == 400
+    assert protocol_mismatch.status_code == 400
+    assert null_repo.status_code == 200
+    assert null_repo.json()["result"]["isError"] is True
+    assert runs.registered == []
