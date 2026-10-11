@@ -236,6 +236,16 @@ async def test_notifications_invalid_ids_and_header_mismatches_never_register(ke
                 },
             },
         )
+        unsupported_protocol = await client.post(
+            MCP_PATH,
+            headers={
+                **identity_headers(
+                    assertion(keys[1], authorities=["work:evidence"], repo_ids=["repo-a"])
+                ),
+                "MCP-Protocol-Version": "unsupported-version",
+            },
+            json=_call(_manifest()),
+        )
         null_repo = await client.post(
             MCP_PATH,
             headers=identity_headers(
@@ -248,6 +258,7 @@ async def test_notifications_invalid_ids_and_header_mismatches_never_register(ke
     assert method_mismatch.status_code == 400
     assert name_mismatch.status_code == 400
     assert protocol_mismatch.status_code == 400
+    assert unsupported_protocol.status_code == 400
     assert null_repo.status_code == 200
     assert null_repo.json()["result"]["isError"] is True
     assert runs.registered == []
