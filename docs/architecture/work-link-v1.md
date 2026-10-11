@@ -27,7 +27,11 @@ or owner response. It contains no claim about currentness or authorization.
 The maker operates under its current authenticated identity and an explicitly
 selected repository. It obtains the selected work item through the existing
 `read_work_delta` owner read, naming its own owned run and the item explicitly.
-It copies the response's complete `current` checkpoint into the link. The
+Before creating a link, it checks the owner envelope's top-level `repo_id` and
+the exact delta schema. It also checks `authorization_scope.run_id` equals its
+own run and `run_owned` is true, `current.repo_id` and `current.item_id` match
+the selected repository and item, and `work.item_id` matches the item. Only
+then does it copy the complete seven-field `current` object into the link. The
 checkpoint is comparison input only; it does not make owner facts current and
 does not authorize an action. A reader without a checkpoint makes the next
 owner comparison unknown rather than inventing a baseline.

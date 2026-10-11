@@ -9,18 +9,18 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 256,
-      "pattern": "^[^\\u0000-\\u001F\\u007F]{1,256}$"
+      "pattern": "^[^\\u0000-\\u001F\\u007F]{1,256}(?![\\s\\S])"
     },
     "repo_id": {
       "type": "string",
       "minLength": 1,
       "maxLength": 256,
-      "pattern": "^[^\\u0000-\\u001F\\u007F]{1,256}$"
+      "pattern": "^[^\\u0000-\\u001F\\u007F]{1,256}(?![\\s\\S])"
     },
     "item_id": {"type": "integer", "minimum": 1},
     "predecessor_run_id": {
       "type": "string",
-      "pattern": "^run_[0-9A-HJKMNP-TV-Z]{26}$"
+      "pattern": "^run_[0-9A-HJKMNP-TV-Z]{26}(?![\\s\\S])"
     },
     "owner_checkpoint": {"$ref": "#/$defs/owner_checkpoint"}
   },
@@ -40,36 +40,36 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 256,
-          "pattern": "^[^\\u0000-\\u001F\\u007F]{1,256}$"
+          "pattern": "^[^\\u0000-\\u001F\\u007F]{1,256}(?![\\s\\S])"
         },
         "item_id": {"type": "integer", "minimum": 1},
         "work_edit_revision": {
           "type": "string",
           "minLength": 1,
           "maxLength": 256,
-          "pattern": "^[^\\u0000-\\u001F\\u007F]{1,256}$"
+          "pattern": "^[^\\u0000-\\u001F\\u007F]{1,256}(?![\\s\\S])"
         },
         "status_revision": {
           "type": "string",
           "minLength": 1,
           "maxLength": 256,
-          "pattern": "^[^\\u0000-\\u001F\\u007F]{1,256}$"
+          "pattern": "^[^\\u0000-\\u001F\\u007F]{1,256}(?![\\s\\S])"
         },
         "current_release_digest": {
           "anyOf": [
-            {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            {"type": "string", "pattern": "^[0-9a-f]{64}(?![\\s\\S])"},
             {"type": "null"}
           ]
         },
         "current_decision_digest": {
           "anyOf": [
-            {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+            {"type": "string", "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"},
             {"type": "null"}
           ]
         },
         "current_reference_set_digest": {
           "anyOf": [
-            {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+            {"type": "string", "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"},
             {"type": "null"}
           ]
         }
