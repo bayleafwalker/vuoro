@@ -28,9 +28,8 @@ from vuoro_service.composition import (
     load_gateway_assertion_resolver,
 )
 
-from . import claim_tools, effect_tools, read_tools, record_tools
+from . import claim_tools, effect_tools, read_tools, record_tools, work_link_tools
 from .edge_proof_auth import EdgeProofAuth
-from .runs import UnavailableRunRegistry
 from .server import create_edge_app
 from .toolsets import ToolSet, ToolsetContext
 from .work_source import DEFAULT_UPSTREAM_URL, ShellWorkSource
@@ -88,7 +87,9 @@ def _timeout(env: Mapping[str, str]) -> float:
     try:
         value = float(raw)
     except ValueError as error:
-        raise EdgeConfigurationError(f"{ENV_UPSTREAM_TIMEOUT} must be a number") from error
+        raise EdgeConfigurationError(
+            f"{ENV_UPSTREAM_TIMEOUT} must be a number"
+        ) from error
     if not 0 < value <= 30:
         raise EdgeConfigurationError(f"{ENV_UPSTREAM_TIMEOUT} must be in (0, 30]")
     return value
@@ -132,5 +133,6 @@ def build_toolsets(context: ToolsetContext) -> tuple[ToolSet, ...]:
         claim_tools.build_toolset(context),
         effect_tools.build_toolset(context),
         read_tools.build_toolset(context),
+        work_link_tools.build_toolset(context),
     )
     return tuple(toolset for toolset in built if toolset is not None)

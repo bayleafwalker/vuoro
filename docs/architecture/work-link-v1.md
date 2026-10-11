@@ -59,9 +59,10 @@ qualified, is limited to the existing `vuoro:work.read` surface for the
 read-only link tools; successor registration remains a separate existing
 operation under its existing authorities.
 
-## Contract-only scope
+## Native tool surface
 
-This document and schema define the artifact and locator text only. They do
-not add Native tools, Cloud allowlist entries, URI resolution, source fetching,
-or an alternate continuation path. Tool names, availability, and composition
-remain subject to a separate product-fit review before implementation.
+The Native edge exposes `make_work_link` and `read_work_link` only when its
+owner catalog advertises `work.run.continuation-delta-v1` and the run registry
+supports predecessor continuation. Both tools use the existing `work:read`
+authority and this same owner operation. They add no owner operation or state;
+Cloud exposure is a separate allowlist change and is not implied here.
