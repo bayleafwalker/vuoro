@@ -226,11 +226,10 @@ class RecordShellClient:
     (work_source.py), which this module cannot use directly because it does
     not expose `work.run.*`/`work.evidence.*`/`work.session-note.*` and is
     frozen/shared (see the module docstring).  Unlike `ShellWorkSource`, this
-    client does not cache the catalog or retry on `stale-catalog`: every
-    record-bucket operation is `idempotency="not-allowed"` at the envelope
-    level (sprintctl.vuoro_adapter's E2 contracts) and manages its own
-    idempotency internally, so a bare retry is always safe to leave to the
-    caller rather than build in here.
+    client does not cache the catalog or retry on `stale-catalog`: record
+    bucket operations manage idempotency internally. The correlated run
+    registration contract additionally requires the same existing domain key
+    at the invocation-envelope level; it is never generated here.
     """
 
     def __init__(
@@ -278,7 +277,12 @@ class RecordShellClient:
         )
 
     async def invoke(
-        self, operation: str, arguments: dict[str, Any], forwarded: ForwardedIdentity
+        self,
+        operation: str,
+        arguments: dict[str, Any],
+        forwarded: ForwardedIdentity,
+        *,
+        idempotency_key: str | None = None,
     ) -> Any:
         envelope = {
             "schema_version": "invocation/v1",
@@ -287,7 +291,7 @@ class RecordShellClient:
             "arguments": arguments,
             "catalog_revision": None,
             "basis_revision": None,
-            "idempotency_key": None,
+            "idempotency_key": idempotency_key,
             "repo_id": forwarded.repo_id,
         }
         try:
@@ -643,7 +647,12 @@ class SprintctlRecordStore:
             if use_correlated
             else OPERATION_RUN_REGISTER
         )
-        result = await self._client.invoke(operation, arguments, forwarded)
+        result = await self._client.invoke(
+            operation,
+            arguments,
+            forwarded,
+            idempotency_key=idempotency_key if use_correlated else None,
+        )
         if use_correlated:
             expected_manifest = dict(manifest)
             if predecessor_run_id is not None:

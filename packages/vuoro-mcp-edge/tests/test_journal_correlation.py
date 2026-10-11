@@ -296,6 +296,28 @@ async def test_signed_pair_uses_owner_capability_and_validates_typed_receipt(
                 "assertion": request.headers["x-vuoro-identity"],
             }
         )
+        envelope = owner_requests[-1]["envelope"]
+        # The correlated owner contract requires the envelope key as well as
+        # the domain argument. Keep the mock strict so dropping either side of
+        # that binding fails at the same boundary as the real owner.
+        if envelope.get("idempotency_key") != envelope.get("arguments", {}).get(
+            "idempotency_key"
+        ):
+            return httpx.Response(
+                400,
+                json={
+                    "schema_version": "invocation-result/v1",
+                    "request_id": REQUEST_ID,
+                    "operation": "work.run.register-correlated-v1",
+                    "catalog_revision": "rev-1",
+                    "status": "rejected",
+                    "result": None,
+                    "error": {
+                        "code": "idempotency-key-required",
+                        "message": "operation requires an idempotency key",
+                    },
+                },
+            )
         run_id = "run_01ARZ3NDEKTSV4RRFFQ69G5FAV"
         observed_profile = _manifest()["observed_profile"]
         run = {
@@ -382,6 +404,8 @@ async def test_signed_pair_uses_owner_capability_and_validates_typed_receipt(
     assert envelope["arguments"] == {
         key: value for key, value in _manifest().items() if key != "repo_id"
     }
+    assert envelope["idempotency_key"] == _manifest()["idempotency_key"]
+    assert envelope["idempotency_key"] == envelope["arguments"]["idempotency_key"]
     assert "invocation_id" not in envelope["arguments"]
     assert "attempt_id" not in envelope["arguments"]
     assert "principal_epoch" not in envelope["arguments"]
@@ -452,4 +476,5 @@ async def test_missing_or_failed_owner_catalog_keeps_legacy_run_response_shape(
         "run_id": "run_01ARZ3NDEKTSV4RRFFQ69G5FAV"
     }
     assert observed[0]["operation"] == "work.run.register-v1"
+    assert observed[0]["idempotency_key"] is None
     assert "invocation_id" not in observed[0]["arguments"]
