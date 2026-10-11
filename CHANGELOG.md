@@ -5,6 +5,15 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service 0.1.94 / vuoro-mcp-edge 0.1.7 candidate: adds caller-bound
+  `explain_acceptance` using the pinned operator-projection 0.2.5 release.
+  The tool requires both work-read and effect-read authorities, checks read
+  semantics against the exact catalog revision and redacts private owner
+  records. Its result reports P1 link consistency and unavailable sources;
+  currentness and current authorization remain unknown. Owner adapter and
+  client release pins stay unchanged. Cloud rollout and real-client acceptance
+  remain separately qualified deployment work.
+
 - vuoro-service 0.1.93 candidate: packages the already merged MCP edge
   `preview_acceptance` and `read_work_delta` reads with the service, and adds
   Git to the service image so the pinned Sprintctl preview parser can report
