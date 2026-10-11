@@ -5,6 +5,11 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-mcp-edge: `list_ready_work` and `describe_work` accept an optional
+  per-call `repo_id`. Calls default to the sole authorized repository and
+  require an explicit authorized selection when the assertion covers multiple
+  repositories; the gateway assertion and grant model are unchanged.
+
 - vuoro-service 0.1.94 / vuoro-mcp-edge 0.1.7 candidate: adds caller-bound
   `explain_acceptance` using the pinned operator-projection 0.2.5 release.
   The tool requires both work-read and effect-read authorities, checks read
