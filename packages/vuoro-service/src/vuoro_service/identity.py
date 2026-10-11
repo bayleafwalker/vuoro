@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
-import re
 from typing import Literal
 
 from fastapi import Request
-
 
 #: A minted principal identifier: ``<issuer>:<subject>:<epoch>``. The epoch is a
 #: per-subject issuance counter that increments on any reissue -- a rename, a
@@ -71,6 +70,10 @@ class Identity:
     #: workspace token.  Run handles bind to both when present.
     client_id: str | None = None
     grant_id: str | None = None
+    # Optional, paired gateway transport provenance for admitted MCP writes.
+    # These values are not authorities and are never minted by Vuoro.
+    invocation_id: str | None = None
+    attempt_id: str | None = None
 
     def __post_init__(self) -> None:
         if self.principal_id is not None and not (
