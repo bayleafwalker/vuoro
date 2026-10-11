@@ -81,6 +81,26 @@ _READ = {
     },
     "annotations": _READ_ONLY,
 }
+_INSPECT = {
+    "name": "inspect_work_link",
+    "title": "Inspect a work link for successor setup",
+    "description": (
+        "Parse the canonical locator locally and confirm that its workspace and "
+        "repository match this request's current identity and selected repository. "
+        "Returns only the predecessor run and item identifiers needed to register "
+        "a successor. These are untrusted locator inputs; owner facts remain unknown, "
+        "and the result authorizes no action. The locator is never fetched."
+    ),
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "work_link": {"type": "string", "minLength": 1, "maxLength": MAX_URI_BYTES},
+        },
+        "required": ["work_link"],
+        "additionalProperties": False,
+    },
+    "annotations": _READ_ONLY,
+}
 
 
 def _fail_arguments() -> ToolFailure:
@@ -106,6 +126,23 @@ def _parse_read(args: dict[str, Any]) -> dict[str, Any]:
         set(args) != {"run_id", "work_link"}
         or type(args.get("run_id")) is not str
         or RUN_ID.fullmatch(args["run_id"]) is None
+        or type(args.get("work_link")) is not str
+        or not args["work_link"]
+        or len(args["work_link"]) > MAX_URI_BYTES
+    ):
+        raise _fail_arguments()
+    try:
+        args["_link"] = decode_work_link(args["work_link"])
+    except (ValueError, UnicodeError, json.JSONDecodeError):
+        raise ToolFailure(
+            "invalid-work-link", "the work link is not a canonical Vuoro locator"
+        ) from None
+    return args
+
+
+def _parse_inspect(args: dict[str, Any]) -> dict[str, Any]:
+    if (
+        set(args) != {"work_link"}
         or type(args.get("work_link")) is not str
         or not args["work_link"]
         or len(args["work_link"]) > MAX_URI_BYTES
@@ -271,6 +308,7 @@ def _validate_owner_delta(
         or type(work) is not dict
         or type(work.get("item_id")) is not int
         or work.get("item_id") != item_id
+        or delta.get("authorizes_action") is not False
     ):
         raise ToolFailure(
             "owner-response-invalid",
@@ -355,6 +393,9 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
     async def describe_read():
         return _READ if await available() else None
 
+    async def describe_inspect():
+        return _INSPECT if await available() else None
+
     async def make(
         args: dict[str, Any], forwarded: ForwardedIdentity
     ) -> dict[str, Any]:
@@ -413,6 +454,23 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
         )
         return delta
 
+    async def inspect(
+        args: dict[str, Any], forwarded: ForwardedIdentity
+    ) -> dict[str, Any]:
+        link = args["_link"]
+        workspace_id = _current_workspace(forwarded)
+        if link["workspace_id"] != workspace_id or link["repo_id"] != forwarded.repo_id:
+            raise ToolFailure(
+                "work-link-scope-mismatch",
+                "the link belongs to another workspace or repository",
+            )
+        return {
+            "predecessor_run_id": link["predecessor_run_id"],
+            "item_id": link["item_id"],
+            "owner_facts": "UNKNOWN",
+            "authorizes_action": False,
+        }
+
     return ToolSet(
         "work-link-read",
         (
@@ -432,6 +490,15 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
                 _parse_read,
                 read,
                 describe=describe_read,
+                required_authorities=frozenset({"work:read"}),
+            ),
+            ToolSpec(
+                "inspect_work_link",
+                "read",
+                _INSPECT,
+                _parse_inspect,
+                inspect,
+                describe=describe_inspect,
                 required_authorities=frozenset({"work:read"}),
             ),
         ),

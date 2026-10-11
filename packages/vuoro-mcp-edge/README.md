@@ -74,6 +74,7 @@ client --OAuth--> vuoro.cloud gateway --X-Vuoro-Identity + X-Request-Id--> POST 
 | `read_work_delta` `{run_id, item_id, checkpoint?, limit?, cursor?, after_note_id?, after_chain_seq?}` | read | `work:read` | `work.run.continuation-delta-v1` | bounded current owner facts for the explicitly named owned run and item; authorizes no action |
 | `make_work_link` `{run_id, item_id}` | read | `work:read` | `work.run.continuation-delta-v1` | canonical `vuoro-work://link/v1/` locator with the selected item, predecessor run and optional owner checkpoint |
 | `read_work_link` `{run_id, work_link}` | read | `work:read` | `work.run.continuation-delta-v1` | unchanged continuation delta for the current caller's own successor run; parses locally and never fetches the locator |
+| `inspect_work_link` `{work_link}` | read | `work:read` | local canonical decode | predecessor run and item identifiers for successor setup, with owner facts marked `UNKNOWN`; authorizes no action |
 
 The two owner-read tools require a fresh Sprintctl catalog and composition that
 advertise these exact operations. An older owner fails closed as unavailable;

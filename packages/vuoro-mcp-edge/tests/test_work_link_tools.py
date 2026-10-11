@@ -131,6 +131,8 @@ class OwnerSource:
             delta["authorization_scope"]["run_owned"] = False
         elif self.response_mutation == "missing-predecessor":
             delta.pop("predecessor_run_id")
+        elif self.response_mutation == "authorizes":
+            delta["authorizes_action"] = True
         envelope = {"repo_id": caller.repo_id, "delta": delta}
         if self.response_mutation == "extra-envelope":
             envelope["unexpected"] = "forged"
@@ -228,6 +230,38 @@ def test_reader_uses_b_run_and_returns_the_owner_delta_unchanged():
     )
 
 
+def test_inspector_returns_local_identifiers_with_unknown_facts_only():
+    source, _, tools, maker, reader = _pair()
+    uri = _call(tools, "make_work_link", {"run_id": RUN_A, "item_id": 17}, maker)[
+        "work_link"
+    ]
+    call_count = len(source.calls)
+    result = _call(tools, "inspect_work_link", {"work_link": uri}, reader)
+    assert result == {
+        "predecessor_run_id": RUN_A,
+        "item_id": 17,
+        "owner_facts": "UNKNOWN",
+        "authorizes_action": False,
+    }
+    assert len(source.calls) == call_count
+
+
+@pytest.mark.parametrize(
+    "change", [{"workspace": "workspace-foreign"}, {"repo": "repo-foreign"}]
+)
+def test_inspector_refuses_foreign_scope_without_owner_call(change):
+    source, _, tools, maker, _ = _pair()
+    uri = _call(tools, "make_work_link", {"run_id": RUN_A, "item_id": 17}, maker)[
+        "work_link"
+    ]
+    call_count = len(source.calls)
+    caller = _identity("principal-c", client="client-c", grant="grant-c", **change)
+    with pytest.raises(ToolFailure) as failure:
+        _call(tools, "inspect_work_link", {"work_link": uri}, caller)
+    assert failure.value.code == "work-link-scope-mismatch"
+    assert len(source.calls) == call_count
+
+
 @pytest.mark.parametrize(
     "change",
     [
@@ -310,7 +344,7 @@ def test_owner_stale_checkpoint_refusal_is_not_replaced_with_a_delta():
 
 
 @pytest.mark.parametrize(
-    "mutation", ["run", "repo", "item", "not-owned", "extra-envelope"]
+    "mutation", ["run", "repo", "item", "not-owned", "extra-envelope", "authorizes"]
 )
 def test_maker_rejects_forged_owner_response_before_minting(mutation):
     source, _, tools, maker, _ = _pair()
@@ -321,7 +355,8 @@ def test_maker_rejects_forged_owner_response_before_minting(mutation):
 
 
 @pytest.mark.parametrize(
-    "mutation", ["run", "repo", "item", "not-owned", "missing-predecessor"]
+    "mutation",
+    ["run", "repo", "item", "not-owned", "missing-predecessor", "authorizes"],
 )
 def test_reader_rejects_forged_or_unlinked_owner_response(mutation):
     source, _, tools, maker, reader = _pair()
@@ -457,6 +492,19 @@ def test_asgi_lists_and_calls_work_link_only_with_work_read_authority(tmp_path):
             )
         )
 
+    def no_read_headers() -> dict[str, str]:
+        return identity_headers(
+            assertion(
+                private,
+                subject="01K66666666666666666666666",
+                client_id="native-c",
+                grant_id="grant-c",
+                authorities=[],
+                repo_ids=[REPO_ID],
+                workspace_id=WORKSPACE_ID,
+            )
+        )
+
     async def scenario() -> None:
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://edge"
@@ -466,13 +514,28 @@ def test_asgi_lists_and_calls_work_link_only_with_work_read_authority(tmp_path):
             )
             listed = listed_response.json()
             names = [tool["name"] for tool in listed["result"]["tools"]]
-            assert {"make_work_link", "read_work_link"} <= set(names)
+            assert {"make_work_link", "inspect_work_link", "read_work_link"} <= set(
+                names
+            )
             made_response = await client.post(
                 MCP_PATH,
                 headers=maker_headers(),
                 json=call("make_work_link", {"run_id": RUN_A, "item_id": 17}),
             )
             uri = made_response.json()["result"]["structuredContent"]["work_link"]
+            owner_calls_before_inspect = len(source.calls)
+            inspected_response = await client.post(
+                MCP_PATH,
+                headers=reader_headers(),
+                json=call("inspect_work_link", {"work_link": uri}),
+            )
+            assert inspected_response.json()["result"]["structuredContent"] == {
+                "predecessor_run_id": RUN_A,
+                "item_id": 17,
+                "owner_facts": "UNKNOWN",
+                "authorizes_action": False,
+            }
+            assert len(source.calls) == owner_calls_before_inspect
             read_response = await client.post(
                 MCP_PATH,
                 headers=reader_headers(),
@@ -484,5 +547,9 @@ def test_asgi_lists_and_calls_work_link_only_with_work_read_authority(tmp_path):
                 ]
                 == RUN_A
             )
+            no_read_response = await client.post(
+                MCP_PATH, headers=no_read_headers(), json=rpc("tools/list")
+            )
+            assert no_read_response.status_code == 401
 
     asyncio.run(scenario())

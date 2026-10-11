@@ -39,8 +39,15 @@ owner comparison unknown rather than inventing a baseline.
 
 The reader uses its own current identity and selected repository. It refuses a
 link whose workspace or repository differs from that identity before any
-owner read. The reader agent registers its own successor run separately,
-naming the link's `predecessor_run_id` through the existing
+owner read. Before successor registration, `inspect_work_link` parses the
+locator locally and checks that its workspace and repository match the
+inspector's current identity and selected repository. It returns the locator's
+`predecessor_run_id` and `item_id` so the caller can provide them to the
+existing `register_run` operation. Those identifiers remain untrusted locator
+input: inspection makes no owner read, validates no predecessor run, and
+reports `owner_facts: "UNKNOWN"` and `authorizes_action: false`. The reader
+agent then registers its own successor run separately, naming the link's
+`predecessor_run_id` through the existing
 `register_run` contract and its existing `work:evidence` plus `work:read`
 requirements. The read-only link reader then calls the existing
 continuation-delta owner read with that successor run, the exact linked item,
@@ -61,8 +68,10 @@ operation under its existing authorities.
 
 ## Native tool surface
 
-The Native edge exposes `make_work_link` and `read_work_link` only when its
+The Native edge exposes `make_work_link`, `inspect_work_link`, and
+`read_work_link` only when its
 owner catalog advertises `work.run.continuation-delta-v1` and the run registry
-supports predecessor continuation. Both tools use the existing `work:read`
-authority and this same owner operation. They add no owner operation or state;
-Cloud exposure is a separate allowlist change and is not implied here.
+supports predecessor continuation. All three use the existing `work:read`
+authority; make/read use this same owner operation, while inspection only
+parses the locator and checks caller scope. The tools add no owner operation or
+state. Cloud exposure is a separate allowlist change and is not implied here.
