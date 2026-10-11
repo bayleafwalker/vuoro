@@ -12,6 +12,7 @@ dependencies = [
   "vuoro-service",
   "vuoro-evidence",
   "httpx>=0.27,<1",
+  "operator-projection @ https://github.com/bayleafwalker/agentops/releases/download/operator-projection-v0.2.5/operator_projection-0.2.5-py3-none-any.whl#sha256=6ebd68e0ac9bd13efc19273375b4b10b024832ae85903fc36a2c26a3afbe7b84",
 ]
 
 [project.optional-dependencies]
@@ -19,6 +20,9 @@ test = ["pytest>=8.3,<9"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/vuoro_mcp_edge"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.uv.sources]
 vuoro-service = { workspace = true }

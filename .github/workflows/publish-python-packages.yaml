@@ -54,7 +54,7 @@ jobs:
           uv run --package vuoro-service --extra test python \
             scripts/validate_release_contract.py "${wheels[@]}" --release
           uv venv --python 3.12 /tmp/vuoro-release-conformance
-          uv pip install --python /tmp/vuoro-release-conformance/bin/python \
+          uv pip install --no-config --python /tmp/vuoro-release-conformance/bin/python \
             "${wheels[@]}" 'httpx>=0.27,<1'
           /tmp/vuoro-release-conformance/bin/python \
             scripts/validate_served_conformance.py
@@ -66,7 +66,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-16
           uv venv --python 3.12 /tmp/vuoro-demo-release
-          uv pip install --python /tmp/vuoro-demo-release/bin/python dist/vuoro-demo/*.whl 'pytest>=8,<10'
+          uv pip install --no-config --python /tmp/vuoro-demo-release/bin/python dist/vuoro-demo/*.whl 'pytest>=8,<10'
           uv pip check --python /tmp/vuoro-demo-release/bin/python
           VUORO_DEMO_TEST_PG_BIN=/usr/lib/postgresql/16/bin \
             /tmp/vuoro-demo-release/bin/python -m pytest packages/vuoro-demo/tests -q

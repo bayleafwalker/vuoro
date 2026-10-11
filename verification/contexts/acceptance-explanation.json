@@ -1,0 +1,85 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.acceptance-explanation",
+  "owner_repo": "vuoro",
+  "subject": "Caller-bound read-only transport of released P1 acceptance explanations",
+  "contract_ref": {
+    "doc_id": "acceptance-explanation-v1",
+    "revision": "sha256:b7c4663a11769842c23fa4bf4909566ee077ae112d76097dd3d00cc89082115a"
+  },
+  "source_of_truth": "Sprintctl owner reads; released operator-projection025 owns P1 link reconstruction; edge owns caller transport only",
+  "depth": 2,
+  "backends": [
+    "actual ASGI runtime shell with synthetic owner handlers",
+    "production Docker image with immutable released adapters"
+  ],
+  "actors": [
+    "verified OAuth MCP caller",
+    "foreign workspace caller",
+    "concurrent catalog refresher"
+  ],
+  "initial_state": [
+    "released protected intent and four existing owner read operations",
+    "pinned projection025 wheel and client012 release"
+  ],
+  "operations": [
+    {
+      "name": "explain_acceptance",
+      "actors": [
+        "verified OAuth MCP caller"
+      ],
+      "synchronization": "non-atomic four-read sequence, per-call body-bound proof; exact checked catalog revision"
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "redacted P1 links and caller-bound read invocation sequence"
+  },
+  "assumptions": {
+    "isolation": "gateway identity and runtime owner authorization verified separately for each shell call",
+    "clock": "30 second assertion lifetime; no currentness or authority inferred from observation timestamps",
+    "fairness": "no availability guarantee after owner denial or unavailable catalog"
+  },
+  "bounds": {
+    "owner_read_operations": 4,
+    "stale_catalog_retries_per_read": 1,
+    "intent_id_length": 128,
+    "owner_item_id_max": 9223372036854775807
+  },
+  "invariants": [
+    "both work:read and work.effect.get required before invocation",
+    "every owner read forwards the same verified caller assertion and repository",
+    "each emitted read uses the catalog revision whose read semantics were checked",
+    "a refreshed write or missing operation cannot be retried",
+    "private owner content and upstream messages are absent from output",
+    "P1 completeness is link consistency only; unavailable sources explicit and authorization/currentness unknown"
+  ],
+  "faults": [
+    "denied owner reads",
+    "missing receipt",
+    "changed Release digest",
+    "foreign repository or intent binding",
+    "unbounded or boolean owner item ID",
+    "malformed or duplicate catalog operations",
+    "operation changes from read to write after stale-catalog response",
+    "concurrent catalog refresh before POST",
+    "replayed proof or absent proof on OAuth-bound call",
+    "foreign workspace"
+  ],
+  "oracles": [
+    "packages/vuoro-mcp-edge/tests/test_acceptance_explanation.py",
+    "vuoro.boundaries: four wheel builds precede distribution boundary checks",
+    "vuoro.suite: workspace regression suite",
+    "scripts/mcp_strict_client.sh: strict protocol and two-workspace isolation against actual built image"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-mcp-edge/src/vuoro_mcp_edge/acceptance_explanation.py:build_spec",
+    "packages/vuoro-mcp-edge/src/vuoro_mcp_edge/work_source.py:ShellWorkSource._invoke",
+    "packages/vuoro-mcp-edge/tests/test_acceptance_explanation.py"
+  ],
+  "expansions": [
+    "semantic-doc",
+    "concurrent-history",
+    "fault-scenario"
+  ]
+}
