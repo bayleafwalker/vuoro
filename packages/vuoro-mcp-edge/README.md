@@ -70,6 +70,16 @@ client --OAuth--> vuoro.cloud gateway --X-Vuoro-Identity + X-Request-Id--> POST 
 | `list_ready_work` `{limit?: 1..50 = 50}` | read | `work:read` | `work.public.list-v1` | items with `status == "pending"` and `blocked == false` (sprintctl's ready rule), owner order, each exactly `work_id, title, priority, status, blocked, updated_at` |
 | `describe_work` `{work_id: integer >= 1}` | read | `work:read` | `work.public.item-v1` | the item whose `work_id` matches the request (a different one is `upstream-mismatch`), in any status, exactly the six list fields plus `created_at, resolution, blocked_by` |
 | `explain_acceptance` `{intent_id: bounded identifier}` | effect-read and read | `work.effect.get` and `work:read` | effect, Release, Decision and lease owner reads | redacted P1 link explanation, explicit unavailable sources and missing links; authorizes no effect |
+| `preview_acceptance` `{intent_id, revision, canonical_intent_digest, artifact_sha256, verification_ref?}` | effect-read and read | `work.effect.get` and `work:read` | `work.effect.acceptance-snapshot-v1` | bounded exact-artifact owner snapshot; authorizes no effect |
+| `read_work_delta` `{run_id, item_id, checkpoint?, limit?, cursor?, after_note_id?, after_chain_seq?}` | read | `work:read` | `work.run.continuation-delta-v1` | bounded current owner facts for the explicitly named owned run and item; authorizes no action |
+
+The two owner-read tools require a fresh Sprintctl catalog and composition that
+advertise these exact operations. An older owner fails closed as unavailable;
+the edge does not synthesize snapshots from legacy reads or substitute a local
+fallback. These request schemas intentionally require the exact artifact digest
+for previews and an explicit item plus the new complete checkpoint shape for
+deltas. Existing clients using earlier request shapes must be requalified
+against the new catalog and owner composition before use.
 
 `explain_acceptance` appears only when all four required owner operations are
 advertised as reads. It uses the caller's assertion for each read, refuses a

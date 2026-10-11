@@ -59,7 +59,10 @@ _DELTA = {
         "Read bounded owner facts for an explicitly named, currently owned run "
         "and work item. Checkpoints are caller comparison data; source bytes and "
         "external Git correspondence are unknown. A cursor only pages the current "
-        "owner reference set and is refused when its snapshot becomes stale."
+        "owner reference set and is refused when its snapshot becomes stale. "
+        "Reference URL and label values marked incomplete are excerpts; do not use "
+        "an incomplete URL as a link. Owner truncation markers and digests are "
+        "returned unchanged."
     ),
     "inputSchema": {"type": "object", "properties": {
         "run_id": {"type": "string", "pattern": RUN_ID.pattern},

@@ -74,6 +74,16 @@ def test_preview_forwards_exact_basis_once_and_returns_owner_snapshot_unchanged(
     assert source.calls == [(ACCEPTANCE_SNAPSHOT, args, REPO)]
 
 
+def test_legacy_preview_request_without_exact_artifact_digest_fails_closed():
+    source = OwnerSource()
+    tool = _tool(source, "preview_acceptance")
+    with pytest.raises(ToolFailure) as error:
+        tool.parse({"intent_id": "effect_1", "revision": 3,
+                    "canonical_intent_digest": INTENT_DIGEST})
+    assert error.value.code == "invalid-arguments"
+    assert source.calls == []
+
+
 def test_delta_requires_explicit_run_and_item_and_maps_one_owner_call():
     source = OwnerSource()
     args = {"run_id": RUN_ID, "item_id": 7, "limit": 12,
@@ -84,6 +94,28 @@ def test_delta_requires_explicit_run_and_item_and_maps_one_owner_call():
     assert source.calls == [(CONTINUATION_DELTA, args, REPO)]
     with pytest.raises(ToolFailure, match="explicit work item"):
         tool.parse({"run_id": RUN_ID})
+
+
+def test_legacy_delta_request_without_explicit_item_fails_closed():
+    source = OwnerSource()
+    tool = _tool(source, "read_work_delta")
+    with pytest.raises(ToolFailure) as error:
+        tool.parse({"run_id": RUN_ID, "work_id": 7})
+    assert error.value.code == "invalid-arguments"
+    assert source.calls == []
+
+
+def test_delta_preserves_owner_reference_truncation_markers():
+    delta = {"schema": "sprintctl-work-continuation-delta/v1",
+        "reference_page": [{"url": "https://example.test/" + "x" * 2028,
+            "url_truncated": True, "url_is_complete": False,
+            "url_sha256": "sha256:" + "e" * 64,
+            "label": "label excerpt", "label_truncated": True,
+            "label_sha256": "sha256:" + "f" * 64}]}
+    source = OwnerSource({CONTINUATION_DELTA: {"repo_id": REPO, "delta": delta}})
+    tool = _tool(source, "read_work_delta")
+    result = asyncio.run(tool.run(tool.parse({"run_id": RUN_ID, "item_id": 7}), _caller()))
+    assert result["reference_page"] == delta["reference_page"]
 
 
 def test_bad_checkpoint_or_cursor_is_refused_before_owner_call():
