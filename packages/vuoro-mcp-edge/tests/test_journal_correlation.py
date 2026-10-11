@@ -267,7 +267,10 @@ async def test_notifications_invalid_ids_and_header_mismatches_never_register(ke
 
 
 @pytest.mark.anyio
-async def test_signed_pair_uses_owner_capability_and_validates_typed_receipt(keys):
+@pytest.mark.parametrize("owner_status", ["bound", "legacy-unbound"])
+async def test_signed_pair_uses_owner_capability_and_validates_typed_receipt(
+    keys, owner_status
+):
     invocation_id = "inv_01ARZ3NDEKTSV4RRFFQ69G5FAV"
     attempt_id = "att_01ARZ3NDEKTSV4RRFFQ69G5FAV"
     token = assertion(
@@ -338,8 +341,8 @@ async def test_signed_pair_uses_owner_capability_and_validates_typed_receipt(key
                 "result": {
                     "repo_id": "repo-a",
                     "run": run,
-                    "correlation_status": "bound",
-                    "receipt": receipt,
+                    "correlation_status": owner_status,
+                    "receipt": receipt if owner_status == "bound" else None,
                 },
                 "error": None,
             },
@@ -363,8 +366,13 @@ async def test_signed_pair_uses_owner_capability_and_validates_typed_receipt(key
     assert tool_result["isError"] is False, tool_result
     content = tool_result["structuredContent"]
     assert content["run_id"] == "run_01ARZ3NDEKTSV4RRFFQ69G5FAV"
-    assert content["correlation_status"] == "bound"
-    assert content["receipt"]["invocation_id"] == invocation_id
+    assert content["correlation_status"] == owner_status
+    if owner_status == "bound":
+        assert content["receipt"]["invocation_id"] == invocation_id
+    else:
+        assert content["receipt"] is None
+        # This is an explicit owner-level unbound result. The edge preserves
+        # it for the caller so the gateway can retain UNKNOWN, not acceptance.
     assert len(owner_requests) == 1
     forwarded = owner_requests[0]
     assert forwarded["assertion"] == token
@@ -380,7 +388,13 @@ async def test_signed_pair_uses_owner_capability_and_validates_typed_receipt(key
 
 
 @pytest.mark.anyio
-async def test_missing_owner_capability_keeps_legacy_run_response_shape(keys):
+@pytest.mark.parametrize(
+    "catalog_status,catalog_payload",
+    [(200, {"operations": []}), (503, {"error": "unavailable"})],
+)
+async def test_missing_or_failed_owner_catalog_keeps_legacy_run_response_shape(
+    keys, catalog_status, catalog_payload
+):
     token = assertion(
         keys[1],
         authorities=["work:evidence"],
@@ -394,7 +408,7 @@ async def test_missing_owner_capability_keeps_legacy_run_response_shape(keys):
 
     def owner(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/api/catalog/v1":
-            return httpx.Response(200, json={"operations": []})
+            return httpx.Response(catalog_status, json=catalog_payload)
         envelope = json.loads(request.content)
         observed.append(envelope)
         run = {
