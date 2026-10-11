@@ -16,8 +16,8 @@ SHARED_PACKAGE_VERSIONS = {
     "vuoro-schema-runtime": "0.1.0",
     # 0.2.0 adds pure strict-view metadata and admission values. Legacy shims
     # and spec bytes remain unchanged. MI-1 repins the runtime to the owners
-    # compatible immutable 0.2.0; source 0.2.1 is a separate release horizon.
-    "vuoro-adapter-kit": "0.2.1",
+    # compatible immutable 0.2.0; source 0.2.2 adds root oneOf and leads its release pin.
+    "vuoro-adapter-kit": "0.2.2",
 }
 FORBIDDEN_CLIENT_TERMS = {
     "adapter",

@@ -1,15 +1,21 @@
-from dataclasses import FrozenInstanceError, replace
 import ast
 import json
+from dataclasses import FrozenInstanceError, replace
 from pathlib import Path
 
 import pytest
-
 from vuoro_adapter_kit import (
-    ARGUMENT_BYTES_LIMIT, CATALOG_REQUIRED_PROFILE, AdmissionIdentity,
-    AdmissionResponse, OwnerAdmissionContext, OwnerAdmissionRequest,
-    PrincipalIdentity, TrustedIngressProvenance, object_schema,
-    operation_spec, operation_spec_v2,
+    ARGUMENT_BYTES_LIMIT,
+    CATALOG_REQUIRED_PROFILE,
+    AdmissionIdentity,
+    AdmissionResponse,
+    OwnerAdmissionContext,
+    OwnerAdmissionRequest,
+    PrincipalIdentity,
+    TrustedIngressProvenance,
+    object_schema,
+    operation_spec,
+    operation_spec_v2,
 )
 
 
@@ -25,13 +31,13 @@ def context(**overrides):
 
 
 def spec(**overrides):
-    fields = dict(
-        admission_profile=CATALOG_REQUIRED_PROFILE, legacy_availability="strict-only",
-        required_authorities=["work.resource.relate", "work.resource.read"],
-        input_schema=object_schema({"kind": {"enum": ["parent-of", "depends-on"]}}, required=("kind",)),
-        result_schema=object_schema({}), execution_semantics="write", idempotency="required",
-        repo_scoped=True, owner_admission_contract="resource-command-admission/v1",
-    )
+    fields = {
+        "admission_profile": CATALOG_REQUIRED_PROFILE, "legacy_availability": "strict-only",
+        "required_authorities": ["work.resource.relate", "work.resource.read"],
+        "input_schema": object_schema({"kind": {"enum": ["parent-of", "depends-on"]}}, required=("kind",)),
+        "result_schema": object_schema({}), "execution_semantics": "write", "idempotency": "required",
+        "repo_scoped": True, "owner_admission_contract": "resource-command-admission/v1",
+    }
     fields.update(overrides)
     return operation_spec_v2("work.resource.relate-v1", **fields)
 
@@ -271,7 +277,7 @@ def test_invalid_operation_and_nonstring_contract_refuse_for_specific_reason():
         spec(owner_admission_contract=1)
 
 
-def test_published_audit_receipt_lookup_root_oneof_is_preserved_only_in_v2():
+def test_published_audit_receipt_lookup_root_oneof_is_preserved_in_both_builders():
     # Exact released auditctl 0.1.9 audit.receipt.lookup input schema; independent
     # installed-owner gate compares the entire real catalog as well.
     schema = {"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object",
@@ -281,12 +287,16 @@ def test_published_audit_receipt_lookup_root_oneof_is_preserved_only_in_v2():
               "oneOf": [{"required": ["receipt_id"]}, {"required": ["event_id"]}]}
     value = spec(input_schema=schema)
     assert value["input_schema"] == schema
+    legacy_builder = operation_spec(
+        "audit.receipt.lookup", input_schema=schema,
+        result_schema=object_schema({}), execution_semantics="read", idempotency="not-allowed",
+    )
     schema["oneOf"][0]["required"].append("later")
     schema["oneOf"].reverse()
     assert value["input_schema"]["oneOf"] == [{"required": ["receipt_id"]}, {"required": ["event_id"]}]
-    with pytest.raises(ValueError, match="unsupported root fields"):
-        operation_spec("audit.receipt.lookup", input_schema=value["input_schema"],
-                       result_schema=object_schema({}), execution_semantics="read", idempotency="not-allowed")
+    assert legacy_builder["input_schema"]["oneOf"] == [
+        {"required": ["receipt_id"]}, {"required": ["event_id"]}
+    ]
 
 
 @pytest.mark.parametrize("branches", [None, "required", {}, [], [None], [3], [[]], [{1: "bad"}],

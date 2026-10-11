@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
-import re
 from typing import Any, Protocol
-
 
 SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema"
 SCHEMA_FEATURES = ("json-schema-draft-2020-12",)
@@ -67,6 +66,8 @@ def object_schema(
 
 def _schema(value: Mapping[str, Any], label: str) -> dict[str, Any]:
     result = _copy_mapping(value, label)
+    has_one_of = "oneOf" in result
+    branches = result.pop("oneOf", None)
     allowed = {"$schema", "type", "properties", "additionalProperties", "required", "$defs"}
     unknown = sorted(set(result) - allowed)
     if unknown:
@@ -95,6 +96,25 @@ def _schema(value: Mapping[str, Any], label: str) -> dict[str, Any]:
             raise ValueError(f"{label}.required contains undeclared properties: {missing}")
     if "$defs" in result and not isinstance(result["$defs"], Mapping):
         raise TypeError(f"{label}.$defs must be a mapping")
+    if has_one_of:
+        if isinstance(branches, (str, bytes)) or not isinstance(branches, Sequence):
+            raise TypeError(f"{label}.oneOf must be a sequence of schemas")
+        if not branches:
+            raise ValueError(f"{label}.oneOf must not be empty")
+        for branch in branches:
+            if type(branch) is bool:
+                continue
+            if not isinstance(branch, Mapping):
+                raise TypeError(f"{label}.oneOf branches must be schema mappings or booleans")
+            if any(type(key) is not str or not key for key in branch):
+                raise ValueError(f"{label}.oneOf branch keys must be non-empty strings")
+            if "required" in branch:
+                names = branch["required"]
+                if isinstance(names, (str, bytes)) or not isinstance(names, Sequence):
+                    raise TypeError(f"{label}.oneOf required must be a sequence")
+                if any(type(name) is not str or not name for name in names) or len(names) != len(set(names)):
+                    raise ValueError(f"{label}.oneOf required must contain unique non-empty strings")
+        result["oneOf"] = branches
     return result
 
 
