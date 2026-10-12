@@ -611,13 +611,24 @@ def create_edge_app(
         else:
             parse, run = tools[name]
             parsed = parse(arguments)
+        # Journal admission selects register_run's repository from the outer
+        # tools/call params. It is transport targeting only: never add it to
+        # the owner's versioned register_run arguments. All other toolsets
+        # retain their existing input and routing behavior.
         selected_repo_id = parsed[1] if name in tools else None
+        if name == "register_run":
+            if set(params) - {"name", "arguments", "repo_id"}:
+                raise _invalid_params(
+                    "register_run accepts only arguments and an outer repo_id"
+                )
+            if "repo_id" in params:
+                selected_repo_id = _repo_argument({"repo_id": params["repo_id"]})
         forwarded = _forwarded(
             identity,
             assertion,
             request_id,
             selected_repo_id,
-            require_named_repo=name in tools,
+            require_named_repo=name in tools or name == "register_run",
         )
         try:
             structured = await run(parsed, forwarded)
@@ -786,6 +797,13 @@ def create_edge_app(
 
         if method == "tools/call":
             try:
+                if (
+                    params.get("name") == "register_run"
+                    and ("invocation_id" in body or "attempt_id" in body)
+                ):
+                    raise _invalid_params(
+                        "register_run correlation IDs are gateway-issued"
+                    )
                 tool_result = await _call_tool(params, identity, assertion, request_id)
                 ttl_ms = _TOOL_TTL_MS
             except _ToolFailure as failure:

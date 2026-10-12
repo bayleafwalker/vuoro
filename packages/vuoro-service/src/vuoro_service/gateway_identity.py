@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from base64 import urlsafe_b64decode
 import binascii
-from collections.abc import Mapping
-from datetime import UTC, datetime
 import hashlib
 import json
-from pathlib import Path
 import re
+from base64 import urlsafe_b64decode
+from collections.abc import Mapping
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import jwt
@@ -32,8 +32,9 @@ from vuoro_service.identity import (
 )
 from vuoro_service.replay import ReplayCache, ReplayCacheFull
 
-
 _ULID = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
+_INVOCATION_ID = re.compile(r"^inv_[0-9A-HJKMNP-TV-Z]{26}$")
+_ATTEMPT_ID = re.compile(r"^att_[0-9A-HJKMNP-TV-Z]{26}$")
 _REPO_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 _PRINCIPAL_SUBJECT = re.compile(r"^[A-Za-z0-9._-]+$")
 #: The replay-cache key is a digest of (subject, jti), so the jti's format
@@ -382,6 +383,29 @@ class GatewayAssertionIdentityResolver:
         # run handles bind to them.
         client_id = _optional_text(claims.get("client_id"), "client_id")
         grant_id = _optional_text(claims.get("grant_id"), "grant_id")
+        invocation_present = "invocation_id" in claims
+        attempt_present = "attempt_id" in claims
+        if invocation_present != attempt_present:
+            raise IdentityResolutionError(
+                "gateway identity invocation correlation claims must be paired"
+            )
+        invocation_id = (
+            _required_text(claims["invocation_id"], "invocation_id")
+            if invocation_present
+            else None
+        )
+        attempt_id = (
+            _required_text(claims["attempt_id"], "attempt_id")
+            if attempt_present
+            else None
+        )
+        if invocation_id is not None and (
+            not _INVOCATION_ID.fullmatch(invocation_id)
+            or not _ATTEMPT_ID.fullmatch(attempt_id or "")
+        ):
+            raise IdentityResolutionError(
+                "gateway identity assertion has invalid invocation correlation"
+            )
         # Last, so only a fully verified assertion reaches the cache: a forged
         # or malformed one can neither fill it nor burn someone else's jti.
         replay_key = hashlib.sha256(
@@ -442,6 +466,8 @@ class GatewayAssertionIdentityResolver:
             principal_id=f"{self._issuer}:{subject}:{epoch}",
             client_id=client_id,
             grant_id=grant_id,
+            invocation_id=invocation_id,
+            attempt_id=attempt_id,
         )
 
     def _refuse_before_replay_window(self, claims: Mapping[str, Any]) -> None:

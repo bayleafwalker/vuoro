@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import jwt
@@ -9,13 +9,11 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from starlette.requests import Request
-
 from vuoro_service.gateway_identity import (
     GatewayAssertionConfigurationError,
     GatewayAssertionIdentityResolver,
 )
 from vuoro_service.identity import IdentityResolutionError
-
 
 WORKSPACE_ID = "01K11111111111111111111111"
 ENVIRONMENT = "vuoro-cloud-ws-01k111111111"
@@ -138,6 +136,7 @@ def test_gateway_assertion_resolver_accepts_cloud_contract(tmp_path: Path) -> No
     assert identity.environment == ENVIRONMENT
     assert identity.workspace_id == WORKSPACE_ID
     assert identity.authorities == frozenset({"work:read", "work:write"})
+    assert identity.invocation_id is None and identity.attempt_id is None
     assert identity.authorizes_repo("repo-a")
     assert not identity.authorizes_repo("repo-c")
 
@@ -149,6 +148,14 @@ def test_gateway_assertion_resolver_accepts_cloud_contract(tmp_path: Path) -> No
         {"sub": "github:other"},
         {"authorities": []},
         {"repo_ids": ["repo-c"]},
+        {"invocation_id": "inv_01ARZ3NDEKTSV4RRFFQ69G5FAV"},
+        {"invocation_id": None, "attempt_id": None},
+        {"invocation_id": None, "attempt_id": "att_01ARZ3NDEKTSV4RRFFQ69G5FAV"},
+        {"invocation_id": "inv_01ARZ3NDEKTSV4RRFFQ69G5FAV", "attempt_id": None},
+        {
+            "invocation_id": "inv_bad",
+            "attempt_id": "att_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        },
         {"request_id": "01K44444444444444444444444", "jti": "01K44444444444444444444444"},
         # The jti need not equal request_id (agentops#2519), and its format is
         # not checked, but it must be a non-empty string of sane length.
@@ -166,6 +173,24 @@ def test_gateway_assertion_resolver_rejects_scope_or_correlation_disagreement(
     path, private = _key_file(tmp_path)
     with pytest.raises(IdentityResolutionError):
         _resolver(path)(_request(_token(private, **overrides)))
+
+
+def test_gateway_assertion_passes_through_paired_invocation_claims_without_authority(
+    tmp_path: Path,
+) -> None:
+    path, private = _key_file(tmp_path)
+    identity = _resolver(path)(
+        _request(
+            _token(
+                private,
+                invocation_id="inv_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                attempt_id="att_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            )
+        )
+    )
+    assert identity.invocation_id == "inv_01ARZ3NDEKTSV4RRFFQ69G5FAV"
+    assert identity.attempt_id == "att_01ARZ3NDEKTSV4RRFFQ69G5FAV"
+    assert identity.authorities == frozenset({"work:read", "work:write"})
 
 
 def test_gateway_assertion_resolver_rejects_assertion_with_no_audience_claim_at_all(
