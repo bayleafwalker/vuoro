@@ -12,6 +12,11 @@ Design notes (for reviewers; see the E2 final report for the full reasoning):
   `ShellWorkSource` (work_source.py) uses, reimplemented as a small,
   independent client (`RecordShellClient`) because `work_source.py` is
   frozen/shared and does not expose these operations.
+* Run registration uses the additive correlated owner operation only when the
+  signed identity has a verified invocation/attempt pair and epoch and the
+  owner catalog advertises that operation. The original signed assertion is
+  forwarded unchanged; the identifiers never enter MCP or owner arguments.
+  Otherwise registration keeps the legacy operation and response shape.
 * `SprintctlRecordStore` implements `runs.RunRegistry` exactly as amended
   on 2026-09-26 (shared contract section 3): `register()` and `resolve()`
   take the caller's `forwarded` assertion, without which sprintctl cannot be
@@ -53,9 +58,11 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import re
 import time
 from collections.abc import Callable, Mapping
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -65,7 +72,7 @@ from vuoro_evidence.run import ObservedProfile, RunManifest
 
 from .idempotency import IDEMPOTENCY_KEY_SCHEMA, require_key
 from .runs import RUN_ID, RunBinding, UnavailableRunRegistry, binding_for
-from .toolsets import ToolFailure, ToolSet, ToolSpec, ToolsetContext, WRITE_ANNOTATIONS
+from .toolsets import WRITE_ANNOTATIONS, ToolFailure, ToolSet, ToolsetContext, ToolSpec
 from .work_source import ForwardedIdentity
 
 __all__ = ["SprintctlRecordStore", "build_run_registry", "build_toolset"]
@@ -79,6 +86,7 @@ _PROTOCOL_HEADER = "X-Vuoro-Client-Protocol"
 _CLIENT_PROTOCOL = "1"
 
 OPERATION_RUN_REGISTER = "work.run.register-v1"
+OPERATION_RUN_REGISTER_CORRELATED = "work.run.register-correlated-v1"
 OPERATION_RUN_RESOLVE = "work.run.resolve-v1"
 OPERATION_EVIDENCE_TAIL = "work.evidence.tail-v1"
 OPERATION_EVIDENCE_APPEND = "work.evidence.append-v1"
@@ -103,6 +111,9 @@ CATALOG_TIMEOUT_SECONDS = 1.0
 #: After a failed catalog read, answer "not available" without asking again
 #: for this long: one probe per few seconds, not one per request or per tool.
 CATALOG_RETRY_SECONDS = 3.0
+_INVOCATION_ID = re.compile(r"inv_[0-9A-HJKMNP-TV-Z]{26}")
+_ATTEMPT_ID = re.compile(r"att_[0-9A-HJKMNP-TV-Z]{26}")
+_SHA256_HEX = re.compile(r"[0-9a-f]{64}")
 
 _NOT_YOURS = "no run with that id belongs to the caller"
 
@@ -133,7 +144,7 @@ CHAIN_ATTEMPTS = 3
 #: `_placeholder_item` builds: never read by entry_digest/link and never
 #: returned to any caller.
 _PLACEHOLDER_VALIDITY = ValidityWindow(
-    basis=ValidityBasis.INDEFINITE, valid_from=datetime(1970, 1, 1, tzinfo=timezone.utc)
+    basis=ValidityBasis.INDEFINITE, valid_from=datetime(1970, 1, 1, tzinfo=UTC)
 )
 
 def _placeholder_item(
@@ -256,7 +267,7 @@ class RecordShellClient:
                 self._client.get(_CATALOG_PATH, timeout=timeout), timeout
             )
             body = response.json() if response.status_code == 200 else None
-        except (httpx.HTTPError, ValueError, asyncio.TimeoutError):
+        except (TimeoutError, httpx.HTTPError, ValueError):
             return None
         if not isinstance(body, dict) or not isinstance(body.get("operations"), list):
             return None
@@ -329,6 +340,157 @@ def _expect_mapping(value: Any, operation: str) -> dict[str, Any]:
     return value
 
 
+@dataclass(frozen=True)
+class CorrelatedRunRegistration:
+    run_id: str
+    correlation_status: str
+    receipt: dict[str, Any] | None
+
+
+def _validate_correlated_registration(
+    value: Any,
+    *,
+    operation: str,
+    binding: RunBinding,
+    forwarded: ForwardedIdentity,
+    invocation_id: str,
+    attempt_id: str,
+    principal_epoch: int,
+    manifest: Mapping[str, Any],
+) -> CorrelatedRunRegistration:
+    """Accept only the closed owner result bound to this verified request."""
+
+    try:
+        result = _expect_mapping(value, operation)
+        if set(result) != {"repo_id", "run", "correlation_status", "receipt"}:
+            raise ValueError("result key set")
+        if result["repo_id"] != forwarded.repo_id:
+            raise ValueError("repository binding")
+        run = _expect_mapping(result["run"], operation)
+        required_run_fields = {
+            "run_id",
+            "principal_id",
+            "workspace_id",
+            "client_id",
+            "grant_id",
+            "harness_id",
+            "harness_build",
+            "model_id",
+            "recipe_id",
+            "observed_profile",
+            "grant_ids",
+            "claim_ids",
+            "created_at",
+        }
+        if set(run) not in (
+            required_run_fields,
+            required_run_fields | {"predecessor_run_id"},
+        ):
+            raise ValueError("run key set")
+        run_id = run["run_id"]
+        if not isinstance(run_id, str) or not RUN_ID.fullmatch(run_id):
+            raise ValueError("run id")
+        if (
+            run["principal_id"] != binding.principal_id
+            or run["workspace_id"] != binding.workspace_id
+            or run["client_id"] != binding.client_id
+            or run["grant_id"] != binding.grant_id
+        ):
+            raise ValueError("run identity binding")
+        if (
+            not isinstance(run["created_at"], str)
+            or not run["created_at"]
+            or not isinstance(run["grant_ids"], list)
+            or any(not isinstance(item, str) or not item for item in run["grant_ids"])
+            or not isinstance(run["claim_ids"], list)
+            or any(not isinstance(item, str) or not item for item in run["claim_ids"])
+        ):
+            raise ValueError("run record fields")
+        for field in (
+            "harness_id",
+            "harness_build",
+            "model_id",
+            "recipe_id",
+            "observed_profile",
+        ):
+            if run[field] != manifest[field]:
+                raise ValueError("run manifest")
+        if "predecessor_run_id" in run and run["predecessor_run_id"] != manifest.get(
+            "predecessor_run_id"
+        ):
+            raise ValueError("run predecessor")
+        RunManifest(
+            run_id=run_id,
+            harness_id=run["harness_id"],
+            harness_build=run["harness_build"],
+            model_id=run["model_id"],
+            recipe_id=run["recipe_id"],
+            observed_profile=ObservedProfile(
+                instruction_digest=run["observed_profile"]["instruction_digest"],
+                skill_digests=tuple(
+                    (pair["skill_id"], pair["digest"])
+                    for pair in run["observed_profile"]["skill_digests"]
+                ),
+            ),
+            grant_ids=tuple(run["grant_ids"]),
+            claim_ids=tuple(run["claim_ids"]),
+        )
+        status = result["correlation_status"]
+        receipt = result["receipt"]
+        if status == "legacy-unbound":
+            if receipt is not None:
+                raise ValueError("legacy receipt")
+            return CorrelatedRunRegistration(run_id, status, None)
+        if status != "bound" or not isinstance(receipt, dict):
+            raise ValueError("correlation status")
+        receipt_fields = {
+            "schema",
+            "repo_id",
+            "invocation_id",
+            "attempt_id",
+            "owner_record_kind",
+            "owner_record_id",
+            "owner_record_digest",
+            "owner_binding",
+        }
+        if set(receipt) != receipt_fields:
+            raise ValueError("receipt key set")
+        if (
+            receipt["schema"] != "sprintctl-run-invocation-receipt/v1"
+            or receipt["repo_id"] != forwarded.repo_id
+            or receipt["invocation_id"] != invocation_id
+            or receipt["attempt_id"] != attempt_id
+            or receipt["owner_record_kind"] != "run"
+            or receipt["owner_record_id"] != run_id
+            or not isinstance(receipt["owner_record_digest"], str)
+            or not _SHA256_HEX.fullmatch(receipt["owner_record_digest"])
+        ):
+            raise ValueError("receipt binding")
+        owner_binding = _expect_mapping(receipt["owner_binding"], operation)
+        if isinstance(owner_binding.get("principal_epoch"), bool) or not isinstance(
+            owner_binding.get("principal_epoch"), int
+        ):
+            raise TypeError("receipt epoch type")
+        expected_binding = {
+            "repo_id": forwarded.repo_id,
+            "workspace_id": binding.workspace_id,
+            "principal_id": binding.principal_id,
+            "principal_epoch": principal_epoch,
+            "client_id": binding.client_id,
+            "grant_id": binding.grant_id,
+        }
+        if owner_binding != expected_binding:
+            raise ValueError("receipt owner binding")
+        return CorrelatedRunRegistration(run_id, status, receipt)
+    except ToolFailure:
+        raise
+    except (KeyError, TypeError, ValueError) as error:
+        raise ToolFailure(
+            "record-shell-unavailable",
+            f"{operation} returned an invalid correlated registration result",
+        ) from error
+
+
 class SprintctlRecordStore:
     """Reaches sprintctl's record-bucket operations through the runtime
     shell.  Implements `vuoro_mcp_edge.runs.RunRegistry` (as amended
@@ -352,10 +514,12 @@ class SprintctlRecordStore:
         self._client = RecordShellClient(
             base_url=base_url, timeout=timeout, transport=transport, auth=auth
         )
-        self._continuation: bool | None = None
+        self._catalog_operations: frozenset[str] | None = None
         self._retry_at = 0.0
         #: The one in-flight catalog read (a task), with the event loop it runs on.
-        self._probe: tuple[asyncio.AbstractEventLoop, asyncio.Task[bool]] | None = None
+        self._probe: (
+            tuple[asyncio.AbstractEventLoop, asyncio.Task[frozenset[str] | None]] | None
+        ) = None
         self.catalog_timeout = CATALOG_TIMEOUT_SECONDS
         self.catalog_retry = CATALOG_RETRY_SECONDS
         self.clock: Callable[[], float] = time.monotonic
@@ -379,12 +543,26 @@ class SprintctlRecordStore:
           continuation off for good.
         """
 
-        if self._continuation is not None:
-            return self._continuation
+        operations = await self._available_operations()
+        return (
+            operations is not None and OPERATION_RUN_PREDECESSOR_CONTEXT in operations
+        )
+
+    async def correlated_registration_available(self) -> bool:
+        """Whether this owner advertises typed correlated run registration."""
+
+        operations = await self._available_operations()
+        return (
+            operations is not None and OPERATION_RUN_REGISTER_CORRELATED in operations
+        )
+
+    async def _available_operations(self) -> frozenset[str] | None:
+        if self._catalog_operations is not None:
+            return self._catalog_operations
         loop = asyncio.get_running_loop()
         if self._probe is None or self._probe[0] is not loop or self._probe[1].done():
             if self.clock() < self._retry_at:
-                return False
+                return None
             # The read runs as its own task and every caller -- the one that
             # started it included -- awaits it shielded, so a caller that is
             # cancelled (a client disconnect) never cancels the read, and a
@@ -392,13 +570,15 @@ class SprintctlRecordStore:
             self._probe = (loop, loop.create_task(self._read_catalog()))
         return await asyncio.shield(self._probe[1])
 
-    async def _read_catalog(self) -> bool:
-        operations = await self._client.advertised_operations(timeout=self.catalog_timeout)
+    async def _read_catalog(self) -> frozenset[str] | None:
+        operations = await self._client.advertised_operations(
+            timeout=self.catalog_timeout
+        )
         if operations is None:
             self._retry_at = self.clock() + self.catalog_retry
-            return False
-        self._continuation = OPERATION_RUN_PREDECESSOR_CONTEXT in operations
-        return self._continuation
+            return None
+        self._catalog_operations = operations
+        return operations
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -422,7 +602,7 @@ class SprintctlRecordStore:
         forwarded: ForwardedIdentity,
         manifest: Mapping[str, Any],
         predecessor_run_id: str | None = None,
-    ) -> str:
+    ) -> str | CorrelatedRunRegistration:
         if predecessor_run_id is not None and not await self.continuation_available():
             # Never dropped silently: a run registered without the link it
             # asked for would read as a fresh run.
@@ -442,7 +622,42 @@ class SprintctlRecordStore:
             # Only when set: a request without a predecessor keeps the digest
             # sprintctl stored for it before continuation existed.
             arguments["predecessor_run_id"] = predecessor_run_id
-        result = await self._client.invoke(OPERATION_RUN_REGISTER, arguments, forwarded)
+        identity = forwarded.identity
+        invocation_id = identity.invocation_id if identity is not None else None
+        attempt_id = identity.attempt_id if identity is not None else None
+        principal_epoch = identity.principal_epoch if identity is not None else None
+        use_correlated = (
+            isinstance(invocation_id, str)
+            and bool(_INVOCATION_ID.fullmatch(invocation_id))
+            and isinstance(attempt_id, str)
+            and bool(_ATTEMPT_ID.fullmatch(attempt_id))
+            and isinstance(principal_epoch, int)
+            and not isinstance(principal_epoch, bool)
+            and identity is not None
+            and identity.principal_id is not None
+            and identity.workspace_id is not None
+            and await self.correlated_registration_available()
+        )
+        operation = (
+            OPERATION_RUN_REGISTER_CORRELATED
+            if use_correlated
+            else OPERATION_RUN_REGISTER
+        )
+        result = await self._client.invoke(operation, arguments, forwarded)
+        if use_correlated:
+            expected_manifest = dict(manifest)
+            if predecessor_run_id is not None:
+                expected_manifest["predecessor_run_id"] = predecessor_run_id
+            return _validate_correlated_registration(
+                result,
+                operation=operation,
+                binding=binding,
+                forwarded=forwarded,
+                invocation_id=invocation_id,
+                attempt_id=attempt_id,
+                principal_epoch=principal_epoch,
+                manifest=expected_manifest,
+            )
         run = _expect_mapping(result, OPERATION_RUN_REGISTER).get("run")
         run = _expect_mapping(run, OPERATION_RUN_REGISTER)
         run_id = run.get("run_id")
@@ -1145,7 +1360,7 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
             )
         if parsed["predecessor_run_id"] is not None:
             _require_continuation_authority(forwarded)
-        run_id = await store.register(
+        registration = await store.register(
             binding,
             idempotency_key=parsed["idempotency_key"],
             forwarded=forwarded,
@@ -1158,7 +1373,13 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
             },
             predecessor_run_id=parsed["predecessor_run_id"],
         )
-        return {"run_id": run_id}
+        if isinstance(registration, CorrelatedRunRegistration):
+            return {
+                "run_id": registration.run_id,
+                "correlation_status": registration.correlation_status,
+                "receipt": registration.receipt,
+            }
+        return {"run_id": registration}
 
     async def _run_append_evidence(
         parsed: dict[str, Any], forwarded: ForwardedIdentity

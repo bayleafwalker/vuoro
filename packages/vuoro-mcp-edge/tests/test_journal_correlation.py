@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import httpx
 import pytest
-from edge_support import assertion, identity_headers
+from edge_support import REQUEST_ID, assertion, identity_headers
 from vuoro_mcp_edge import record_tools
+from vuoro_mcp_edge.record_tools import SprintctlRecordStore
 from vuoro_mcp_edge.server import MCP_PATH, create_edge_app
 from vuoro_mcp_edge.toolsets import ToolsetContext
 
@@ -262,3 +264,192 @@ async def test_notifications_invalid_ids_and_header_mismatches_never_register(ke
     assert null_repo.status_code == 200
     assert null_repo.json()["result"]["isError"] is True
     assert runs.registered == []
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("owner_status", ["bound", "legacy-unbound"])
+async def test_signed_pair_uses_owner_capability_and_validates_typed_receipt(
+    keys, owner_status
+):
+    invocation_id = "inv_01ARZ3NDEKTSV4RRFFQ69G5FAV"
+    attempt_id = "att_01ARZ3NDEKTSV4RRFFQ69G5FAV"
+    token = assertion(
+        keys[1],
+        authorities=["work:evidence"],
+        repo_ids=["repo-a"],
+        client_id="client-a",
+        grant_id="grant-a",
+        invocation_id=invocation_id,
+        attempt_id=attempt_id,
+    )
+    owner_requests: list[dict[str, Any]] = []
+
+    async def owner(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/catalog/v1":
+            return httpx.Response(
+                200,
+                json={"operations": [{"name": "work.run.register-correlated-v1"}]},
+            )
+        owner_requests.append(
+            {
+                "envelope": json.loads(request.content),
+                "assertion": request.headers["x-vuoro-identity"],
+            }
+        )
+        run_id = "run_01ARZ3NDEKTSV4RRFFQ69G5FAV"
+        observed_profile = _manifest()["observed_profile"]
+        run = {
+            "run_id": run_id,
+            "principal_id": "vuoro-cloud-control:01K44444444444444444444444:0",
+            "workspace_id": "01K11111111111111111111111",
+            "client_id": "client-a",
+            "grant_id": "grant-a",
+            "harness_id": "codex",
+            "harness_build": "test-build",
+            "model_id": "model-test",
+            "recipe_id": "recipe-test",
+            "observed_profile": observed_profile,
+            "grant_ids": [],
+            "claim_ids": [],
+            "created_at": "2026-10-11T12:34:56.123456Z",
+        }
+        receipt = {
+            "schema": "sprintctl-run-invocation-receipt/v1",
+            "repo_id": "repo-a",
+            "invocation_id": invocation_id,
+            "attempt_id": attempt_id,
+            "owner_record_kind": "run",
+            "owner_record_id": run_id,
+            "owner_record_digest": "a" * 64,
+            "owner_binding": {
+                "repo_id": "repo-a",
+                "workspace_id": "01K11111111111111111111111",
+                "principal_id": "vuoro-cloud-control:01K44444444444444444444444:0",
+                "principal_epoch": 0,
+                "client_id": "client-a",
+                "grant_id": "grant-a",
+            },
+        }
+        return httpx.Response(
+            200,
+            json={
+                "schema_version": "invocation-result/v1",
+                "request_id": REQUEST_ID,
+                "operation": "work.run.register-correlated-v1",
+                "catalog_revision": "rev-1",
+                "status": "accepted",
+                "result": {
+                    "repo_id": "repo-a",
+                    "run": run,
+                    "correlation_status": owner_status,
+                    "receipt": receipt if owner_status == "bound" else None,
+                },
+                "error": None,
+            },
+        )
+
+    store = SprintctlRecordStore(
+        base_url="http://owner",
+        timeout=5,
+        transport=httpx.MockTransport(owner),
+    )
+    app = _app(keys, frozenset({"repo-a"}), store)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://edge"
+    ) as client:
+        response = await client.post(
+            MCP_PATH,
+            headers=identity_headers(token),
+            json=_call(_manifest(), repo_id="repo-a"),
+        )
+    tool_result = response.json()["result"]
+    assert tool_result["isError"] is False, tool_result
+    content = tool_result["structuredContent"]
+    assert content["run_id"] == "run_01ARZ3NDEKTSV4RRFFQ69G5FAV"
+    assert content["correlation_status"] == owner_status
+    if owner_status == "bound":
+        assert content["receipt"]["invocation_id"] == invocation_id
+    else:
+        assert content["receipt"] is None
+        # This is an explicit owner-level unbound result. The edge preserves
+        # it for the caller so the gateway can retain UNKNOWN, not acceptance.
+    assert len(owner_requests) == 1
+    forwarded = owner_requests[0]
+    assert forwarded["assertion"] == token
+    envelope = forwarded["envelope"]
+    assert envelope["operation"] == "work.run.register-correlated-v1"
+    assert envelope["repo_id"] == "repo-a"
+    assert envelope["arguments"] == {
+        key: value for key, value in _manifest().items() if key != "repo_id"
+    }
+    assert "invocation_id" not in envelope["arguments"]
+    assert "attempt_id" not in envelope["arguments"]
+    assert "principal_epoch" not in envelope["arguments"]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "catalog_status,catalog_payload",
+    [(200, {"operations": []}), (503, {"error": "unavailable"})],
+)
+async def test_missing_or_failed_owner_catalog_keeps_legacy_run_response_shape(
+    keys, catalog_status, catalog_payload
+):
+    token = assertion(
+        keys[1],
+        authorities=["work:evidence"],
+        repo_ids=["repo-a"],
+        client_id="client-a",
+        grant_id="grant-a",
+        invocation_id="inv_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        attempt_id="att_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+    )
+    observed: list[dict[str, Any]] = []
+
+    def owner(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/catalog/v1":
+            return httpx.Response(catalog_status, json=catalog_payload)
+        envelope = json.loads(request.content)
+        observed.append(envelope)
+        run = {
+            "run_id": "run_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "harness_id": "codex",
+            "harness_build": "test-build",
+            "model_id": "model-test",
+            "recipe_id": "recipe-test",
+            "observed_profile": _manifest()["observed_profile"],
+            "grant_ids": [],
+            "claim_ids": [],
+        }
+        return httpx.Response(
+            200,
+            json={
+                "schema_version": "invocation-result/v1",
+                "request_id": REQUEST_ID,
+                "operation": "work.run.register-v1",
+                "catalog_revision": "rev-1",
+                "status": "accepted",
+                "result": {"repo_id": "repo-a", "run": run},
+                "error": None,
+            },
+        )
+
+    store = SprintctlRecordStore(
+        base_url="http://owner", timeout=5, transport=httpx.MockTransport(owner)
+    )
+    app = _app(keys, frozenset({"repo-a"}), store)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://edge"
+    ) as client:
+        response = await client.post(
+            MCP_PATH,
+            headers=identity_headers(token),
+            json=_call(_manifest(), repo_id="repo-a"),
+        )
+    tool_result = response.json()["result"]
+    assert tool_result["isError"] is False, tool_result
+    assert tool_result["structuredContent"] == {
+        "run_id": "run_01ARZ3NDEKTSV4RRFFQ69G5FAV"
+    }
+    assert observed[0]["operation"] == "work.run.register-v1"
+    assert "invocation_id" not in observed[0]["arguments"]

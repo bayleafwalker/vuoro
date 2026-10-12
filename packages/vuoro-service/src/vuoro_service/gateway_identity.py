@@ -25,6 +25,7 @@ from vuoro_service.edge_proof import (
     EdgeProofVerifier,
 )
 from vuoro_service.identity import (
+    MAX_SAFE_INTEGER,
     Identity,
     IdentityReplayCapacityError,
     IdentityReplayedError,
@@ -222,7 +223,7 @@ class GatewayAssertionIdentityResolver:
         edge_proofs: EdgeProofVerifier | None = None,
         edge_audience: str | None = None,
         require_oauth_grant: bool = False,
-    ) -> "GatewayAssertionIdentityResolver":
+    ) -> GatewayAssertionIdentityResolver:
         if (
             not issuer
             or issuer != issuer.strip()
@@ -329,7 +330,12 @@ class GatewayAssertionIdentityResolver:
         # principal by construction. Vuoro Cloud mints and persists it per
         # subject; this side only refuses an assertion without one.
         epoch = claims.get("principal_epoch")
-        if isinstance(epoch, bool) or not isinstance(epoch, int) or epoch < 0:
+        if (
+            isinstance(epoch, bool)
+            or not isinstance(epoch, int)
+            or epoch < 0
+            or epoch > MAX_SAFE_INTEGER
+        ):
             raise IdentityResolutionError(
                 "gateway identity assertion has invalid principal_epoch"
             )
@@ -409,7 +415,7 @@ class GatewayAssertionIdentityResolver:
         # Last, so only a fully verified assertion reaches the cache: a forged
         # or malformed one can neither fill it nor burn someone else's jti.
         replay_key = hashlib.sha256(
-            f"{subject}\x00{signed_jti}".encode("utf-8")
+            f"{subject}\x00{signed_jti}".encode()
         ).digest()
         replay_expires_at = claims["exp"] + _NBF_CLOCK_SKEW_SECONDS
         if self._require_oauth_grant and (client_id is None or grant_id is None):
@@ -464,6 +470,7 @@ class GatewayAssertionIdentityResolver:
             repo_ids=frozenset(repo_ids),
             workspace_id=workspace_id,
             principal_id=f"{self._issuer}:{subject}:{epoch}",
+            principal_epoch=epoch,
             client_id=client_id,
             grant_id=grant_id,
             invocation_id=invocation_id,

@@ -6,12 +6,11 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
 import pytest
-from vuoro_service.identity import Identity
 from vuoro_mcp_edge.record_tools import (
     CHAIN_ATTEMPTS,
     RECORD_OWNER_INCOMPATIBLE,
@@ -23,6 +22,7 @@ from vuoro_mcp_edge.record_tools import (
 from vuoro_mcp_edge.runs import RunBinding, UnavailableRunRegistry
 from vuoro_mcp_edge.toolsets import ToolFailure, ToolsetContext
 from vuoro_mcp_edge.work_source import ForwardedIdentity, ShellWorkSource
+from vuoro_service.identity import Identity
 
 REQUEST_ID = "01K33333333333333333333333"
 REPO_ID = "repo-a"
@@ -221,6 +221,140 @@ class TestRegisterRun:
         with pytest.raises(ToolFailure) as excinfo:
             _run(spec.run(parsed, _forwarded()))
         assert excinfo.value.code == "idempotency-conflict"
+
+
+def _correlated_result() -> dict[str, Any]:
+    run = {
+        "run_id": RUN_ID,
+        "principal_id": PRINCIPAL_ID,
+        "workspace_id": WORKSPACE_ID,
+        "client_id": "client-a",
+        "grant_id": "grant-a",
+        "harness_id": "claude-code",
+        "harness_build": "1.0.0",
+        "model_id": "model-1",
+        "recipe_id": "recipe-1",
+        "observed_profile": OBSERVED_PROFILE,
+        "grant_ids": [],
+        "claim_ids": [],
+        "created_at": "2026-10-11T12:34:56Z",
+    }
+    receipt = {
+        "schema": "sprintctl-run-invocation-receipt/v1",
+        "repo_id": REPO_ID,
+        "invocation_id": "inv_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        "attempt_id": "att_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        "owner_record_kind": "run",
+        "owner_record_id": RUN_ID,
+        "owner_record_digest": "a" * 64,
+        "owner_binding": {
+            "repo_id": REPO_ID,
+            "workspace_id": WORKSPACE_ID,
+            "principal_id": PRINCIPAL_ID,
+            "principal_epoch": 0,
+            "client_id": "client-a",
+            "grant_id": "grant-a",
+        },
+    }
+    return {
+        "repo_id": REPO_ID,
+        "run": run,
+        "correlation_status": "bound",
+        "receipt": receipt,
+    }
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "wrong-invocation",
+        "wrong-epoch",
+        "boolean-epoch",
+        "uppercase-digest",
+        "extra-result-field",
+        "missing-receipt",
+        "foreign-run-principal",
+    ],
+)
+def test_correlated_registration_refuses_malformed_or_foreign_owner_results(
+    mutation: str,
+) -> None:
+    result = _correlated_result()
+    if mutation == "wrong-invocation":
+        result["receipt"]["invocation_id"] = "inv_01ARZ3NDEKTSV4RRFFQ69G5FAW"
+    elif mutation == "wrong-epoch":
+        result["receipt"]["owner_binding"]["principal_epoch"] = 1
+    elif mutation == "boolean-epoch":
+        result["receipt"]["owner_binding"]["principal_epoch"] = False
+    elif mutation == "uppercase-digest":
+        result["receipt"]["owner_record_digest"] = "A" * 64
+    elif mutation == "extra-result-field":
+        result["unexpected"] = True
+    elif mutation == "missing-receipt":
+        result["receipt"] = None
+    elif mutation == "foreign-run-principal":
+        result["run"]["principal_id"] = "vuoro-cloud-control:foreign:0"
+    else:  # pragma: no cover - the parametrized cases above are exhaustive
+        raise AssertionError(mutation)
+
+    requests: list[httpx.Request] = []
+
+    def owner(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/catalog/v1":
+            return httpx.Response(
+                200,
+                json={"operations": [{"name": "work.run.register-correlated-v1"}]},
+            )
+        requests.append(request)
+        return _accepted("work.run.register-correlated-v1", result)
+
+    store = SprintctlRecordStore(
+        base_url="http://owner", timeout=5, transport=httpx.MockTransport(owner)
+    )
+    identity = Identity(
+        actor="github:123",
+        environment="vuoro-dev",
+        authorities=frozenset({"work:evidence"}),
+        repo_ids=frozenset({REPO_ID}),
+        workspace_id=WORKSPACE_ID,
+        principal_id=PRINCIPAL_ID,
+        client_id="client-a",
+        grant_id="grant-a",
+        invocation_id="inv_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        attempt_id="att_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        principal_epoch=0,
+    )
+    forwarded = ForwardedIdentity(
+        assertion="signed.assertion.value",
+        request_id=REQUEST_ID,
+        repo_id=REPO_ID,
+        identity=identity,
+    )
+    with pytest.raises(ToolFailure) as excinfo:
+        _run(
+            store.register(
+                RunBinding(
+                    principal_id=PRINCIPAL_ID,
+                    workspace_id=WORKSPACE_ID,
+                    repo_id=REPO_ID,
+                    client_id="client-a",
+                    grant_id="grant-a",
+                ),
+                idempotency_key="register-key-0005",
+                forwarded=forwarded,
+                manifest={
+                    "harness_id": "claude-code",
+                    "harness_build": "1.0.0",
+                    "model_id": "model-1",
+                    "recipe_id": "recipe-1",
+                    "observed_profile": OBSERVED_PROFILE,
+                },
+            )
+        )
+    assert excinfo.value.code == "record-shell-unavailable"
+    assert len(requests) == 1
+    arguments = json.loads(requests[0].content)["arguments"]
+    assert not {"invocation_id", "attempt_id", "principal_epoch"} & set(arguments)
 
     @pytest.mark.parametrize(
         "bad_arguments",
@@ -462,11 +596,15 @@ class TestAppendEvidence:
         # not an arbitrary string: a run bound to it must not be able to
         # forge a link with a hand-picked value.
         from vuoro_evidence.core.chain import entry_digest
-        from vuoro_evidence.core.model import EvidenceItem, ValidityBasis, ValidityWindow
+        from vuoro_evidence.core.model import (
+            EvidenceItem,
+            ValidityBasis,
+            ValidityWindow,
+        )
 
         placeholder_validity = ValidityWindow(
             basis=ValidityBasis.INDEFINITE,
-            valid_from=datetime(1970, 1, 1, tzinfo=timezone.utc),
+            valid_from=datetime(1970, 1, 1, tzinfo=UTC),
         )
         tail_item = EvidenceItem(
             item_id="evi_1", kind="_", ref="_", digest=tail_digest, collector="_",

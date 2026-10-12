@@ -135,6 +135,7 @@ def test_gateway_assertion_resolver_accepts_cloud_contract(tmp_path: Path) -> No
     assert identity.actor == "github:123"
     assert identity.environment == ENVIRONMENT
     assert identity.workspace_id == WORKSPACE_ID
+    assert identity.principal_epoch == 0
     assert identity.authorities == frozenset({"work:read", "work:write"})
     assert identity.invocation_id is None and identity.attempt_id is None
     assert identity.authorizes_repo("repo-a")
@@ -190,6 +191,7 @@ def test_gateway_assertion_passes_through_paired_invocation_claims_without_autho
     )
     assert identity.invocation_id == "inv_01ARZ3NDEKTSV4RRFFQ69G5FAV"
     assert identity.attempt_id == "att_01ARZ3NDEKTSV4RRFFQ69G5FAV"
+    assert identity.principal_epoch == 0
     assert identity.authorities == frozenset({"work:read", "work:write"})
 
 
@@ -401,7 +403,7 @@ def test_the_assertion_must_carry_a_principal_epoch(tmp_path: Path) -> None:
     with pytest.raises(IdentityResolutionError):
         resolver(_request(token))
 
-    for invalid in ("0", -1, 1.5, True):
+    for invalid in ("0", -1, 1.5, True, 9_007_199_254_740_992):
         with pytest.raises(IdentityResolutionError, match="principal_epoch"):
             resolver(_request(_token(private, principal_epoch=invalid)))
     # A null claim is a missing claim to PyJWT's require check, so it fails one
