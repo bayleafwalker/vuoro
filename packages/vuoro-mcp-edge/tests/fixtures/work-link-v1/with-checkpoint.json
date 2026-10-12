@@ -1,0 +1,16 @@
+{
+  "schema": "vuoro-work-link/v1",
+  "workspace_id": "workspace-demo",
+  "repo_id": "owner/repository",
+  "item_id": 27,
+  "predecessor_run_id": "run_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "owner_checkpoint": {
+    "repo_id": "owner/repository",
+    "item_id": 27,
+    "work_edit_revision": "edit:17",
+    "status_revision": "status:4",
+    "current_release_digest": null,
+    "current_decision_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "current_reference_set_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  }
+}

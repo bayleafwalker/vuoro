@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vuoro:work-link:v1",
+  "title": "Vuoro work link v1",
+  "type": "object",
+  "properties": {
+    "schema": {"const": "vuoro-work-link/v1"},
+    "workspace_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[^\\u0000-\\u001F\\u007F]{1,256}(?![\\s\\S])"
+    },
+    "repo_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[^\\u0000-\\u001F\\u007F]{1,256}(?![\\s\\S])"
+    },
+    "item_id": {"type": "integer", "minimum": 1},
+    "predecessor_run_id": {
+      "type": "string",
+      "pattern": "^run_[0-9A-HJKMNP-TV-Z]{26}(?![\\s\\S])"
+    },
+    "owner_checkpoint": {"$ref": "#/$defs/owner_checkpoint"}
+  },
+  "required": [
+    "schema",
+    "workspace_id",
+    "repo_id",
+    "item_id",
+    "predecessor_run_id"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "owner_checkpoint": {
+      "type": "object",
+      "properties": {
+        "repo_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]{1,256}(?![\\s\\S])"
+        },
+        "item_id": {"type": "integer", "minimum": 1},
+        "work_edit_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]{1,256}(?![\\s\\S])"
+        },
+        "status_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]{1,256}(?![\\s\\S])"
+        },
+        "current_release_digest": {
+          "anyOf": [
+            {"type": "string", "pattern": "^[0-9a-f]{64}(?![\\s\\S])"},
+            {"type": "null"}
+          ]
+        },
+        "current_decision_digest": {
+          "anyOf": [
+            {"type": "string", "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"},
+            {"type": "null"}
+          ]
+        },
+        "current_reference_set_digest": {
+          "anyOf": [
+            {"type": "string", "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"},
+            {"type": "null"}
+          ]
+        }
+      },
+      "required": [
+        "repo_id",
+        "item_id",
+        "work_edit_revision",
+        "status_revision",
+        "current_release_digest",
+        "current_decision_digest",
+        "current_reference_set_digest"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
