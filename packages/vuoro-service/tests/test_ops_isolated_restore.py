@@ -117,6 +117,20 @@ def test_restore_runs_the_pinned_check_as_runtime_roles_on_a_throwaway_copy(dump
     assert {"kind": "dump", "id": "sha256:" + body["restore"]["dump_sha256"]} in result.work_refs
 
 
+def test_an_unprobed_knowledge_domain_is_an_unknown_not_ok(dump):
+    path, _ = dump
+
+    def probe(script, env):
+        observation = reading_probe(script, env)
+        observation["domains"].pop("knowledge")
+        observation["unknowns"] = ["domain-not-checked:knowledge"]
+        return observation
+
+    result = isolated_restore(path, manifest_path=PINS, probe_runner=probe, bin_dir=BINS)
+    assert result.status == "attention" and result.result["compatibility"]["state"] == "unknown"
+    assert result.unknowns.count("domain-not-checked:knowledge") == 1
+
+
 def test_incompatible_restored_state_is_attention(dump):
     path, _ = dump
 

@@ -317,6 +317,7 @@ def isolated_restore(
                 compatibility["domains"] = {
                     domain: _domain_summary(value) for domain, value in (observation.get("domains") or {}).items()
                 }
+                unknowns.extend(str(item) for item in observation.get("unknowns") or ())
     restore["cluster_torn_down"] = not keep
     domain_states = compatibility.get("domains") or {}
     unchecked = [domain for domain in domains if domain not in domain_states]

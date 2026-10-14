@@ -11,6 +11,10 @@ must point the DSNs at a disposable database only.  Output: one JSON object.
 import json
 import os
 
+#: Every domain a deployable composition pins. A domain whose DSN was not
+#: handed to the probe is reported as an unknown, never silently skipped.
+DOMAINS = ("work", "audit", "knowledge")
+
 
 def _version(name):
     from importlib.metadata import PackageNotFoundError, version
@@ -34,6 +38,11 @@ def observe(env):
         "installed": installed,
         "pins_satisfied": all(installed[name] == pins[name] for name in pins),
         "domains": {},
+        "unknowns": [
+            f"domain-not-checked:{domain}"
+            for domain in DOMAINS
+            if not env.get(f"VUORO_OPS_{domain.upper()}_DSN")
+        ],
     }
     if not observation["pins_satisfied"]:
         return observation

@@ -678,7 +678,7 @@ def _runtime_env(
         (environ[alias] for alias in aliases if alias in environ), None
     )
     if not value:
-        raise CompositionError(f"{name} is required for four-domain composition")
+        raise CompositionError(f"{name} is required for three-domain composition")
     return value
 
 
