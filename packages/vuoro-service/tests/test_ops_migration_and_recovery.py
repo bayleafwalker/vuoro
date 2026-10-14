@@ -75,6 +75,13 @@ def test_preflight_with_an_additive_migration_allows_image_revert():
     assert result.result["recovery_class"] == "image-revert" and result.status == "ok"
 
 
+def test_committed_schema_outside_prior_is_forward_fix_not_blocked():
+    result = migration_preflight(candidate_image=CANDIDATE, prior_image=PRIOR, target_schema=25, current_schema=25,
+                                 job_state="complete", image_runner=runner_for({CANDIDATE: (25, 25), PRIOR: (22, 22)}))
+    assert result.result["blocked_by"] == [] and result.result["recovery_class"] == "forward-fix-or-restore"
+    assert result.status == "attention"
+
+
 def test_prior_that_cannot_serve_the_current_schema_blocks_instead_of_cancel():
     result = migration_preflight(candidate_image=CANDIDATE, prior_image=PRIOR, target_schema=25, current_schema=22,
                                  job_state="not-created",

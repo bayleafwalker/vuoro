@@ -164,8 +164,14 @@ def migration_preflight(
             unknowns.append(f"gate-unknown:{name}")
     now_class, now_reason = recovery_class(current_schema, target_schema, prior_range, job_state)
     after_class, after_reason = committed_class(target_schema, prior_range)
-    blocked = [name for name in ("candidate_admits_target", "target_not_behind_current", "prior_admits_current")
-               if gates[name] is False]
+    blocking = ["candidate_admits_target", "target_not_behind_current"]
+    if current_schema is not None and current_schema < target_schema:
+        # Before the migration commits the prior image is what serves the
+        # current schema; if it cannot admit it, the observed state is
+        # inconsistent and nothing may be cancelled on its basis.  After a
+        # commit, prior not admitting current is what forward-fix means.
+        blocking.append("prior_admits_current")
+    blocked = [name for name in blocking if gates[name] is False]
 
     proof = startup_proof(candidate_image, target_schema, startup_proof_script) if run_startup_proof else {
         "state": "not-requested"}

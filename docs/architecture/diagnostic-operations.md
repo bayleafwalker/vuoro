@@ -176,8 +176,11 @@ no class and status `error`, never advice:
 `recovery_class_after_commit` is the class once the target commits. The gates
 (`candidate_admits_target`, `prior_admits_current`, `prior_admits_target`,
 `target_not_behind_current`, `migration_job_settled`) are reported
-individually. A failed `candidate_admits_target`, `target_not_behind_current`
-or `prior_admits_current` blocks the preflight with `error`. `--run-startup-proof` wraps
+individually. A failed `candidate_admits_target` or `target_not_behind_current`
+blocks the preflight with `error`. So does a failed `prior_admits_current` while
+the schema is still below the target, because then the prior image must be
+what serves it. After a commit, a prior image that does not admit the current
+schema is what `forward-fix-or-restore` means. `--run-startup-proof` wraps
 `scripts/verify_pre_migration_startup.py`, but only where it applies. That
 specialist proof (#2092) has its states fixed at work 5 to 6 and requires
 podman, so any other target reports `not-applicable` instead of a misleading
