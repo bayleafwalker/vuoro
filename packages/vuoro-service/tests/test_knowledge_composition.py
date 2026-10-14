@@ -124,6 +124,7 @@ def _environ(tmp_path: Path, **extra: str) -> dict[str, str]:
         # An unreachable local socket: the read-only gate reports, never retries or migrates.
         "VUORO_KNOWLEDGE_RUNTIME_DSN": f"host={tmp_path / 'nosock'} dbname=none connect_timeout=1",
         "VUORO_KNOWLEDGE_OBJECT_STORE": f"fs:{tmp_path / 'objects'}",
+        "VUORO_KNOWLEDGE_RUNTIME_ROLE": "vuoro_knowledge_runtime",
         **extra,
     }
 
@@ -141,6 +142,8 @@ def test_compose_knowledge_registers_the_owner_operations_and_gates_the_schema(t
 @pytest.mark.parametrize("missing, message", [
     ("VUORO_KNOWLEDGE_RUNTIME_DSN", "VUORO_KNOWLEDGE_RUNTIME_DSN"),
     ("VUORO_KNOWLEDGE_OBJECT_STORE", "VUORO_KNOWLEDGE_OBJECT_STORE"),
+    # Never defaulted to the connecting role: an owner DSN must not pass the role check.
+    ("VUORO_KNOWLEDGE_RUNTIME_ROLE", "VUORO_KNOWLEDGE_RUNTIME_ROLE"),
 ])
 def test_compose_knowledge_requires_its_runtime_configuration(tmp_path: Path, missing: str, message: str) -> None:
     environ = _environ(tmp_path)
@@ -168,3 +171,40 @@ def test_compose_knowledge_refuses_a_version_other_than_the_pin(tmp_path: Path) 
     pin = _load(tmp_path, raw).pin("knowledge")
     with pytest.raises(CompositionError, match="installed distribution version"):
         _compose_knowledge(pin, CatalogRegistry(), _environ(tmp_path))
+
+
+def _record(**overrides):
+    return {
+        "schema": "knowledge", "domain_api_version": "vuoro-workspace/v1", "installed_schema_version": 1,
+        "minimum_schema_version": 1, "maximum_schema_version": 1, "current_role": "vuoro_knowledge_runtime",
+        "expected_role_kind": "runtime", "configured_role": "vuoro_knowledge_runtime", "compatible": True,
+        "reasons": [], "schema_version": "knowledge-schema/v1", **overrides,
+    }
+
+
+def test_compose_knowledge_starts_compatible_when_the_owner_gate_passes(tmp_path: Path, monkeypatch) -> None:
+    from vuoro_workspace.vuoro_adapter import KnowledgeApplication
+
+    monkeypatch.setattr(KnowledgeApplication, "compatibility", lambda self: _record())
+    state = _compose_knowledge(_pin(tmp_path), CatalogRegistry(), _environ(tmp_path))
+    assert state.state == "compatible" and state.reason is None
+    assert (state.api_version, state.schema_version) == ("vuoro-workspace/v1", "knowledge-schema/v1")
+
+
+def test_compose_knowledge_refuses_a_store_api_other_than_the_pin(tmp_path: Path, monkeypatch) -> None:
+    from vuoro_workspace.vuoro_adapter import KnowledgeApplication
+
+    monkeypatch.setattr(KnowledgeApplication, "compatibility",
+                        lambda self: _record(domain_api_version="vuoro-workspace/v2"))
+    state = _compose_knowledge(_pin(tmp_path), CatalogRegistry(), _environ(tmp_path))
+    assert state.state == "incompatible"
+    assert "API version" in (state.reason or "")
+
+
+def test_compose_knowledge_reports_an_owner_dsn_as_incompatible(tmp_path: Path, monkeypatch) -> None:
+    from vuoro_workspace.vuoro_adapter import KnowledgeApplication
+
+    monkeypatch.setattr(KnowledgeApplication, "compatibility", lambda self: _record(
+        compatible=False, reasons=["runtime_role_owns_schema"], reason="runtime_role_owns_schema"))
+    state = _compose_knowledge(_pin(tmp_path), CatalogRegistry(), _environ(tmp_path))
+    assert state.state == "incompatible" and "owns_schema" in (state.reason or "")

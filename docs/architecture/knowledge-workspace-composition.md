@@ -38,42 +38,81 @@ records how the domain is bound, configured, migrated and released.
   | Operation | Authority | Semantics | Idempotency |
   | --- | --- | --- | --- |
   | `workspace.create`, `member.set`, `item.delete`, `artifact.delete` | `knowledge:admin` | write | required |
-  | `workspace.reconcile` | `knowledge:admin` | write | not-allowed (convergent) |
+  | `workspace.reconcile` | `knowledge:admin` | write | not-allowed (convergent; `grace_seconds` ≥ 3600, default 86400) |
   | `item.create`, `revision.draft`, `proposal.submit`, `proposal.withdraw`, `artifact.begin`, `artifact.finalize` | `knowledge:contribute` | write | required |
-  | `artifact.upload` | `knowledge:contribute` | write | not-allowed (convergent put; finalize verifies the digest) |
+  | `artifact.upload` | `knowledge:contribute` | write | not-allowed (last write wins until finalize; see below) |
   | `proposal.review`, `artifact.review` | `knowledge:review` | write | required |
   | `item.read`, `artifact.download`, `workspace.search`, `workspace.changes` | `knowledge:read` | read | not-allowed |
 
   The knowledge-only catalog revision is
-  `133e24ad0490a7e3302d510f22c59b7f3dd37456d7ae2892c4bd8d4d2fd21767`. Together
+  `e651dd978f73772e520f28f5ab9b6f46b77578ecc459d171d01eb4c204e75e49`. Together
   with the pinned work (97) and audit (5) operations, the three-domain catalog
   has 120 operations, revision
-  `01e47ad04f9be5a0c1e9d5b5657fdba4712d4d9d1b15b56f9a231941659b103c`
+  `270c8e6c34563b7abb8e7fad54bfd9be522a3a2cec2f256cd91784142066fb8b`
   (`scripts/validate_knowledge_catalog_composition.py`). The served catalog
   stays at 102 operations until the pin lands.
 - **Authority.** The shell checks the coarse credential authority
   (`authority-required`, 403). The store then intersects the credential's
   `knowledge:*` authorities with the caller's current membership role on
   every call. A refusal from the store is served as `knowledge-forbidden`
-  (403), and every other store error as `knowledge-<code>`.
+  (403), and every other mapped store error as `knowledge-<code>`. Error
+  details are filtered to a per-code allowlist, so storage internals such as
+  object keys and schema diagnostics are logged server-side and never sent to
+  the caller. An unmapped store code is served as a generic
+  `knowledge-internal-error` (500), and a failed schema check as
+  `knowledge-unavailable` (503).
 - **Principal.** The store principal is the identity's minted `principal_id`,
   never the display `actor`. An identity without a `principal_id` is refused.
-  The caller counts as an agent, and is capped at contributor, in either of
-  two cases:
-  - the identity was minted under a delegated OAuth client grant
-    (`client_id` or `grant_id` set): a connected client acting for a user;
-  - the credential carries the marker authority `knowledge:agent`.
+  The agent cap **fails closed**. Every caller is an agent, capped at
+  contributor, unless its credential carries the explicit `knowledge:human`
+  marker authority. Only two issuers may mint that marker:
+  - the operator-controlled static identity registry;
+  - Vuoro Cloud, for human sessions.
 
-  A membership row can also mark a principal as an agent.
+  An identity minted under a delegated OAuth client grant (`client_id` or
+  `grant_id` set) stays an agent even if it carries the marker. A workspace
+  token or any other identity without the marker is an agent. A membership
+  row can also mark a principal as an agent. The marker is not passed on as
+  an authority.
+- **Idempotency keys.** The shell accepts envelope keys of 1–256 characters,
+  and the store's ledger takes `^[A-Za-z0-9._:-]{8,128}$`. A key that already
+  matches passes through unchanged. Any other key becomes
+  `vk1:<sha256 hex>` deterministically, so its replays and conflicts behave
+  exactly like a conforming key's. The ledger is per principal, so a derived
+  key can collide only with the same caller's own literal `vk1:` key.
+- **Upload retries.** `artifact.upload` keeps no ledger. A retry with the
+  same bytes converges. A retry with different bytes replaces the stored
+  object, because the last write before finalize wins. Finalize then verifies
+  the object against the SHA-256 and size fixed by `artifact.begin`, and
+  rejects the version on a mismatch.
 - **Bytes.** Uploads send `content_base64` in the JSON envelope. The limit is
   8 MiB per call in Phase 1, so a version is reserved with
-  `expected_size` ≤ 8 MiB. Downloads return base64 together with the
-  recorded media type in JSON only, and never as an HTTP body with an active
-  content type. Larger artifacts wait for presigned uploads. The MCP edge has
-  its own 64 KiB body limit; P2 handles that.
-- **Not served.** Workspace export and import read and write server-side
-  bundle directories. They stay store-API and operator only until a
-  bundle-transfer design exists.
+  `expected_size` ≤ 8 MiB. Downloads compare the recorded size with the cap
+  before fetching any bytes. They return base64 together with the recorded
+  media type and `content_disposition: attachment`, in JSON only, and never
+  as an HTTP body with an active content type. Larger artifacts wait for
+  presigned uploads.
+- **Request body limit.** The service shell refuses a
+  `POST /api/invoke/v1` body over 12 MiB with `request-too-large` (413)
+  before parsing it. The limit is `ServiceSettings.invoke_body_limit_bytes`
+  and applies to the invoke route only. The MCP edge keeps its own 64 KiB
+  limit; P2 handles that.
+- **Concurrency.** Handlers are synchronous store calls, and they run in a
+  worker thread (`asyncio.to_thread`), never on the service event loop.
+  Connections come from a bounded pool of runtime-role connections (8 by
+  default). The store's schema check runs once, when a pooled connection is
+  opened, not on every call.
+
+### Contract deviation: export and import are not served
+
+Phase 0 §3.5 lists `export` and `import` among the store operations served as
+`knowledge.*`. P1b deliberately does **not** serve them. They read and write
+server-side bundle directories, and serving them would turn a filesystem path
+into a caller-supplied argument. In Phase 1 they stay available through the
+store API and to the operator only. Serving them needs a bundle-transfer
+design, for example a bundle as an artifact with presigned transfer. That
+design is open, and it must be decided before the Phase 1 export/import
+scenario is served.
 
 ## Runtime configuration
 
@@ -83,7 +122,7 @@ records how the domain is bound, configured, migrated and released.
 | `VUORO_KNOWLEDGE_OBJECT_STORE` | yes | `fs:/absolute/path` or `s3://bucket[/prefix]` |
 | `VUORO_KNOWLEDGE_S3_ENDPOINT_URL`, `VUORO_KNOWLEDGE_S3_REGION` | for S3-compatible stores | boto3 client endpoint and region; credentials come from the standard AWS environment |
 | `VUORO_KNOWLEDGE_SCHEMA` | no (default `knowledge`) | schema name |
-| `VUORO_KNOWLEDGE_RUNTIME_ROLE` | no | expected runtime role for the role check |
+| `VUORO_KNOWLEDGE_RUNTIME_ROLE` | yes | the runtime role the DSN must connect as; never defaulted to the connecting role |
 
 The S3 backend needs the `vuoro-workspace[s3]` extra (boto3) installed in the
 image.
@@ -95,9 +134,13 @@ image.
 `VUORO_WORKSPACE_SCHEMA_MODE`. The result becomes the handshake's
 `compatibility.domains.knowledge` entry. If the schema is incompatible, the
 store's API version differs from the pin, or the database is unreachable,
-startup refuses, exactly as for work and audit. Each invocation opens its own
-autocommit connection, and the store re-checks the schema when it is
-constructed.
+startup refuses, exactly as for work and audit.
+
+The gate also refuses an owner or migration DSN. The connecting role must
+equal the configured `VUORO_KNOWLEDGE_RUNTIME_ROLE`. If the runtime role is
+unset, schema-runtime's `role_not_configured` makes the check fail closed.
+The gate further rejects a connection that owns the schema
+(`runtime_role_owns_schema`) or is a superuser (`runtime_role_is_superuser`).
 
 ## Migration entrypoint
 

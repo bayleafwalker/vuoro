@@ -22,6 +22,15 @@ import pytest
 
 PG_BIN_ENV = "VUORO_WORKSPACE_TEST_PG_BIN"
 DSN_ENV = "VUORO_WORKSPACE_TEST_DSN"
+#: Set in release and CI qualification: a missing database (or missing served
+#: test dependency) fails instead of skipping, so a green run proves coverage.
+REQUIRE_ENV = "VUORO_WORKSPACE_REQUIRE_PG"
+
+
+def require_or_skip(reason: str) -> None:
+    if os.environ.get(REQUIRE_ENV) == "1":
+        pytest.fail(f"{REQUIRE_ENV}=1 but {reason}")
+    pytest.skip(reason)
 
 
 @pytest.fixture(scope="session")
@@ -31,7 +40,7 @@ def pg_dsn() -> Iterator[str]:
         return
     pg_bin = os.environ.get(PG_BIN_ENV)
     if not pg_bin:
-        pytest.skip(f"set {PG_BIN_ENV} (PostgreSQL bin dir) or {DSN_ENV} for disposable PostgreSQL tests")
+        require_or_skip(f"set {PG_BIN_ENV} (PostgreSQL bin dir) or {DSN_ENV} for disposable PostgreSQL tests")
     bin_dir = Path(pg_bin)
     base = Path(tempfile.mkdtemp(prefix="vwpg-", dir="/tmp" if Path("/tmp").is_dir() else None))
     data, sock = base / "data", base / "s"

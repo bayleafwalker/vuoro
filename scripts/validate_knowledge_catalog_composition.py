@@ -17,7 +17,7 @@ from vuoro_workspace.vuoro_adapter import KnowledgeApplication, register_knowled
 
 
 EXPECTED_TOTAL = 120
-EXPECTED_REVISION = "01e47ad04f9be5a0c1e9d5b5657fdba4712d4d9d1b15b56f9a231941659b103c"
+EXPECTED_REVISION = "270c8e6c34563b7abb8e7fad54bfd9be522a3a2cec2f256cd91784142066fb8b"
 EXPECTED_DOMAIN_COUNTS = {"work": 97, "audit": 5, "knowledge": 18}
 
 
@@ -34,7 +34,7 @@ def main() -> int:
     register_work_catalog(registry, WorkStub())
     VuoroAuditAdapter(connection_factory=lambda: None).register(registry)
     with tempfile.TemporaryDirectory() as root:
-        register_knowledge_catalog(registry, KnowledgeApplication(lambda: None, FsObjectStore(root)))
+        register_knowledge_catalog(registry, KnowledgeApplication(lambda: None, FsObjectStore(root), runtime_role="vuoro_knowledge_runtime"))
     catalog = registry.catalog().model_dump(mode="json")
     counts: dict[str, int] = {}
     for operation in catalog["operations"]:

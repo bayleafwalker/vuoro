@@ -874,7 +874,8 @@ class WorkspaceStore:
             "relations": relations, "watermark": watermark,
         })
 
-    def download(self, p: Principal, ws: str, artifact_id: str, version: str = "latest-approved") -> dict[str, Any]:
+    def download(self, p: Principal, ws: str, artifact_id: str, version: str = "latest-approved", *,
+                 max_bytes: int | None = None) -> dict[str, Any]:
         """Authenticated download; bytes are re-verified against the recorded checksum.
 
         Callers serving the bytes over HTTP must use ``content_disposition``
@@ -896,6 +897,10 @@ class WorkspaceStore:
             raise WorkspaceError(E.NOT_FOUND, "version not available")
         if row["review_state"] != "approved" and not access.can(CONTRIBUTE):
             raise WorkspaceError(E.NOT_FOUND, "version not available")
+        if max_bytes is not None and row["size_bytes"] > max_bytes:
+            # Checked against the recorded size before any bytes are fetched.
+            raise WorkspaceError(E.TOO_LARGE, "artifact exceeds this download path's size limit",
+                                 size=row["size_bytes"], limit=max_bytes)
         data = self.objects.get(row["object_key"])
         if data is None or _sha256(data) != row["sha256"]:
             raise WorkspaceError(E.OBJECT_MISSING, "stored object is missing or corrupt", version_id=version_id)
@@ -1061,7 +1066,8 @@ class WorkspaceStore:
         crashed between its transactions) is reset to ``reserved`` so it can
         be finalized again, or expired if its reservation has lapsed.
         An orphan (object with no live row, older than ``grace``) is deleted
-        only when ``delete_orphans`` is set *and* an earlier pass recorded it.
+        only when ``delete_orphans`` is set *and* an earlier pass recorded it
+        at least ``grace`` ago.
         """
         now = self.now()
         with self.conn.transaction(), self.conn.cursor() as cur:
@@ -1100,7 +1106,10 @@ class WorkspaceStore:
             if info.modified_at > now - grace:
                 continue
             reason = "no-row" if row is None else f"{row['processing_state']}-version"
-            status = "deleted" if (delete_orphans and key in seen) else "pending-second-pass"
+            # A second sighting only counts once ``grace`` has passed since the
+            # first: two back-to-back passes never delete anything.
+            confirmed = key in seen and now - seen[key] >= grace
+            status = "deleted" if (delete_orphans and confirmed) else "pending-second-pass"
             orphans.append({"object_key": key, "size": info.size, "reason": reason, "status": status})
         with self.conn.transaction(), self.conn.cursor() as cur:
             self._authorize(cur, p, ws, ADMIN)

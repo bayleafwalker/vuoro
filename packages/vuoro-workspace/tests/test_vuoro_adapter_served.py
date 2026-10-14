@@ -17,8 +17,13 @@ from typing import Any
 
 import pytest
 
-pytest.importorskip("vuoro_service", reason="served-adapter tests need vuoro-service (test extra)")
-pytest.importorskip("httpx", reason="served-adapter tests need httpx (test extra)")
+from workspace_fixtures import require_or_skip
+
+try:
+    import httpx  # noqa: F401
+    import vuoro_service  # noqa: F401
+except ImportError:  # pragma: no cover - depends on the test extra
+    require_or_skip("served-adapter tests need the vuoro-workspace test extra (vuoro-service, httpx)")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -32,15 +37,17 @@ from vuoro_workspace.vuoro_adapter import (  # noqa: E402
     catalog_operation_specs,
     principal_from_identity,
     register_knowledge_catalog,
+    store_idempotency_key,
 )
 from workspace_fixtures import pg_conn, pg_dsn, schema  # noqa: E402,F401  (fixtures)
 
 ENV = "knowledge-test"
+HUMAN = "knowledge:human"
 EVERY = ("knowledge:read", "knowledge:contribute", "knowledge:review", "knowledge:admin")
 
 #: Pinned so any change to a knowledge operation's served contract is a
 #: deliberate, reviewed catalog revision change.
-KNOWLEDGE_CATALOG_REVISION = "133e24ad0490a7e3302d510f22c59b7f3dd37456d7ae2892c4bd8d4d2fd21767"
+KNOWLEDGE_CATALOG_REVISION = "e651dd978f73772e520f28f5ab9b6f46b77578ecc459d171d01eb4c204e75e49"
 EXPECTED_OPERATIONS = {
     "knowledge.workspace.create-v1": ("knowledge:admin", "write", "required"),
     "knowledge.member.set-v1": ("knowledge:admin", "write", "required"),
@@ -63,9 +70,11 @@ EXPECTED_OPERATIONS = {
 }
 
 
-def _registry(tmp_path: Path, connect=lambda: None, schema_name: str = "knowledge") -> CatalogRegistry:
+def _registry(tmp_path: Path, connect=lambda: None, schema_name: str = "knowledge",
+              runtime_role: str = "vuoro_knowledge_runtime") -> CatalogRegistry:
     registry = CatalogRegistry()
-    application = KnowledgeApplication(connect, FsObjectStore(tmp_path / "objects"), schema=schema_name)
+    application = KnowledgeApplication(connect, FsObjectStore(tmp_path / "objects"), schema=schema_name,
+                                       runtime_role=runtime_role)
     register_knowledge_catalog(registry, application)
     return registry
 
@@ -100,19 +109,42 @@ def test_catalog_revision_is_stable_and_pinned(tmp_path: Path) -> None:
     assert _registry(tmp_path / "third").revision == KNOWLEDGE_CATALOG_REVISION
 
 
-def test_principal_mapping_uses_principal_id_and_the_agent_rule() -> None:
-    human = principal_from_identity(Identity("alice", ENV, frozenset({*EVERY, "work:read"}), principal_id="iss:alice:0"))
+def test_principal_mapping_fails_closed_to_agent() -> None:
+    human = principal_from_identity(
+        Identity("alice", ENV, frozenset({*EVERY, HUMAN, "work:read"}), principal_id="iss:alice:0"))
     assert human.principal_id == "iss:alice:0" and not human.is_agent
-    assert human.authorities == frozenset(EVERY)
-    oauth = principal_from_identity(Identity("bot", ENV, frozenset(EVERY), principal_id="iss:bot:0", client_id="c1"))
-    marked = principal_from_identity(
-        Identity("rt", ENV, frozenset({*EVERY, "knowledge:agent"}), principal_id="iss:rt:0"))
-    assert oauth.is_agent and marked.is_agent
-    assert "knowledge:agent" not in marked.authorities
+    assert human.authorities == frozenset(EVERY)  # markers and other domains are not passed on
+    unmarked = principal_from_identity(Identity("tok", ENV, frozenset(EVERY), principal_id="iss:tok:0"))
+    oauth_with_marker = principal_from_identity(
+        Identity("bot", ENV, frozenset({*EVERY, HUMAN}), principal_id="iss:bot:0", client_id="c1"))
+    grant_with_marker = principal_from_identity(
+        Identity("bot", ENV, frozenset({*EVERY, HUMAN}), principal_id="iss:bot:0", grant_id="g1"))
+    assert unmarked.is_agent and oauth_with_marker.is_agent and grant_with_marker.is_agent
     from vuoro_workspace import WorkspaceError
 
     with pytest.raises(WorkspaceError):
-        principal_from_identity(Identity("anon", ENV, frozenset(EVERY)))
+        principal_from_identity(Identity("anon", ENV, frozenset({*EVERY, HUMAN})))
+
+
+def test_envelope_idempotency_keys_map_deterministically_onto_the_store_grammar() -> None:
+    from types import SimpleNamespace
+
+    from vuoro_workspace.store import IDEMPOTENCY_KEY_RE
+
+    assert store_idempotency_key(SimpleNamespace(idempotency_key=None)) is None
+    assert store_idempotency_key(SimpleNamespace(idempotency_key="plain-key-0001")) == "plain-key-0001"
+    for raw in ("short", "x" * 200, "spaces are fine here", "ünïcode-key"):
+        derived = store_idempotency_key(SimpleNamespace(idempotency_key=raw))
+        assert IDEMPOTENCY_KEY_RE.fullmatch(derived) and derived.startswith("vk1:")
+        assert derived == store_idempotency_key(SimpleNamespace(idempotency_key=raw))
+    assert store_idempotency_key(SimpleNamespace(idempotency_key="short")) != \
+        store_idempotency_key(SimpleNamespace(idempotency_key="short2"))
+
+
+def test_runtime_role_is_required(tmp_path: Path) -> None:
+    for role in (None, "", "  "):
+        with pytest.raises((ValueError, TypeError)):
+            KnowledgeApplication(lambda: None, FsObjectStore(tmp_path), runtime_role=role)  # type: ignore[arg-type]
 
 
 # ----------------------------------------------------------------- served
@@ -150,36 +182,63 @@ def _identity(name: str, authorities: tuple[str, ...] = EVERY, **extra: Any) -> 
 
 
 TOKENS = {
-    "t-admin": _identity("admin"),
-    "t-reader": _identity("reader"),
-    "t-contrib": _identity("contrib"),
-    "t-reviewer": _identity("reviewer"),
-    "t-outsider": _identity("outsider"),
-    "t-agent": _identity("agent", client_id="mcp-client"),
+    # Operator-minted static identities for humans carry the explicit marker.
+    "t-admin": _identity("admin", (*EVERY, HUMAN)),
+    "t-reader": _identity("reader", (*EVERY, HUMAN)),
+    "t-contrib": _identity("contrib", (*EVERY, HUMAN)),
+    "t-reviewer": _identity("reviewer", (*EVERY, HUMAN)),
+    "t-outsider": _identity("outsider", (*EVERY, HUMAN)),
+    # An OAuth client stays an agent even if a human marker leaks onto it.
+    "t-agent": _identity("agent", (*EVERY, HUMAN), client_id="mcp-client"),
+    # A workspace-token style identity without the marker is an agent.
+    "t-token": _identity("token"),
     "t-noknow": _identity("noknow", ("work:read",)),
-    "t-readonly-cred": _identity("readonly", ("knowledge:read",)),
+    "t-readonly-cred": _identity("readonly", ("knowledge:read", HUMAN)),
 }
+RUNTIME_PASSWORD = "kw-test-only"
+
+
+def _runtime_role(pg_conn: Any, schema: str) -> str:
+    """A non-owner, non-superuser login role with only runtime DML on the schema."""
+    role = f"{schema}_rt"
+    pg_conn.execute(f'DROP ROLE IF EXISTS "{role}"')
+    pg_conn.execute(f"CREATE ROLE \"{role}\" LOGIN PASSWORD '{RUNTIME_PASSWORD}'")
+    pg_conn.execute(f'GRANT USAGE ON SCHEMA "{schema}" TO "{role}"')
+    pg_conn.execute(f'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA "{schema}" TO "{role}"')
+    return role
+
+
+def _connect_as(pg_dsn: str, role: str):
+    import psycopg
+    from psycopg.conninfo import make_conninfo
+
+    dsn = make_conninfo(pg_dsn, user=role, password=RUNTIME_PASSWORD)
+    return lambda: psycopg.connect(dsn, autocommit=True)
 
 
 @pytest.fixture
-def served(pg_dsn: str, pg_conn: Any, schema: str, tmp_path: Path) -> Any:
+def served(pg_dsn: str, pg_conn: Any, schema: str, tmp_path: Path) -> Any:  # noqa: C901
     import psycopg
     from vuoro_workspace import migrate_schema
 
     migrate_schema(pg_conn, schema)
-    registry = _registry(tmp_path, lambda: psycopg.connect(pg_dsn, autocommit=True), schema)
+    role = _runtime_role(pg_conn, schema)
+    registry = _registry(tmp_path, _connect_as(pg_dsn, role), schema, runtime_role=role)
     app = create_app(
         settings=ServiceSettings(environment_name=ENV, compatibility_state="compatible"),
         registry=registry,
         identity_resolver=StaticBearerIdentityResolver(TOKENS),
     )
     s = Served(TestClient(app))
+    s.dsn, s.schema = pg_dsn, schema
     s.ws = s.ok("t-admin", "knowledge.workspace.create-v1", {"name": "Research"})["workspace_id"]
-    for name, role in (("reader", "reader"), ("contrib", "contributor"), ("reviewer", "reviewer"),
-                       ("agent", "reviewer"), ("readonly", "administrator")):
+    for name, member_role in (("reader", "reader"), ("contrib", "contributor"), ("reviewer", "reviewer"),
+                              ("agent", "reviewer"), ("token", "reviewer"), ("readonly", "administrator")):
         s.ok("t-admin", "knowledge.member.set-v1",
-             {"workspace_id": s.ws, "principal_id": f"test:{name}:0", "role": role})
-    return s
+             {"workspace_id": s.ws, "principal_id": f"test:{name}:0", "role": member_role})
+    yield s
+    pg_conn.execute(f'DROP OWNED BY "{role}"')
+    pg_conn.execute(f'DROP ROLE IF EXISTS "{role}"')
 
 
 def test_missing_knowledge_authority_is_refused_by_the_shell(served) -> None:
@@ -203,10 +262,13 @@ def test_membership_is_intersected_on_every_call(served) -> None:
     item = s.ok("t-contrib", "knowledge.item.create-v1", {"workspace_id": s.ws, "title": "Draft", "body_md": "b"})
     prop = s.ok("t-contrib", "knowledge.proposal.submit-v1",
                 {"workspace_id": s.ws, "revision_id": item["revision_id"], "expected_base_revision_id": None})
-    # An OAuth-client (agent) identity is capped at contributor despite a reviewer membership.
-    assert s.code("t-agent", "knowledge.proposal.review-v1",
-                  {"workspace_id": s.ws, "proposal_id": prop["proposal_id"], "decision": "approve"}) \
-        == (403, "knowledge-forbidden")
+    review = {"workspace_id": s.ws, "proposal_id": prop["proposal_id"], "decision": "approve"}
+    # Agents are capped at contributor despite a reviewer membership: an OAuth
+    # client (even carrying the human marker) and an unmarked token identity.
+    assert s.code("t-agent", "knowledge.proposal.review-v1", review) == (403, "knowledge-forbidden")
+    assert s.code("t-token", "knowledge.proposal.review-v1", review) == (403, "knowledge-forbidden")
+    # A static identity with the explicit human marker and a reviewer role can review.
+    assert s.ok("t-reviewer", "knowledge.proposal.review-v1", review)["state"] == "approved"
     # Removing a member refuses their very next call.
     s.ok("t-reader", "knowledge.workspace.changes-v1", {"workspace_id": s.ws})
     s.ok("t-admin", "knowledge.member.set-v1",
@@ -223,7 +285,13 @@ def test_idempotency_replay_and_conflict(served) -> None:
     assert replay == first
     assert s.code("t-contrib", "knowledge.item.create-v1", {**args, "body_md": "other"},
                   key="item-create-0001") == (409, "knowledge-idempotency-conflict")
-    assert s.code("t-contrib", "knowledge.item.create-v1", args, key="short") == (422, "knowledge-invalid-argument")
+    # Envelope keys outside the store grammar are hashed deterministically, so
+    # they replay and conflict exactly like grammar-conforming keys.
+    for raw in ("short", "k" * 200):
+        once = s.ok("t-contrib", "knowledge.item.create-v1", {**args, "title": raw[:20]}, key=raw)
+        assert s.ok("t-contrib", "knowledge.item.create-v1", {**args, "title": raw[:20]}, key=raw) == once
+        assert s.code("t-contrib", "knowledge.item.create-v1", {**args, "title": "changed"}, key=raw) \
+            == (409, "knowledge-idempotency-conflict")
     assert s.code("t-contrib", "knowledge.workspace.search-v1", {"workspace_id": s.ws, "query": "x"},
                   key="not-allowed-key") == (400, "idempotency-key-not-allowed")
 
@@ -320,9 +388,9 @@ def test_search_scope_filtering(served) -> None:
     approved = s.ok("t-reader", "knowledge.workspace.search-v1", query)
     assert approved["total"] == 1 and approved["results"][0]["id"] == published["item_id"]
     assert approved["scope"] == "approved" and approved["index_watermark"] > 0
-    assert s.code("t-reader", "knowledge.workspace.search-v1", {**query, "scope": "working"}) \
-        == (403, "knowledge-forbidden")
-    assert s.ok("t-reader", "knowledge.workspace.search-v1", {**query, "scope": "history"})["total"] == 1
+    for scope in ("working", "history"):
+        assert s.code("t-reader", "knowledge.workspace.search-v1", {**query, "scope": scope}) \
+            == (403, "knowledge-forbidden")
     assert s.ok("t-contrib", "knowledge.workspace.search-v1", {**query, "scope": "working"})["total"] == 2
     read = s.ok("t-reader", "knowledge.item.read-v1", {"workspace_id": s.ws, "item_id": published["item_id"]})
     assert read["publication_state"] == "approved" and read["revision_id"] == published["revision_id"]
@@ -361,20 +429,90 @@ def test_delete_tombstones_and_changes_feed(served) -> None:
     assert report["workspace_id"] == s.ws and report["reset_verifications"] == []
 
 
-def test_compatibility_gate_is_read_only(pg_dsn: str, pg_conn: Any, schema: str, tmp_path: Path,
-                                         monkeypatch: pytest.MonkeyPatch) -> None:
+def test_compatibility_gate_is_read_only_and_refuses_owner_dsns(pg_dsn: str, pg_conn: Any, schema: str,
+                                                               tmp_path: Path,
+                                                               monkeypatch: pytest.MonkeyPatch) -> None:
     import psycopg
     from vuoro_workspace import migrate_schema
 
     monkeypatch.setenv("VUORO_WORKSPACE_SCHEMA_MODE", "operator-migrate")
-    application = KnowledgeApplication(lambda: psycopg.connect(pg_dsn, autocommit=True),
-                                       FsObjectStore(tmp_path / "objects"), schema=schema)
-    before = application.compatibility()
+    objects = FsObjectStore(tmp_path / "objects")
+    owner = KnowledgeApplication(lambda: psycopg.connect(pg_dsn, autocommit=True), objects, schema=schema,
+                                 runtime_role="vuoro_knowledge_runtime")
+    before = owner.compatibility()
     assert before["compatible"] is False and before["reason"]
     # The gate never migrates, whatever the store's startup-mode variable says.
     assert pg_conn.execute("SELECT count(*) FROM pg_namespace WHERE nspname = %s", (schema,)).fetchone()[0] == 0
     migrate_schema(pg_conn, schema)
-    after = application.compatibility()
-    assert after["compatible"] is True
-    assert after["domain_api_version"] == "vuoro-workspace/v1"
-    assert after["schema_version"] == "knowledge-schema/v1"
+    # The owner/migration DSN is refused even once the schema exists: it is not
+    # the configured runtime role, and even when configured as one, it is a
+    # superuser (owner) connection.
+    assert "role_kind_mismatch" in owner.compatibility()["reasons"]
+    as_owner = KnowledgeApplication(lambda: psycopg.connect(pg_dsn, autocommit=True), objects, schema=schema,
+                                    runtime_role="postgres")
+    refused = as_owner.compatibility()
+    assert refused["compatible"] is False
+    assert "runtime_role_is_superuser" in refused["reasons"]
+    role = _runtime_role(pg_conn, schema)
+    try:
+        runtime = KnowledgeApplication(_connect_as(pg_dsn, role), objects, schema=schema, runtime_role=role)
+        after = runtime.compatibility()
+        assert after["compatible"] is True, after
+        assert after["domain_api_version"] == "vuoro-workspace/v1"
+        assert after["schema_version"] == "knowledge-schema/v1"
+    finally:
+        pg_conn.execute(f'DROP OWNED BY "{role}"')
+        pg_conn.execute(f'DROP ROLE IF EXISTS "{role}"')
+
+
+def test_errors_do_not_disclose_storage_internals(served) -> None:
+    s = served
+    data = b"bytes never uploaded"
+    begun = s.ok("t-contrib", "knowledge.artifact.begin-v1", {
+        "workspace_id": s.ws, "expected_sha256": hashlib.sha256(data).hexdigest(), "expected_size": len(data),
+        "media_type": "text/plain", "name": "missing.txt"})
+    status, body = s.call("t-contrib", "knowledge.artifact.finalize-v1",
+                          {"workspace_id": s.ws, "version_id": begun["version_id"]})
+    assert status == 409 and body["error"]["code"] == "knowledge-object-missing"
+    assert "object_key" not in (body["error"].get("details") or {})
+    assert "ws/" not in body["error"]["message"]
+
+
+def test_reconcile_never_deletes_on_back_to_back_passes(served) -> None:
+    s = served
+    args = {"workspace_id": s.ws, "delete_orphans": True, "grace_seconds": 3600}
+    first = s.ok("t-admin", "knowledge.workspace.reconcile-v1", args)
+    second = s.ok("t-admin", "knowledge.workspace.reconcile-v1", args)
+    assert all(o["status"] != "deleted" for o in first["orphans"] + second["orphans"])
+    assert s.code("t-admin", "knowledge.workspace.reconcile-v1", {**args, "grace_seconds": 0}) \
+        == (422, "schema-validation-failed")
+
+
+def test_download_size_is_checked_before_fetching(served, tmp_path: Path) -> None:
+    s = served
+    data = b"# small\n"
+    begun = s.ok("t-contrib", "knowledge.artifact.begin-v1", {
+        "workspace_id": s.ws, "expected_sha256": hashlib.sha256(data).hexdigest(), "expected_size": len(data),
+        "media_type": "text/markdown", "name": "small.md"})
+    s.ok("t-contrib", "knowledge.artifact.upload-v1", {
+        "workspace_id": s.ws, "version_id": begun["version_id"], "content_base64": base64.b64encode(data).decode()})
+    s.ok("t-contrib", "knowledge.artifact.finalize-v1", {"workspace_id": s.ws, "version_id": begun["version_id"]})
+    # The store refuses on the recorded size before touching the object store.
+    from vuoro_workspace import WorkspaceError
+    from vuoro_workspace.store import Principal
+
+    class NoFetch(FsObjectStore):
+        def get(self, key):  # pragma: no cover - must not be reached
+            raise AssertionError("bytes fetched before the size check")
+
+    import psycopg
+    from vuoro_workspace import WorkspaceStore
+
+    store = WorkspaceStore(psycopg.connect(s.dsn, autocommit=True), NoFetch(tmp_path / "nofetch"), schema=s.schema)
+    try:
+        with pytest.raises(WorkspaceError) as info:
+            store.download(Principal("test:contrib:0", frozenset(EVERY)), s.ws, begun["artifact_id"],
+                           begun["version_id"], max_bytes=len(data) - 1)
+        assert info.value.code == "payload-too-large"
+    finally:
+        store.close()

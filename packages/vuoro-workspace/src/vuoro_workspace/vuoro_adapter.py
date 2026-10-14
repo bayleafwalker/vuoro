@@ -16,11 +16,13 @@ Authority is two-layered (phase0 contract §3.2):
 
 Principal mapping (see :func:`principal_from_identity`): the store principal is
 the identity's minted ``principal_id`` (never the display ``actor``). The
-caller is treated as an agent, and so capped at contributor, when the identity
-was minted under a delegated OAuth client grant (``client_id`` or
-``grant_id`` present: a connected client acting for a user) or when the
-credential carries the ``knowledge:agent`` marker authority. Membership rows
-can additionally mark a principal as an agent; either marker caps it.
+agent cap fails closed: every caller is an agent, capped at contributor,
+unless its credential carries the explicit ``knowledge:human`` marker
+authority. That marker is minted only in the operator-controlled static
+identity registry or by Vuoro Cloud for human sessions. An identity minted
+under a delegated OAuth client grant (``client_id`` or ``grant_id`` present)
+stays an agent even with the marker. Membership rows can additionally mark a
+principal as an agent.
 
 Artifact bytes travel as base64 in JSON. One upload call carries at most
 :data:`MAX_UPLOAD_BYTES` (8 MiB) in Phase 1, so a served artifact version is
@@ -35,10 +37,13 @@ bundle-transfer design rather than a filesystem path argument.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import hashlib
+import logging
 import os
+import threading
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from copy import deepcopy
@@ -54,18 +59,37 @@ from .errors import WorkspaceError
 from .ids import normalize
 from .migrations import DEFAULT_SCHEMA, DOMAIN_API_VERSION, SchemaCompatibilityError, compatibility
 from .objectstore import FsObjectStore, ObjectStore, S3ObjectStore
-from .store import ADMIN, CONTRIBUTE, READ, REVIEW, ROLES, SCOPES, Principal, WorkspaceStore
+from .store import (
+    ADMIN,
+    CONTRIBUTE,
+    IDEMPOTENCY_KEY_RE,
+    READ,
+    REVIEW,
+    ROLES,
+    SCOPES,
+    Principal,
+    WorkspaceStore,
+)
+
+LOGGER = logging.getLogger(__name__)
 
 DOMAIN_NAME = "knowledge"
 #: Served API identity; equals the store's own ``domain_api_version``.
 API_VERSION = DOMAIN_API_VERSION
 SCHEMA_VERSION = "knowledge-schema/v1"
-AGENT_MARKER_AUTHORITY = "knowledge:agent"
-KNOWLEDGE_AUTHORITIES = frozenset({READ, CONTRIBUTE, REVIEW, ADMIN, AGENT_MARKER_AUTHORITY})
+HUMAN_MARKER_AUTHORITY = "knowledge:human"
+KNOWLEDGE_AUTHORITIES = frozenset({READ, CONTRIBUTE, REVIEW, ADMIN})
+#: Envelope idempotency keys outside the store's key grammar are mapped to
+#: this deterministic, grammar-conforming form (prefix + SHA-256 hex).
+DERIVED_KEY_PREFIX = "vk1:"
 #: Phase 1 per-call upload cap (bytes, before base64).
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 MAX_UPLOAD_BASE64 = 4 * ((MAX_UPLOAD_BYTES + 2) // 3)
 SCHEMA_FEATURES = list(_ADAPTER_SCHEMA_FEATURES)
+#: Served orphan sweeps never use a grace below one hour (default 24 hours);
+#: a second pass deletes only once grace has passed since the first sighting.
+MIN_RECONCILE_GRACE_SECONDS = 3600
+DEFAULT_RECONCILE_GRACE_SECONDS = 86400
 
 OBJECT_STORE_ENV = "VUORO_KNOWLEDGE_OBJECT_STORE"
 S3_ENDPOINT_ENV = "VUORO_KNOWLEDGE_S3_ENDPOINT_URL"
@@ -313,9 +337,10 @@ _OPERATIONS: tuple[dict[str, Any], ...] = (
                                "expires_at": _TIMESTAMP}),
         handler="artifact_begin",
     ),
-    # A convergent put of a reserved version's bytes: retrying is safe without
-    # a key (the reservation fixes the expected digest, and finalize verifies
-    # it), and the store keeps no ledger for the transfer step.
+    # Transfer step with last-write-wins semantics and no ledger: retrying
+    # with the *same* bytes converges; a retry with *different* bytes replaces
+    # the stored object until finalize, which verifies it against the digest
+    # and size fixed by artifact.begin and rejects the version on mismatch.
     _spec(
         "knowledge.artifact.upload-v1", authority=CONTRIBUTE, semantics=_W, idempotency="not-allowed",
         input_schema=_obj({**_WS, "version_id": _ULID,
@@ -395,7 +420,8 @@ _OPERATIONS: tuple[dict[str, Any], ...] = (
     # orphan sweep are safe to re-run, and the store keeps no ledger for it.
     _spec(
         "knowledge.workspace.reconcile-v1", authority=ADMIN, semantics=_W, idempotency="not-allowed",
-        input_schema=_obj({**_WS, "grace_seconds": {"type": "integer", "minimum": 0, "maximum": 30 * 86400},
+        input_schema=_obj({**_WS, "grace_seconds": {"type": "integer", "minimum": MIN_RECONCILE_GRACE_SECONDS,
+                                             "maximum": 30 * 86400},
                            "delete_orphans": {"type": "boolean"}}, ("workspace_id",)),
         result_schema=_result({"workspace_id": _ULID, "expired_versions": {"type": "array", "items": _ULID},
                                "reset_verifications": {"type": "array"},
@@ -420,38 +446,52 @@ def principal_from_identity(identity: Any) -> Principal:
 
     * ``principal_id`` is the identity's minted, stable principal; an identity
       without one cannot hold workspace membership and is refused.
-    * Only ``knowledge:*`` authorities are passed on.
-    * Agent rule: an identity minted under a delegated OAuth client grant
-      (``client_id`` or ``grant_id`` set) is a connected client acting for a
-      user, and a credential carrying ``knowledge:agent`` is an autonomous
-      runtime; both are agents, capped at contributor by the store.
+    * Only ``knowledge:read|contribute|review|admin`` are passed on.
+    * Agent rule (fail closed): the caller is an agent unless its credential
+      holds ``knowledge:human``; an identity minted under an OAuth client
+      grant (``client_id`` or ``grant_id``) is an agent regardless.
     """
     principal_id = getattr(identity, "principal_id", None)
     if not isinstance(principal_id, str) or not principal_id:
         raise WorkspaceError(E.FORBIDDEN, "knowledge operations require a minted principal_id")
-    authorities = frozenset(a for a in getattr(identity, "authorities", ()) if a in KNOWLEDGE_AUTHORITIES)
-    is_agent = (
-        getattr(identity, "client_id", None) is not None
-        or getattr(identity, "grant_id", None) is not None
-        or AGENT_MARKER_AUTHORITY in authorities
-    )
-    return Principal(principal_id, authorities - {AGENT_MARKER_AUTHORITY}, is_agent=is_agent)
+    held = frozenset(getattr(identity, "authorities", ()))
+    delegated = getattr(identity, "client_id", None) is not None or getattr(identity, "grant_id", None) is not None
+    is_agent = delegated or HUMAN_MARKER_AUTHORITY not in held
+    return Principal(principal_id, held & KNOWLEDGE_AUTHORITIES, is_agent=is_agent)
+
+
+def store_idempotency_key(context: Any) -> str | None:
+    """Map the envelope's idempotency key onto the store's key grammar.
+
+    Keys already matching ``^[A-Za-z0-9._:-]{8,128}$`` pass through unchanged;
+    any other envelope key (the shell accepts 1-256 characters) becomes
+    ``vk1:<sha256 hex>`` deterministically, so its replays still match. The
+    ledger is scoped per principal, so a derived key can only collide with the
+    same caller's own literal ``vk1:`` key.
+    """
+    key = getattr(context, "idempotency_key", None)
+    if key is None:
+        return None
+    if IDEMPOTENCY_KEY_RE.fullmatch(key):
+        return key
+    return DERIVED_KEY_PREFIX + hashlib.sha256(key.encode("utf-8")).hexdigest()
 
 
 # -------------------------------------------------------------- application
 
-_HTTP_STATUS = {
-    E.FORBIDDEN: 403,
-    E.NOT_FOUND: 404,
-    E.INVALID: 422,
-    E.STALE_BASE: 409,
-    E.IDEMPOTENCY_CONFLICT: 409,
-    E.STATE_CONFLICT: 409,
-    E.OBJECT_MISSING: 409,
-    E.RESERVATION_EXPIRED: 410,
-    E.INVALID_CURSOR: 400,
-    E.IMPORT_INVALID: 422,
-    "payload-too-large": 413,
+#: Store error code -> (HTTP status, details keys a caller may see).
+_SERVED_ERRORS: dict[str, tuple[int, frozenset[str]]] = {
+    E.FORBIDDEN: (403, frozenset()),
+    E.NOT_FOUND: (404, frozenset({"target_id"})),
+    E.INVALID: (422, frozenset()),
+    E.STALE_BASE: (409, frozenset({"expected_base_revision_id", "current_revision_id", "current_revision"})),
+    E.IDEMPOTENCY_CONFLICT: (409, frozenset({"operation"})),
+    E.STATE_CONFLICT: (409, frozenset()),
+    E.OBJECT_MISSING: (409, frozenset({"version_id"})),
+    E.RESERVATION_EXPIRED: (410, frozenset()),
+    E.INVALID_CURSOR: (400, frozenset()),
+    E.IMPORT_INVALID: (422, frozenset()),
+    E.TOO_LARGE: (413, frozenset({"size", "limit"})),
 }
 
 
@@ -495,11 +535,14 @@ def object_store_from_uri(uri: str, environ: Mapping[str, str] | None = None) ->
 
 
 class KnowledgeApplication:
-    """Serve store calls; one autocommit connection per invocation.
+    """Serve store calls over a small pool of runtime-role connections.
 
     Construction opens nothing. :meth:`compatibility` is the read-only startup
-    gate; it never migrates (``VUORO_WORKSPACE_SCHEMA_MODE`` is deliberately
-    not consulted here — only ``vuoro-workspace migrate`` runs DDL).
+    gate: it never migrates (``VUORO_WORKSPACE_SCHEMA_MODE`` is deliberately
+    not consulted), it requires an explicitly configured ``runtime_role``, and
+    it refuses a connection that owns the schema or is a superuser, so a
+    migration/owner DSN cannot serve. Each pooled connection runs the store's
+    schema check once, when it is opened; invocations reuse it.
     """
 
     def __init__(
@@ -507,17 +550,25 @@ class KnowledgeApplication:
         connection_factory: ConnectionFactory,
         object_store: ObjectStore,
         *,
+        runtime_role: str,
         schema: str = DEFAULT_SCHEMA,
-        runtime_role: str | None = None,
+        max_connections: int = 8,
         rejection_factory: RejectionFactory = _load_rejection,
         store_kwargs: Mapping[str, Any] | None = None,
     ) -> None:
+        if not isinstance(runtime_role, str) or not runtime_role.strip():
+            raise ValueError("knowledge runtime_role must be configured explicitly")
+        if not isinstance(max_connections, int) or max_connections < 1:
+            raise ValueError("max_connections must be a positive integer")
         self._connect = connection_factory
         self.objects = object_store
         self.schema = schema
         self.runtime_role = runtime_role
         self._reject_factory = rejection_factory
         self._store_kwargs = dict(store_kwargs or {})
+        self._slots = threading.BoundedSemaphore(max_connections)
+        self._idle: list[WorkspaceStore] = []
+        self._lock = threading.Lock()
 
     @classmethod
     def from_dsn(cls, dsn: str, object_store: ObjectStore, **kwargs: Any) -> "KnowledgeApplication":
@@ -531,12 +582,30 @@ class KnowledgeApplication:
     # -- gate
 
     def compatibility(self) -> dict[str, Any]:
-        """Read-only schema/role check for the service handshake."""
+        """Read-only schema and role check for the service handshake."""
         conn = self._connect()
         try:
             report = compatibility(conn, self.schema, self.runtime_role).to_dict()
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT r.rolsuper AS superuser, "
+                    "coalesce((SELECT n.nspowner = r.oid FROM pg_namespace n WHERE n.nspname = %s), false) AS owner "
+                    "FROM pg_roles r WHERE r.rolname = current_user",
+                    (self.schema,),
+                )
+                row = cur.fetchone()
         finally:
             conn.close()
+        privileged = []
+        if row is not None:
+            superuser, owner = (row["superuser"], row["owner"]) if isinstance(row, Mapping) else (row[0], row[1])
+            if superuser:
+                privileged.append("runtime_role_is_superuser")
+            if owner:
+                privileged.append("runtime_role_owns_schema")
+        if privileged:
+            report["compatible"] = False
+            report["reasons"] = list(dict.fromkeys([*report.get("reasons", []), *privileged]))
         report["schema_version"] = (
             f"knowledge-schema/v{report['installed_schema_version']}"
             if report.get("installed_schema_version") is not None else "uninstalled"
@@ -550,15 +619,48 @@ class KnowledgeApplication:
     def _reject(self, code: str, message: str, status: int, details: Mapping[str, Any] | None = None) -> NoReturn:
         raise self._reject_factory(code, message, status, details)
 
-    @contextmanager
-    def _store(self) -> Iterator[WorkspaceStore]:
+    def _acquire(self) -> WorkspaceStore:
+        with self._lock:
+            if self._idle:
+                return self._idle.pop()
         conn = self._connect()
         try:
-            store = WorkspaceStore(conn, self.objects, schema=self.schema, runtime_role=self.runtime_role,
-                                   **self._store_kwargs)
-            yield store
-        finally:
+            return WorkspaceStore(conn, self.objects, schema=self.schema, runtime_role=self.runtime_role,
+                                  **self._store_kwargs)
+        except BaseException:
             conn.close()
+            raise
+
+    def _release(self, store: WorkspaceStore, healthy: bool) -> None:
+        conn = store.conn
+        if healthy and not conn.closed and not getattr(conn, "broken", False):
+            with self._lock:
+                self._idle.append(store)
+            return
+        try:
+            conn.close()
+        except Exception:  # pragma: no cover - best effort
+            pass
+
+    @contextmanager
+    def _store(self) -> Iterator[WorkspaceStore]:
+        with self._slots:
+            store = self._acquire()
+            healthy = False
+            try:
+                yield store
+                healthy = True
+            except WorkspaceError:
+                healthy = True  # a domain refusal leaves the connection usable
+                raise
+            finally:
+                self._release(store, healthy)
+
+    def close(self) -> None:
+        with self._lock:
+            idle, self._idle = self._idle, []
+        for store in idle:
+            store.close()
 
     def _call(self, context: Any, fn: Callable[[WorkspaceStore, Principal], dict[str, Any]]) -> dict[str, Any]:
         try:
@@ -566,52 +668,62 @@ class KnowledgeApplication:
             with self._store() as store:
                 return normalize(fn(store, principal))
         except WorkspaceError as error:
-            details = normalize(error.details) if error.details else None
-            self._reject(f"knowledge-{error.code}", error.message, _HTTP_STATUS.get(error.code, 409), details)
+            served = _SERVED_ERRORS.get(error.code)
+            if served is None:
+                LOGGER.error("unmapped knowledge store error %s: %s", error.code, error.message)
+                self._reject("knowledge-internal-error", "the knowledge operation failed", 500)
+            status, visible = served
+            withheld = sorted(set(error.details or {}) - visible)
+            if withheld:
+                LOGGER.info("knowledge error %s: withheld details %s", error.code,
+                            {k: error.details[k] for k in withheld})
+            details = {k: v for k, v in (error.details or {}).items() if k in visible}
+            self._reject(f"knowledge-{error.code}", error.message, status, normalize(details) if details else None)
         except SchemaCompatibilityError as error:
-            self._reject("knowledge-schema-incompatible", str(error), 503)
+            LOGGER.error("knowledge schema check failed: %s", error)
+            self._reject("knowledge-unavailable", "the knowledge store is unavailable", 503)
 
     # -- handlers (arguments are already schema-validated by the registry)
 
     def workspace_create(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
-        return self._call(ctx, lambda s, p: s.workspace_create(p, a["name"], idempotency_key=ctx.idempotency_key))
+        return self._call(ctx, lambda s, p: s.workspace_create(p, a["name"], idempotency_key=store_idempotency_key(ctx)))
 
     def member_set(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
         extra = {"is_agent": a["is_agent"]} if "is_agent" in a else {}
         return self._call(ctx, lambda s, p: s.member_set(p, a["workspace_id"], a["principal_id"], a["role"],
-                                                         idempotency_key=ctx.idempotency_key, **extra))
+                                                         idempotency_key=store_idempotency_key(ctx), **extra))
 
     def item_create(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
         return self._call(ctx, lambda s, p: s.item_create(
             p, a["workspace_id"], a["title"], a["body_md"], sources=a.get("sources", []),
-            relations=a.get("relations", []), idempotency_key=ctx.idempotency_key))
+            relations=a.get("relations", []), idempotency_key=store_idempotency_key(ctx)))
 
     def revision_draft(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
         return self._call(ctx, lambda s, p: s.revision_draft(
             p, a["workspace_id"], a["item_id"], a["title"], a["body_md"],
             parent_revision_id=a.get("parent_revision_id"), sources=a.get("sources", []),
-            relations=a.get("relations", []), idempotency_key=ctx.idempotency_key))
+            relations=a.get("relations", []), idempotency_key=store_idempotency_key(ctx)))
 
     def proposal_submit(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
         return self._call(ctx, lambda s, p: s.proposal_submit(
             p, a["workspace_id"], a["revision_id"], a["expected_base_revision_id"],
-            rationale=a.get("rationale", ""), evidence=a.get("evidence", []), idempotency_key=ctx.idempotency_key))
+            rationale=a.get("rationale", ""), evidence=a.get("evidence", []), idempotency_key=store_idempotency_key(ctx)))
 
     def proposal_review(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
         return self._call(ctx, lambda s, p: s.proposal_review(
             p, a["workspace_id"], a["proposal_id"], a["decision"], note=a.get("note"),
-            idempotency_key=ctx.idempotency_key))
+            idempotency_key=store_idempotency_key(ctx)))
 
     def proposal_withdraw(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
         return self._call(ctx, lambda s, p: s.proposal_withdraw(
-            p, a["workspace_id"], a["proposal_id"], idempotency_key=ctx.idempotency_key))
+            p, a["workspace_id"], a["proposal_id"], idempotency_key=store_idempotency_key(ctx)))
 
     def artifact_begin(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
         def run(s: WorkspaceStore, p: Principal) -> dict[str, Any]:
             result = s.artifact_begin(
                 p, a["workspace_id"], expected_sha256=a["expected_sha256"], expected_size=a["expected_size"],
                 media_type=a["media_type"], name=a.get("name"), artifact_id=a.get("artifact_id"),
-                relations=a.get("relations", []), idempotency_key=ctx.idempotency_key)
+                relations=a.get("relations", []), idempotency_key=store_idempotency_key(ctx))
             return result
 
         return self._call(ctx, run)
@@ -634,7 +746,7 @@ class KnowledgeApplication:
 
     def artifact_finalize(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
         def run(s: WorkspaceStore, p: Principal) -> dict[str, Any]:
-            result = s.artifact_finalize(p, a["workspace_id"], a["version_id"], idempotency_key=ctx.idempotency_key)
+            result = s.artifact_finalize(p, a["workspace_id"], a["version_id"], idempotency_key=store_idempotency_key(ctx))
             return result
 
         return self._call(ctx, run)
@@ -642,7 +754,7 @@ class KnowledgeApplication:
     def artifact_review(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
         return self._call(ctx, lambda s, p: s.artifact_review(
             p, a["workspace_id"], a["version_id"], a["decision"], note=a.get("note"),
-            idempotency_key=ctx.idempotency_key))
+            idempotency_key=store_idempotency_key(ctx)))
 
     def item_read(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
         def run(s: WorkspaceStore, p: Principal) -> dict[str, Any]:
@@ -653,10 +765,9 @@ class KnowledgeApplication:
 
     def artifact_download(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
         def run(s: WorkspaceStore, p: Principal) -> dict[str, Any]:
-            result = s.download(p, a["workspace_id"], a["artifact_id"], a.get("version", "latest-approved"))
+            result = s.download(p, a["workspace_id"], a["artifact_id"], a.get("version", "latest-approved"),
+                                max_bytes=MAX_UPLOAD_BYTES)
             data = result.pop("data")
-            if len(data) > MAX_UPLOAD_BYTES:
-                raise WorkspaceError("payload-too-large", "artifact exceeds the Phase 1 served download cap")
             # Bytes travel only as base64 inside the JSON envelope with the
             # recorded media type; nothing is ever served as an HTTP body.
             served = dict(result)
@@ -676,15 +787,15 @@ class KnowledgeApplication:
 
     def item_delete(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
         return self._call(ctx, lambda s, p: s.delete(p, a["workspace_id"], "item", a["item_id"],
-                                                     idempotency_key=ctx.idempotency_key))
+                                                     idempotency_key=store_idempotency_key(ctx)))
 
     def artifact_delete(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
         return self._call(ctx, lambda s, p: s.delete(p, a["workspace_id"], "artifact", a["artifact_id"],
-                                                     idempotency_key=ctx.idempotency_key))
+                                                     idempotency_key=store_idempotency_key(ctx)))
 
     def workspace_reconcile(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
         return self._call(ctx, lambda s, p: s.reconcile(
-            p, a["workspace_id"], grace=timedelta(seconds=a.get("grace_seconds", 3600)),
+            p, a["workspace_id"], grace=timedelta(seconds=a.get("grace_seconds", DEFAULT_RECONCILE_GRACE_SECONDS)),
             delete_orphans=a.get("delete_orphans", False)))
 
 
@@ -710,15 +821,18 @@ def register_knowledge_catalog(
 
 
 def _projecting(handler: Callable[[Any, Any], dict[str, Any]], properties: frozenset[str]) -> Callable[..., Any]:
-    def project(arguments: Any, context: Any) -> dict[str, Any]:
-        return {key: value for key, value in handler(arguments, context).items() if key in properties}
+    async def project(arguments: Any, context: Any) -> dict[str, Any]:
+        # Store calls block on PostgreSQL and the object store; run them in a
+        # worker thread so the service event loop keeps serving.
+        result = await asyncio.to_thread(handler, arguments, context)
+        return {key: value for key, value in result.items() if key in properties}
 
     project.__name__ = getattr(handler, "__name__", "knowledge_handler")
     return project
 
 
 __all__ = [
-    "AGENT_MARKER_AUTHORITY",
+    "HUMAN_MARKER_AUTHORITY",
     "API_VERSION",
     "DOMAIN_NAME",
     "KnowledgeApplication",
@@ -727,5 +841,6 @@ __all__ = [
     "catalog_operation_specs",
     "object_store_from_uri",
     "principal_from_identity",
+    "store_idempotency_key",
     "register_knowledge_catalog",
 ]

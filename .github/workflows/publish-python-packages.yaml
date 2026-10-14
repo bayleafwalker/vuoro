@@ -69,7 +69,7 @@ jobs:
           sudo apt-get install -y postgresql-16
           uv run --package vuoro-service --extra test python \
             scripts/validate_release_contract.py dist/vuoro-workspace/*.whl --release
-          VUORO_WORKSPACE_TEST_PG_BIN=/usr/lib/postgresql/16/bin \
+          VUORO_WORKSPACE_REQUIRE_PG=1 VUORO_WORKSPACE_TEST_PG_BIN=/usr/lib/postgresql/16/bin \
             uv run --package vuoro-workspace --extra test pytest packages/vuoro-workspace/tests -ra
       - name: Qualify optional demo against its published owner closure
         if: steps.package.outputs.name == 'vuoro-demo'

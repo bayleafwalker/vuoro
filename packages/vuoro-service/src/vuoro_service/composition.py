@@ -1013,7 +1013,9 @@ def _compose_knowledge(
     except (ValueError, RuntimeError, OSError) as error:
         raise CompositionError(f"knowledge: {error}") from error
     schema = environ.get("VUORO_KNOWLEDGE_SCHEMA") or "knowledge"
-    runtime_role = environ.get("VUORO_KNOWLEDGE_RUNTIME_ROLE") or None
+    # Required, never defaulted to the connecting role: the role check is what
+    # keeps an owner/migration DSN from serving (fail-closed role_not_configured).
+    runtime_role = _runtime_env("VUORO_KNOWLEDGE_RUNTIME_ROLE", environ)
     application = KnowledgeApplication.from_dsn(
         dsn, object_store, schema=schema, runtime_role=runtime_role
     )
