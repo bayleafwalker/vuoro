@@ -12,6 +12,9 @@ from __future__ import annotations
 import base64
 import hashlib
 import itertools
+import threading
+from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from pathlib import Path
 from typing import Any
 
@@ -70,12 +73,23 @@ EXPECTED_OPERATIONS = {
 }
 
 
+class LiveClock:
+    """Real time plus a test-controlled offset (object mtimes stay real)."""
+
+    def __init__(self) -> None:
+        self.offset = timedelta(0)
+
+    def __call__(self) -> datetime:
+        return datetime.now(timezone.utc) + self.offset
+
+
 def _registry(tmp_path: Path, connect=lambda: None, schema_name: str = "knowledge",
-              runtime_role: str = "vuoro_knowledge_runtime") -> CatalogRegistry:
+              runtime_role: str = "vuoro_knowledge_runtime", **app_kwargs: Any) -> CatalogRegistry:
     registry = CatalogRegistry()
     application = KnowledgeApplication(connect, FsObjectStore(tmp_path / "objects"), schema=schema_name,
-                                       runtime_role=runtime_role)
+                                       runtime_role=runtime_role, **app_kwargs)
     register_knowledge_catalog(registry, application)
+    registry.application = application  # type: ignore[attr-defined]  (test handle)
     return registry
 
 
@@ -223,14 +237,17 @@ def served(pg_dsn: str, pg_conn: Any, schema: str, tmp_path: Path) -> Any:  # no
 
     migrate_schema(pg_conn, schema)
     role = _runtime_role(pg_conn, schema)
-    registry = _registry(tmp_path, _connect_as(pg_dsn, role), schema, runtime_role=role)
+    clock = LiveClock()
+    registry = _registry(tmp_path, _connect_as(pg_dsn, role), schema, runtime_role=role,
+                         store_kwargs={"clock": clock})
     app = create_app(
         settings=ServiceSettings(environment_name=ENV, compatibility_state="compatible"),
         registry=registry,
         identity_resolver=StaticBearerIdentityResolver(TOKENS),
     )
     s = Served(TestClient(app))
-    s.dsn, s.schema = pg_dsn, schema
+    s.dsn, s.schema, s.clock, s.role = pg_dsn, schema, clock, role
+    s.application, s.objects_root = registry.application, tmp_path / "objects"
     s.ws = s.ok("t-admin", "knowledge.workspace.create-v1", {"name": "Research"})["workspace_id"]
     for name, member_role in (("reader", "reader"), ("contrib", "contributor"), ("reviewer", "reviewer"),
                               ("agent", "reviewer"), ("token", "reviewer"), ("readonly", "administrator")):
@@ -480,10 +497,19 @@ def test_errors_do_not_disclose_storage_internals(served) -> None:
 
 def test_reconcile_never_deletes_on_back_to_back_passes(served) -> None:
     s = served
+    orphan_key = f"ws/{s.ws}/art/01JUNKARTIFACT000000000000/01JUNKVERSION0000000000000"
+    s.application.objects.put(orphan_key, b"stray bytes")
+    s.clock.offset = timedelta(days=2)  # the object is now well past grace
     args = {"workspace_id": s.ws, "delete_orphans": True, "grace_seconds": 3600}
     first = s.ok("t-admin", "knowledge.workspace.reconcile-v1", args)
     second = s.ok("t-admin", "knowledge.workspace.reconcile-v1", args)
-    assert all(o["status"] != "deleted" for o in first["orphans"] + second["orphans"])
+    for report in (first, second):
+        assert [(o["object_key"], o["status"]) for o in report["orphans"]] == [(orphan_key, "pending-second-pass")]
+    assert s.application.objects.head(orphan_key) is not None
+    s.clock.offset += timedelta(seconds=3601)  # grace has now passed since the first sighting
+    third = s.ok("t-admin", "knowledge.workspace.reconcile-v1", args)
+    assert [(o["object_key"], o["status"]) for o in third["orphans"]] == [(orphan_key, "deleted")]
+    assert s.application.objects.head(orphan_key) is None
     assert s.code("t-admin", "knowledge.workspace.reconcile-v1", {**args, "grace_seconds": 0}) \
         == (422, "schema-validation-failed")
 
@@ -516,3 +542,163 @@ def test_download_size_is_checked_before_fetching(served, tmp_path: Path) -> Non
         assert info.value.code == "payload-too-large"
     finally:
         store.close()
+
+
+# ------------------------------------------------------------------- pool
+
+
+def _ctx(name: str = "reader") -> SimpleNamespace:
+    return SimpleNamespace(identity=TOKENS[f"t-{name}"], idempotency_key=None)
+
+
+def test_pool_reuses_a_connection_after_a_domain_refusal(served) -> None:
+    s = served
+    app = s.application
+    s.ok("t-reader", "knowledge.workspace.changes-v1", {"workspace_id": s.ws})
+    assert len(app._idle) == 1
+    conn = app._idle[0].conn
+    assert s.code("t-outsider", "knowledge.workspace.changes-v1", {"workspace_id": s.ws}) \
+        == (403, "knowledge-forbidden")
+    assert [store.conn for store in app._idle] == [conn]  # same connection, back in the pool
+
+
+def test_pool_replaces_a_dead_idle_connection(served, pg_conn: Any) -> None:
+    s = served
+    app = s.application
+    s.ok("t-reader", "knowledge.workspace.changes-v1", {"workspace_id": s.ws})
+    dead = app._idle[0].conn
+    pid = dead.info.backend_pid
+    pg_conn.execute("SELECT pg_terminate_backend(%s, 5000)", (pid,))  # waits for exit
+    s.ok("t-reader", "knowledge.workspace.changes-v1", {"workspace_id": s.ws})
+    assert len(app._idle) == 1 and app._idle[0].conn is not dead
+    assert dead.closed
+
+
+def test_pool_discards_a_connection_broken_mid_call(served) -> None:
+    s = served
+    app = s.application
+    s.ok("t-reader", "knowledge.workspace.changes-v1", {"workspace_id": s.ws})
+    first = app._idle[0].conn
+
+    def explode(store, principal):
+        store.conn.close()
+        raise RuntimeError("connection lost mid-call")
+
+    with pytest.raises(RuntimeError):
+        app._call(_ctx(), explode)
+    assert app._idle == []
+    s.ok("t-reader", "knowledge.workspace.changes-v1", {"workspace_id": s.ws})
+    assert app._idle[0].conn is not first
+
+
+def test_more_concurrent_calls_than_pool_slots_all_complete(served) -> None:
+    s = served
+    app = KnowledgeApplication(_connect_as(s.dsn, s.role), FsObjectStore(s.objects_root), schema=s.schema,
+                               runtime_role=s.role, max_connections=3)
+    results: list[Any] = []
+    errors: list[BaseException] = []
+
+    def call() -> None:
+        try:
+            results.append(app.workspace_changes({"workspace_id": s.ws}, _ctx()))
+        except BaseException as error:  # pragma: no cover - reported below
+            errors.append(error)
+
+    threads = [threading.Thread(target=call) for _ in range(12)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+    try:
+        assert errors == [] and len(results) == 12
+        assert 1 <= len(app._idle) <= 3
+    finally:
+        app.close()
+
+
+def test_pool_wait_is_bounded_and_answers_unavailable(served) -> None:
+    from vuoro_service.catalog import OperationRejectedError
+
+    s = served
+    app = KnowledgeApplication(_connect_as(s.dsn, s.role), FsObjectStore(s.objects_root), schema=s.schema,
+                               runtime_role=s.role, max_connections=1, acquire_timeout=0.2)
+    assert app._slots.acquire(timeout=1)  # hold the only slot
+    try:
+        with pytest.raises(OperationRejectedError) as info:
+            app.workspace_changes({"workspace_id": s.ws}, _ctx())
+        assert (info.value.code, info.value.http_status) == ("knowledge-unavailable", 503)
+    finally:
+        app._slots.release()
+        app.close()
+
+
+def test_from_dsn_bounds_connect_and_statement_time(served) -> None:
+    from psycopg.conninfo import make_conninfo
+
+    s = served
+    app = KnowledgeApplication.from_dsn(make_conninfo(s.dsn, user=s.role, password=RUNTIME_PASSWORD),
+                                        FsObjectStore(s.objects_root), schema=s.schema, runtime_role=s.role,
+                                        statement_timeout_ms=1234)
+    conn = app._connect()
+    try:
+        assert conn.execute("SHOW statement_timeout").fetchone()[0] == "1234ms"
+        assert conn.info.get_parameters().get("connect_timeout") == "5"
+    finally:
+        conn.close()
+
+
+def test_connection_parameters_keep_dsn_options_and_add_bounds() -> None:
+    from vuoro_workspace.vuoro_adapter import connection_parameters
+
+    merged = connection_parameters("host=db dbname=k options='-c search_path=public' connect_timeout=2 keepalives_idle=7",
+                                   statement_timeout_ms=1000)
+    assert merged["options"] == "-c search_path=public -c statement_timeout=1000"
+    assert merged["connect_timeout"] == "2" and merged["keepalives_idle"] == "7"
+    plain = connection_parameters("host=db dbname=k")
+    assert plain["options"] == "-c statement_timeout=30000" and plain["connect_timeout"] == 5
+    assert plain["keepalives"] == 1 and plain["keepalives_count"] == 3
+
+
+def test_from_dsn_preserves_dsn_options_on_a_real_connection(served) -> None:
+    from psycopg.conninfo import make_conninfo
+
+    s = served
+    dsn = make_conninfo(s.dsn, user=s.role, password=RUNTIME_PASSWORD, options="-c lock_timeout=4321")
+    app = KnowledgeApplication.from_dsn(dsn, FsObjectStore(s.objects_root), schema=s.schema, runtime_role=s.role)
+    conn = app._connect()
+    try:
+        assert conn.execute("SHOW lock_timeout").fetchone()[0] == "4321ms"
+        assert conn.execute("SHOW statement_timeout").fetchone()[0] == "30s"
+    finally:
+        conn.close()
+
+
+def test_a_non_inheriting_member_of_the_owner_role_is_refused(served, pg_conn: Any) -> None:
+    s = served
+    owner, member = f"{s.schema}_owner", f"{s.schema}_noinherit"
+    pg_conn.execute(f'CREATE ROLE "{owner}" NOLOGIN')
+    pg_conn.execute(f'ALTER SCHEMA "{s.schema}" OWNER TO "{owner}"')
+    pg_conn.execute(f"CREATE ROLE \"{member}\" LOGIN NOINHERIT PASSWORD '{RUNTIME_PASSWORD}'")
+    pg_conn.execute(f'GRANT "{owner}" TO "{member}"')
+    # Ordinary runtime grants, so only the owner membership can fail the gate.
+    pg_conn.execute(f'GRANT USAGE ON SCHEMA "{s.schema}" TO "{member}"')
+    pg_conn.execute(f'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA "{s.schema}" TO "{member}"')
+    try:
+        app = KnowledgeApplication(_connect_as(s.dsn, member), FsObjectStore(s.objects_root), schema=s.schema,
+                                   runtime_role=member)
+        report = app.compatibility()
+        assert report["compatible"] is False and "runtime_role_owns_schema" in report["reasons"]
+    finally:
+        pg_conn.execute(f'ALTER SCHEMA "{s.schema}" OWNER TO CURRENT_USER')
+        pg_conn.execute(f'DROP OWNED BY "{member}"')
+        pg_conn.execute(f'DROP ROLE IF EXISTS "{member}"')
+        pg_conn.execute(f'DROP ROLE IF EXISTS "{owner}"')
+
+
+def test_a_store_released_after_close_is_closed_not_pooled(served) -> None:
+    s = served
+    app = s.application
+    with app._store() as store:
+        app.close()
+        conn = store.conn
+    assert app._idle == [] and conn.closed
