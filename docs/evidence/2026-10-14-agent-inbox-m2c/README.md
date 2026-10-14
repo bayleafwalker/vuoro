@@ -1,0 +1,103 @@
+# Agent inbox M2c: one recorded cross-runtime continuation
+
+Live run, 2026-10-14 14:22–14:35 UTC, against vuoro-shared. That deployment is
+vuoro-service 0.1.95, image `sha256:b3e4097f…`, work schema 25, 102 catalog
+operations, revision `fd49d79d…`, and identity revision 12. The run follows
+roadmap §7 (`docs/plans/2026-10-14-agent-coordination-roadmap.md`) and the
+contract in `docs/architecture/agent-directory-and-inbox.md`.
+
+| Role | Principal | Runtime |
+|---|---|---|
+| Sender | `vuoro-static:workstation-inbox-native:0` | Claude Code on the workstation; sprintctl 0.19.0 |
+| Recipient | `vuoro-static:devbox-inbox-native:0`, instance `ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y` | agentops host adapter (agentops PR #343 at `42932e5`) on devbox, launching OpenCode 1.18.33 (`opencode serve` on loopback) with model `opencode-go/deepseek-v4-flash` |
+
+Both identities hold only `work:read` and `work:evidence`, for repository
+`agentops` and workspace `vuoro-native:agentops-coord:0`. The work item is
+agentops #2654.
+
+The adapter ran as a systemd user unit with explicit
+`SPRINTCTL_BACKEND=served` and `SPRINTCTL_VUORO_PROFILE`, without direnv.
+The `opencode serve` unit sets the same two variables, so the successor's
+`sprintctl` calls run as `devbox-inbox-native`.
+
+Files:
+
+- `records.json` holds `work.message.status-v1` for all 9 messages: the
+  envelope plus 49 receipts. This is the owner's durable record.
+- `adapter_status.json` holds the adapter's local processing records: 9 records
+  for one instance.
+- `successor-notes.txt` holds the session notes on each successor run, read
+  back through the owner (`work.run.predecessor-context-v1` from a reader run).
+
+## Success path (message `msg_01M4XCR3F4XF5354B7CJTSCDCQ`)
+
+1. The directory read (`work.agent.list-v1`) shows the adapter instance
+   registered with `observed` and `reachable(opencode-serve)` current, both
+   self-reported.
+2. The sender registered its own run `run_MF762HM5CEEZ7SV8DBPNY6YXSB` and wrote
+   note 1 on it. It then minted a `vuoro-work-link/v1` for item 2654 with that
+   run as predecessor, and sent `continue` to the devbox principal (inbox
+   seq 1).
+3. The adapter recorded `observed`, `acknowledged` and `accepted`, after
+   checking the message independently against its policy file. It then
+   registered the successor run `run_W5NFWA2N3SG9JSK416FA7B1Q4B` under owner
+   key `inbox.<message_id>` and recorded `run-linked`.
+4. The adapter created the OpenCode session `ses_ec533e3c…` titled
+   `vuoro-msg:<message_id>`. The successor ran `sprintctl run context`, which
+   showed the predecessor's note 1, then `sprintctl run note` with key
+   `inbox.<message_id>.note`, which wrote note 2.
+5. The adapter recorded `result-linked` with outcome `completed`. Its evidence
+   refs are the run and the harness session; from F1 onward they also include
+   the session note (see the fixes below).
+6. The sender rebuilt the chain using only owner reads: the message status
+   (5 receipts) and the successor's notes.
+
+## Induced failure histories
+
+| # | Failure (roadmap §7) | How it was induced | Observed | Result |
+|---|---|---|---|---|
+| F1 | Sender retries after an uncertain response | Same envelope sent twice; then the same `message_id` with an altered body | Second send `replayed: true`, same `inbox_seq` 2 and envelope digest; the altered one was refused with `message-id-conflict` | One logical message |
+| F2 | Recipient receives the same message repeatedly | Adapter stopped, read cursor rewound 2 → 0, re-polled | Both messages re-read; still 2 processing records; receipts unchanged (5 each) | One processing record |
+| F3 | Adapter crashes before launch | Hard exit (`os._exit`) at `run_registered_persisted`, then the service restarted | Resumed with the same run `run_EF84…`; one `run-linked`; completed | Resumed safely |
+| F4 | Adapter crashes after launch, before acknowledgment | Hard exit at `session_created` (session exists, id not persisted), then restart | Session found by title and adopted; exactly 1 session with that title; completed; not prompted twice | Existing run found |
+| F4b | Same, with two matching sessions | As F4, plus a second session created with the same title | `launch-ambiguous` receipt carrying the run id; neither session prompted (0 messages each); no relaunch. `resolve --abandon` was refused while the service held the lock (exit 3); after a stop it recorded `result-linked` `abandoned` / `operator-abandoned` | Ambiguity surfaced; explicit operator close |
+| F5 | Effect succeeds before result recording fails | Successor's note write replayed with key `inbox.<msg>.note` | Same key and text return note 2 with the original `created_at`; same key with different text gives `idempotency-conflict` | Owner deduplicates |
+| F6 | Authorization changes before execution | Policy swapped to remove the sender after `accepted`, before launch | Policy re-read before launch: `result-linked` `not-started`, reason `sender-not-allowed`; 0 sessions; 0 notes | Refused under current policy |
+| F7 | Cancellation races with execution | `cancel` 0.8 s after `run-linked`, while launched | The session finished before the adapter's next tick: outcome `completed`, and `cancel-requested` stays in the record; a repeated cancel returns the first (`replayed: true`) | Records what happened |
+| F7b | Cancel after completion | `cancel` 5 s after `result-linked` | Cancel accepted and recorded after the result; outcome remains `completed` | Cancel never implies rollback |
+| F7c | Cancel while the session is busy | Hard exit at `prompt_sent`, then cancel, then restart | The adapter aborted the busy session: `result-linked` `canceled` (`MessageAbortedError`); 0 notes | Aborted, recorded as canceled |
+
+Fault injection ran the adapter's own `Adapter` class with a checkpoint hook,
+against the live owner and the live `opencode serve`. Nothing was mocked.
+
+**Owner-side effects.** Each of the 6 completed runs has exactly one session
+note. The 3 runs that did not complete (abandoned, not started, canceled)
+have none. See `successor-notes.txt`.
+
+## Defects found live and fixed on agentops PR #343
+
+1. **Envelope idempotency key.** `VuoroOwner` sent an envelope idempotency key
+   to operations whose catalog entry is `idempotency: not-allowed`. The live
+   service refuses this with `idempotency-key-not-allowed`. Registration,
+   observation and run registration would all have failed. Fixed in
+   `acc58e5`, with a regression test.
+2. **Session-note reference.** The adapter looked for a `note_<ULID>`
+   reference, but the owner returns an integer, run-scoped `note_id`. The
+   first matching id in the session text is also the predecessor's, because
+   the context read prints it first. Fixed in `42932e5`: the adapter now takes
+   the last JSON `note_id`. Live from F1 onward
+   (`run_91YN…/note/4`).
+3. **Hook file mode.** Two hooks were committed without the executable bit,
+   which failed CI. Fixed in `a68044d`.
+
+## Not exercised
+
+- Gateway outage (the vuoro-shared endpoint going unreachable during a run).
+- Overlapping reservations and stale work revisions. The bounded effect here
+  is a session note, which has an owner idempotency boundary but no
+  reservation or revision fence.
+- `opencode serve` crashing mid-session.
+- A run that hangs: there is still no run timeout (carried gap).
+
+Two empty OpenCode sessions from F4b remain on devbox. They are idle,
+unprompted and titled `vuoro-msg:msg_01M4XD770A2PHQYWT3D4GWMWN8`.

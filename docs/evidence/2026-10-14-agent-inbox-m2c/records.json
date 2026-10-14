@@ -1,0 +1,1349 @@
+{
+ "f1": {
+  "message": {
+   "body": {
+    "text": "M2c F1: read your run context and record one short note."
+   },
+   "context": {
+    "correlation_id": "m2c-2654",
+    "item_id": 2654,
+    "predecessor_run_id": "run_4P4G324DAA9PQTWKY3B06ZE2D7",
+    "work_link": "vuoro-work://link/v1/eyJpdGVtX2lkIjoyNjU0LCJwcmVkZWNlc3Nvcl9ydW5faWQiOiJydW5fNFA0RzMyNERBQTlQUVRXS1kzQjA2WkUyRDciLCJyZXBvX2lkIjoiYWdlbnRvcHMiLCJzY2hlbWEiOiJ2dW9yby13b3JrLWxpbmsvdjEiLCJ3b3Jrc3BhY2VfaWQiOiJ2dW9yby1uYXRpdmU6YWdlbnRvcHMtY29vcmQ6MCJ9"
+   },
+   "created_at": "2026-10-14T14:28:54.015317Z",
+   "envelope_digest": "7619e17afa129d38dc35e6a5b7662eb546d5b2d37085fd95351a125b3afd93e4",
+   "inbox_seq": 2,
+   "kind": "continue",
+   "message_id": "msg_01M4XD1W3ZS2MP61GXFYFNVRXD",
+   "mode": "request",
+   "persisted_at": "2026-10-14T14:28:54.240926Z",
+   "receipts": [
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "observed",
+     "message_id": "msg_01M4XD1W3ZS2MP61GXFYFNVRXD",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:29:07.380376Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "acknowledged",
+     "message_id": "msg_01M4XD1W3ZS2MP61GXFYFNVRXD",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:29:07.422027Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "accepted",
+     "message_id": "msg_01M4XD1W3ZS2MP61GXFYFNVRXD",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:29:07.454809Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "run-linked",
+     "message_id": "msg_01M4XD1W3ZS2MP61GXFYFNVRXD",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:29:07.571207Z",
+     "run_id": "run_91YNEYW52JEZ9K62SQ0ABVYE5Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "evidence_refs": [
+      {
+       "kind": "run",
+       "ref": "run_91YNEYW52JEZ9K62SQ0ABVYE5Z"
+      },
+      {
+       "kind": "harness-session",
+       "ref": "ses_ec52eda1effe1tR6cZ9soU08mS"
+      },
+      {
+       "kind": "session-note",
+       "ref": "run_91YNEYW52JEZ9K62SQ0ABVYE5Z/note/4"
+      }
+     ],
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "result-linked",
+     "message_id": "msg_01M4XD1W3ZS2MP61GXFYFNVRXD",
+     "outcome": "completed",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:29:38.533542Z",
+     "schema": "agent-message-receipt/v1",
+     "summary": "session ses_ec52eda1effe1tR6cZ9soU08mS ended completed"
+    }
+   ],
+   "recipient": {
+    "principal_id": "vuoro-static:devbox-inbox-native:0"
+   },
+   "repo_id": "agentops",
+   "schema": "agent-message/v1",
+   "sender_principal_id": "vuoro-static:workstation-inbox-native:0",
+   "workspace_id": "vuoro-native:agentops-coord:0"
+  },
+  "receipts": [
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "observed",
+    "message_id": "msg_01M4XD1W3ZS2MP61GXFYFNVRXD",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:29:07.380376Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "acknowledged",
+    "message_id": "msg_01M4XD1W3ZS2MP61GXFYFNVRXD",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:29:07.422027Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "accepted",
+    "message_id": "msg_01M4XD1W3ZS2MP61GXFYFNVRXD",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:29:07.454809Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "run-linked",
+    "message_id": "msg_01M4XD1W3ZS2MP61GXFYFNVRXD",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:29:07.571207Z",
+    "run_id": "run_91YNEYW52JEZ9K62SQ0ABVYE5Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "evidence_refs": [
+     {
+      "kind": "run",
+      "ref": "run_91YNEYW52JEZ9K62SQ0ABVYE5Z"
+     },
+     {
+      "kind": "harness-session",
+      "ref": "ses_ec52eda1effe1tR6cZ9soU08mS"
+     },
+     {
+      "kind": "session-note",
+      "ref": "run_91YNEYW52JEZ9K62SQ0ABVYE5Z/note/4"
+     }
+    ],
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "result-linked",
+    "message_id": "msg_01M4XD1W3ZS2MP61GXFYFNVRXD",
+    "outcome": "completed",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:29:38.533542Z",
+    "schema": "agent-message-receipt/v1",
+    "summary": "session ses_ec52eda1effe1tR6cZ9soU08mS ended completed"
+   }
+  ]
+ },
+ "f3": {
+  "message": {
+   "body": {
+    "text": "M2c F3: read your run context and record one short note."
+   },
+   "context": {
+    "correlation_id": "m2c-2654",
+    "item_id": 2654,
+    "predecessor_run_id": "run_JEDMBT344FJ67BVWXCC20MSDXD",
+    "work_link": "vuoro-work://link/v1/eyJpdGVtX2lkIjoyNjU0LCJwcmVkZWNlc3Nvcl9ydW5faWQiOiJydW5fSkVETUJUMzQ0Rko2N0JWV1hDQzIwTVNEWEQiLCJyZXBvX2lkIjoiYWdlbnRvcHMiLCJzY2hlbWEiOiJ2dW9yby13b3JrLWxpbmsvdjEiLCJ3b3Jrc3BhY2VfaWQiOiJ2dW9yby1uYXRpdmU6YWdlbnRvcHMtY29vcmQ6MCJ9"
+   },
+   "created_at": "2026-10-14T14:30:19.886377Z",
+   "envelope_digest": "564820f291fe01744812f2f768140ad4e8f9132548c02363d9eb6ae8f76c2d6e",
+   "inbox_seq": 3,
+   "kind": "continue",
+   "message_id": "msg_01M4XD4FZEJWS4MHADJEZKD4P6",
+   "mode": "request",
+   "persisted_at": "2026-10-14T14:30:20.128042Z",
+   "receipts": [
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "observed",
+     "message_id": "msg_01M4XD4FZEJWS4MHADJEZKD4P6",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:30:22.454496Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "acknowledged",
+     "message_id": "msg_01M4XD4FZEJWS4MHADJEZKD4P6",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:30:22.503719Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "accepted",
+     "message_id": "msg_01M4XD4FZEJWS4MHADJEZKD4P6",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:30:22.587948Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "run-linked",
+     "message_id": "msg_01M4XD4FZEJWS4MHADJEZKD4P6",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:30:29.397508Z",
+     "run_id": "run_EF84QEJEDV6MY26E080HMWGA4F",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "evidence_refs": [
+      {
+       "kind": "run",
+       "ref": "run_EF84QEJEDV6MY26E080HMWGA4F"
+      },
+      {
+       "kind": "harness-session",
+       "ref": "ses_ec52d9a79ffeJIVZ4IZMgZsuct"
+      },
+      {
+       "kind": "session-note",
+       "ref": "run_EF84QEJEDV6MY26E080HMWGA4F/note/6"
+      }
+     ],
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "result-linked",
+     "message_id": "msg_01M4XD4FZEJWS4MHADJEZKD4P6",
+     "outcome": "completed",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:30:45.538899Z",
+     "schema": "agent-message-receipt/v1",
+     "summary": "session ses_ec52d9a79ffeJIVZ4IZMgZsuct ended completed"
+    }
+   ],
+   "recipient": {
+    "principal_id": "vuoro-static:devbox-inbox-native:0"
+   },
+   "repo_id": "agentops",
+   "schema": "agent-message/v1",
+   "sender_principal_id": "vuoro-static:workstation-inbox-native:0",
+   "workspace_id": "vuoro-native:agentops-coord:0"
+  },
+  "receipts": [
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "observed",
+    "message_id": "msg_01M4XD4FZEJWS4MHADJEZKD4P6",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:30:22.454496Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "acknowledged",
+    "message_id": "msg_01M4XD4FZEJWS4MHADJEZKD4P6",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:30:22.503719Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "accepted",
+    "message_id": "msg_01M4XD4FZEJWS4MHADJEZKD4P6",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:30:22.587948Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "run-linked",
+    "message_id": "msg_01M4XD4FZEJWS4MHADJEZKD4P6",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:30:29.397508Z",
+    "run_id": "run_EF84QEJEDV6MY26E080HMWGA4F",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "evidence_refs": [
+     {
+      "kind": "run",
+      "ref": "run_EF84QEJEDV6MY26E080HMWGA4F"
+     },
+     {
+      "kind": "harness-session",
+      "ref": "ses_ec52d9a79ffeJIVZ4IZMgZsuct"
+     },
+     {
+      "kind": "session-note",
+      "ref": "run_EF84QEJEDV6MY26E080HMWGA4F/note/6"
+     }
+    ],
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "result-linked",
+    "message_id": "msg_01M4XD4FZEJWS4MHADJEZKD4P6",
+    "outcome": "completed",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:30:45.538899Z",
+    "schema": "agent-message-receipt/v1",
+    "summary": "session ses_ec52d9a79ffeJIVZ4IZMgZsuct ended completed"
+   }
+  ]
+ },
+ "f4": {
+  "message": {
+   "body": {
+    "text": "M2c F4: read your run context and record one short note."
+   },
+   "context": {
+    "correlation_id": "m2c-2654",
+    "item_id": 2654,
+    "predecessor_run_id": "run_KB69SAY7W4HTTQMRP6XX03QDKE",
+    "work_link": "vuoro-work://link/v1/eyJpdGVtX2lkIjoyNjU0LCJwcmVkZWNlc3Nvcl9ydW5faWQiOiJydW5fS0I2OVNBWTdXNEhUVFFNUlA2WFgwM1FES0UiLCJyZXBvX2lkIjoiYWdlbnRvcHMiLCJzY2hlbWEiOiJ2dW9yby13b3JrLWxpbmsvdjEiLCJ3b3Jrc3BhY2VfaWQiOiJ2dW9yby1uYXRpdmU6YWdlbnRvcHMtY29vcmQ6MCJ9"
+   },
+   "created_at": "2026-10-14T14:30:59.569638Z",
+   "envelope_digest": "760154868cd225156b45b7a8b3fa51835caab9197ec0551d4567db3b0fbb7f61",
+   "inbox_seq": 4,
+   "kind": "continue",
+   "message_id": "msg_01M4XD5PQH2X4V02EQMESK38SX",
+   "mode": "request",
+   "persisted_at": "2026-10-14T14:30:59.734316Z",
+   "receipts": [
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "observed",
+     "message_id": "msg_01M4XD5PQH2X4V02EQMESK38SX",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:31:00.644086Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "acknowledged",
+     "message_id": "msg_01M4XD5PQH2X4V02EQMESK38SX",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:31:00.686358Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "accepted",
+     "message_id": "msg_01M4XD5PQH2X4V02EQMESK38SX",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:31:00.720043Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "run-linked",
+     "message_id": "msg_01M4XD5PQH2X4V02EQMESK38SX",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:31:00.806792Z",
+     "run_id": "run_TJQTYRG6VBT5X7J0YF2K5ZNKW7",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "evidence_refs": [
+      {
+       "kind": "run",
+       "ref": "run_TJQTYRG6VBT5X7J0YF2K5ZNKW7"
+      },
+      {
+       "kind": "harness-session",
+       "ref": "ses_ec52d1ffeffeLlld7FwlgEo6fB"
+      },
+      {
+       "kind": "session-note",
+       "ref": "run_TJQTYRG6VBT5X7J0YF2K5ZNKW7/note/8"
+      }
+     ],
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "result-linked",
+     "message_id": "msg_01M4XD5PQH2X4V02EQMESK38SX",
+     "outcome": "completed",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:31:32.450269Z",
+     "schema": "agent-message-receipt/v1",
+     "summary": "session ses_ec52d1ffeffeLlld7FwlgEo6fB ended completed"
+    }
+   ],
+   "recipient": {
+    "principal_id": "vuoro-static:devbox-inbox-native:0"
+   },
+   "repo_id": "agentops",
+   "schema": "agent-message/v1",
+   "sender_principal_id": "vuoro-static:workstation-inbox-native:0",
+   "workspace_id": "vuoro-native:agentops-coord:0"
+  },
+  "receipts": [
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "observed",
+    "message_id": "msg_01M4XD5PQH2X4V02EQMESK38SX",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:31:00.644086Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "acknowledged",
+    "message_id": "msg_01M4XD5PQH2X4V02EQMESK38SX",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:31:00.686358Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "accepted",
+    "message_id": "msg_01M4XD5PQH2X4V02EQMESK38SX",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:31:00.720043Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "run-linked",
+    "message_id": "msg_01M4XD5PQH2X4V02EQMESK38SX",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:31:00.806792Z",
+    "run_id": "run_TJQTYRG6VBT5X7J0YF2K5ZNKW7",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "evidence_refs": [
+     {
+      "kind": "run",
+      "ref": "run_TJQTYRG6VBT5X7J0YF2K5ZNKW7"
+     },
+     {
+      "kind": "harness-session",
+      "ref": "ses_ec52d1ffeffeLlld7FwlgEo6fB"
+     },
+     {
+      "kind": "session-note",
+      "ref": "run_TJQTYRG6VBT5X7J0YF2K5ZNKW7/note/8"
+     }
+    ],
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "result-linked",
+    "message_id": "msg_01M4XD5PQH2X4V02EQMESK38SX",
+    "outcome": "completed",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:31:32.450269Z",
+    "schema": "agent-message-receipt/v1",
+    "summary": "session ses_ec52d1ffeffeLlld7FwlgEo6fB ended completed"
+   }
+  ]
+ },
+ "f4b": {
+  "message": {
+   "body": {
+    "text": "M2c F4b: read your run context and record one short note."
+   },
+   "context": {
+    "correlation_id": "m2c-2654",
+    "item_id": 2654,
+    "predecessor_run_id": "run_2YB63DAMN90ZHQVEXD41F45RXJ",
+    "work_link": "vuoro-work://link/v1/eyJpdGVtX2lkIjoyNjU0LCJwcmVkZWNlc3Nvcl9ydW5faWQiOiJydW5fMllCNjNEQU1OOTBaSFFWRVhENDFGNDVSWEoiLCJyZXBvX2lkIjoiYWdlbnRvcHMiLCJzY2hlbWEiOiJ2dW9yby13b3JrLWxpbmsvdjEiLCJ3b3Jrc3BhY2VfaWQiOiJ2dW9yby1uYXRpdmU6YWdlbnRvcHMtY29vcmQ6MCJ9"
+   },
+   "created_at": "2026-10-14T14:31:49.002523Z",
+   "envelope_digest": "7bb0642992218beab7454cf551f4fe568e8bbcea23e36a65ff1315e3e5851e87",
+   "inbox_seq": 5,
+   "kind": "continue",
+   "message_id": "msg_01M4XD770A2PHQYWT3D4GWMWN8",
+   "mode": "request",
+   "persisted_at": "2026-10-14T14:31:49.165467Z",
+   "receipts": [
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "observed",
+     "message_id": "msg_01M4XD770A2PHQYWT3D4GWMWN8",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:31:51.363423Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "acknowledged",
+     "message_id": "msg_01M4XD770A2PHQYWT3D4GWMWN8",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:31:51.405277Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "accepted",
+     "message_id": "msg_01M4XD770A2PHQYWT3D4GWMWN8",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:31:51.456284Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "run-linked",
+     "message_id": "msg_01M4XD770A2PHQYWT3D4GWMWN8",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:31:51.550624Z",
+     "run_id": "run_FJGAQF968XET82CWXE2G9P8B3J",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "detail": "launch intent persisted without a session id; title search for vuoro-msg:msg_01M4XD770A2PHQYWT3D4GWMWN8 found 2 sessions; not relaunching",
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "launch-ambiguous",
+     "message_id": "msg_01M4XD770A2PHQYWT3D4GWMWN8",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:31:52.538892Z",
+     "run_id": "run_FJGAQF968XET82CWXE2G9P8B3J",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "evidence_refs": [
+      {
+       "kind": "run",
+       "ref": "run_FJGAQF968XET82CWXE2G9P8B3J"
+      }
+     ],
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "result-linked",
+     "message_id": "msg_01M4XD770A2PHQYWT3D4GWMWN8",
+     "outcome": "abandoned",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "reason": {
+      "code": "operator-abandoned",
+      "text": "an operator abandoned an ambiguous launch"
+     },
+     "recorded_at": "2026-10-14T14:32:28.802977Z",
+     "schema": "agent-message-receipt/v1",
+     "summary": "ambiguous launch abandoned by an explicit operator act"
+    }
+   ],
+   "recipient": {
+    "principal_id": "vuoro-static:devbox-inbox-native:0"
+   },
+   "repo_id": "agentops",
+   "schema": "agent-message/v1",
+   "sender_principal_id": "vuoro-static:workstation-inbox-native:0",
+   "workspace_id": "vuoro-native:agentops-coord:0"
+  },
+  "receipts": [
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "observed",
+    "message_id": "msg_01M4XD770A2PHQYWT3D4GWMWN8",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:31:51.363423Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "acknowledged",
+    "message_id": "msg_01M4XD770A2PHQYWT3D4GWMWN8",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:31:51.405277Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "accepted",
+    "message_id": "msg_01M4XD770A2PHQYWT3D4GWMWN8",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:31:51.456284Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "run-linked",
+    "message_id": "msg_01M4XD770A2PHQYWT3D4GWMWN8",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:31:51.550624Z",
+    "run_id": "run_FJGAQF968XET82CWXE2G9P8B3J",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "detail": "launch intent persisted without a session id; title search for vuoro-msg:msg_01M4XD770A2PHQYWT3D4GWMWN8 found 2 sessions; not relaunching",
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "launch-ambiguous",
+    "message_id": "msg_01M4XD770A2PHQYWT3D4GWMWN8",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:31:52.538892Z",
+    "run_id": "run_FJGAQF968XET82CWXE2G9P8B3J",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "evidence_refs": [
+     {
+      "kind": "run",
+      "ref": "run_FJGAQF968XET82CWXE2G9P8B3J"
+     }
+    ],
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "result-linked",
+    "message_id": "msg_01M4XD770A2PHQYWT3D4GWMWN8",
+    "outcome": "abandoned",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "reason": {
+     "code": "operator-abandoned",
+     "text": "an operator abandoned an ambiguous launch"
+    },
+    "recorded_at": "2026-10-14T14:32:28.802977Z",
+    "schema": "agent-message-receipt/v1",
+    "summary": "ambiguous launch abandoned by an explicit operator act"
+   }
+  ]
+ },
+ "f6": {
+  "message": {
+   "body": {
+    "text": "M2c F6: read your run context and record one short note."
+   },
+   "context": {
+    "correlation_id": "m2c-2654",
+    "item_id": 2654,
+    "predecessor_run_id": "run_F0H4JCHA9RQ0DQVRKV3PN89XWX",
+    "work_link": "vuoro-work://link/v1/eyJpdGVtX2lkIjoyNjU0LCJwcmVkZWNlc3Nvcl9ydW5faWQiOiJydW5fRjBINEpDSEE5UlEwRFFWUktWM1BOODlYV1giLCJyZXBvX2lkIjoiYWdlbnRvcHMiLCJzY2hlbWEiOiJ2dW9yby13b3JrLWxpbmsvdjEiLCJ3b3Jrc3BhY2VfaWQiOiJ2dW9yby1uYXRpdmU6YWdlbnRvcHMtY29vcmQ6MCJ9"
+   },
+   "created_at": "2026-10-14T14:32:39.540166Z",
+   "envelope_digest": "a495a7d0b51d00b6fbbac0b5bf5b1511d325b4cce64a26d2436f8f36b006b7bc",
+   "inbox_seq": 6,
+   "kind": "continue",
+   "message_id": "msg_01M4XD8RBMVZ553GVR0BHPMWAR",
+   "mode": "request",
+   "persisted_at": "2026-10-14T14:32:39.739502Z",
+   "receipts": [
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "observed",
+     "message_id": "msg_01M4XD8RBMVZ553GVR0BHPMWAR",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:32:41.430873Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "acknowledged",
+     "message_id": "msg_01M4XD8RBMVZ553GVR0BHPMWAR",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:32:41.489268Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "accepted",
+     "message_id": "msg_01M4XD8RBMVZ553GVR0BHPMWAR",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:32:41.521553Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "run-linked",
+     "message_id": "msg_01M4XD8RBMVZ553GVR0BHPMWAR",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:32:41.655771Z",
+     "run_id": "run_H4A4YAAZGB5WVFFXR8JX3KZPVR",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "evidence_refs": [
+      {
+       "kind": "run",
+       "ref": "run_H4A4YAAZGB5WVFFXR8JX3KZPVR"
+      }
+     ],
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "result-linked",
+     "message_id": "msg_01M4XD8RBMVZ553GVR0BHPMWAR",
+     "outcome": "not-started",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "reason": {
+      "code": "sender-not-allowed",
+      "text": "sender is not in allowed_senders"
+     },
+     "recorded_at": "2026-10-14T14:32:41.763094Z",
+     "schema": "agent-message-receipt/v1",
+     "summary": "message accepted, run not started"
+    }
+   ],
+   "recipient": {
+    "principal_id": "vuoro-static:devbox-inbox-native:0"
+   },
+   "repo_id": "agentops",
+   "schema": "agent-message/v1",
+   "sender_principal_id": "vuoro-static:workstation-inbox-native:0",
+   "workspace_id": "vuoro-native:agentops-coord:0"
+  },
+  "receipts": [
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "observed",
+    "message_id": "msg_01M4XD8RBMVZ553GVR0BHPMWAR",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:32:41.430873Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "acknowledged",
+    "message_id": "msg_01M4XD8RBMVZ553GVR0BHPMWAR",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:32:41.489268Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "accepted",
+    "message_id": "msg_01M4XD8RBMVZ553GVR0BHPMWAR",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:32:41.521553Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "run-linked",
+    "message_id": "msg_01M4XD8RBMVZ553GVR0BHPMWAR",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:32:41.655771Z",
+    "run_id": "run_H4A4YAAZGB5WVFFXR8JX3KZPVR",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "evidence_refs": [
+     {
+      "kind": "run",
+      "ref": "run_H4A4YAAZGB5WVFFXR8JX3KZPVR"
+     }
+    ],
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "result-linked",
+    "message_id": "msg_01M4XD8RBMVZ553GVR0BHPMWAR",
+    "outcome": "not-started",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "reason": {
+     "code": "sender-not-allowed",
+     "text": "sender is not in allowed_senders"
+    },
+    "recorded_at": "2026-10-14T14:32:41.763094Z",
+    "schema": "agent-message-receipt/v1",
+    "summary": "message accepted, run not started"
+   }
+  ]
+ },
+ "f7": {
+  "message": {
+   "body": {
+    "text": "M2c F7: read your run context, then before writing anything list the files in scripts/ and summarise three of them in detail, then record one short note."
+   },
+   "context": {
+    "correlation_id": "m2c-2654",
+    "item_id": 2654,
+    "predecessor_run_id": "run_GT2ADCRB0MZNR5ZZN2T7RPW0QV",
+    "work_link": "vuoro-work://link/v1/eyJpdGVtX2lkIjoyNjU0LCJwcmVkZWNlc3Nvcl9ydW5faWQiOiJydW5fR1QyQURDUkIwTVpOUjVaWk4yVDdSUFcwUVYiLCJyZXBvX2lkIjoiYWdlbnRvcHMiLCJzY2hlbWEiOiJ2dW9yby13b3JrLWxpbmsvdjEiLCJ3b3Jrc3BhY2VfaWQiOiJ2dW9yby1uYXRpdmU6YWdlbnRvcHMtY29vcmQ6MCJ9"
+   },
+   "created_at": "2026-10-14T14:33:01.798292Z",
+   "envelope_digest": "bfee8e27a1fac43ecadf4220bec584aea324e2301a7fc667a874b651637bfbeb",
+   "inbox_seq": 7,
+   "kind": "continue",
+   "message_id": "msg_01M4XD9E36WP894K40V4Y7HGJ5",
+   "mode": "request",
+   "persisted_at": "2026-10-14T14:33:01.977870Z",
+   "receipts": [
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "observed",
+     "message_id": "msg_01M4XD9E36WP894K40V4Y7HGJ5",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:33:08.615270Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "acknowledged",
+     "message_id": "msg_01M4XD9E36WP894K40V4Y7HGJ5",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:33:08.646415Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "accepted",
+     "message_id": "msg_01M4XD9E36WP894K40V4Y7HGJ5",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:33:08.677895Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "run-linked",
+     "message_id": "msg_01M4XD9E36WP894K40V4Y7HGJ5",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:33:08.760638Z",
+     "run_id": "run_GX573J69BJK9AJDE8TWS828GPY",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": null,
+     "kind": "cancel-requested",
+     "message_id": "msg_01M4XD9E36WP894K40V4Y7HGJ5",
+     "principal_id": "vuoro-static:workstation-inbox-native:0",
+     "reason": "M2c F7: sender cancels during execution",
+     "recorded_at": "2026-10-14T14:33:09.558642Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "evidence_refs": [
+      {
+       "kind": "run",
+       "ref": "run_GX573J69BJK9AJDE8TWS828GPY"
+      },
+      {
+       "kind": "harness-session",
+       "ref": "ses_ec52b2c0cffeiJ9wUhGAM5h7As"
+      },
+      {
+       "kind": "session-note",
+       "ref": "run_GX573J69BJK9AJDE8TWS828GPY/note/12"
+      }
+     ],
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "result-linked",
+     "message_id": "msg_01M4XD9E36WP894K40V4Y7HGJ5",
+     "outcome": "completed",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:33:24.438272Z",
+     "schema": "agent-message-receipt/v1",
+     "summary": "session ses_ec52b2c0cffeiJ9wUhGAM5h7As ended completed"
+    }
+   ],
+   "recipient": {
+    "principal_id": "vuoro-static:devbox-inbox-native:0"
+   },
+   "repo_id": "agentops",
+   "schema": "agent-message/v1",
+   "sender_principal_id": "vuoro-static:workstation-inbox-native:0",
+   "workspace_id": "vuoro-native:agentops-coord:0"
+  },
+  "receipts": [
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "observed",
+    "message_id": "msg_01M4XD9E36WP894K40V4Y7HGJ5",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:33:08.615270Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "acknowledged",
+    "message_id": "msg_01M4XD9E36WP894K40V4Y7HGJ5",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:33:08.646415Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "accepted",
+    "message_id": "msg_01M4XD9E36WP894K40V4Y7HGJ5",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:33:08.677895Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "run-linked",
+    "message_id": "msg_01M4XD9E36WP894K40V4Y7HGJ5",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:33:08.760638Z",
+    "run_id": "run_GX573J69BJK9AJDE8TWS828GPY",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": null,
+    "kind": "cancel-requested",
+    "message_id": "msg_01M4XD9E36WP894K40V4Y7HGJ5",
+    "principal_id": "vuoro-static:workstation-inbox-native:0",
+    "reason": "M2c F7: sender cancels during execution",
+    "recorded_at": "2026-10-14T14:33:09.558642Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "evidence_refs": [
+     {
+      "kind": "run",
+      "ref": "run_GX573J69BJK9AJDE8TWS828GPY"
+     },
+     {
+      "kind": "harness-session",
+      "ref": "ses_ec52b2c0cffeiJ9wUhGAM5h7As"
+     },
+     {
+      "kind": "session-note",
+      "ref": "run_GX573J69BJK9AJDE8TWS828GPY/note/12"
+     }
+    ],
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "result-linked",
+    "message_id": "msg_01M4XD9E36WP894K40V4Y7HGJ5",
+    "outcome": "completed",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:33:24.438272Z",
+    "schema": "agent-message-receipt/v1",
+    "summary": "session ses_ec52b2c0cffeiJ9wUhGAM5h7As ended completed"
+   }
+  ]
+ },
+ "f7b": {
+  "message": {
+   "body": {
+    "text": "M2c F7b: first run the shell command 'sleep 120' and wait for it to finish, then read your run context and record one short note."
+   },
+   "context": {
+    "correlation_id": "m2c-2654",
+    "item_id": 2654,
+    "predecessor_run_id": "run_VT9EPZTY1QHXPD8AM2B57F5FAZ",
+    "work_link": "vuoro-work://link/v1/eyJpdGVtX2lkIjoyNjU0LCJwcmVkZWNlc3Nvcl9ydW5faWQiOiJydW5fVlQ5RVBaVFkxUUhYUEQ4QU0yQjU3RjVGQVoiLCJyZXBvX2lkIjoiYWdlbnRvcHMiLCJzY2hlbWEiOiJ2dW9yby13b3JrLWxpbmsvdjEiLCJ3b3Jrc3BhY2VfaWQiOiJ2dW9yby1uYXRpdmU6YWdlbnRvcHMtY29vcmQ6MCJ9"
+   },
+   "created_at": "2026-10-14T14:33:41.190264Z",
+   "envelope_digest": "ae98cb3f8191e20b069b0e5c0e8eb04b4590bb4b0cc78f62bc4b19257d24d7e9",
+   "inbox_seq": 8,
+   "kind": "continue",
+   "message_id": "msg_01M4XDAMJ6CBEMQXT3TXN4PX1E",
+   "mode": "request",
+   "persisted_at": "2026-10-14T14:33:41.381701Z",
+   "receipts": [
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "observed",
+     "message_id": "msg_01M4XDAMJ6CBEMQXT3TXN4PX1E",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:33:55.219633Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "acknowledged",
+     "message_id": "msg_01M4XDAMJ6CBEMQXT3TXN4PX1E",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:33:55.262922Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "accepted",
+     "message_id": "msg_01M4XDAMJ6CBEMQXT3TXN4PX1E",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:33:55.296206Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "run-linked",
+     "message_id": "msg_01M4XDAMJ6CBEMQXT3TXN4PX1E",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:33:55.386215Z",
+     "run_id": "run_Z2JP1QWPY2W31Q9YZ81NN995DJ",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "evidence_refs": [
+      {
+       "kind": "run",
+       "ref": "run_Z2JP1QWPY2W31Q9YZ81NN995DJ"
+      },
+      {
+       "kind": "harness-session",
+       "ref": "ses_ec52a75f1ffe2YC22IFRzFkbvh"
+      },
+      {
+       "kind": "session-note",
+       "ref": "run_Z2JP1QWPY2W31Q9YZ81NN995DJ/note/14"
+      }
+     ],
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "result-linked",
+     "message_id": "msg_01M4XDAMJ6CBEMQXT3TXN4PX1E",
+     "outcome": "completed",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:34:11.065949Z",
+     "schema": "agent-message-receipt/v1",
+     "summary": "session ses_ec52a75f1ffe2YC22IFRzFkbvh ended completed"
+    },
+    {
+     "instance_id": null,
+     "kind": "cancel-requested",
+     "message_id": "msg_01M4XDAMJ6CBEMQXT3TXN4PX1E",
+     "principal_id": "vuoro-static:workstation-inbox-native:0",
+     "reason": "M2c F7b: sender cancels during a long step",
+     "recorded_at": "2026-10-14T14:34:15.974046Z",
+     "schema": "agent-message-receipt/v1"
+    }
+   ],
+   "recipient": {
+    "principal_id": "vuoro-static:devbox-inbox-native:0"
+   },
+   "repo_id": "agentops",
+   "schema": "agent-message/v1",
+   "sender_principal_id": "vuoro-static:workstation-inbox-native:0",
+   "workspace_id": "vuoro-native:agentops-coord:0"
+  },
+  "receipts": [
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "observed",
+    "message_id": "msg_01M4XDAMJ6CBEMQXT3TXN4PX1E",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:33:55.219633Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "acknowledged",
+    "message_id": "msg_01M4XDAMJ6CBEMQXT3TXN4PX1E",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:33:55.262922Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "accepted",
+    "message_id": "msg_01M4XDAMJ6CBEMQXT3TXN4PX1E",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:33:55.296206Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "run-linked",
+    "message_id": "msg_01M4XDAMJ6CBEMQXT3TXN4PX1E",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:33:55.386215Z",
+    "run_id": "run_Z2JP1QWPY2W31Q9YZ81NN995DJ",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "evidence_refs": [
+     {
+      "kind": "run",
+      "ref": "run_Z2JP1QWPY2W31Q9YZ81NN995DJ"
+     },
+     {
+      "kind": "harness-session",
+      "ref": "ses_ec52a75f1ffe2YC22IFRzFkbvh"
+     },
+     {
+      "kind": "session-note",
+      "ref": "run_Z2JP1QWPY2W31Q9YZ81NN995DJ/note/14"
+     }
+    ],
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "result-linked",
+    "message_id": "msg_01M4XDAMJ6CBEMQXT3TXN4PX1E",
+    "outcome": "completed",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:34:11.065949Z",
+    "schema": "agent-message-receipt/v1",
+    "summary": "session ses_ec52a75f1ffe2YC22IFRzFkbvh ended completed"
+   },
+   {
+    "instance_id": null,
+    "kind": "cancel-requested",
+    "message_id": "msg_01M4XDAMJ6CBEMQXT3TXN4PX1E",
+    "principal_id": "vuoro-static:workstation-inbox-native:0",
+    "reason": "M2c F7b: sender cancels during a long step",
+    "recorded_at": "2026-10-14T14:34:15.974046Z",
+    "schema": "agent-message-receipt/v1"
+   }
+  ]
+ },
+ "f7c": {
+  "message": {
+   "body": {
+    "text": "M2c F7c: read your run context and record one short note."
+   },
+   "context": {
+    "correlation_id": "m2c-2654",
+    "item_id": 2654,
+    "predecessor_run_id": "run_DQT0AQ4ZG8CGQ5QNYWYCZ590N5",
+    "work_link": "vuoro-work://link/v1/eyJpdGVtX2lkIjoyNjU0LCJwcmVkZWNlc3Nvcl9ydW5faWQiOiJydW5fRFFUMEFRNFpHOENHUTVRTllXWUNaNTkwTjUiLCJyZXBvX2lkIjoiYWdlbnRvcHMiLCJzY2hlbWEiOiJ2dW9yby13b3JrLWxpbmsvdjEiLCJ3b3Jrc3BhY2VfaWQiOiJ2dW9yby1uYXRpdmU6YWdlbnRvcHMtY29vcmQ6MCJ9"
+   },
+   "created_at": "2026-10-14T14:34:30.885119Z",
+   "envelope_digest": "1908d6ba5ed56f5dff47d5362ad536e5ea8082cf35f21a5b177fd64bf8877551",
+   "inbox_seq": 9,
+   "kind": "continue",
+   "message_id": "msg_01M4XDC535ZJ1GNKDM6REA77R1",
+   "mode": "request",
+   "persisted_at": "2026-10-14T14:34:31.087833Z",
+   "receipts": [
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "observed",
+     "message_id": "msg_01M4XDC535ZJ1GNKDM6REA77R1",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:34:32.002121Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "acknowledged",
+     "message_id": "msg_01M4XDC535ZJ1GNKDM6REA77R1",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:34:32.044738Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "accepted",
+     "message_id": "msg_01M4XDC535ZJ1GNKDM6REA77R1",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:34:32.077974Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "run-linked",
+     "message_id": "msg_01M4XDC535ZJ1GNKDM6REA77R1",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:34:32.169423Z",
+     "run_id": "run_AWB9KY9X3XM534DD8K3QB5XHGR",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": null,
+     "kind": "cancel-requested",
+     "message_id": "msg_01M4XDC535ZJ1GNKDM6REA77R1",
+     "principal_id": "vuoro-static:workstation-inbox-native:0",
+     "reason": "M2c F7c: sender cancels while the session is busy",
+     "recorded_at": "2026-10-14T14:34:32.524254Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "evidence_refs": [
+      {
+       "kind": "run",
+       "ref": "run_AWB9KY9X3XM534DD8K3QB5XHGR"
+      },
+      {
+       "kind": "harness-session",
+       "ref": "ses_ec529e652ffeDfTgYQD1DG82U6"
+      }
+     ],
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "result-linked",
+     "message_id": "msg_01M4XDC535ZJ1GNKDM6REA77R1",
+     "outcome": "canceled",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:34:33.717457Z",
+     "schema": "agent-message-receipt/v1",
+     "summary": "session ses_ec529e652ffeDfTgYQD1DG82U6 ended canceled (MessageAbortedError)"
+    }
+   ],
+   "recipient": {
+    "principal_id": "vuoro-static:devbox-inbox-native:0"
+   },
+   "repo_id": "agentops",
+   "schema": "agent-message/v1",
+   "sender_principal_id": "vuoro-static:workstation-inbox-native:0",
+   "workspace_id": "vuoro-native:agentops-coord:0"
+  },
+  "receipts": [
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "observed",
+    "message_id": "msg_01M4XDC535ZJ1GNKDM6REA77R1",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:34:32.002121Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "acknowledged",
+    "message_id": "msg_01M4XDC535ZJ1GNKDM6REA77R1",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:34:32.044738Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "accepted",
+    "message_id": "msg_01M4XDC535ZJ1GNKDM6REA77R1",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:34:32.077974Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "run-linked",
+    "message_id": "msg_01M4XDC535ZJ1GNKDM6REA77R1",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:34:32.169423Z",
+    "run_id": "run_AWB9KY9X3XM534DD8K3QB5XHGR",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": null,
+    "kind": "cancel-requested",
+    "message_id": "msg_01M4XDC535ZJ1GNKDM6REA77R1",
+    "principal_id": "vuoro-static:workstation-inbox-native:0",
+    "reason": "M2c F7c: sender cancels while the session is busy",
+    "recorded_at": "2026-10-14T14:34:32.524254Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "evidence_refs": [
+     {
+      "kind": "run",
+      "ref": "run_AWB9KY9X3XM534DD8K3QB5XHGR"
+     },
+     {
+      "kind": "harness-session",
+      "ref": "ses_ec529e652ffeDfTgYQD1DG82U6"
+     }
+    ],
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "result-linked",
+    "message_id": "msg_01M4XDC535ZJ1GNKDM6REA77R1",
+    "outcome": "canceled",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:34:33.717457Z",
+    "schema": "agent-message-receipt/v1",
+    "summary": "session ses_ec529e652ffeDfTgYQD1DG82U6 ended canceled (MessageAbortedError)"
+   }
+  ]
+ },
+ "success": {
+  "message": {
+   "body": {
+    "text": "M2c success path: read your run context (it holds the predecessor's note for item 2654) and record one short note confirming what it shows."
+   },
+   "context": {
+    "correlation_id": "m2c-2654",
+    "item_id": 2654,
+    "predecessor_run_id": "run_MF762HM5CEEZ7SV8DBPNY6YXSB",
+    "work_link": "vuoro-work://link/v1/eyJpdGVtX2lkIjoyNjU0LCJwcmVkZWNlc3Nvcl9ydW5faWQiOiJydW5fTUY3NjJITTVDRUVaN1NWOERCUE5ZNllYU0IiLCJyZXBvX2lkIjoiYWdlbnRvcHMiLCJzY2hlbWEiOiJ2dW9yby13b3JrLWxpbmsvdjEiLCJ3b3Jrc3BhY2VfaWQiOiJ2dW9yby1uYXRpdmU6YWdlbnRvcHMtY29vcmQ6MCJ9"
+   },
+   "created_at": "2026-10-14T14:23:33.861010Z",
+   "envelope_digest": "a41c6bc1ace539fb3acd8d865a78c499d5a7cc6a77702d5d7d86c52f0ad6fe24",
+   "inbox_seq": 1,
+   "kind": "continue",
+   "message_id": "msg_01M4XCR3F4XF5354B7CJTSCDCQ",
+   "mode": "request",
+   "persisted_at": "2026-10-14T14:23:34.016978Z",
+   "receipts": [
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "observed",
+     "message_id": "msg_01M4XCR3F4XF5354B7CJTSCDCQ",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:23:37.260625Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "acknowledged",
+     "message_id": "msg_01M4XCR3F4XF5354B7CJTSCDCQ",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:23:37.307960Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "accepted",
+     "message_id": "msg_01M4XCR3F4XF5354B7CJTSCDCQ",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:23:37.343027Z",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "run-linked",
+     "message_id": "msg_01M4XCR3F4XF5354B7CJTSCDCQ",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:23:37.454804Z",
+     "run_id": "run_W5NFWA2N3SG9JSK416FA7B1Q4B",
+     "schema": "agent-message-receipt/v1"
+    },
+    {
+     "evidence_refs": [
+      {
+       "kind": "run",
+       "ref": "run_W5NFWA2N3SG9JSK416FA7B1Q4B"
+      },
+      {
+       "kind": "harness-session",
+       "ref": "ses_ec533e3c1ffeLK7XlEWLUx56BT"
+      }
+     ],
+     "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+     "kind": "result-linked",
+     "message_id": "msg_01M4XCR3F4XF5354B7CJTSCDCQ",
+     "outcome": "completed",
+     "principal_id": "vuoro-static:devbox-inbox-native:0",
+     "recorded_at": "2026-10-14T14:26:42.404140Z",
+     "schema": "agent-message-receipt/v1",
+     "summary": "session ses_ec533e3c1ffeLK7XlEWLUx56BT ended completed"
+    }
+   ],
+   "recipient": {
+    "principal_id": "vuoro-static:devbox-inbox-native:0"
+   },
+   "repo_id": "agentops",
+   "schema": "agent-message/v1",
+   "sender_principal_id": "vuoro-static:workstation-inbox-native:0",
+   "workspace_id": "vuoro-native:agentops-coord:0"
+  },
+  "receipts": [
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "observed",
+    "message_id": "msg_01M4XCR3F4XF5354B7CJTSCDCQ",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:23:37.260625Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "acknowledged",
+    "message_id": "msg_01M4XCR3F4XF5354B7CJTSCDCQ",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:23:37.307960Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "accepted",
+    "message_id": "msg_01M4XCR3F4XF5354B7CJTSCDCQ",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:23:37.343027Z",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "run-linked",
+    "message_id": "msg_01M4XCR3F4XF5354B7CJTSCDCQ",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:23:37.454804Z",
+    "run_id": "run_W5NFWA2N3SG9JSK416FA7B1Q4B",
+    "schema": "agent-message-receipt/v1"
+   },
+   {
+    "evidence_refs": [
+     {
+      "kind": "run",
+      "ref": "run_W5NFWA2N3SG9JSK416FA7B1Q4B"
+     },
+     {
+      "kind": "harness-session",
+      "ref": "ses_ec533e3c1ffeLK7XlEWLUx56BT"
+     }
+    ],
+    "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+    "kind": "result-linked",
+    "message_id": "msg_01M4XCR3F4XF5354B7CJTSCDCQ",
+    "outcome": "completed",
+    "principal_id": "vuoro-static:devbox-inbox-native:0",
+    "recorded_at": "2026-10-14T14:26:42.404140Z",
+    "schema": "agent-message-receipt/v1",
+    "summary": "session ses_ec533e3c1ffeLK7XlEWLUx56BT ended completed"
+   }
+  ]
+ }
+}

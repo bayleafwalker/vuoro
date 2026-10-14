@@ -2529,6 +2529,74 @@ items:
       question: Does the metanarrative model survive S4 as its own store, or become evidence kinds?
       step: At S4, claims and observations become claim and lesson evidence kinds plus Decisions (TS-13), when kctl and
         the auditctl central store retire.
+- key: agent-inbox-hub
+  name: Agent directory and durable inbox (work.agent.* and work.message.* served operations)
+  repos:
+  - /projects/dev/sprintctl
+  - /projects/dev/vuoro
+  - /projects/dev/appservice
+  role: 'Directory of agent principals and instances with independently evidenced facts, and a durable request inbox
+    with receipts, owned by sprintctl (schemas 23-25) and served by vuoro-service on vuoro-shared. Contract and
+    conformance suite in vuoro (docs/architecture/agent-directory-and-inbox.md).'
+  status: active
+  intention: 'Single authoritative store on vuoro-shared until Q1(b); request mode only (delegation mode is M5). Next:
+    M3 bounded operational pilot (roadmap section 8).'
+  waking_condition: n/a - active.
+  supersession: none.
+  last_verified:
+    date: '2026-10-14'
+    observations:
+    - claim: vuoro-shared runs vuoro-service 0.1.95 (sprintctl 0.19.0, work schema 25) with 102 catalog operations,
+        including the five work.agent.* and five work.message.* operations.
+      source: kubectl get deploy vuoro-shared (image sha256:b3e4097f...), migration Job vuoro-work-migrate-v25 log
+        (to_version 25, compatible true), sprintctl doctor schema listing
+      verdict: confirmed
+    - claim: One recorded cross-runtime continuation plus nine induced failure histories completed live through the
+        inbox; 9 messages, 49 receipts, every chain reconstructible from owner records.
+      source: docs/evidence/2026-10-14-agent-inbox-m2c/
+      verdict: confirmed
+  divergence: 'Instances are not separately authenticated (instance_id is self-asserted under the principal); writes
+    use work:evidence rather than a dedicated authority.'
+  confidence: high
+  goal_state:
+    reviewed: '2026-10-14'
+    v2_status: absent
+    v3_status: active
+    basis:
+    - docs/plans/2026-10-14-agent-coordination-roadmap.md (operator directive) M2c exit condition
+    - docs/evidence/2026-10-14-agent-inbox-m2c/
+    note: New row, moved to active on the M2c evidence.
+- key: agentops-host-adapter
+  name: agentops host adapter (Vuoro inbox to opencode serve)
+  repos:
+  - /projects/dev/agentops
+  role: 'Recipient-side adapter: reads the inbox for one principal, authorizes each request against a local policy,
+    registers the successor run, launches it through opencode serve on loopback and links the result. Never relaunches
+    an ambiguous launch.'
+  status: active
+  intention: 'One adapter per state directory on devbox under the devbox-inbox-native identity. Next: environment
+    authority gate (agentops #346/#347), then M4 runtime coverage one integration at a time.'
+  waking_condition: n/a - active.
+  supersession: none.
+  last_verified:
+    date: '2026-10-14'
+    observations:
+    - claim: The adapter runs as a systemd user unit on devbox (instance ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y) and
+        processed 9 live messages, including crash-before-launch, crash-after-launch, ambiguous launch, policy change
+        and cancellation histories.
+      source: docs/evidence/2026-10-14-agent-inbox-m2c/ (adapter_status.json, records.json)
+      verdict: confirmed
+  divergence: 'Deployed from agentops PR #343 at 42932e5 until that PR merges. No run timeout for a hung session;
+    opencode serve crash behaviour and gateway outage not exercised.'
+  confidence: medium
+  goal_state:
+    reviewed: '2026-10-14'
+    v2_status: absent
+    v3_status: active
+    basis:
+    - docs/plans/2026-10-14-agent-coordination-roadmap.md (operator directive) M2c exit condition
+    - docs/evidence/2026-10-14-agent-inbox-m2c/
+    note: New row, moved to active on the M2c evidence.
 open_claims:
 - claim: Served next-work works, but the product's first promised capability - session resume - does not.
   verdict: contradicted

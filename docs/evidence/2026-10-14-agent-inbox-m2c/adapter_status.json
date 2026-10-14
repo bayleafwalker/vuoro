@@ -1,0 +1,122 @@
+{
+ "instance_id": "ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y",
+ "records": [
+  {
+   "closed": 1,
+   "decision": "accepted",
+   "detail": null,
+   "inbox_seq": 1,
+   "last_error": null,
+   "message_id": "msg_01M4XCR3F4XF5354B7CJTSCDCQ",
+   "outcome": "completed",
+   "repo_id": "agentops",
+   "run_id": "run_W5NFWA2N3SG9JSK416FA7B1Q4B",
+   "session_id": "ses_ec533e3c1ffeLK7XlEWLUx56BT",
+   "state": "finished"
+  },
+  {
+   "closed": 1,
+   "decision": "accepted",
+   "detail": null,
+   "inbox_seq": 2,
+   "last_error": null,
+   "message_id": "msg_01M4XD1W3ZS2MP61GXFYFNVRXD",
+   "outcome": "completed",
+   "repo_id": "agentops",
+   "run_id": "run_91YNEYW52JEZ9K62SQ0ABVYE5Z",
+   "session_id": "ses_ec52eda1effe1tR6cZ9soU08mS",
+   "state": "finished"
+  },
+  {
+   "closed": 1,
+   "decision": "accepted",
+   "detail": null,
+   "inbox_seq": 3,
+   "last_error": null,
+   "message_id": "msg_01M4XD4FZEJWS4MHADJEZKD4P6",
+   "outcome": "completed",
+   "repo_id": "agentops",
+   "run_id": "run_EF84QEJEDV6MY26E080HMWGA4F",
+   "session_id": "ses_ec52d9a79ffeJIVZ4IZMgZsuct",
+   "state": "finished"
+  },
+  {
+   "closed": 1,
+   "decision": "accepted",
+   "detail": null,
+   "inbox_seq": 4,
+   "last_error": null,
+   "message_id": "msg_01M4XD5PQH2X4V02EQMESK38SX",
+   "outcome": "completed",
+   "repo_id": "agentops",
+   "run_id": "run_TJQTYRG6VBT5X7J0YF2K5ZNKW7",
+   "session_id": "ses_ec52d1ffeffeLlld7FwlgEo6fB",
+   "state": "finished"
+  },
+  {
+   "closed": 1,
+   "decision": "accepted",
+   "detail": "launch intent persisted without a session id; title search for vuoro-msg:msg_01M4XD770A2PHQYWT3D4GWMWN8 found 2 sessions; not relaunching",
+   "inbox_seq": 5,
+   "last_error": null,
+   "message_id": "msg_01M4XD770A2PHQYWT3D4GWMWN8",
+   "outcome": "abandoned",
+   "repo_id": "agentops",
+   "run_id": "run_FJGAQF968XET82CWXE2G9P8B3J",
+   "session_id": null,
+   "state": "finished"
+  },
+  {
+   "closed": 1,
+   "decision": "accepted",
+   "detail": null,
+   "inbox_seq": 6,
+   "last_error": null,
+   "message_id": "msg_01M4XD8RBMVZ553GVR0BHPMWAR",
+   "outcome": "not-started",
+   "repo_id": "agentops",
+   "run_id": "run_H4A4YAAZGB5WVFFXR8JX3KZPVR",
+   "session_id": null,
+   "state": "not_started"
+  },
+  {
+   "closed": 1,
+   "decision": "accepted",
+   "detail": null,
+   "inbox_seq": 7,
+   "last_error": null,
+   "message_id": "msg_01M4XD9E36WP894K40V4Y7HGJ5",
+   "outcome": "completed",
+   "repo_id": "agentops",
+   "run_id": "run_GX573J69BJK9AJDE8TWS828GPY",
+   "session_id": "ses_ec52b2c0cffeiJ9wUhGAM5h7As",
+   "state": "finished"
+  },
+  {
+   "closed": 1,
+   "decision": "accepted",
+   "detail": null,
+   "inbox_seq": 8,
+   "last_error": null,
+   "message_id": "msg_01M4XDAMJ6CBEMQXT3TXN4PX1E",
+   "outcome": "completed",
+   "repo_id": "agentops",
+   "run_id": "run_Z2JP1QWPY2W31Q9YZ81NN995DJ",
+   "session_id": "ses_ec52a75f1ffe2YC22IFRzFkbvh",
+   "state": "finished"
+  },
+  {
+   "closed": 1,
+   "decision": "accepted",
+   "detail": null,
+   "inbox_seq": 9,
+   "last_error": null,
+   "message_id": "msg_01M4XDC535ZJ1GNKDM6REA77R1",
+   "outcome": "canceled",
+   "repo_id": "agentops",
+   "run_id": "run_AWB9KY9X3XM534DD8K3QB5XHGR",
+   "session_id": "ses_ec529e652ffeDfTgYQD1DG82U6",
+   "state": "finished"
+  }
+ ]
+}
