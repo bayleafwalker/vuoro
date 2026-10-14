@@ -37,6 +37,12 @@ printed):
 
 Every subcommand takes `--pins`, `--attestation`, `--work-ref` and `--output`.
 
+An operation run off-image (on a workstation, from a source checkout) has no
+`installed-composition.json`, so `installed-composition-attestation-absent` is
+always among its unknowns and its status is at best `attention`. Pass
+`--attestation` with the attestation of the image being diagnosed to compare
+it with the pins and allow `ok`.
+
 ## Operations
 
 ### `uncertain-effects`
@@ -82,7 +88,8 @@ This check establishes one attempt's provider outcome without re-dispatching:
   is compared on head SHA and base branch, for both push and PR attempts.
   The token from `--github-token-env` is only sent to `https://api.github.com`,
   unless `--allow-token-for-github-api` explicitly allows another
-  `--github-api`. Redirects are never followed.
+  `--github-api`. That flag is refused unless `--github-api` is https with no
+  userinfo. Redirects are never followed.
 - **Signed artifact.** For the protected Git path from #220, when the
   artifact root is supplied, the journaled `LOCAL_READY` bundle digest is
   re-hashed and `git bundle list-heads` must contain the journaled commit.
@@ -169,6 +176,18 @@ no class and status `error`, never advice:
 | Class | When |
 | --- | --- |
 | `cancel` | The current schema is below the target, the Job is `not-created` or `failed`, and the prior image admits the current schema. If the Job reports `complete` while the schema is below the target, no class is given. |
+
+"Job `failed` and schema below target, so `cancel`" assumes every migration
+step is transactional: a failed step rolled back and left no partial change.
+Neither owner publishes machine-readable metadata confirming that, so this
+case always carries the unknown `non-transactional-step-possible`, and its
+status is `attention`. Confirm that the owner's steps are transactional before
+treating the rollout as cancelled. A Job that is `not-created` or `failed`
+while the schema is already at or above the target is reported as the anomaly
+`job-state-inconsistent-with-schema`. That state means an earlier rollout, an
+out-of-band migration or a commit before the failure, and a person must
+confirm which. A same-image redeploy with no migration also shows this
+anomaly.
 | `image-revert` | The target is committed and the prior image's range still admits it. |
 | `forward-fix-or-restore` | The committed schema is outside the prior image's range. Recovery is a compatible forward image or a coordinated restore, not an old-image rollback. |
 
@@ -216,8 +235,12 @@ runs with no network as the invoking uid.
 The command recreates every role the dump owns or grants to, as non-superuser
 roles. It then restores with `--exit-on-error --single-transaction` as
 `vuoro_ops_restorer`, a non-superuser that is a member of those roles and owns
-the scratch database. Schema owners get `CREATE` on that database, and object
-owners get `CREATE` on its `public` schema, which the owner changes need.
+the scratch database. Object owners get `CREATE` on its `public` schema,
+because changing an object's owner needs it. The configured runtime roles
+(`--role`, default `<domain>_runtime`) never get that grant. A dump in which a
+runtime role owns a `public` object therefore fails to restore rather than
+handing that role DDL privileges. No role gets `CREATE` on the database: only
+the restorer, which owns it, needs that to change a schema's owner.
 Superuser-only statements in a dump therefore fail the restore instead of
 running on the host: `COPY ... TO PROGRAM`, untrusted languages, event
 triggers and most extensions. pg_restore itself still parses the archive, so

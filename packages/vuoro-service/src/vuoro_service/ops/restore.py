@@ -51,7 +51,6 @@ _ROLE_PATTERNS = (
     re.compile(r"OWNER TO " + _IDENT),
     re.compile(r"FOR ROLE " + _IDENT),
 )
-_SCHEMA_OWNER = re.compile(r"ALTER SCHEMA " + _IDENT + r" OWNER TO " + r'(?:"((?:[^"]|"")+)"|([A-Za-z_][A-Za-z0-9_$]*))')
 _GRANT = re.compile(r"\b(?:GRANT|REVOKE)\b[^;]*?\b(?:TO|FROM) ([^;]+);")
 _RESERVED_ROLES = {"PUBLIC", "CURRENT_USER", "SESSION_USER", "CURRENT_ROLE", _ADMIN, _RESTORER}
 
@@ -158,10 +157,6 @@ def object_owners(schema_sql: str) -> list[str]:
     return sorted({_ident(match) for match in _ROLE_PATTERNS[0].finditer(schema_sql)} - _RESERVED_ROLES)
 
 
-def schema_owners(schema_sql: str) -> list[str]:
-    return sorted({_ident(match, 3) for match in _SCHEMA_OWNER.finditer(schema_sql)} - _RESERVED_ROLES)
-
-
 def _quote_ident(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
 
@@ -234,15 +229,19 @@ def isolated_restore(
     toc_entries = [line for line in toc.stdout.splitlines() if line and not line.startswith(";")]
     dump_schemas = sorted({m.group(1) for m in re.finditer(r"^CREATE SCHEMA (\S+);", schema_sql.stdout, re.MULTILINE)})
     needed_roles = dump_roles(schema_sql.stdout)
-    owners = [role for role in schema_owners(schema_sql.stdout) if role in needed_roles]
-    public_owners = [role for role in object_owners(schema_sql.stdout) if role in needed_roles]
+    # Runtime roles never receive CREATE here, even if the dump makes them
+    # owners of public-schema objects: the restore then fails rather than
+    # handing a runtime role DDL privileges production does not give it.
+    runtime_roles = {(roles or {}).get(domain, f"{domain}_runtime") for domain in domains}
+    public_owners = [role for role in object_owners(schema_sql.stdout)
+                     if role in needed_roles and role not in runtime_roles]
 
     restore: dict[str, Any] = {
         "dump": str(dump_path), "dump_sha256": digest, "format": "custom",
         "toc_entries": len(toc_entries), "schemas": dump_schemas, "roles_created": needed_roles,
         "restored_as": _RESTORER, "restorer_superuser": False,
-        "database_create_granted_to_schema_owners": owners,
         "public_schema_create_granted_to_object_owners": public_owners,
+        "create_withheld_from_runtime_roles": sorted(runtime_roles),
     }
     compatibility: dict[str, Any] = {}
     with disposable_cluster(bins, keep=keep) as cluster:
@@ -252,11 +251,10 @@ def isolated_restore(
         statements.append(f"CREATE ROLE {_RESTORER} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS")
         statements += [f"GRANT {_quote_ident(role)} TO {_RESTORER}" for role in needed_roles]
         statements.append(f"CREATE DATABASE {_DATABASE} OWNER {_RESTORER}")
-        # ALTER SCHEMA ... OWNER TO needs the new owner to hold CREATE on the
-        # database, as the migration roles that own the schemas do in production.
-        statements += [f"GRANT CREATE ON DATABASE {_DATABASE} TO {_quote_ident(role)}" for role in owners]
-        # ALTER ... OWNER TO also needs CREATE on the containing schema; the
-        # public schema belongs to the database owner (the restorer) here.
+        # ALTER SCHEMA ... OWNER TO needs CREATE on the database only for the
+        # restorer (the database owner).  ALTER <object> ... OWNER TO needs the
+        # new owner to hold CREATE on the containing schema; the public schema
+        # belongs to the database owner (the restorer) here.
         in_database = [f"GRANT CREATE ON SCHEMA public TO {_quote_ident(role)}" for role in public_owners]
         for statement, database in [(sql, "postgres") for sql in statements] + [(sql, _DATABASE) for sql in in_database]:
             created = _psql(bins, cluster, statement, database)

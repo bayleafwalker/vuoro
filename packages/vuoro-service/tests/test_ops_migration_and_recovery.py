@@ -91,6 +91,30 @@ def test_prior_that_cannot_serve_the_current_schema_blocks_instead_of_cancel():
     assert result.result["recovery_class"] is None and result.status == "error"
 
 
+def test_failed_job_below_target_cancels_but_flags_non_transactional_steps():
+    result = migration_preflight(candidate_image=CANDIDATE, prior_image=PRIOR, target_schema=25, current_schema=22,
+                                 job_state="failed", image_runner=runner_for({CANDIDATE: (25, 25), PRIOR: (22, 22)}))
+    assert result.result["recovery_class"] == "cancel"
+    assert "non-transactional-step-possible" in result.unknowns
+    not_created = migration_preflight(candidate_image=CANDIDATE, prior_image=PRIOR, target_schema=25,
+                                      current_schema=22, job_state="not-created",
+                                      image_runner=runner_for({CANDIDATE: (25, 25), PRIOR: (22, 22)}))
+    assert "non-transactional-step-possible" not in not_created.unknowns
+
+
+@pytest.mark.parametrize(("job", "current", "flagged"), [
+    ("not-created", 25, True), ("failed", 25, True), ("failed", 26, True),
+    ("complete", 25, False), ("not-created", 22, False),
+])
+def test_job_state_inconsistent_with_schema_is_an_anomaly(job, current, flagged):
+    result = migration_preflight(candidate_image=CANDIDATE, prior_image=PRIOR, target_schema=25,
+                                 current_schema=current, job_state=job,
+                                 image_runner=runner_for({CANDIDATE: (25, 26), PRIOR: (25, 26)}))
+    assert ("job-state-inconsistent-with-schema" in result.result["anomalies"]) is flagged
+    if flagged:
+        assert result.status != "ok"
+
+
 @pytest.mark.parametrize("job", ["in-flight", "absent", None])
 def test_unsettled_or_unobserved_job_yields_no_class(job):
     result = migration_preflight(candidate_image=CANDIDATE, prior_image=PRIOR, target_schema=25, current_schema=22,
