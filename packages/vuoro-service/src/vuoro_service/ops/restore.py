@@ -290,6 +290,7 @@ def isolated_restore(
                 used_roles[domain] = role
                 env[f"VUORO_OPS_{domain.upper()}_DSN"] = _dsn(socket_dir, role, schema)
                 env[f"VUORO_OPS_{domain.upper()}_SCHEMA"] = schema
+                env[f"VUORO_OPS_{domain.upper()}_ROLE"] = role
             compatibility["roles"] = used_roles
             mode = None
             observation = None

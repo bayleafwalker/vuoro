@@ -2,8 +2,9 @@
 
 The checked-in manifest pins the released vuoro-workspace 0.1.0 owner. These
 tests prove that the runtime gate, the fetcher and the attester all require
-exactly work, audit and knowledge and refuse anything else. The served knowledge operations themselves are
-exercised end to end in packages/vuoro-workspace/tests/test_vuoro_adapter_served.py.
+exactly work, audit and knowledge and refuse anything else. The served
+knowledge operations themselves are exercised end to end in
+packages/vuoro-workspace/tests/test_vuoro_adapter_served.py.
 """
 
 from __future__ import annotations
@@ -199,3 +200,18 @@ def test_compose_knowledge_reports_an_owner_dsn_as_incompatible(tmp_path: Path, 
         compatible=False, reasons=["runtime_role_owns_schema"], reason="runtime_role_owns_schema"))
     state = _compose_knowledge(_pin(tmp_path), CatalogRegistry(), _environ(tmp_path))
     assert state.state == "incompatible" and "owns_schema" in (state.reason or "")
+
+
+def test_historical_two_domain_closures_are_attested_only_when_declared() -> None:
+    """The upgrade proofs attest released pre-knowledge closures (service <= 0.1.95)."""
+    historical = json.loads((ROOT / "tests" / "fixtures" / "schema22-adapter-pins.json").read_text(encoding="utf-8"))
+    attester = _script("attest_installed_composition")
+    with pytest.raises(SystemExit, match="exactly three"):
+        attester._pinned(historical)
+    entries = attester._pinned(historical, attester._HISTORICAL_DOMAINS)
+    assert "vuoro-workspace" not in {entry["distribution"] for entry in entries}
+    # The flag never admits the current three-domain manifest as two-domain.
+    with pytest.raises(SystemExit, match="exactly two"):
+        attester._pinned(_three_domain(), attester._HISTORICAL_DOMAINS)
+    prepare = (SCRIPTS / "prepare_schema21_upgrade_fixture.py").read_text(encoding="utf-8")
+    assert "--historical-two-domain-closure" in prepare

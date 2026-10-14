@@ -1,8 +1,10 @@
 """Run the pinned owners' read-only startup compatibility checks.
 
 The same calls ``create_composed_app`` makes at startup: Sprintctl's
-``compatibility_handshake`` on the work store and Auditctl's
-``check_compatibility`` for the runtime role.  Neither migrates.  Callers
+``compatibility_handshake`` on the work store, Auditctl's
+``check_compatibility`` for the runtime role, and vuoro-workspace's
+``KnowledgeApplication.compatibility`` (schema, runtime role, not owner or
+superuser) for the knowledge store.  None migrates.  Callers
 must point the DSNs at a disposable database only.  Output: one JSON object.
 """
 
@@ -78,6 +80,31 @@ def observe(env):
             }
         except Exception as error:  # noqa: BLE001
             observation["domains"]["audit"] = {
+                "compatible": False,
+                "reason": "probe-error",
+                "error": f"{type(error).__name__}: {str(error)[:300]}",
+            }
+    knowledge_dsn = env.get("VUORO_OPS_KNOWLEDGE_DSN")
+    if knowledge_dsn:
+        try:
+            import psycopg
+            from vuoro_workspace.vuoro_adapter import KnowledgeApplication
+
+            role = env.get("VUORO_OPS_KNOWLEDGE_ROLE") or ""
+            application = KnowledgeApplication(
+                lambda: psycopg.connect(knowledge_dsn, autocommit=True),
+                None,  # the read-only gate never touches the object store
+                schema=env.get("VUORO_OPS_KNOWLEDGE_SCHEMA", "knowledge"),
+                runtime_role=role,
+            )
+            record = application.compatibility()
+            observation["domains"]["knowledge"] = {
+                "compatible": bool(record.get("compatible")),
+                "reason": ",".join(record.get("reasons") or ()) or None,
+                "handshake": _jsonable(record),
+            }
+        except Exception as error:  # noqa: BLE001
+            observation["domains"]["knowledge"] = {
                 "compatible": False,
                 "reason": "probe-error",
                 "error": f"{type(error).__name__}: {str(error)[:300]}",

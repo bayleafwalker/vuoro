@@ -18,8 +18,12 @@ import re
 from urllib.parse import urlsplit
 
 _LOCK_KINDS = {"adapter", "owner-dependency", "shared-dependency"}
-_DOMAINS = {"work", "audit", "knowledge"}
-_ADMITTED_DOMAINS = _DOMAINS
+_DOMAINS = frozenset({"work", "audit", "knowledge"})
+#: Released service closures from before the knowledge domain (service <=
+#: 0.1.95) pinned exactly work and audit. Only the upgrade proofs attest such a
+#: historical closure, and they must say so explicitly; the current manifest
+#: and the image build always use ``_DOMAINS``.
+_HISTORICAL_DOMAINS = frozenset({"work", "audit"})
 _SHARED_SOURCE = "https://github.com/bayleafwalker/vuoro"
 _SHARED_DISTRIBUTIONS = {"vuoro-schema-runtime", "vuoro-adapter-kit"}
 _LOCK_FIELDS = {"lock_id", "lock_kind", "source_repository", "source_revision", "artifact_url", "artifact_sha256", "distribution", "distribution_version"}
@@ -53,7 +57,15 @@ def _filename(lock: dict) -> str:
     return artifact_parts[5]
 
 
-def _pinned(manifest: dict) -> list[dict]:
+def _count(domains: frozenset[str]) -> str:
+    return "three" if domains == _DOMAINS else "two"
+
+
+def _names(domains: frozenset[str]) -> str:
+    return "work, audit and knowledge" if domains == _DOMAINS else "work and audit"
+
+
+def _pinned(manifest: dict, domains: frozenset[str] = _DOMAINS) -> list[dict]:
     entries: list[dict] = []
     if manifest.get("schema_version") != "vuoro-composition/v3":
         raise SystemExit("unsupported composition schema_version")
@@ -101,14 +113,14 @@ def _pinned(manifest: dict) -> list[dict]:
     descriptors = manifest.get("runtime_descriptors")
     if (
         not isinstance(descriptors, list)
-        or not len(_DOMAINS) <= len(descriptors) <= len(_ADMITTED_DOMAINS)
+        or len(descriptors) != len(domains)
     ):
-        raise SystemExit("composition must contain exactly three runtime descriptors")
+        raise SystemExit(f"composition must contain exactly {_count(domains)} runtime descriptors")
     if any(not isinstance(item, dict) or set(item) != _DESCRIPTOR_FIELDS for item in descriptors):
         raise SystemExit("runtime descriptor fields do not match the v3 contract")
-    domains = [item["domain"] for item in descriptors]
-    if len(domains) != len(set(domains)) or not _DOMAINS <= set(domains) <= _ADMITTED_DOMAINS:
-        raise SystemExit("composition must pin exactly work, audit and knowledge")
+    pinned_domains = [item["domain"] for item in descriptors]
+    if len(pinned_domains) != len(set(pinned_domains)) or set(pinned_domains) != domains:
+        raise SystemExit(f"composition must pin exactly {_names(domains)}")
     referenced: list[str] = []
     primary_counts: dict[str, int] = {}
     dependency_counts: dict[str, int] = {}
@@ -174,16 +186,19 @@ def _installed_files_digest(distribution_name: str) -> tuple[str, int]:
 
 def main(argv: list[str] | None = None) -> int:
     argv = argv or sys.argv[1:]
+    domains = _DOMAINS
+    if argv and argv[0] == "--historical-two-domain-closure":
+        domains, argv = _HISTORICAL_DOMAINS, argv[1:]
     if len(argv) != 3:
         raise SystemExit(
-            "usage: attest_installed_composition.py MANIFEST WHEEL_DIR OUTPUT"
+            "usage: attest_installed_composition.py [--historical-two-domain-closure] MANIFEST WHEEL_DIR OUTPUT"
         )
     manifest_path, wheel_dir, output = map(Path, argv)
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
     failures: list[str] = []
     attested: list[dict] = []
-    for entry in _pinned(manifest):
+    for entry in _pinned(manifest, domains):
         record = dict(entry)
 
         wheel = wheel_dir / entry["artifact_url"].rsplit("/", 1)[-1]
