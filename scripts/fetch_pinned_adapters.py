@@ -19,6 +19,9 @@ _LOCK_KINDS = {"adapter", "owner-dependency", "shared-dependency"}
 _CANONICAL_VUORO_SOURCE_REPOSITORY = "https://github.com/bayleafwalker/vuoro"
 _SHARED_DEPENDENCY_DISTRIBUTIONS = {"vuoro-schema-runtime", "vuoro-adapter-kit"}
 _REQUIRED_DOMAINS = {"work", "audit"}
+# Admitted but not yet required: knowledge (vuoro-workspace) becomes required
+# in the same change that pins its first release (P1b follow-up).
+_ADMITTED_DOMAINS = _REQUIRED_DOMAINS | {"knowledge"}
 _DESCRIPTOR_FIELDS = {
     "domain", "lock_id", "dependency_lock_ids", "adapter_module", "register",
     "api_version", "schema_version",
@@ -94,7 +97,9 @@ def artifact_pins(manifest: object) -> list[tuple[str, dict[str, str]]]:
     descriptors = manifest["runtime_descriptors"]
     if not all(isinstance(descriptor, dict) for descriptor in descriptors):
         raise SystemExit("runtime descriptors must be objects")
-    if len(descriptors) != len(_REQUIRED_DOMAINS):
+    if len(descriptors) != len({
+        descriptor.get("domain") for descriptor in descriptors
+    }):
         raise SystemExit("composition contains duplicate runtime domains")
     if any(
         set(descriptor) != _DESCRIPTOR_FIELDS
@@ -103,8 +108,12 @@ def artifact_pins(manifest: object) -> list[tuple[str, dict[str, str]]]:
         for descriptor in descriptors
     ):
         raise SystemExit("runtime descriptor fields do not match the v3 contract")
-    if {descriptor["domain"] for descriptor in descriptors} != _REQUIRED_DOMAINS:
-        raise SystemExit("composition must pin exactly work and audit")
+    if not (
+        _REQUIRED_DOMAINS
+        <= {descriptor["domain"] for descriptor in descriptors}
+        <= _ADMITTED_DOMAINS
+    ):
+        raise SystemExit("composition must pin work and audit, and may pin knowledge")
     referenced: list[str] = []
     primary_references: dict[str, int] = {}
     dependency_references: dict[str, int] = {}

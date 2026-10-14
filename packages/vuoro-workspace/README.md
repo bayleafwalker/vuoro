@@ -19,10 +19,13 @@ and versioned artifacts, with publication state, held in the PostgreSQL
   resolved by `vuoro-knowledge`. A workspace item may *cite* a repository
   document (`repository_document` relation with repository, commit and path);
   it never writes or mirrors one.
-- **Not here yet:** the Vuoro adapter registering `knowledge.*.v1`
-  operations and service composition (P1b), deployment, DSNs, buckets and
-  credentials (P1c, appservice). Runtime code never runs DDL; only
-  `vuoro-workspace migrate` (the migration role) does.
+- **Vuoro adapter (P1b):** `vuoro_workspace.vuoro_adapter` registers 18
+  `knowledge.*-v1` operations; composition, configuration and the release/pin
+  follow-up are in
+  [`docs/architecture/knowledge-workspace-composition.md`](../../docs/architecture/knowledge-workspace-composition.md).
+- **Not here:** deployment, DSNs, buckets and credentials (P1c, appservice).
+  Runtime code never runs DDL; only `vuoro-workspace migrate` (the migration
+  role) does.
 
 ## Use
 

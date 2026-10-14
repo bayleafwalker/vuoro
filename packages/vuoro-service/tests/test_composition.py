@@ -619,7 +619,7 @@ def test_artifact_verification_fails_closed_on_mismatch(tmp_path: Path) -> None:
     raw["runtime_descriptors"] = [raw["runtime_descriptors"][0]]
     path = tmp_path / "manifest.json"
     path.write_text(json.dumps(raw), encoding="utf-8")
-    with pytest.raises(CompositionError, match="exactly"):
+    with pytest.raises(CompositionError, match="must pin work and audit"):
         CompositionManifest.load(path)
     raw = json.loads(source.read_text(encoding="utf-8"))
     raw["release_locks"][0]["artifact_sha256"] = hashlib.sha256(artifact.read_bytes()).hexdigest()
