@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vuoro-workspace"
+version = "0.1.0"
+description = "Knowledge workspace store: workspace collections with reviewed revisions, versioned artifacts and publication state in the PostgreSQL knowledge schema plus a pluggable object store (docs/plans/2026-10-14-knowledge-workspace-phase0.md)."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "psycopg[binary]>=3.2,<4",
+  "vuoro-schema-runtime",
+]
+
+[project.scripts]
+vuoro-workspace = "vuoro_workspace.cli:main"
+
+[project.optional-dependencies]
+s3 = ["boto3>=1.34,<2"]
+pdf = ["pypdf>=4,<7"]
+test = ["pytest>=8.3,<9"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vuoro_workspace"]
+
+[tool.uv.sources]
+vuoro-schema-runtime = { workspace = true }

@@ -17,11 +17,17 @@ their domain repositories.
   belong here.
 - Sprintctl, actionq, kctl, and auditctl retain their respective work,
   execution, knowledge, and audit semantics.
-- `packages/vuoro-knowledge/` resolves Git-authored documentation and records
-  which sources were supplied to work. Git owns the documents, the catalog is
+- `packages/vuoro-knowledge/` resolves Git-authored repository documentation
+  and records which sources were supplied to work. Git owns the documents, the catalog is
   a rebuildable projection, and manifests bind through the existing evidence
   path. It holds no review, approval or publication state, and its metadata
   grants no authority (`docs/architecture/knowledge-resolution.md`).
+- `packages/vuoro-workspace/` owns the knowledge workspace domain: workspace
+  collections (membership and roles, revisions, proposals and review,
+  artifact versions, publication state), the PostgreSQL `knowledge` schema
+  and its migrations, and the object store. It never writes or mirrors
+  Git-authored repository documentation; it may only cite it
+  (`docs/plans/2026-10-14-knowledge-workspace-phase0.md`).
 
 ## Runtime invariants
 
@@ -43,6 +49,7 @@ uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests
 uv run --package vuoro-mcp-edge --extra test pytest packages/vuoro-mcp-edge/tests
 uv run --package vuoro-reconciler --extra test pytest packages/vuoro-reconciler/tests
 uv run --package vuoro-knowledge --extra test pytest packages/vuoro-knowledge/tests
+VUORO_WORKSPACE_TEST_PG_BIN=/usr/lib/postgresql/16/bin uv run --package vuoro-workspace --extra test pytest packages/vuoro-workspace/tests
 uv run --package vuoro-knowledge vuoro-knowledge validate --root . --errors-only
 uv build --package vuoro-client --wheel --out-dir dist/vuoro-client
 uv build --package vuoro-service --wheel --out-dir dist/vuoro-service

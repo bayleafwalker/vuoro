@@ -30,6 +30,24 @@ jobs:
           uv pip check --python /tmp/vuoro-demo-conformance/bin/python
           VUORO_DEMO_TEST_PG_BIN=/usr/lib/postgresql/16/bin \
             /tmp/vuoro-demo-conformance/bin/python -m pytest packages/vuoro-demo/tests -q
+  workspace-store:
+    # Knowledge workspace store against a disposable PostgreSQL 16 cluster.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v8.3.2
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install disposable PostgreSQL 16 tools
+        run: sudo apt-get update && sudo apt-get install -y postgresql-16
+      - run: uv sync --all-packages --all-extras
+      - name: Workspace store, migrations and Phase 1 failure scenarios
+        run: >-
+          VUORO_WORKSPACE_TEST_PG_BIN=/usr/lib/postgresql/16/bin
+          uv run --package vuoro-workspace --extra test pytest packages/vuoro-workspace/tests -ra
+      - run: uv build --package vuoro-workspace --wheel --out-dir dist/vuoro-workspace
   test:
     runs-on: ubuntu-latest
     steps:
