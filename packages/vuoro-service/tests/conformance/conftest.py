@@ -53,6 +53,8 @@ def inbox_provider(request):
     url = request.config.getoption("--inbox-pg-url")
     reason = unavailable_reason(url)
     if reason:
+        if os.environ.get("VUORO_INBOX_CONFORMANCE_PROOF") == "1":
+            pytest.fail("mandatory released-owner inbox conformance cannot run: " + reason)
         pytest.skip(reason)
     binding = SprintctlInboxProvider(url)
     try:
