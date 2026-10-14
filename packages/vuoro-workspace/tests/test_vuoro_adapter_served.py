@@ -568,7 +568,7 @@ def test_pool_replaces_a_dead_idle_connection(served, pg_conn: Any) -> None:
     s.ok("t-reader", "knowledge.workspace.changes-v1", {"workspace_id": s.ws})
     dead = app._idle[0].conn
     pid = dead.info.backend_pid
-    pg_conn.execute("SELECT pg_terminate_backend(%s)", (pid,))
+    pg_conn.execute("SELECT pg_terminate_backend(%s, 5000)", (pid,))  # waits for exit
     s.ok("t-reader", "knowledge.workspace.changes-v1", {"workspace_id": s.ws})
     assert len(app._idle) == 1 and app._idle[0].conn is not dead
     assert dead.closed
@@ -591,7 +591,7 @@ def test_pool_discards_a_connection_broken_mid_call(served) -> None:
     assert app._idle[0].conn is not first
 
 
-def test_more_concurrent_calls_than_pool_slots_all_complete(served, tmp_path: Path) -> None:
+def test_more_concurrent_calls_than_pool_slots_all_complete(served) -> None:
     s = served
     app = KnowledgeApplication(_connect_as(s.dsn, s.role), FsObjectStore(s.objects_root), schema=s.schema,
                                runtime_role=s.role, max_connections=3)
@@ -645,3 +645,60 @@ def test_from_dsn_bounds_connect_and_statement_time(served) -> None:
         assert conn.info.get_parameters().get("connect_timeout") == "5"
     finally:
         conn.close()
+
+
+def test_connection_parameters_keep_dsn_options_and_add_bounds() -> None:
+    from vuoro_workspace.vuoro_adapter import connection_parameters
+
+    merged = connection_parameters("host=db dbname=k options='-c search_path=public' connect_timeout=2 keepalives_idle=7",
+                                   statement_timeout_ms=1000)
+    assert merged["options"] == "-c search_path=public -c statement_timeout=1000"
+    assert merged["connect_timeout"] == "2" and merged["keepalives_idle"] == "7"
+    plain = connection_parameters("host=db dbname=k")
+    assert plain["options"] == "-c statement_timeout=30000" and plain["connect_timeout"] == 5
+    assert plain["keepalives"] == 1 and plain["keepalives_count"] == 3
+
+
+def test_from_dsn_preserves_dsn_options_on_a_real_connection(served) -> None:
+    from psycopg.conninfo import make_conninfo
+
+    s = served
+    dsn = make_conninfo(s.dsn, user=s.role, password=RUNTIME_PASSWORD, options="-c lock_timeout=4321")
+    app = KnowledgeApplication.from_dsn(dsn, FsObjectStore(s.objects_root), schema=s.schema, runtime_role=s.role)
+    conn = app._connect()
+    try:
+        assert conn.execute("SHOW lock_timeout").fetchone()[0] == "4321ms"
+        assert conn.execute("SHOW statement_timeout").fetchone()[0] == "30s"
+    finally:
+        conn.close()
+
+
+def test_a_non_inheriting_member_of_the_owner_role_is_refused(served, pg_conn: Any) -> None:
+    s = served
+    owner, member = f"{s.schema}_owner", f"{s.schema}_noinherit"
+    pg_conn.execute(f'CREATE ROLE "{owner}" NOLOGIN')
+    pg_conn.execute(f'ALTER SCHEMA "{s.schema}" OWNER TO "{owner}"')
+    pg_conn.execute(f"CREATE ROLE \"{member}\" LOGIN NOINHERIT PASSWORD '{RUNTIME_PASSWORD}'")
+    pg_conn.execute(f'GRANT "{owner}" TO "{member}"')
+    # Ordinary runtime grants, so only the owner membership can fail the gate.
+    pg_conn.execute(f'GRANT USAGE ON SCHEMA "{s.schema}" TO "{member}"')
+    pg_conn.execute(f'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA "{s.schema}" TO "{member}"')
+    try:
+        app = KnowledgeApplication(_connect_as(s.dsn, member), FsObjectStore(s.objects_root), schema=s.schema,
+                                   runtime_role=member)
+        report = app.compatibility()
+        assert report["compatible"] is False and "runtime_role_owns_schema" in report["reasons"]
+    finally:
+        pg_conn.execute(f'ALTER SCHEMA "{s.schema}" OWNER TO CURRENT_USER')
+        pg_conn.execute(f'DROP OWNED BY "{member}"')
+        pg_conn.execute(f'DROP ROLE IF EXISTS "{member}"')
+        pg_conn.execute(f'DROP ROLE IF EXISTS "{owner}"')
+
+
+def test_a_store_released_after_close_is_closed_not_pooled(served) -> None:
+    s = served
+    app = s.application
+    with app._store() as store:
+        app.close()
+        conn = store.conn
+    assert app._idle == [] and conn.closed

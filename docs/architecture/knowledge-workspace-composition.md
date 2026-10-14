@@ -115,7 +115,9 @@ records how the domain is bound, configured, migrated and released.
   Connections come from a bounded pool of runtime-role connections (8 by
   default). A caller waits at most 10 s for a free connection; after that it
   gets `knowledge-unavailable` (503). Each connection has a 5 s
-  `connect_timeout` and a 30 s `statement_timeout`. Before an idle
+  `connect_timeout`, a 30 s `statement_timeout` (appended to any `options`
+  already in the DSN, which are kept) and TCP keepalives (30 s idle, 3 probes
+  10 s apart), so a dead network path is detected in about a minute. Before an idle
   connection is reused, the pool probes it with `SELECT 1` and replaces it
   if it is dead. The pool also discards a connection after any non-domain
   failure. The store's schema check runs once, when a pooled connection is
@@ -159,7 +161,8 @@ equal the configured `VUORO_KNOWLEDGE_RUNTIME_ROLE`. If the runtime role is
 unset, schema-runtime's `role_not_configured` makes the check fail closed.
 The gate further rejects a connection that owns the schema or is a member of
 its owner role (`runtime_role_owns_schema`, checked with
-`pg_has_role(current_user, nspowner, 'USAGE')`), and a connection that is a
+`pg_has_role(current_user, nspowner, 'MEMBER')`, which also covers
+non-inheriting membership), and a connection that is a
 superuser (`runtime_role_is_superuser`).
 
 ## Migration entrypoint

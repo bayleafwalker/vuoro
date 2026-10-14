@@ -485,6 +485,29 @@ CONNECT_TIMEOUT_SECONDS = 5
 STATEMENT_TIMEOUT_MS = 30_000
 
 
+#: TCP keepalives so a dead network path is detected in about a minute rather
+#: than the OS default (~2 h): statement_timeout is server-enforced and cannot
+#: end a wait on a blackholed socket.
+KEEPALIVE_PARAMETERS = {"keepalives": 1, "keepalives_idle": 30, "keepalives_interval": 10, "keepalives_count": 3}
+
+
+def connection_parameters(dsn: str, *, connect_timeout: int = 5, statement_timeout_ms: int = 30_000) -> dict[str, Any]:
+    """Merge the served bounds into a DSN without discarding what it already sets.
+
+    An ``options`` value in the DSN is kept and the statement timeout appended;
+    a ``connect_timeout`` or keepalive setting in the DSN wins over the default.
+    """
+    from psycopg.conninfo import conninfo_to_dict
+
+    params: dict[str, Any] = dict(conninfo_to_dict(dsn))
+    timeout = f"-c statement_timeout={int(statement_timeout_ms)}"
+    params["options"] = " ".join(filter(None, [params.get("options"), timeout]))
+    params.setdefault("connect_timeout", connect_timeout)
+    for key, value in KEEPALIVE_PARAMETERS.items():
+        params.setdefault(key, value)
+    return params
+
+
 class PoolExhaustedError(RuntimeError):
     """No pooled connection became free within the acquire timeout."""
 
@@ -601,6 +624,7 @@ class KnowledgeApplication:
         self._slots = threading.BoundedSemaphore(max_connections)
         self._idle: list[WorkspaceStore] = []
         self._lock = threading.Lock()
+        self._closed = False
 
     @classmethod
     def from_dsn(
@@ -618,10 +642,9 @@ class KnowledgeApplication:
             import psycopg
 
             return psycopg.connect(
-                dsn,
+                **connection_parameters(dsn, connect_timeout=connect_timeout,
+                                        statement_timeout_ms=statement_timeout_ms),
                 autocommit=True,
-                connect_timeout=connect_timeout,
-                options=f"-c statement_timeout={int(statement_timeout_ms)}",
             )
 
         return cls(connect, object_store, **kwargs)
@@ -636,7 +659,7 @@ class KnowledgeApplication:
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT r.rolsuper AS superuser, "
-                    "coalesce((SELECT pg_has_role(current_user, n.nspowner, 'USAGE') FROM pg_namespace n "
+                    "coalesce((SELECT pg_has_role(current_user, n.nspowner, 'MEMBER') FROM pg_namespace n "
                     "WHERE n.nspname = %s), false) AS owner "
                     "FROM pg_roles r WHERE r.rolname = current_user",
                     (self.schema,),
@@ -688,8 +711,9 @@ class KnowledgeApplication:
         conn = store.conn
         if healthy and not conn.closed and not getattr(conn, "broken", False):
             with self._lock:
-                self._idle.append(store)
-            return
+                if not self._closed:
+                    self._idle.append(store)
+                    return
         _close_quietly(conn)
 
     @contextmanager
@@ -714,6 +738,7 @@ class KnowledgeApplication:
 
     def close(self) -> None:
         with self._lock:
+            self._closed = True
             idle, self._idle = self._idle, []
         for store in idle:
             store.close()
