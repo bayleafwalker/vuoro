@@ -114,21 +114,38 @@ cutover or with the M4 expansion.
 These are two runtime types under two principals, which meets M1's exit
 condition.
 
+Observation sources:
+
+- **Adapter.** It reports `observed` on each poll and `reachable` for channel
+  `opencode-serve` after each successful serve health check. It reports
+  `executing` per live run. Each observation is valid for three times the poll
+  interval.
+- **Sender.** agentops Claude Code hooks provide it. SessionStart registers
+  the workstation instance. UserPromptSubmit reports `observed`, and
+  `attended` too, because a submitted prompt is explicit evidence that a human
+  is present. Both are valid for 15 minutes.
+- **When either runtime stops,** its facts go `stale` and none reads `false`.
+
 ### 2.3 Launch recovery
 
 Neither harness offers idempotent launch, so the adapter uses mechanism 2
 (discovery by a stable correlation identifier), backed by the owner:
 
 1. The adapter persists a processing record before any external act.
-2. It records `accepted` at the store. Only one instance of the principal can
-   win.
+2. It authorizes against its local policy file: allowed senders, repositories
+   and kinds, plus a launches-enabled switch. It honours `not_after`. It
+   records `accepted` or `refused` at the store, and only one instance of the
+   principal can win.
 3. It registers the run with key `inbox.<message_id>`. Retries converge on one
    `run_id`.
-4. It persists the launch intent, then creates the OpenCode session titled
+4. Immediately before launch it re-reads the policy and the message's
+   receipts. A denial or a `cancel-requested` closes the message with
+   `result-linked` `not-started` (contract §3.3).
+5. It persists the launch intent, then creates the OpenCode session titled
    `vuoro-msg:<message_id>`, then persists the session id.
-5. On restart, a launch intent without a session id is resolved by title
-   search. If found, it is adopted. If not found, it becomes `ambiguous`. That
-   is shown in the adapter's status and the store's receipts, and it is
+6. On restart, a launch intent without a session id is resolved by title
+   search. If found, it is adopted. If not found, the adapter records
+   `launch-ambiguous` at the store and shows it in its own status. It is
    **never relaunched automatically**.
 
 Duplicate computation stays possible if someone relaunches by hand. Duplicate
@@ -180,6 +197,8 @@ enabled.
 4. No principal revocation appears in the directory. The `work:evidence`
    reuse is noted in §2.5.
 5. `opencode serve` crash and restart behavior is not yet measured.
+6. Instances of one principal are not separately authenticated (contract §1).
+   Per-instance credential subjects are an M3 prerequisite.
 
 ## 5. Estimate for M0 to M2c
 

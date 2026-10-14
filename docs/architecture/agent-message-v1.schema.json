@@ -33,7 +33,10 @@
       "const": "continue"
     },
     "mode": {
-      "const": "request"
+      "enum": [
+        "request",
+        "delegation"
+      ]
     },
     "context": {
       "type": "object",
@@ -132,5 +135,5 @@
     "created_at"
   ],
   "additionalProperties": false,
-  "$comment": "body.text maxLength counts characters; the 16 KiB UTF-8 and 64 KiB canonical-envelope limits are enforced by the store (contract section 3.1)."
+  "$comment": "body.text maxLength counts characters; the 16 KiB UTF-8 and 64 KiB canonical-envelope limits are enforced by the store (contract section 3.1). mode 'delegation' is schema-valid and refused by the store in v1 (mode-not-supported)."
 }
