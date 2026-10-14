@@ -14,6 +14,7 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.responses import JSONResponse, Response
 
 from vuoro_service import __version__
+from vuoro_service.body_limit import DEFAULT_INVOKE_BODY_LIMIT_BYTES, InvokeBodyLimitMiddleware
 from vuoro_service.catalog import (
     CatalogRegistry,
     InvocationInputValidationError,
@@ -85,6 +86,7 @@ class ServiceSettings:
     compatibility_state: Literal["compatible", "degraded", "incompatible"] = "degraded"
     client_protocol_minimum: int = 1
     client_protocol_maximum: int = 1
+    invoke_body_limit_bytes: int = DEFAULT_INVOKE_BODY_LIMIT_BYTES
 
 
 def _protocol_version(request: Request) -> int | None:
@@ -159,6 +161,7 @@ def create_app(
     app.state.settings = settings
     app.state.registry = registry
     app.state.metrics = metrics
+    app.add_middleware(InvokeBodyLimitMiddleware, limit_bytes=settings.invoke_body_limit_bytes)
 
     @app.exception_handler(RequestValidationError)
     async def invalid_request_envelope(

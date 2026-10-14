@@ -1,4 +1,4 @@
-"""Pinned two-domain (work, audit) Vuoro service composition.
+"""Pinned Vuoro service composition: work and audit, plus knowledge when pinned.
 
 The service accepts domain adapters only through the checked-in composition
 manifest. Deployment supplies runtime DSNs and an environment-bound identity
@@ -48,6 +48,15 @@ from vuoro_service.project_binding import (
 
 
 _REQUIRED_DOMAINS = frozenset({"work", "audit"})
+#: Domains the manifest may pin. ``knowledge`` (the vuoro-workspace owner
+#: adapter, docs/architecture/knowledge-workspace-composition.md) is admitted
+#: with its full runtime contract but cannot be *required* until its first
+#: release is pinned: the change that adds that release lock also moves it
+#: into ``_REQUIRED_DOMAINS``. Admission is decided by the immutable manifest
+#: baked into the image, never by deployment configuration.
+_ADMITTED_DOMAINS = _REQUIRED_DOMAINS | frozenset({"knowledge"})
+_KNOWLEDGE_ADAPTER_MODULE = "vuoro_workspace.vuoro_adapter"
+_KNOWLEDGE_REGISTER = "register_knowledge_catalog"
 _DEPLOYABLE_ENVIRONMENT_CLASSES = frozenset({"development", "production"})
 _DEFAULT_PROJECT_BINDINGS_PATH = Path("/opt/vuoro/composition/project-bindings.json")
 _CLOUD_PROJECT_BINDINGS_PATH = Path("/etc/vuoro/bindings/bindings.json")
@@ -362,9 +371,12 @@ class CompositionManifest:
                     "with differing digests"
                 )
             filename_digests[filename] = lock.artifact_sha256
-        if {descriptor.domain for descriptor in descriptors} != _REQUIRED_DOMAINS:
-            raise CompositionError("composition must pin exactly work and audit")
-        if len(descriptors) != len(_REQUIRED_DOMAINS):
+        domains = {descriptor.domain for descriptor in descriptors}
+        if not _REQUIRED_DOMAINS <= domains <= _ADMITTED_DOMAINS:
+            raise CompositionError(
+                "composition must pin work and audit, and may pin knowledge"
+            )
+        if len(descriptors) != len(domains):
             raise CompositionError("composition contains duplicate runtime domains")
         by_id = {lock.lock_id: lock for lock in locks}
         referenced: list[str] = []
@@ -967,6 +979,60 @@ def _load_function(pin: AdapterPin) -> Callable[..., Any]:
     return function
 
 
+def _compose_knowledge(
+    pin: AdapterPin, registry: CatalogRegistry, environ: Mapping[str, str]
+) -> DomainCompatibility:
+    """Register the pinned knowledge workspace adapter and gate its schema.
+
+    The gate is the owner's read-only compatibility check: startup never
+    migrates (only the operator ``vuoro-workspace migrate`` entrypoint, run as
+    the migration role, executes DDL), and ``VUORO_WORKSPACE_SCHEMA_MODE`` is
+    not consulted on this path.
+    """
+
+    if (
+        pin.adapter_module != _KNOWLEDGE_ADAPTER_MODULE
+        or pin.register != _KNOWLEDGE_REGISTER
+    ):
+        raise CompositionError(
+            "knowledge: manifest does not select the owner adapter registration"
+        )
+    register = _load_function(pin)
+    from vuoro_workspace.vuoro_adapter import (
+        KnowledgeApplication,
+        object_store_from_uri,
+    )
+
+    dsn = _runtime_env(
+        "VUORO_KNOWLEDGE_RUNTIME_DSN", environ, aliases=("VUORO_KNOWLEDGE_DSN",)
+    )
+    try:
+        object_store = object_store_from_uri(
+            _runtime_env("VUORO_KNOWLEDGE_OBJECT_STORE", environ), environ
+        )
+    except (ValueError, RuntimeError, OSError) as error:
+        raise CompositionError(f"knowledge: {error}") from error
+    schema = environ.get("VUORO_KNOWLEDGE_SCHEMA") or "knowledge"
+    # Required, never defaulted to the connecting role: the role check is what
+    # keeps an owner/migration DSN from serving (fail-closed role_not_configured).
+    runtime_role = _runtime_env("VUORO_KNOWLEDGE_RUNTIME_ROLE", environ)
+    application = KnowledgeApplication.from_dsn(
+        dsn, object_store, schema=schema, runtime_role=runtime_role
+    )
+    register(registry, application)
+    try:
+        record = application.compatibility()
+    except Exception as error:  # connection failures are reported, never retried here
+        record = {"compatible": False, "reason": f"knowledge runtime unavailable: {type(error).__name__}"}
+    if record.get("compatible") and record.get("domain_api_version") != pin.api_version:
+        record = {
+            **record,
+            "compatible": False,
+            "reason": "knowledge store API version does not match the composition pin",
+        }
+    return _compatibility("knowledge", record, pin)
+
+
 def create_composed_app(
     *,
     manifest_path: Path | None = None,
@@ -1185,6 +1251,10 @@ def create_composed_app(
         "work": work_state,
         "audit": audit_state,
     }
+    if any(pin.domain == "knowledge" for pin in manifest.adapters):
+        domains["knowledge"] = _compose_knowledge(
+            manifest.pin("knowledge"), registry, environ
+        )
     incompatible = [name for name, state in domains.items() if state.state != "compatible"]
     if incompatible:
         raise CompositionError("runtime compatibility failed for: " + ", ".join(incompatible))

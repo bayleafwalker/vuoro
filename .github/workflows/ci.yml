@@ -45,7 +45,7 @@ jobs:
       - run: uv sync --all-packages --all-extras
       - name: Workspace store, migrations and Phase 1 failure scenarios
         run: >-
-          VUORO_WORKSPACE_TEST_PG_BIN=/usr/lib/postgresql/16/bin
+          VUORO_WORKSPACE_REQUIRE_PG=1 VUORO_WORKSPACE_TEST_PG_BIN=/usr/lib/postgresql/16/bin
           uv run --package vuoro-workspace --extra test pytest packages/vuoro-workspace/tests -ra
       - run: uv build --package vuoro-workspace --wheel --out-dir dist/vuoro-workspace
   test:
@@ -151,6 +151,27 @@ jobs:
           uv pip check --python /tmp/vuoro-released-two-domain-wheel/bin/python
           /tmp/vuoro-released-two-domain-wheel/bin/python \
             scripts/validate_released_catalog_composition.py
+      - name: Exercise three-domain catalog with the local knowledge owner wheel
+        # vuoro-workspace is not released yet: until its pin lands, the
+        # knowledge adapter is the wheel built from this checkout, composed
+        # with the pinned released work and audit owners.
+        shell: bash
+        run: |
+          uv build --package vuoro-workspace --wheel --out-dir dist/vuoro-workspace
+          uv venv --python 3.12 /tmp/vuoro-knowledge-three-domain-wheel
+          uv pip install --no-config --python /tmp/vuoro-knowledge-three-domain-wheel/bin/python \
+            dist/vuoro-service/*.whl \
+            'httpx>=0.27,<1' 'click>=8.1' 'psycopg[binary]>=3.2,<4'
+          uv pip install --no-config --python /tmp/vuoro-knowledge-three-domain-wheel/bin/python \
+            --no-deps \
+            dist/adapters/vuoro_adapter_kit-*.whl \
+            dist/adapters/vuoro_schema_runtime-*.whl \
+            dist/adapters/sprintctl-*.whl \
+            dist/adapters/auditctl-*.whl \
+            dist/vuoro-workspace/*.whl
+          uv pip check --python /tmp/vuoro-knowledge-three-domain-wheel/bin/python
+          /tmp/vuoro-knowledge-three-domain-wheel/bin/python \
+            scripts/validate_knowledge_catalog_composition.py
       - run: python -m json.tool vuoro.dispatch.json >/dev/null
 
   settlement-scenario:

@@ -272,6 +272,11 @@ def test_s9_reconcile_reports_missing_objects_and_orphans_two_pass(env):
     assert second["orphans"] == [{"object_key": orphan_key, "size": 11, "reason": "no-row",
                                   "status": "pending-second-pass"}]
     assert e.objects.head(orphan_key) is not None  # never deleted on the first sighting
+    # An immediate second pass is not a confirmation: grace must pass since the first sighting.
+    again = e.store.reconcile(e.admin, e.ws, grace=timedelta(days=1), delete_orphans=True)
+    assert again["orphans"][0]["status"] == "pending-second-pass"
+    assert e.objects.head(orphan_key) is not None
+    e.clock.advance(days=1)
     third = e.store.reconcile(e.admin, e.ws, grace=timedelta(days=1), delete_orphans=True)
     assert third["orphans"][0]["status"] == "deleted"
     assert e.objects.head(orphan_key) is None

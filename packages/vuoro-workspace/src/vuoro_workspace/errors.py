@@ -14,6 +14,7 @@ OBJECT_MISSING = "object-missing"
 RESERVATION_EXPIRED = "reservation-expired"
 INVALID_CURSOR = "invalid-cursor"
 IMPORT_INVALID = "import-invalid"
+TOO_LARGE = "payload-too-large"
 
 
 class WorkspaceError(Exception):
