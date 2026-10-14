@@ -1085,6 +1085,7 @@ def create_composed_app(
     def make_member_application(repo_id: str) -> WorkApplication:
         member_store = work_pg.get_connection(work_dsn)
         member_store.repo_id = repo_id
+        member_store.remote_schema_version = getattr(work_store, "remote_schema_version", None)
         return WorkApplication.postgres(member_store)
 
     def make_project_application(
@@ -1147,7 +1148,18 @@ def create_composed_app(
     _bind_work_resource_visibility(
         registry, work_application, work_resource_observation_authorizer
     )
-    work_state = _compatibility("work", work_migrations.compatibility_handshake(work_store), work_pin)
+    work_handshake = work_migrations.compatibility_handshake(work_store)
+    work_state = _compatibility("work", work_handshake, work_pin)
+    if work_state.state == "compatible":
+        # The owner gates schema-additive operations (run invocation receipts
+        # at 23, the agent directory and inbox at 25) on the schema version
+        # its runtime store observed. Record the read-only handshake result,
+        # as the owner's own runtime startup does; this never migrates. The
+        # catalog is already registered, so it still derives only from the
+        # released artifacts.
+        remote_schema = work_handshake.get("remote_schema")
+        if isinstance(remote_schema, Mapping):
+            work_store.remote_schema_version = remote_schema.get("actual")
 
     audit_pin = manifest.pin("audit")
     from auditctl.vuoro_adapter import VuoroAuditAdapter

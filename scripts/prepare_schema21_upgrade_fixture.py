@@ -13,11 +13,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
     parser.add_argument("--artifact-cache", type=Path)
+    parser.add_argument("--closure", choices=("schema21", "schema22"), default="schema21",
+                        help="old closure fixture pair under packages/vuoro-service/tests/fixtures")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     fixtures = root / "packages/vuoro-service/tests/fixtures"
-    manifest = fixtures / "schema21-adapter-pins.json"
-    service = json.loads((fixtures / "schema21-service.json").read_text())
+    manifest = fixtures / f"{args.closure}-adapter-pins.json"
+    service = json.loads((fixtures / f"{args.closure}-service.json").read_text())
     pins = json.loads(manifest.read_text())["release_locks"]
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)

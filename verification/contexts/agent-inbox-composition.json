@@ -1,0 +1,121 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.agent-inbox-composition",
+  "owner_repo": "vuoro",
+  "subject": "released Sprintctl 0.19.0 schema-25 owner composition, inbox conformance and explicit schema22 to25 upgrade",
+  "contract_ref": {
+    "doc_id": "agent-inbox-composition",
+    "revision": "sha256:c4e379c6a1b3d5876faca197bc84f45ad1e9f21196460370d3ec310553216081"
+  },
+  "source_of_truth": "immutable owner/shared release wheels and installed service catalog",
+  "depth": 2,
+  "backends": [
+    "installed immutable wheel closure",
+    "disposable PostgreSQL16",
+    "source workspace"
+  ],
+  "actors": [
+    "agent principal",
+    "effect applier",
+    "service runtime",
+    "explicit migration operator",
+    "old released service and owner"
+  ],
+  "initial_state": [
+    "service0.1.95 source release candidate",
+    "published Sprintctl0.19.0 with immutable kit0.2.2",
+    "actual hash-pinned service0.1.93/Sprintctl0.18.0 closure at schema22",
+    "no production state or endpoint"
+  ],
+  "operations": [
+    {
+      "name": "attest and verify released composition",
+      "actors": [
+        "service runtime"
+      ]
+    },
+    {
+      "name": "inbox contract against reference and released owner",
+      "actors": [
+        "agent principal"
+      ],
+      "synchronization": "disposable inbox_conformance database; owner test clock; held-commit concurrency hook"
+    },
+    {
+      "name": "explicit schema22 to25 CLI migration",
+      "actors": [
+        "explicit migration operator",
+        "old released service and owner"
+      ],
+      "synchronization": "separate runtime and migration roles; sequential refusal, migration and readiness"
+    },
+    {
+      "name": "serve preserved attempt and schema25 directory through composed runtime",
+      "actors": [
+        "effect applier",
+        "agent principal"
+      ],
+      "synchronization": "sequential API history after migration"
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "release identity, preserved owner rows, served inbox contract and runtime-only roles"
+  },
+  "assumptions": {
+    "isolation": "disposable loopback PostgreSQL; sequential API histories except the contract's held-commit scenario",
+    "clock": "owner inbox test clock honoured only on a database commented disposable",
+    "fairness": "none"
+  },
+  "bounds": {
+    "work_operations": 97,
+    "audit_operations": 5,
+    "catalog_operations": 102,
+    "previous_unchanged_operations": 80,
+    "inbox_owner_scenarios": 31,
+    "concurrent_operations": 2
+  },
+  "invariants": [
+    "actual wheel hashes and installed versions match pins",
+    "all previous work operation definitions unchanged",
+    "new composition refuses schema22 at startup and performs no DDL",
+    "migration only through explicit sprintctl remote-schema migrate with the migration role; idempotent rerun",
+    "pre-existing work and audit rows preserved across migration and serving",
+    "runtime roles lack DDL and migration-role membership",
+    "old service and old owner refuse schema25",
+    "released owner satisfies every inbox contract scenario the reference satisfies"
+  ],
+  "faults": [
+    "old schema at new startup",
+    "repeated migration",
+    "runtime DDL attempt",
+    "old closure against migrated schema",
+    "libpq routing overrides in fixture URLs",
+    "unavailable owner binding under mandatory proof"
+  ],
+  "oracles": [
+    "installed pip check and exact metadata/catalog fingerprints",
+    "test_actual_schema22_refusal_explicit25_cli_migration_and_runtime_ddl_denial",
+    "test_inbox_contract.py with 31 executed sprintctl-bound cases",
+    "existing released bound-proposal/evidence/attempt HTTP conformance",
+    "existing schema21 closure migration conformance retargeted to schema25"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-service/composition/adapter-pins.json",
+    "packages/vuoro-service/src/vuoro_service/composition.py",
+    "scripts/validate_released_work_adapter.py",
+    "scripts/validate_released_catalog_composition.py",
+    "scripts/prepare_schema21_upgrade_fixture.py",
+    "packages/vuoro-service/tests/fixtures/schema22-adapter-pins.json",
+    "packages/vuoro-service/tests/fixtures/schema22-service.json",
+    "packages/vuoro-service/tests/conformance/test_schema25_composition_migration.py",
+    "packages/vuoro-service/tests/conformance/test_schema22_composition_migration.py",
+    "packages/vuoro-service/tests/conformance/test_inbox_contract.py",
+    "packages/vuoro-service/tests/conformance/inbox_sprintctl_binding.py",
+    ".github/workflows/ci.yml"
+  ],
+  "expansions": [
+    "semantic-doc",
+    "fault-scenario"
+  ]
+}

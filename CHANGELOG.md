@@ -10,6 +10,21 @@ recorded here.
   require an explicit authorized selection when the assertion covers multiple
   repositories; the gateway assertion and grant model are unchanged.
 
+- vuoro-service 0.1.95 candidate: composes the released Sprintctl 0.19.0
+  owner (work schemas 23 to 25) with its adapter-kit 0.2.2 dependency.
+  Ten agent directory and inbox operations, `work.agent.*` and
+  `work.message.*`, are added, along with run invocation receipts and
+  acceptance/basis reads. The result is a 102-operation catalog in which
+  every previous descriptor is unchanged. Composition now records the work
+  schema version that its read-only startup handshake observed, so the owner
+  serves its schema-gated operations. Startup still runs no DDL. The 0.1.93
+  closure at schema 22 must be migrated explicitly with
+  `sprintctl remote-schema migrate`, and CI qualifies that path from the
+  actual old wheels. The inbox conformance suite runs against the released
+  owner in CI. Auditctl 0.1.9, schema-runtime 0.1.0 and client 0.1.2 stay
+  pinned. Rollout is separate deployment work. vuoro-shared stays the
+  authoritative inbox store until Q1(b).
+
 - vuoro-service 0.1.94 / vuoro-mcp-edge 0.1.7 candidate: adds caller-bound
   `explain_acceptance` using the pinned operator-projection 0.2.5 release.
   The tool requires both work-read and effect-read authorities, checks read

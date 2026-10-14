@@ -24,6 +24,14 @@ from .test_bound_proposal_http import assert_installed_composition
 
 pytestmark = pytest.mark.essential_safety
 
+# Tables the explicit migration from the schema-21 closure creates: 22 attempt
+# facts, 23 run/invocation correlations, 25 agent directory and inbox. The
+# preserved-row comparison covers every table that existed before migration.
+POST21_TABLES = ('work_effect_attempt', 'work_effect_attempt_event',
+                 'work_run_invocation_binding', 'work_run_invocation_attempt',
+                 'agent_instance', 'agent_declaration_revision', 'agent_observation',
+                 'agent_inbox_counter', 'agent_message', 'agent_message_receipt')
+
 
 def validate_fixture_urls(urls):
     """Refuse libpq query routing overrides before opening any connection."""
@@ -155,7 +163,7 @@ s.conn.close()
             tables=[r[0] for r in conn.execute("SELECT tablename FROM pg_tables WHERE schemaname='work' ORDER BY tablename")]
             rows={}
             for table in tables:
-                if table in ('schema_version','work_effect_attempt','work_effect_attempt_event'):continue
+                if table in ('schema_version',*POST21_TABLES):continue
                 values=conn.execute(sql.SQL('SELECT to_jsonb(t) FROM {} t').format(sql.Identifier(table))).fetchall()
                 rows[table]=sorted((r[0] for r in values),key=lambda v:json.dumps(v,sort_keys=True))
             return rows
@@ -214,7 +222,7 @@ else:
     store=pg.get_connection(migration);store.repo_id='agentops'
     try:
         migrated=pg_migrations.migrate_schema(store)
-        assert migrated['from_version']==21 and migrated['to_version']==22 and migrated['applied_versions']==[22]
+        assert migrated['from_version']==21 and migrated['to_version']==25 and migrated['applied_versions']==[22,23,24,25]
         assert pg_migrations.migrate_schema(store)['applied_versions']==[]
     finally:store.conn.close()
     grants()
@@ -223,18 +231,18 @@ else:
         response=client.get('/api/meta/v1/handshake',headers={'X-Vuoro-Client-Protocol':'1'})
         assert response.status_code==200,response.json()
         handshake=response.json()
-        assert handshake['service_version']=='0.1.94' and handshake['compatibility']['state']=='compatible'
+        assert handshake['service_version']=='0.1.95' and handshake['compatibility']['state']=='compatible'
         assert all(x['state']=='compatible' for x in handshake['compatibility']['domains'].values())
         catalog=client.get('/api/catalog/v1',headers={'X-Vuoro-Client-Protocol':'1'}).json()
-        assert len(catalog['operations'])==85
-        assert handshake['catalog_revision']=='4230516fcb775d72e14dfa774c8395a9f50ad5b640ccd9134648a8c659f22af3'
+        assert len(catalog['operations'])==102
+        assert handshake['catalog_revision']=='fd49d79de14a0ec630dde511928cc76e3aceb2e159266f883dcbe6ab14853d2b'
         response=client.get('/health/ready')
         assert response.status_code==200
     with psycopg.connect(runtime) as conn:
         role=conn.execute('SELECT rolsuper,rolcreatedb,rolcreaterole,rolreplication,rolbypassrls FROM pg_roles WHERE rolname=current_user').fetchone()
         assert not any(role)
         assert not conn.execute("SELECT pg_has_role(current_user,%s,'MEMBER')",(migration_role,)).fetchone()[0]
-        assert conn.execute('SELECT version FROM schema_version').fetchone()[0]==22
+        assert conn.execute('SELECT version FROM schema_version').fetchone()[0]==25
         assert not conn.execute("SELECT has_schema_privilege(current_user,'work','CREATE')").fetchone()[0]
         for table in ('work_effect_attempt','work_effect_attempt_event'):
             assert conn.execute('SELECT has_table_privilege(current_user,%s,%s)',(table,'SELECT,INSERT,UPDATE,DELETE')).fetchone()[0]
@@ -257,7 +265,7 @@ else:
             response=client.post('/api/invoke/v1',headers={'X-Vuoro-Client-Protocol':'1',
                 'Authorization':'Bearer '+'a'*40},json={'schema_version':'invocation/v1',
                 'request_id':uuid.uuid4().hex,'repo_id':'agentops',
-                'catalog_revision':'4230516fcb775d72e14dfa774c8395a9f50ad5b640ccd9134648a8c659f22af3',
+                'catalog_revision':'fd49d79de14a0ec630dde511928cc76e3aceb2e159266f883dcbe6ab14853d2b',
                 'operation':operation,'arguments':arguments})
             assert response.status_code==200,response.json()
             return response.json()['result']

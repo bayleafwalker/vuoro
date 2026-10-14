@@ -2,10 +2,12 @@ import os
 import pytest
 from .reference import ReferenceProvider
 from .sprintctl_binding import SprintctlProvider
+from .inbox_reference import ReferenceInboxProvider
 
 
 def pytest_addoption(parser):
     parser.addoption("--lease-pg-url", default=os.environ.get("LEASE_CONFORMANCE_PG_URL"))
+    parser.addoption("--inbox-pg-url", default=os.environ.get("INBOX_CONFORMANCE_PG_URL"))
 
 
 def pytest_configure(config):
@@ -15,6 +17,11 @@ def pytest_configure(config):
 
 
 def pytest_generate_tests(metafunc):
+    if "inbox_provider" in metafunc.fixturenames:
+        providers = ["reference"]
+        if metafunc.config.getoption("--inbox-pg-url"):
+            providers.append("sprintctl")
+        metafunc.parametrize("inbox_provider", providers, indirect=True)
     if "provider" in metafunc.fixturenames:
         providers = ["reference"]
         if metafunc.config.getoption("--lease-pg-url") is not None:
@@ -35,3 +42,22 @@ def provider(request):
             yield binding
         finally:
             binding.close()
+
+
+@pytest.fixture
+def inbox_provider(request):
+    if request.param == "reference":
+        yield ReferenceInboxProvider()
+        return
+    from .inbox_sprintctl_binding import SprintctlInboxProvider, unavailable_reason
+    url = request.config.getoption("--inbox-pg-url")
+    reason = unavailable_reason(url)
+    if reason:
+        if os.environ.get("VUORO_INBOX_CONFORMANCE_PROOF") == "1":
+            pytest.fail("mandatory released-owner inbox conformance cannot run: " + reason)
+        pytest.skip(reason)
+    binding = SprintctlInboxProvider(url)
+    try:
+        yield binding
+    finally:
+        binding.close()

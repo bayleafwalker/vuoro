@@ -1,0 +1,102 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.agent-inbox-composition",
+  "contract_ref": {
+    "doc_id": "agent-inbox-composition",
+    "revision": "sha256:c4e379c6a1b3d5876faca197bc84f45ad1e9f21196460370d3ec310553216081"
+  },
+  "implementation_sha": "f02cbe65e7e45830bf9ef737c266c9213c07aca7",
+  "depth": 2,
+  "environment": {
+    "backend": "actual immutable installed owner/shared wheels and locally built service wheel; actual service0.1.93 closure; disposable PostgreSQL16",
+    "isolation": "loopback disposable roles/databases; no production endpoint or state",
+    "tool_versions": {
+      "python": "3.12.14",
+      "pytest": "8.4.2",
+      "postgresql": "16.15"
+    }
+  },
+  "execution": {
+    "seed": null,
+    "histories": 4,
+    "bounds": {
+      "installed_http_passed": 47,
+      "schema22_to25_upgrade_passed": 8,
+      "schema21_to25_upgrade_passed": 8,
+      "inbox_contract_passed": 62,
+      "inbox_owner_bound_passed": 31,
+      "conformance_dir_with_owner_passed": 131,
+      "full_workspace_passed": 2223,
+      "full_workspace_skipped": 70,
+      "four_wheels_built": true
+    },
+    "faults_exercised": [
+      "old schema at new startup",
+      "repeated migration",
+      "runtime DDL attempt",
+      "old closure against migrated schema",
+      "libpq routing overrides in fixture URLs"
+    ]
+  },
+  "claims": [
+    {
+      "property": "Exact owner release closure with kit0.2.2; unchanged80 previous work definitions plus17 additive operations; 97work/5audit catalog, revision fd49d79de14a0ec630dde511928cc76e3aceb2e159266f883dcbe6ab14853d2b",
+      "result": "example-tested",
+      "evidence": [
+        "scripts/validate_released_work_adapter.py",
+        "scripts/validate_released_audit_adapter.py",
+        "scripts/validate_released_catalog_composition.py",
+        "packages/vuoro-service/composition/adapter-pins.json"
+      ]
+    },
+    {
+      "property": "Actual service0.1.93/Sprintctl0.18.0 schema22 store is refused by the new startup without DDL, migrates 23-25 exactly once only through explicit sprintctl remote-schema migrate, then serves the 102-operation catalog, the preserved attempt and the agent directory with runtime DDL refused and old service/owner refusing schema25",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/tests/conformance/test_schema25_composition_migration.py"
+      ]
+    },
+    {
+      "property": "Composed runtime serves owner schema-gated inbox operations only after recording its compatible read-only handshake; without that record the owner answered owner-capability-unavailable",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/src/vuoro_service/composition.py",
+        "packages/vuoro-service/tests/conformance/test_schema25_composition_migration.py"
+      ]
+    },
+    {
+      "property": "Released owner passes all31 provider-neutral inbox contract scenarios alongside the reference provider",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/tests/conformance/test_inbox_contract.py",
+        "packages/vuoro-service/tests/conformance/inbox_sprintctl_binding.py"
+      ]
+    },
+    {
+      "property": "Existing bound proposal, evidence, attempt, lease, resource, ledger and settlement scenarios pass on the released0.19.0 owner; schema21 closure gate migrates to25",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/tests/conformance/test_bound_proposal_http.py",
+        "packages/vuoro-service/tests/conformance/test_evidence_evaluation_http.py",
+        "packages/vuoro-service/tests/conformance/test_effect_attempt_http.py",
+        "packages/vuoro-service/tests/conformance/test_schema22_composition_migration.py",
+        "scripts/settlement_scenario.py"
+      ]
+    },
+    {
+      "property": "Production deployment, live vuoro-shared migration or owner completion under this candidate",
+      "result": "unknown",
+      "evidence": [
+        "docs/architecture/agent-inbox-composition.md"
+      ]
+    }
+  ],
+  "counterexamples": [],
+  "notes": [
+    "Anonymous downloaded owner wheel SHA 6d819cf6... and kit0.2.2 SHA 6d78c2f0... match pins; service0.1.93 wheel SHA db3bdba3... matches the GitHub release asset digest.",
+    "Auditctl0.1.9 metadata still names kit0.2.0 by URL; the installed closure with kit0.2.2 passes uv pip check and the audit validator.",
+    "Full workspace skips are unconfigured PostgreSQL extras; the owner-backed steps were run separately against disposable PostgreSQL16.",
+    "No production, served, deployment, merge, tag, release or task closure action performed.",
+    "implementation_sha identifies source/context commit; result is a subsequent evidence-only commit."
+  ]
+}
