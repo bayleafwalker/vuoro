@@ -119,7 +119,9 @@ def test_uncertain_effects_classifies_and_links_work(journal):
     attempts = [
         attempt("A", "redeemed"),                                    # PR redeemed, no report
         attempt("B", "redeemed", intent=INTENT_B, report={"commit_sha": COMMIT, "pr_url": "https://x/pull/1"}),
-        attempt("D", "accepted", intent="intent_" + "D" * 26),       # unredeemed, nothing in journal
+        attempt("D", "accepted", intent="intent_" + "D" * 26),       # unredeemed, not in the journal
+        attempt("H", "accepted", intent=INTENT_A, operation="push_branch"),  # linked, but spent
+        attempt("J", "accepted", intent=INTENT_B),                   # linked, PR never marked spent
         attempt("E", "accepted", intent=INTENT_B, operation="push_branch"),  # unredeemed but journal spent
         attempt("F", "sealed_unused", intent="intent_" + "F" * 26),
     ]
@@ -130,7 +132,11 @@ def test_uncertain_effects_classifies_and_links_work(journal):
     assert by_id["attempt_" + "A" * 26]["classification"] == "provider-outcome-needed"
     assert by_id["attempt_" + "A" * 26]["journal"]["spent"] == ["branch-create", "pr-create"]
     assert by_id["attempt_" + "B" * 26]["classification"] == "reported"
-    assert by_id["attempt_" + "D" * 26]["classification"] == "safe-to-seal"
+    assert by_id["attempt_" + "D" * 26]["classification"] == "provider-outcome-needed"
+    assert by_id["attempt_" + "D" * 26]["journal_link"] == "unlinked"
+    assert by_id["attempt_" + "H" * 26]["classification"] == "provider-outcome-needed"
+    assert by_id["attempt_" + "J" * 26]["classification"] == "safe-to-seal"
+    assert by_id["attempt_" + "J" * 26]["journal_link"] == "linked"
     assert by_id["attempt_" + "E" * 26]["classification"] == "provider-outcome-needed"
     assert "journal-transmission-marker-without-redemption" in by_id["attempt_" + "E" * 26]["anomalies"]
     assert by_id["attempt_" + "F" * 26]["classification"] == "closed-unused"
@@ -182,28 +188,82 @@ def remote(tmp_path):
     return bare, head, tmp_path / "original.bundle"
 
 
+def _pulls(*pulls):
+    calls = []
+
+    def get(url, headers):
+        calls.append((url, dict(headers)))
+        return 200, list(pulls)
+
+    get.calls = calls
+    return get
+
+
 def test_push_outcome_is_read_from_the_remote_without_writing(remote, tmp_path):
     bare, head, _ = remote
+    attempt_id = "attempt_" + "A" * 26
     refs_before = _git("for-each-ref", cwd=bare)
+
+    def check(entry, http_get=_pulls(), **kwargs):
+        return provider_outcome_check(attempt_id, source_for(entry), journal_dir=None, remote=str(bare),
+                                      http_get=http_get, **kwargs)
+
     applied = attempt("A", "redeemed", operation="push_branch")
     applied["authorization"]["target"]["commit_sha"] = head
-    result = provider_outcome_check("attempt_" + "A" * 26, source_for(applied), journal_dir=None, remote=str(bare))
+    result = check(applied)
     assert result.result["provider_outcome"] == "applied"
     assert result.result["next_step"].startswith("applied at the provider")
     assert _git("for-each-ref", cwd=bare) == refs_before
 
-    absent = attempt("A", "redeemed", operation="push_branch", branch="vuoro-effect/missing")
-    result = provider_outcome_check("attempt_" + "A" * 26, source_for(absent), journal_dir=None, remote=str(bare))
-    assert result.result["provider_outcome"] == "not-observed"
-    assert "replay never re-grants" in result.result["next_step"]
+    # Absent now is not "not applied": the branch may have been deleted after merge.
+    gone = attempt("A", "redeemed", operation="push_branch", branch="vuoro-effect/missing")
+    gone["authorization"]["target"]["commit_sha"] = head
+    result = check(gone)
+    assert result.result["provider_outcome"] == "unknown" and result.status == "error"
+    assert "do not seal" in result.result["next_step"]
+    merged = {"number": 3, "html_url": "https://github.com/bayleafwalker/vuoro/pull/3", "state": "closed",
+              "merged_at": "2026-10-01T00:00:00Z", "head": {"sha": head}, "base": {"ref": "main"}}
+    result = check(gone, _pulls(merged))
+    assert result.result["provider_outcome"] == "applied"
+    closed = {**merged, "merged_at": None}
+    assert check(gone, _pulls(closed)).result["provider_outcome"] == "unknown"
 
     unredeemed = attempt("A", "accepted", operation="push_branch", branch="vuoro-effect/missing")
-    result = provider_outcome_check("attempt_" + "A" * 26, source_for(unredeemed), journal_dir=None, remote=str(bare))
-    assert "attempt-seal-unused-v1" in result.result["next_step"]
+    result = check(unredeemed)
+    assert result.result["provider_outcome"] == "unknown"
+    assert "seal-unused" not in result.result["next_step"]
 
-    conflict = attempt("A", "redeemed", operation="push_branch")
-    result = provider_outcome_check("attempt_" + "A" * 26, source_for(conflict), journal_dir=None, remote=str(bare))
-    assert result.result["provider_outcome"] == "conflict"
+    # A head that moved after the push needs review; it is not a conflict verdict.
+    moved = attempt("A", "redeemed", operation="push_branch")
+    result = check(moved)
+    assert result.result["provider_outcome"] == "needs-review"
+    assert "do not re-dispatch" in result.result["next_step"]
+
+
+def test_github_token_only_goes_to_the_default_api(remote):
+    bare, head, _ = remote
+    entry = attempt("A", "redeemed")
+    entry["authorization"]["target"]["commit_sha"] = head
+    default = _pulls()
+    provider_outcome_check("attempt_" + "A" * 26, source_for(entry), journal_dir=None, remote=str(bare),
+                           github_token="secret", http_get=default)
+    assert default.calls[0][1] == {"Authorization": "Bearer secret"}
+    other = _pulls()
+    result = provider_outcome_check("attempt_" + "A" * 26, source_for(entry), journal_dir=None, remote=str(bare),
+                                    github_token="secret", github_api="https://ghe.example", http_get=other)
+    assert other.calls[0][1] == {} and "github-token-withheld-from-non-allowlisted-api" in result.unknowns
+    allowed = _pulls()
+    provider_outcome_check("attempt_" + "A" * 26, source_for(entry), journal_dir=None, remote=str(bare),
+                           github_token="secret", github_api="https://ghe.example", allow_token_for_api=True,
+                           http_get=allowed)
+    assert allowed.calls[0][1] == {"Authorization": "Bearer secret"}
+
+
+def test_ls_remote_refuses_option_shaped_operands():
+    from vuoro_service.ops.effects import ls_remote_head
+
+    assert ls_remote_head("--upload-pack=touch /tmp/x", "main") == (None, "refused-remote-or-branch")
+    assert ls_remote_head("https://example.invalid/r.git", "-x") == (None, "refused-remote-or-branch")
 
 
 def test_pull_request_outcome_and_signed_artifact(remote, tmp_path):
@@ -248,3 +308,8 @@ def test_pull_request_outcome_and_signed_artifact(remote, tmp_path):
     result = provider_outcome_check("attempt_" + "A" * 26, source_for(redeemed), journal_dir=journal,
                                     remote=str(bare), http_get=lambda url, headers: (502, None))
     assert result.result["provider_outcome"] == "unknown" and result.status == "error"
+    moved = {"number": 7, "html_url": "u", "state": "open", "merged_at": None, "head": {"sha": "9" * 40},
+             "base": {"ref": "main"}}
+    result = provider_outcome_check("attempt_" + "A" * 26, source_for(redeemed), journal_dir=journal,
+                                    remote=str(bare), http_get=lambda url, headers: (200, [moved]))
+    assert result.result["provider_outcome"] == "needs-review"

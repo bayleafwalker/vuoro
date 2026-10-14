@@ -9,7 +9,9 @@ proving the check runs as the runtime role against the restored copy.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+import stat
 import subprocess
 from urllib.parse import urlsplit
 
@@ -23,12 +25,14 @@ try:
     BINS = pg_bin_dir()
 except RestoreRefused:
     BINS = None
-pytestmark = pytest.mark.skipif(BINS is None, reason="PostgreSQL binaries (initdb/pg_ctl/pg_restore) not available")
+    if os.environ.get("VUORO_OPS_REQUIRE_PG16") == "1":
+        raise
+pytestmark = pytest.mark.skipif(BINS is None, reason="PostgreSQL 16 binaries (initdb/pg_ctl/pg_restore) not available")
 
 
 def psql(cluster, sql, database="postgres"):
     completed = subprocess.run(
-        [str(BINS / "psql"), "-X", "-v", "ON_ERROR_STOP=1", "-h", "127.0.0.1", "-p", str(cluster["port"]),
+        [str(BINS / "psql"), "-X", "-v", "ON_ERROR_STOP=1", "-h", cluster["socket_dir"], "-p", str(cluster["port"]),
          "-U", cluster["admin"], "-d", database, "-At", "-c", sql], capture_output=True, text=True, check=True)
     return completed.stdout.strip()
 
@@ -49,10 +53,10 @@ def dump(tmp_path_factory):
                      "GRANT USAGE ON SCHEMA work TO work_runtime; GRANT SELECT ON work.schema_version TO work_runtime; "
                      "GRANT USAGE ON SCHEMA audit TO audit_runtime; "
                      "GRANT SELECT ON audit.schema_migration TO audit_runtime", "src")
-        subprocess.run([str(BINS / "pg_dump"), "-Fc", "-h", "127.0.0.1", "-p", str(source["port"]),
+        subprocess.run([str(BINS / "pg_dump"), "-Fc", "-h", source["socket_dir"], "-p", str(source["port"]),
                         "-U", source["admin"], "-d", "src", "-f", str(path)], check=True)
-        source_port = source["port"]
-    return path, source_port
+        source_socket = source["socket_dir"]
+    return path, source_socket
 
 
 def reading_probe(script, env):
@@ -61,7 +65,7 @@ def reading_probe(script, env):
     domains = {}
     for domain, table in (("work", "schema_version"), ("audit", "schema_migration")):
         dsn = env[f"VUORO_OPS_{domain.upper()}_DSN"]
-        assert urlsplit(dsn).hostname == "127.0.0.1"
+        assert urlsplit(dsn).hostname is None and "host=%2F" in dsn  # Unix socket only, never TCP
         completed = subprocess.run([str(BINS / "psql"), "-X", "-At", dsn, "-c",
                                     f"SELECT current_user || ':' || max(version) FROM {table}"],
                                    capture_output=True, text=True)
@@ -80,7 +84,7 @@ def test_dump_roles_are_extracted_from_ownership_and_grants():
 
 
 def test_restore_runs_the_pinned_check_as_runtime_roles_on_a_throwaway_copy(dump):
-    path, source_port = dump
+    path, source_socket = dump
     seen = {}
 
     def probe(script, env):
@@ -96,8 +100,8 @@ def test_restore_runs_the_pinned_check_as_runtime_roles_on_a_throwaway_copy(dump
     assert body["compatibility"]["roles"] == {"work": "work_runtime", "audit": "audit_runtime"}
     assert body["compatibility"]["domains"]["work"]["schema"] == {"actual": 25}
     assert body["live_database_touched"] is False and body["restore"]["cluster_torn_down"] is True
-    restore_port = urlsplit(seen["VUORO_OPS_WORK_DSN"]).port
-    assert restore_port != source_port
+    assert source_socket.replace("/", "%2F") not in seen["VUORO_OPS_WORK_DSN"]
+    assert body["restore"]["restored_as"] == "vuoro_ops_restorer" and body["restore"]["restorer_superuser"] is False
     pins = json.loads(seen["VUORO_OPS_PINS"])
     assert pins["sprintctl"] and pins["auditctl"]
     assert {"kind": "dump", "id": "sha256:" + body["restore"]["dump_sha256"]} in result.work_refs
@@ -113,6 +117,62 @@ def test_incompatible_restored_state_is_attention(dump):
 
     result = isolated_restore(path, manifest_path=PINS, probe_runner=probe, bin_dir=BINS)
     assert result.status == "attention" and result.result["compatibility"]["state"] == "incompatible"
+
+
+def test_cluster_is_socket_only_in_a_private_directory():
+    with disposable_cluster(BINS) as cluster:
+        assert stat.S_IMODE(os.stat(cluster["socket_dir"]).st_mode) == 0o700
+        assert psql(cluster, "SHOW listen_addresses") == ""
+        assert psql(cluster, "SELECT rolsuper FROM pg_roles WHERE rolname = current_user") == "t"
+    assert not os.path.exists(cluster["socket_dir"]) and not os.path.exists(cluster["root"])
+
+
+def test_missing_runtime_role_never_falls_back_to_a_superuser(dump):
+    path, _ = dump
+    seen = {}
+
+    def probe(script, env):
+        seen.update(env)
+        observation = reading_probe(script, {**env, "VUORO_OPS_AUDIT_DSN": env["VUORO_OPS_WORK_DSN"]})
+        observation["domains"].pop("audit")
+        return observation
+
+    result = isolated_restore(path, manifest_path=PINS, probe_runner=probe, bin_dir=BINS,
+                              roles={"audit": "audit_reader_missing"})
+    assert "VUORO_OPS_AUDIT_DSN" not in seen
+    assert result.result["compatibility"]["roles"]["audit"] is None
+    assert "runtime-role-absent-from-dump:audit:audit_reader_missing" in result.unknowns
+    assert result.status == "attention"
+
+
+def test_superuser_only_statements_cannot_run_during_restore(tmp_path):
+    """Superuser-only DDL in a dump fails the restore: the restorer is not a superuser.
+
+    An event trigger stands in for the class (COPY ... TO PROGRAM, untrusted
+    languages): all need superuser, so none executes on this host.
+    """
+    path = tmp_path / "hostile.dump"
+    with disposable_cluster(BINS) as source:
+        psql(source, "CREATE ROLE app LOGIN SUPERUSER")  # a superuser-owned source; never on restore
+        psql(source, "CREATE DATABASE src OWNER app")
+        psql(source, "SET ROLE app; CREATE FUNCTION et() RETURNS event_trigger LANGUAGE plpgsql AS $$ BEGIN END $$; "
+                     "RESET ROLE; CREATE EVENT TRIGGER e ON ddl_command_start EXECUTE FUNCTION et(); "
+                     "ALTER EVENT TRIGGER e OWNER TO app", "src")
+        subprocess.run([str(BINS / "pg_dump"), "-Fc", "-h", source["socket_dir"], "-p", str(source["port"]),
+                        "-U", source["admin"], "-d", "src", "-f", str(path)], check=True)
+    result = isolated_restore(path, manifest_path=PINS, probe_runner=reading_probe, bin_dir=BINS)
+    assert result.status == "error" and result.result["restore"]["pg_restore_exit"] != 0
+    assert "event trigger" in result.result["restore"]["pg_restore_error"]
+
+
+def test_a_non_16_bin_dir_is_refused(tmp_path):
+    fake = tmp_path / "bin"
+    fake.mkdir()
+    for name in ("initdb", "pg_restore"):
+        (fake / name).write_text("#!/bin/sh\necho 'initdb (PostgreSQL) 15.4'\n")
+        (fake / name).chmod(0o755)
+    with pytest.raises(RestoreRefused):
+        pg_bin_dir(fake)
 
 
 def test_without_pinned_owners_the_check_is_an_unknown(dump, monkeypatch):

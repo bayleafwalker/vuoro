@@ -14,13 +14,14 @@ from pathlib import Path
 import stat
 from typing import Any
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 
 from vuoro_service import __version__
 
 from .result import DiagnosticResult, composition_pins_sha256, load_pins
-from .runtime import ImageRunner, ProbeError, probe_source, tls_context
+from .runtime import ImageRunner, ProbeError, open_without_redirects, probe_source
 
 CLIENT_PROTOCOL = 1
 PROFILE_SCHEMA_VERSION = "vuoro-client-profile/v1"
@@ -52,8 +53,9 @@ def load_served_profile(path: Path) -> ServedProfile:
     if target.get("environment_class") == "production" and raw.get("production_endpoint_denied"):
         raise ProbeRefused("profile denies its production endpoint")
     endpoint = target.get("endpoint")
-    if not isinstance(endpoint, str) or not endpoint.startswith(("https://", "http://127.0.0.1", "http://localhost")):
-        raise ProbeRefused("profile endpoint must be https (or loopback http)")
+    if not isinstance(endpoint, str):
+        raise ProbeRefused("profile endpoint must be a URL")
+    validate_endpoint(endpoint)
     return ServedProfile(
         profile_id=raw["id"],
         endpoint=endpoint.rstrip("/"),
@@ -62,6 +64,23 @@ def load_served_profile(path: Path) -> ServedProfile:
         environment_class=target["environment_class"],
         required_authorities=tuple(raw.get("required_authorities") or ()),
     )
+
+
+LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def validate_endpoint(endpoint: str) -> None:
+    """https anywhere, or plain http only to an exact loopback host; never userinfo."""
+    parsed = urllib.parse.urlsplit(endpoint)
+    if parsed.username is not None or parsed.password is not None or "@" in parsed.netloc:
+        raise ProbeRefused("profile endpoint must not carry userinfo")
+    if parsed.query or parsed.fragment or not parsed.hostname:
+        raise ProbeRefused("profile endpoint must be scheme://host[:port][/path]")
+    if parsed.scheme == "https":
+        return
+    if parsed.scheme == "http" and parsed.hostname in LOOPBACK_HOSTS:
+        return
+    raise ProbeRefused("profile endpoint must be https, or http to exactly localhost/127.0.0.1/::1")
 
 
 def resolve_file_credential(ref: str) -> str:
@@ -97,7 +116,7 @@ def urllib_transport(endpoint: str, *, timeout: float = 20.0) -> Transport:
                      **({"Content-Type": "application/json"} if data else {}), **headers},
         )
         try:
-            with urllib.request.urlopen(request, timeout=timeout, context=tls_context()) as response:  # noqa: S310 - profile https
+            with open_without_redirects(request, timeout=timeout) as response:
                 status, payload = response.status, response.read()
         except urllib.error.HTTPError as error:
             status, payload = error.code, error.read()

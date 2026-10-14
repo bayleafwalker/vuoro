@@ -90,19 +90,28 @@ class FakeServer:
         return 200, {"status": "accepted", "result": {"items": []}}
 
 
+def _attestation(tmp_path: Path) -> Path:
+    path = tmp_path / "installed-composition.json"
+    path.write_text(json.dumps({"schema_version": "vuoro-installed-composition/v1", "verified": True,
+                                "manifest_sha256": PINS_SHA, "distributions": []}))
+    return path
+
+
 def _document(result: DiagnosticResult, tmp_path: Path, attestation: Path | None = None) -> dict:
-    return result.document(manifest_path=PINS, attestation_path=attestation or tmp_path / "absent.json")
+    return result.document(manifest_path=PINS, attestation_path=attestation or _attestation(tmp_path))
 
 
 def test_envelope_carries_pins_digest_and_validates(tmp_path):
     document = _document(DiagnosticResult("role-probe", "1", "ok", {"x": 1},
-                                          work_refs=[{"kind": "work-item", "id": "1"}] * 2), tmp_path)
+                                          work_refs=[{"kind": "work-item", "id": "1"}] * 2), tmp_path,
+                         tmp_path / "absent.json")
     assert document["schema_version"] == "vuoro-diagnostic-result/v1"
     assert document["composition"]["pins_sha256"] == PINS_SHA
     assert document["composition"]["manifest_valid"] is True
     assert {lock["distribution"] for lock in document["composition"]["locks"]} >= {"sprintctl", "auditctl"}
     assert document["work_refs"] == [{"kind": "work-item", "id": "1"}]
     assert "installed-composition-attestation-absent" in document["unknowns"]
+    assert document["status"] == "attention"  # an unknown never leaves a result ok
     with pytest.raises(ValueError):
         DiagnosticResult("role-probe", "1", "maybe", {}).document(manifest_path=PINS)
     with pytest.raises(jsonschema.ValidationError):
@@ -136,6 +145,7 @@ def test_role_probe_matches_pins_and_observes_authorities_read_only(tmp_path):
     authorities = document["result"]["required_authorities"]
     assert authorities["work:read"]["state"] == "granted"
     assert authorities["work:evidence"] == {"probe_operation": "work.evidence.list", "state": "granted", "status": 200}
+    assert document["unknowns"] == []
     invoked = [body["operation"] for method, _, body in server.requests if method == "POST"]
     assert "work.item.done" not in invoked
 
@@ -160,6 +170,50 @@ def test_reader_refuses_non_read_operations(tmp_path):
     reader = ServedReader(load_served_profile(_profile(tmp_path)), FakeServer(), "test-token")
     with pytest.raises(ProbeRefused):
         reader.read("work.item.done", {"id": 1}, repo_id="agentops")
+
+
+@pytest.mark.parametrize("endpoint", [
+    "http://localhost.evil.example", "http://127.0.0.1.nip.io", "http://user:pw@localhost",
+    "https://token@vuoro.invalid", "ftp://localhost", "http://10.0.0.1", "http://localhost/?x=1",
+])
+def test_endpoint_must_be_https_or_exact_loopback_without_userinfo(tmp_path, endpoint):
+    path = _profile(tmp_path, target={"environment_id": "t", "environment_class": "development", "endpoint": endpoint})
+    with pytest.raises(ProbeRefused):
+        load_served_profile(path)
+
+
+@pytest.mark.parametrize("endpoint", ["http://localhost:8080", "http://127.0.0.1", "http://[::1]:9", "https://v.invalid/x"])
+def test_loopback_and_https_endpoints_are_accepted(tmp_path, endpoint):
+    path = _profile(tmp_path, target={"environment_id": "t", "environment_class": "development", "endpoint": endpoint})
+    assert load_served_profile(path).endpoint == endpoint.rstrip("/")
+
+
+def test_redirects_are_never_followed_with_the_credential():
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    from vuoro_service.ops.served import urllib_transport
+
+    hits = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            hits.append((self.path, self.headers.get("Authorization")))
+            self.send_response(302)
+            self.send_header("Location", "/elsewhere")
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.handle_request, daemon=True)
+    thread.start()
+    status, _ = urllib_transport(f"http://127.0.0.1:{server.server_port}")("GET", "/api/meta/v1/handshake",
+                                                                          {"Authorization": "Bearer t"}, None)
+    thread.join(5)
+    server.server_close()
+    assert status == 302 and hits == [("/api/meta/v1/handshake", "Bearer t")]
 
 
 def test_profile_that_denies_production_is_refused(tmp_path):

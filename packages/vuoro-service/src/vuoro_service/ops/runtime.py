@@ -4,8 +4,8 @@ A probe is one self-contained Python script (stdlib plus whatever the pinned
 image ships) that prints one JSON object.  The same text runs in-process when
 the pinned distributions are installed here, or inside an immutable service
 image through the local container engine.  Images run with ``--rm``, no
-volumes, no network unless handed a loopback DSN, the image's own non-root
-user and a read-only root filesystem.
+volumes except an explicitly mounted socket directory, no network, and a
+read-only root filesystem.
 """
 
 from __future__ import annotations
@@ -14,9 +14,11 @@ from collections.abc import Callable, Mapping
 from importlib.resources import files
 import json
 import os
+import re
 import shutil
 import ssl
 import subprocess
+import urllib.request
 from typing import Any
 
 ImageRunner = Callable[[str, str, Mapping[str, str]], dict[str, Any]]
@@ -42,6 +44,25 @@ def tls_context() -> ssl.SSLContext:
     return ssl.create_default_context()
 
 
+class _RefuseRedirect(urllib.request.HTTPRedirectHandler):
+    """A redirect would resend the bearer credential elsewhere: surface it instead."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D401 - urllib hook
+        return None
+
+
+def open_without_redirects(request: urllib.request.Request, *, timeout: float):
+    """``urlopen`` with verified TLS that never follows a redirect (3xx is an HTTPError)."""
+    opener = urllib.request.build_opener(
+        urllib.request.HTTPSHandler(context=tls_context()), _RefuseRedirect()
+    )
+    return opener.open(request, timeout=timeout)
+
+
+#: An image reference: registry/name[:tag][@sha256:digest]; never an option.
+IMAGE_REF = re.compile(r"^[a-z0-9][a-z0-9._-]*(?::[0-9]+)?(?:/[a-z0-9][a-z0-9._-]*)*(?::[A-Za-z0-9_][A-Za-z0-9_.-]{0,127})?(?:@sha256:[0-9a-f]{64})?$")
+
+
 class ProbeError(RuntimeError):
     """A probe could not produce its JSON observation."""
 
@@ -59,15 +80,34 @@ def container_engine() -> str | None:
 
 
 def run_in_image(
-    image: str, script: str, env: Mapping[str, str], *, timeout: float = 300.0
+    image: str,
+    script: str,
+    env: Mapping[str, str],
+    *,
+    mounts: Mapping[str, str] | None = None,
+    as_invoking_user: bool = False,
+    timeout: float = 300.0,
 ) -> dict[str, Any]:
+    """Run a probe in ``image`` with no network; ``mounts`` are host->container dirs.
+
+    ``as_invoking_user`` runs as this process's uid/gid so a bind-mounted 0700
+    socket directory stays private to the invoking user.
+    """
+    if not IMAGE_REF.fullmatch(image):
+        raise ProbeError("image reference is not a plain registry/name[:tag][@sha256:digest]")
     engine = container_engine()
     if engine is None:
         raise ProbeError("no container engine (podman or docker) is available")
-    # Only a probe handed a (disposable, loopback) DSN needs the host network.
-    network = "host" if any(key.endswith("_DSN") for key in env) else "none"
-    argv = [engine, "run", "--rm", "-i", "--network", network, "--read-only",
+    argv = [engine, "run", "--rm", "-i", "--network", "none", "--read-only",
             "--tmpfs", "/tmp", "--entrypoint", "python"]
+    if as_invoking_user:
+        argv += ["--user", f"{os.getuid()}:{os.getgid()}"]
+        if os.path.basename(engine) == "podman":
+            argv += ["--userns", "keep-id"]
+    for host, container in (mounts or {}).items():
+        if "," in host or "," in container:
+            raise ProbeError("mount paths must not contain commas")
+        argv += ["--mount", f"type=bind,source={host},target={container}"]
     for key, value in env.items():
         argv += ["-e", f"{key}={value}"]
     argv += [image, "-I", "-"]

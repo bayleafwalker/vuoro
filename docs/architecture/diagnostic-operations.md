@@ -33,7 +33,7 @@ printed):
 | `work_refs` | `{kind, id}` links, such as `effect-attempt`, `effect-intent` (`id@revision`), `work-item`, `incident`, `environment`, `candidate-image`, `prior-image` or `dump` (`sha256:`). The operator can add more with `--work-ref KIND:ID`. |
 | `observed_at` | UTC observation time. |
 | `result` | Operation-specific body (below). |
-| `unknowns` | Everything the operation could not establish. An unknown is never silently turned into a pass. |
+| `unknowns` | Everything the operation could not establish. A non-empty list downgrades `ok` to `attention` in every operation, so an unknown is never reported as a pass. |
 
 Every subcommand takes `--pins`, `--attestation`, `--work-ref` and `--output`.
 
@@ -57,8 +57,8 @@ Tampering makes the journal an unknown, never a pass. Classes:
 | Class | Rule |
 | --- | --- |
 | `reported` | Redeemed, and `application_report_received` is recorded. This is an applier claim, not provider proof. |
-| `safe-to-seal` | Never redeemed, and a supplied journal holds no transmission marker for that intent and operation. |
-| `provider-outcome-needed` | Redeemed without a report. Push authorizations never take a report. It also covers an unredeemed attempt with a journal transmission marker (flagged as an anomaly) and an unredeemed attempt checked without a journal. |
+| `safe-to-seal` | Never redeemed, and exactly one journal record links to the intent revision with no transmission marker for that operation. |
+| `provider-outcome-needed` | Redeemed without a report. Push authorizations never take a report. It also covers every unredeemed attempt whose journal link is absent, ambiguous or carries a transmission marker (flagged as an anomaly), and every attempt checked without a journal. Absence of journal evidence is not evidence of no transmission. |
 | `closed-unused` | Already sealed without redemption. |
 
 Sprintctl has no attempt list operation, so enumeration is limited to the
@@ -69,25 +69,46 @@ also lists unsettled journal effects that match no supplied attempt.
 
 ```
 vuoro-ops provider-outcome-check (--profile P | --attempts-export F) --attempt-id A \
-  [--journal DIR] [--artifact-root DIR] [--remote URL] [--github-token-env VAR]
+  [--journal DIR] [--artifact-root DIR] [--remote URL] [--github-token-env VAR] \
+  [--github-api URL [--allow-token-for-github-api]]
 ```
 
 This check establishes one attempt's provider outcome without re-dispatching:
 
-- **Branch.** `git ls-remote --refs <remote> refs/heads/<branch>` is compared
-  with the authorized `commit_sha`.
+- **Branch.** `git ls-remote --refs --end-of-options <remote> refs/heads/<branch>`
+  is compared with the authorized `commit_sha`. Option-shaped remotes and
+  branches are refused.
 - **Pull request.** `GET /repos/{owner}/{repo}/pulls?head=owner:branch&state=all`
-  is compared on head SHA and base branch.
+  is compared on head SHA and base branch, for both push and PR attempts.
+  The token from `--github-token-env` is only sent to `https://api.github.com`,
+  unless `--allow-token-for-github-api` explicitly allows another
+  `--github-api`. Redirects are never followed.
 - **Signed artifact.** For the protected Git path from #220, when the
   artifact root is supplied, the journaled `LOCAL_READY` bundle digest is
   re-hashed and `git bundle list-heads` must contain the journaled commit.
 
-Outcomes are `applied`, `not-observed`, `partially-applied` (branch present,
-no PR), `conflict` or `unknown`. `next_step` states the owner action as text.
+A missing or moved ref never settles to "not applied" on its own:
+
+| Operation | Observation | Outcome |
+| --- | --- | --- |
+| push | branch head is the authorized commit | `applied` |
+| push | branch absent, a merged PR's head is the authorized commit (branch deleted after merge) | `applied` |
+| push | branch absent otherwise | `unknown` |
+| push | branch head is another commit (moved after the push, or another actor) | `needs-review` |
+| PR | a PR from the branch has the authorized head and base | `applied` |
+| PR | a PR exists with another head or base | `needs-review` |
+| PR | no PR ever, branch at the authorized commit | `partially-applied` |
+| PR | no PR ever, branch absent | `not-observed` |
+| PR | no PR ever, branch elsewhere | `needs-review` |
+| any | a lookup failed | `unknown` |
+
+`next_step` states the owner action as text.
 An applied, unreported PR is an applier's `attempt-report-applied-v1`. A
 redeemed, unapplied attempt needs a new intent revision, because replay never
-re-grants dispatch. An unredeemed, unobserved attempt can be sealed by its
-principal. `vuoro-ops` performs none of these.
+re-grants dispatch. Only an unredeemed `safe-to-seal` attempt that is
+`not-observed` is described as sealable by its principal. `unknown` and
+`needs-review` say not to seal, report or re-dispatch. `vuoro-ops` performs
+none of these.
 
 ### `role-probe` and `catalog-probe`
 
@@ -97,7 +118,9 @@ vuoro-ops catalog-probe --profile P [--expected-from-image IMG | --expected-cata
 ```
 
 Both probes use a `vuoro-client-profile/v1` served profile and its 0600
-`file:` credential. Only handshake and catalog `GET` requests are sent, plus
+`file:` credential. The endpoint must be `https`, or `http` to exactly
+`localhost`, `127.0.0.1` or `::1`, without userinfo. Redirects are never
+followed, so the bearer credential is only sent to the profile's endpoint. Only handshake and catalog `GET` requests are sent, plus
 invocations whose catalog semantics are `read`, without an idempotency key.
 The reader refuses anything else.
 
@@ -123,7 +146,8 @@ that image's manifest digest with the local pins. Mismatches are structured
 
 ```
 vuoro-ops migration-preflight --candidate-image IMG@sha256:... --prior-image IMG@sha256:... \
-  --target-schema N [--current-schema N | --profile P --served-image IMG] [--domain work|audit]
+  --target-schema N --migration-job-state STATE \
+  [--current-schema N | --profile P --served-image IMG] [--domain work|audit]
 ```
 
 The preflight reads each image's admitted startup range from the pinned
@@ -131,21 +155,29 @@ owners inside the image: Sprintctl's `MINIMUM/MAXIMUM_SCHEMA_VERSION` and
 Auditctl's `MIN/MAX_RUNTIME_SCHEMA_VERSION`. It also reads each image's
 installed distributions and composition attestation. The current schema is
 taken from the operator, or deduced: a served handshake reporting the domain
-compatible, from an image that admits exactly one version, proves that
-version. The recovery class is computed from these values and never accepted
-as input:
+compatible, from the `--served-image` that admits exactly one version, proves
+that version. Without `--served-image`, the current schema stays unknown. The
+prior image's range is never borrowed for it.
+
+`--migration-job-state` is the observed state of this rollout's migration Job:
+`not-created`, `in-flight`, `complete`, `failed`, or `absent` (the Job cannot
+be observed, so whether it ran is unknown). The recovery class is computed
+from these values and never accepted as input. Any unknown input (the prior
+range, the current schema, or a Job that is `in-flight` or `absent`) yields
+no class and status `error`, never advice:
 
 | Class | When |
 | --- | --- |
-| `cancel` | The current schema is below the target: no change has been applied yet. |
+| `cancel` | The current schema is below the target, the Job is `not-created` or `failed`, and the prior image admits the current schema. If the Job reports `complete` while the schema is below the target, no class is given. |
 | `image-revert` | The target is committed and the prior image's range still admits it. |
 | `forward-fix-or-restore` | The committed schema is outside the prior image's range. Recovery is a compatible forward image or a coordinated restore, not an old-image rollback. |
 
 `recovery_class` is the class at the observed state, and
 `recovery_class_after_commit` is the class once the target commits. The gates
 (`candidate_admits_target`, `prior_admits_current`, `prior_admits_target`,
-`target_not_behind_current`) are reported individually. A failed gate blocks
-the preflight with `error`. `--run-startup-proof` wraps
+`target_not_behind_current`, `migration_job_settled`) are reported
+individually. A failed `candidate_admits_target`, `target_not_behind_current`
+or `prior_admits_current` blocks the preflight with `error`. `--run-startup-proof` wraps
 `scripts/verify_pre_migration_startup.py`, but only where it applies. That
 specialist proof (#2092) has its states fixed at work 5 to 6 and requires
 podman, so any other target reports `not-applicable` instead of a misleading
@@ -170,21 +202,39 @@ vuoro-ops isolated-restore --dump FILE.dump [--owner-image IMG] [--role work=wor
 
 The command accepts a plain `pg_dump -Fc` file and never a connection string.
 Age-encrypted input (an `age-encryption.org/` header) and non-custom archives
-are refused. It initializes a throwaway PostgreSQL cluster (PostgreSQL 16 from
-`VUORO_PG_BIN`, `PATH`, the Nix store or `/usr/lib/postgresql`) in a fresh
-temporary directory. The cluster listens only on 127.0.0.1 at a free port.
-The command recreates every role the dump owns or grants to, restores with
-`--exit-on-error --single-transaction`, and runs the pinned owners' read-only
-startup checks as each domain's runtime role (`<domain>_runtime` by default).
+are refused. It initializes a throwaway PostgreSQL cluster in a fresh
+temporary directory. The binaries must report major version 16 (from
+`--pg-bin`, `VUORO_PG_BIN`, `PATH`, the Nix store or `/usr/lib/postgresql/16`);
+any other version is refused. The cluster has `listen_addresses=''`, so there
+is no TCP. Its Unix socket lives in a private 0700 directory. For an
+`--owner-image` check, that directory is bind-mounted into a container that
+runs with no network as the invoking uid.
+
+The command recreates every role the dump owns or grants to, as non-superuser
+roles. It then restores with `--exit-on-error --single-transaction` as
+`vuoro_ops_restorer`, a non-superuser that is a member of those roles and owns
+the scratch database. Schema owners get `CREATE` on that database, and object
+owners get `CREATE` on its `public` schema, which the owner changes need.
+Superuser-only statements in a dump therefore fail the restore instead of
+running on the host: `COPY ... TO PROGRAM`, untrusted languages, event
+triggers and most extensions. pg_restore itself still parses the archive, so
+restore only dumps from a known producer.
+
+The pinned owners' read-only startup checks then run as each domain's runtime
+role (`<domain>_runtime` by default). A runtime role missing from the dump is
+never replaced by a superuser: that domain is reported unchecked, as an
+unknown with status `attention`.
 These are Sprintctl `compatibility_handshake` and Auditctl
 `check_compatibility`, the same calls `create_composed_app` makes. The cluster
 is then deleted.
 
 The check runs in-process when the pinned distributions are installed at the
 pinned versions, or inside `--owner-image`. Otherwise it is an unknown. The
-result carries the dump digest, TOC size, schemas, created roles, restore exit
-status, per-domain compatibility with the owner's schema range, and
-`live_database_touched: false`.
+result carries the dump digest (hashed as a stream), TOC size, schemas,
+created roles, the restore role, restore exit status, per-domain
+compatibility with the owner's schema range, and `live_database_touched:
+false`. CI sets `VUORO_OPS_REQUIRE_PG16=1`, so these tests fail rather than
+skip when PostgreSQL 16 is missing.
 
 ## Verification
 

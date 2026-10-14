@@ -17,6 +17,7 @@ from typing import Any
 
 from vuoro_service import __version__
 
+from .migration import JOB_STATES
 from .result import DiagnosticResult, default_attestation_path, default_manifest_path, parse_work_ref
 
 _EXIT = {"ok": 0, "attention": 1, "error": 2}
@@ -61,6 +62,8 @@ def build_parser() -> argparse.ArgumentParser:
     outcome.add_argument("--artifact-root", type=Path, help="protected Git artifact root (holds artifacts/<effect_key>/original.bundle)")
     outcome.add_argument("--remote", help="git remote to ls-remote (default: https://github.com/<repository>.git)")
     outcome.add_argument("--github-api", default="https://api.github.com")
+    outcome.add_argument("--allow-token-for-github-api", action="store_true",
+                         help="send the read token to a non-default --github-api (otherwise only api.github.com)")
     outcome.add_argument("--github-token-env", default="GITHUB_TOKEN", help="environment variable holding a read token (optional)")
 
     for name, help_text in (("role-probe", "handshake + identity.current + authority probes against the pins"),
@@ -80,8 +83,10 @@ def build_parser() -> argparse.ArgumentParser:
     preflight.add_argument("--target-schema", type=int, required=True)
     preflight.add_argument("--domain", default="work", choices=("work", "audit"))
     preflight.add_argument("--current-schema", type=int, help="observed current schema version")
+    preflight.add_argument("--migration-job-state", required=True, choices=JOB_STATES,
+                           help="observed state of this rollout's migration Job; absent/in-flight yield no class")
     preflight.add_argument("--profile", type=Path, help="served profile: deduce current schema from the served handshake")
-    preflight.add_argument("--served-image", help="image actually serving (default: --prior-image)")
+    preflight.add_argument("--served-image", help="image actually serving; required to deduce the current schema")
     preflight.add_argument("--run-startup-proof", action="store_true",
                            help="also run scripts/verify_pre_migration_startup.py where it applies")
     preflight.add_argument("--startup-proof-script", type=Path,
@@ -139,7 +144,8 @@ def dispatch(args: argparse.Namespace) -> DiagnosticResult:
         return provider_outcome_check(
             args.attempt_id, _attempt_source(args), journal_dir=args.journal, remote=args.remote,
             artifact_root=args.artifact_root, github_api=args.github_api.rstrip("/"),
-            github_token=os.environ.get(args.github_token_env) or None, work_refs=refs)
+            github_token=os.environ.get(args.github_token_env) or None,
+            allow_token_for_api=args.allow_token_for_github_api, work_refs=refs)
     if args.command == "role-probe":
         from .served import role_probe
 
@@ -166,6 +172,7 @@ def dispatch(args: argparse.Namespace) -> DiagnosticResult:
         result = migration_preflight(
             candidate_image=args.candidate_image, prior_image=args.prior_image,
             target_schema=args.target_schema, domain=args.domain, current_schema=args.current_schema,
+            job_state=args.migration_job_state,
             served_handshake=handshake, served_image=args.served_image,
             run_startup_proof=args.run_startup_proof, startup_proof_script=args.startup_proof_script,
             work_refs=refs)

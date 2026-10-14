@@ -175,11 +175,13 @@ class DiagnosticResult:
             raise ValueError(f"unknown diagnostic status {self.status!r}")
         stamp, stamp_unknowns = composition_stamp(manifest_path, attestation_path)
         unknowns = list(dict.fromkeys([*self.unknowns, *stamp_unknowns]))
+        # Anything not established is never reported as ok.
+        status = "attention" if self.status == "ok" and unknowns else self.status
         document = {
             "schema_version": RESULT_SCHEMA_VERSION,
             "operation": self.operation,
             "version": self.version,
-            "status": self.status,
+            "status": status,
             "composition": stamp,
             "work_refs": _dedupe_refs(self.work_refs),
             "observed_at": observed_at or observed_now(),

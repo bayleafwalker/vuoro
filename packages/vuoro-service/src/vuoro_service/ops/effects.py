@@ -30,14 +30,12 @@ import urllib.parse
 import urllib.request
 
 from .result import DiagnosticResult
-from .runtime import tls_context
+from .runtime import open_without_redirects
 
 ATTEMPT_ID = re.compile(r"^attempt_[0-9A-HJKMNP-TV-Z]{26}$")
 JOURNAL_DB = "journal.sqlite3"
 JOURNAL_TABLES = {"journal_metadata", "effect_bindings", "journal_events", "publication_spent", "applied_outcomes"}
 JOURNAL_OPERATION = {"push_branch": "branch-create", "open_pull_request": "pr-create"}
-TRANSMISSION_EVENT = {"branch-create": "BRANCH_TRANSMISSION_POSSIBLE", "pr-create": "PR_TRANSMISSION_POSSIBLE"}
-OBSERVED_EVENT = {"branch-create": "BRANCH_OBSERVED", "pr-create": "PR_OBSERVED"}
 TERMINAL = {"APPLIED", "REFUSED", "CONFLICT"}
 
 # attempt_id -> (http status, attempt-get result or error body)
@@ -172,14 +170,20 @@ def read_journal(directory: Path) -> dict[str, JournalEffect]:
     return effects
 
 
-def _journal_for(attempt: Mapping[str, Any], journal: Mapping[str, JournalEffect]) -> JournalEffect | None:
+def _journal_link(attempt: Mapping[str, Any], journal: Mapping[str, JournalEffect] | None
+                  ) -> tuple[JournalEffect | None, str]:
+    """``(effect, link)`` with link ``linked``, ``unlinked``, ``ambiguous`` or ``no-journal``."""
+    if journal is None:
+        return None, "no-journal"
     authorization = attempt.get("authorization") or {}
     matches = [
         effect for effect in journal.values()
         if effect.intent_id == authorization.get("intent_id")
         and str(effect.intent_revision) == str(authorization.get("intent_revision"))
     ]
-    return matches[0] if len(matches) == 1 else None
+    if len(matches) == 1:
+        return matches[0], "linked"
+    return None, "ambiguous" if matches else "unlinked"
 
 
 def _attempt_facts(attempt: Mapping[str, Any]) -> dict[str, Any]:
@@ -208,14 +212,14 @@ def classify(attempt: Mapping[str, Any], journal: Mapping[str, JournalEffect] | 
     """Classify one attempt from owner facts and (optional) journal markers.
 
     ``reported``: redeemed and an application report is recorded.
-    ``safe-to-seal``: never redeemed and the journal shows no transmission
-    marker for this intent and provider operation.
+    ``safe-to-seal``: never redeemed, and exactly one journal record links to
+    this intent revision with no transmission marker for the operation.
     ``provider-outcome-needed``: everything that only the provider can settle,
-    including an unredeemed attempt without journal evidence.
+    including an unredeemed attempt with no, or an ambiguous, journal link.
     ``closed-unused``: already sealed without redemption; nothing to do.
     """
     facts = _attempt_facts(attempt)
-    linked = _journal_for(attempt, journal) if journal is not None else None
+    linked, link = _journal_link(attempt, journal)
     operation = JOURNAL_OPERATION.get(facts["provider_operation"] or "")
     marker = bool(linked and operation in linked.spent)
     anomalies: list[str] = []
@@ -235,16 +239,20 @@ def classify(attempt: Mapping[str, Any], journal: Mapping[str, JournalEffect] | 
         if facts["provider_operation"] == "push_branch":
             reasons.append("push authorizations take no application report; only the provider settles them")
     elif state == "accepted":
-        if journal is None:
+        if link != "linked":
+            # Only a uniquely linked journal record can exclude an in-flight
+            # transmission; absence of evidence is not evidence of absence.
             classification = "provider-outcome-needed"
-            reasons.append("unredeemed, but no journal was supplied to exclude an in-flight transmission")
+            reasons.append(f"unredeemed, but the journal link is {link}: an in-flight transmission is not excluded")
+            if link == "ambiguous":
+                anomalies.append("journal-link-ambiguous")
         elif marker:
             classification = "provider-outcome-needed"
             anomalies.append("journal-transmission-marker-without-redemption")
             reasons.append("journal records a possible transmission for an unredeemed authorization")
         else:
             classification = "safe-to-seal"
-            reasons.append("never redeemed and no journal transmission marker")
+            reasons.append("never redeemed, and its uniquely linked journal record has no transmission marker")
     else:
         classification = "provider-outcome-needed"
         anomalies.append(f"unknown-attempt-state:{state}")
@@ -256,6 +264,7 @@ def classify(attempt: Mapping[str, Any], journal: Mapping[str, JournalEffect] | 
         "classification": classification,
         "reasons": reasons,
         "anomalies": anomalies,
+        "journal_link": link,
         "journal": None if linked is None else linked.summary(),
     }
 
@@ -364,7 +373,7 @@ HttpGet = Callable[[str, Mapping[str, str]], tuple[int, Any]]
 def _http_get(url: str, headers: Mapping[str, str]) -> tuple[int, Any]:
     request = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json", **headers})
     try:
-        with urllib.request.urlopen(request, timeout=20, context=tls_context()) as response:  # noqa: S310 - fixed https API base
+        with open_without_redirects(request, timeout=20) as response:
             return response.status, json.loads(response.read() or b"null")
     except urllib.error.HTTPError as error:
         return error.code, None
@@ -379,15 +388,29 @@ def github_repository(repository: str | None) -> str | None:
     return match.group(1) if match else None
 
 
+GITHUB_API = "https://api.github.com"
+_BRANCH = re.compile(r"^(?!-)[A-Za-z0-9._/-]{1,200}$")
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def ls_remote_head(remote: str, branch: str, *, timeout: float = 30.0) -> tuple[str | None, str | None]:
     """The branch head on ``remote`` via ``git ls-remote``; (oid, error)."""
     git = shutil.which("git")
     if git is None:
         return None, "git-not-installed"
+    if remote.startswith("-") or not _BRANCH.fullmatch(branch):
+        return None, "refused-remote-or-branch"
     env = {"GIT_TERMINAL_PROMPT": "0", "PATH": os.environ.get("PATH", ""), "HOME": os.environ.get("HOME", "/")}
     try:
         completed = subprocess.run(
-            [git, "ls-remote", "--refs", remote, f"refs/heads/{branch}"],
+            [git, "ls-remote", "--refs", "--end-of-options", remote, f"refs/heads/{branch}"],
             capture_output=True, text=True, timeout=timeout, check=False, env=env,
         )
     except subprocess.TimeoutExpired:
@@ -398,7 +421,7 @@ def ls_remote_head(remote: str, branch: str, *, timeout: float = 30.0) -> tuple[
         oid, _, ref = line.partition("\t")
         if ref == f"refs/heads/{branch}":
             return oid, None
-    return "", None  # empty string: definitively absent
+    return "", None  # empty string: absent now (not proof it never existed)
 
 
 def _artifact_check(effect: JournalEffect | None, artifact_root: Path | None) -> dict[str, Any]:
@@ -410,14 +433,14 @@ def _artifact_check(effect: JournalEffect | None, artifact_root: Path | None) ->
                 "artifact_sha256": local.get("artifact_sha256")}
     bundle = artifact_root / local["artifact_relative_path"]
     try:
-        raw = bundle.read_bytes()
+        hexdigest = _file_sha256(bundle)
     except OSError:
         return {"state": "artifact-missing", "path": str(bundle)}
-    digest_ok = _sha(raw) == local.get("artifact_sha256") or hashlib.sha256(raw).hexdigest() == local.get("artifact_sha256")
+    digest_ok = local.get("artifact_sha256") in ("sha256:" + hexdigest, hexdigest)
     heads: list[str] = []
     git = shutil.which("git")
     if git is not None:
-        listed = subprocess.run([git, "bundle", "list-heads", str(bundle)], capture_output=True,
+        listed = subprocess.run([git, "bundle", "list-heads", str(bundle.resolve())], capture_output=True,
                                 text=True, timeout=30, check=False)
         heads = [line.split()[0] for line in listed.stdout.splitlines() if line.strip()]
     return {
@@ -429,6 +452,66 @@ def _artifact_check(effect: JournalEffect | None, artifact_root: Path | None) ->
     }
 
 
+def _pull_requests(repo: str | None, branch: str | None, expected: str | None, base_branch: str | None, *,
+                   github_api: str, github_token: str | None, allow_token_for_api: bool,
+                   http_get: HttpGet | None) -> tuple[str, dict[str, Any] | None, list[str]]:
+    """``(state, pull, unknowns)``: state ``matches``/``differs``/``absent``/``unknown``."""
+    if repo is None or not branch:
+        return "unknown", None, ["pull-request-provider-unsupported"]
+    owner = repo.split("/")[0]
+    query = urllib.parse.urlencode({"head": f"{owner}:{branch}", "state": "all", "per_page": "10"})
+    headers: dict[str, str] = {}
+    unknowns: list[str] = []
+    if github_token:
+        if github_api == GITHUB_API or allow_token_for_api:
+            headers["Authorization"] = f"Bearer {github_token}"
+        else:
+            unknowns.append("github-token-withheld-from-non-allowlisted-api")
+    code, pulls = (http_get or _http_get)(f"{github_api}/repos/{repo}/pulls?{query}", headers)
+    if code != 200 or not isinstance(pulls, list):
+        return "unknown", {"error_status": code}, [*unknowns, "pull-request-lookup-failed"]
+    if not pulls:
+        return "absent", None, unknowns
+    pull = max(pulls, key=lambda item: item.get("number") or 0)
+    observed = {
+        "number": pull.get("number"),
+        "url": pull.get("html_url"),
+        "state": "merged" if pull.get("merged_at") else pull.get("state"),
+        "head_sha": (pull.get("head") or {}).get("sha"),
+        "base_branch": (pull.get("base") or {}).get("ref"),
+    }
+    base_ok = base_branch in (None, observed["base_branch"])
+    return ("matches" if observed["head_sha"] == expected and base_ok else "differs"), observed, unknowns
+
+
+def _outcome(operation: str | None, branch_state: str, pr_state: str,
+             pull: dict[str, Any] | None) -> tuple[str, str]:
+    """Provider outcome and why.  Absence or movement never settles to "not applied" alone."""
+    if operation == "push_branch":
+        if branch_state == "matches":
+            return "applied", "branch head is the authorized commit"
+        if branch_state == "absent":
+            if pr_state == "matches" and pull and pull.get("state") == "merged":
+                return "applied", "branch is gone but a merged PR's head is the authorized commit"
+            return "unknown", "branch absent now; neither the push nor its absence is established"
+        if branch_state == "differs":
+            return "needs-review", "branch head moved away from the authorized commit (later push or another actor)"
+        return "unknown", "branch lookup failed"
+    if operation == "open_pull_request":
+        if pr_state == "matches":
+            return "applied", "a PR from the branch has the authorized head commit and base"
+        if pr_state == "differs":
+            return "needs-review", "a PR exists but its head or base differs (moved after opening, or another actor)"
+        if pr_state == "absent":
+            if branch_state == "matches":
+                return "partially-applied", "branch pushed at the authorized commit, no PR ever opened"
+            if branch_state == "differs":
+                return "needs-review", "no PR, and the branch head is not the authorized commit"
+            return "not-observed", "the provider has never had a PR from this branch"
+        return "unknown", "PR lookup failed or the provider is unsupported"
+    return "unknown", f"unsupported provider operation {operation!r}"
+
+
 def provider_outcome_check(
     attempt_id: str,
     source: AttemptSource,
@@ -436,8 +519,9 @@ def provider_outcome_check(
     journal_dir: Path | None,
     remote: str | None = None,
     artifact_root: Path | None = None,
-    github_api: str = "https://api.github.com",
+    github_api: str = GITHUB_API,
     github_token: str | None = None,
+    allow_token_for_api: bool = False,
     http_get: HttpGet | None = None,
     ls_remote: Callable[[str, str], tuple[str | None, str | None]] = ls_remote_head,
     work_refs: list[dict[str, str]] | None = None,
@@ -461,7 +545,7 @@ def provider_outcome_check(
         unknowns.append("execution-journal-not-supplied")
     entry = classify(body, journal)
     refs.append({"kind": "effect-intent", "id": f"{entry['intent_id']}@{entry['intent_revision']}"})
-    linked = _journal_for(body, journal) if journal is not None else None
+    linked, _ = _journal_link(body, journal)
     expected = entry["commit_sha"]
     branch = entry["branch"]
     repo = github_repository(entry["repository"])
@@ -482,56 +566,31 @@ def provider_outcome_check(
             branch_state = "absent" if head == "" else ("matches" if head == expected else "differs")
     observed["branch_state"] = branch_state
 
-    pr_state = None
-    if entry["provider_operation"] == "open_pull_request":
-        if repo is None:
-            pr_state = "unknown"
-            unknowns.append("pull-request-provider-unsupported")
-        else:
-            owner = repo.split("/")[0]
-            query = urllib.parse.urlencode({"head": f"{owner}:{branch}", "state": "all", "per_page": "10"})
-            headers = {"Authorization": f"Bearer {github_token}"} if github_token else {}
-            code, pulls = (http_get or _http_get)(f"{github_api}/repos/{repo}/pulls?{query}", headers)
-            if code != 200 or not isinstance(pulls, list):
-                pr_state = "unknown"
-                observed["pull_request_error"] = code
-                unknowns.append("pull-request-lookup-failed")
-            elif not pulls:
-                pr_state = "absent"
-            else:
-                pull = max(pulls, key=lambda item: item.get("number") or 0)
-                head_sha = (pull.get("head") or {}).get("sha")
-                observed["pull_request"] = {
-                    "number": pull.get("number"),
-                    "url": pull.get("html_url"),
-                    "state": "merged" if pull.get("merged_at") else pull.get("state"),
-                    "head_sha": head_sha,
-                    "base_branch": (pull.get("base") or {}).get("ref"),
-                }
-                base_ok = entry["base_branch"] in (None, observed["pull_request"]["base_branch"])
-                pr_state = "matches" if head_sha == expected and base_ok else "differs"
-        observed["pull_request_state"] = pr_state
-
-    decisive = pr_state if entry["provider_operation"] == "open_pull_request" else branch_state
-    outcome = {"matches": "applied", "absent": "not-observed", "differs": "conflict"}.get(decisive or "", "unknown")
-    if outcome == "not-observed" and entry["provider_operation"] == "open_pull_request" and branch_state == "matches":
-        outcome = "partially-applied"
+    pr_state, pull, pr_unknowns = _pull_requests(
+        repo, branch, expected, entry["base_branch"], github_api=github_api, github_token=github_token,
+        allow_token_for_api=allow_token_for_api, http_get=http_get)
+    observed["pull_request_state"] = pr_state
+    if pull is not None:
+        observed["pull_request"] = pull
+    outcome, why = _outcome(entry["provider_operation"], branch_state, pr_state, pull)
+    if outcome == "unknown" or "github-token-withheld-from-non-allowlisted-api" in pr_unknowns:
+        unknowns.extend(pr_unknowns)
 
     report = entry["report"]
     if report and outcome == "applied":
-        pull = observed.get("pull_request") or {}
-        if report.get("commit_sha") != expected or (pull and report.get("pr_url") != pull.get("url")):
+        pr_url = (pull or {}).get("url")
+        if report.get("commit_sha") != expected or (pr_url and report.get("pr_url") != pr_url):
             entry["anomalies"].append("application-report-differs-from-provider")
-    next_step = _next_step(entry, outcome)
     result = {
         "attempt": {key: entry[key] for key in (
             "attempt_id", "state", "classification", "provider_operation", "repository", "branch",
-            "commit_sha", "base_branch", "report", "anomalies")},
+            "commit_sha", "base_branch", "report", "anomalies", "journal_link")},
         "provider_outcome": outcome,
+        "provider_outcome_reason": why,
         "observed": observed,
         "signed_artifact": _artifact_check(linked, artifact_root),
         "journal": None if linked is None else linked.summary(),
-        "next_step": next_step,
+        "next_step": _next_step(entry, outcome),
         "dispatch": "none: this check never redeems, re-dispatches or reports",
     }
     status_value = "error" if outcome == "unknown" else (
@@ -542,12 +601,15 @@ def provider_outcome_check(
 def _next_step(entry: Mapping[str, Any], outcome: str) -> str:
     state, operation = entry["state"], entry["provider_operation"]
     if outcome == "unknown":
-        return "provider outcome could not be established; retry the read-only check"
-    if outcome == "conflict":
-        return "provider shows a different commit: investigate before any report; do not re-dispatch"
+        return "provider outcome not established; do not seal, report or re-dispatch on this basis"
+    if outcome == "needs-review":
+        return "provider state moved or differs: a person must review before any report or seal; do not re-dispatch"
     if state == "accepted":
+        if outcome == "not-observed" and entry["classification"] == "safe-to-seal":
+            return ("unredeemed, no journal transmission and no PR ever opened: eligible for "
+                    "attempt-seal-unused-v1 by its owner principal")
         if outcome == "not-observed":
-            return "unredeemed and not observed at the provider: eligible for attempt-seal-unused-v1 by its owner principal"
+            return "unredeemed and no PR observed, but the journal does not exclude a transmission: review before sealing"
         return "observed at the provider without redemption: investigate the out-of-band actor"
     if state == "redeemed":
         if outcome == "applied" and operation == "open_pull_request" and entry["report"] is None:

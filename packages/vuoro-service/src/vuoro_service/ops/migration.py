@@ -25,9 +25,12 @@ from typing import Any
 from .result import DiagnosticResult
 from .runtime import ImageRunner, ProbeError, probe_source, run_in_image
 
-RECOVERY_CLASSES = ("cancel", "image-revert", "forward-fix-or-restore")
 #: The historical #2092 proof hard-codes work 5 -> 6; it proves nothing else.
 STARTUP_PROOF_TARGET = 6
+#: Observed state of this rollout's migration Job.  ``not-created``: no Job
+#: was ever created for this rollout; ``absent``: the Job cannot be observed
+#: (deleted, TTL-expired, wrong namespace), so whether it ran is unknown.
+JOB_STATES = ("not-created", "in-flight", "complete", "failed", "absent")
 
 
 def admits(schema_range: Mapping[str, Any] | None, version: int | None) -> bool | None:
@@ -36,24 +39,39 @@ def admits(schema_range: Mapping[str, Any] | None, version: int | None) -> bool 
     return schema_range["minimum"] <= version <= schema_range["maximum"]
 
 
-def recovery_class(current: int | None, target: int, prior: Mapping[str, Any] | None) -> tuple[str | None, str]:
-    """The recovery class at the observed ``current`` schema."""
-    if current is None:
-        return None, "current schema unknown"
-    if current < target:
-        return "cancel", f"schema {current} < target {target}: no migration applied yet"
-    prior_admits = admits(prior, current)
+def committed_class(schema: int, prior: Mapping[str, Any] | None) -> tuple[str | None, str]:
+    """The class once ``schema`` is committed: does the prior image still admit it?"""
+    prior_admits = admits(prior, schema)
     if prior_admits is None:
         return None, "prior image schema range unknown"
-    if current > target:
-        return ("image-revert" if prior_admits else "forward-fix-or-restore",
-                f"schema {current} is beyond target {target}")
     if prior_admits:
-        return "image-revert", f"prior image admits committed schema {current}"
+        return "image-revert", f"prior image admits committed schema {schema}"
     return "forward-fix-or-restore", (
-        f"committed schema {current} is outside the prior image range "
-        f"{prior['minimum']}..{prior['maximum']}"
+        f"committed schema {schema} is outside the prior image range {prior['minimum']}..{prior['maximum']}"
     )
+
+
+def recovery_class(current: int | None, target: int, prior: Mapping[str, Any] | None,
+                   job_state: str | None) -> tuple[str | None, str]:
+    """The recovery class at the observed ``current`` schema and migration Job state.
+
+    Every input must be known; any unknown yields ``None`` rather than advice.
+    """
+    if not prior or "minimum" not in prior:
+        return None, "prior image schema range unknown"
+    if current is None:
+        return None, "current schema unknown"
+    if job_state not in JOB_STATES:
+        return None, "migration job state not supplied"
+    if job_state in ("absent", "in-flight"):
+        return None, f"migration job is {job_state}: a commit may be pending or unobserved"
+    if current < target:
+        if job_state == "complete":
+            return None, f"job reports complete but schema {current} is below target {target}"
+        if not admits(prior, current):
+            return None, f"prior image does not admit current schema {current}, so it cannot be what serves it"
+        return "cancel", f"schema {current} < target {target}, job {job_state}: no migration applied"
+    return committed_class(current, prior)
 
 
 def _deduce_current(served: Mapping[str, Any] | None, served_range: Mapping[str, Any] | None,
@@ -95,6 +113,7 @@ def migration_preflight(
     target_schema: int,
     domain: str = "work",
     current_schema: int | None = None,
+    job_state: str | None = None,
     served_handshake: Mapping[str, Any] | None = None,
     served_image: str | None = None,
     image_runner: ImageRunner | None = None,
@@ -125,7 +144,9 @@ def migration_preflight(
         return value if value and "minimum" in value else None
 
     candidate_range, prior_range = schema_range("candidate"), schema_range("prior")
-    served_range = schema_range("served") if served_image else prior_range
+    # Without the serving image's own range nothing proves which version a
+    # compatible handshake stands for; never borrow the prior image's range.
+    served_range = schema_range("served") if served_image else None
     current_source = "operator-supplied" if current_schema is not None else None
     if current_schema is None:
         current_schema, current_source = _deduce_current(served_handshake, served_range, domain)
@@ -136,13 +157,15 @@ def migration_preflight(
         "prior_admits_current": admits(prior_range, current_schema),
         "prior_admits_target": admits(prior_range, target_schema),
         "target_not_behind_current": None if current_schema is None else target_schema >= current_schema,
+        "migration_job_settled": None if job_state not in JOB_STATES else job_state in ("not-created", "complete", "failed"),
     }
     for name, value in gates.items():
         if value is None:
             unknowns.append(f"gate-unknown:{name}")
-    now_class, now_reason = recovery_class(current_schema, target_schema, prior_range)
-    after_class, after_reason = recovery_class(target_schema, target_schema, prior_range)
-    blocked = [name for name in ("candidate_admits_target", "target_not_behind_current") if gates[name] is False]
+    now_class, now_reason = recovery_class(current_schema, target_schema, prior_range, job_state)
+    after_class, after_reason = committed_class(target_schema, prior_range)
+    blocked = [name for name in ("candidate_admits_target", "target_not_behind_current", "prior_admits_current")
+               if gates[name] is False]
 
     proof = startup_proof(candidate_image, target_schema, startup_proof_script) if run_startup_proof else {
         "state": "not-requested"}
@@ -153,6 +176,7 @@ def migration_preflight(
         "target_schema": target_schema,
         "current_schema": current_schema,
         "current_schema_source": current_source,
+        "migration_job_state": job_state,
         "images": {
             role: {
                 "ref": ref,
