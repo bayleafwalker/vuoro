@@ -25,13 +25,11 @@ records how the domain is bound, configured, migrated and released.
   store's own `domain_api_version`), and schema version `knowledge-schema/v1`.
   It depends on the shared `vuoro-adapter-kit` and `vuoro-schema-runtime`
   locks.
-- **Admission.** `composition.py` admits `knowledge` as a third domain
-  beside the required `work` and `audit` domains. The fetch and attest
-  scripts apply the same rule. Until the first `vuoro-workspace` release is
-  pinned, the checked-in manifest stays work + audit, so `knowledge` is
-  admitted but not yet required. The change that pins the release also moves
-  `knowledge` into `_REQUIRED_DOMAINS` and both scripts' domain sets (see
-  "Release and pin").
+- **Required domain.** From vuoro-service 0.1.96, `knowledge` is a
+  required domain beside `work` and `audit`. The runtime gate
+  (`composition.py`) and the fetch and attest scripts all refuse any
+  manifest that does not pin exactly these three. The checked-in manifest
+  pins the released `vuoro-workspace` 0.1.0 wheel (see "Release and pin").
 - **Operations.** There are 18 operations, `knowledge.<noun>.<verb>-v1`, none
   of them repo-scoped:
 
@@ -49,8 +47,8 @@ records how the domain is bound, configured, migrated and released.
   with the pinned work (97) and audit (5) operations, the three-domain catalog
   has 120 operations, revision
   `270c8e6c34563b7abb8e7fad54bfd9be522a3a2cec2f256cd91784142066fb8b`
-  (`scripts/validate_knowledge_catalog_composition.py`). The served catalog
-  stays at 102 operations until the pin lands.
+  (`scripts/validate_released_catalog_composition.py`, run against the
+  released wheels). This is the served catalog from vuoro-service 0.1.96.
 - **Authority.** The shell checks the coarse credential authority
   (`authority-required`, 403). The store then intersects the credential's
   `knowledge:*` authorities with the caller's current membership role on
@@ -186,15 +184,22 @@ the grants.
   `.github/workflows/publish-python-packages.yaml`. That workflow also runs
   the workspace tests against a disposable PostgreSQL 16, then attests the
   wheel and publishes it as a GitHub release.
-- The follow-up after merge, in one change:
-  1. Tag `vuoro-workspace-v0.1.0`.
-  2. Add the `knowledge-adapter` release lock (URL, SHA-256, source revision)
-     and the descriptor above to `composition/adapter-pins.json`.
-  3. Move `knowledge` into `_REQUIRED_DOMAINS` in `composition.py`,
-     `fetch_pinned_adapters.py` and `attest_installed_composition.py`.
-  4. Install the wheel in the `Dockerfile`'s `--no-deps` owner set.
-  5. Switch the CI three-domain gate to the fetched wheel.
-  6. Update the served catalog counts (102 → 120).
+- Pinned release: `vuoro-workspace-v0.1.0`, built from source revision
+  `b3397927fedc453b034ede00aa6e28804a773908`. The wheel is
+  `vuoro_workspace-0.1.0-py3-none-any.whl`, SHA-256
+  `b563f5bfdda15d97ae1e89533fe9b0e906c5d2cd50edee371b1d3fc336e7b22f`.
+- The image installs that wheel `--no-deps` from the hash-verified lock,
+  alongside the other owner wheels. The install attestation covers it. The
+  image also carries `boto3`, which the S3-compatible object store needs.
+  The same wheel ships the `vuoro-workspace migrate` operator entrypoint.
+- CI composes the fetched released wheels:
+  - The three-domain catalog gate checks 120 operations and the revision
+    above.
+  - The schema-22 and schema-25 upgrade proofs prepare the knowledge domain
+    as a deployment does. Separate knowledge migration and runtime roles,
+    `vuoro-workspace migrate` and the runtime grants come first; startup
+    then gets `VUORO_KNOWLEDGE_RUNTIME_DSN`, `VUORO_KNOWLEDGE_RUNTIME_ROLE`
+    and `VUORO_KNOWLEDGE_OBJECT_STORE`.
 
 ## Cutover requirement (P1c, appservice)
 

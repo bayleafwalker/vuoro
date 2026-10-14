@@ -123,9 +123,11 @@ def test_ci_exercises_the_released_audit_composition() -> None:
     assert "scripts/validate_released_audit_adapter.py" in workflow
 
 
-def test_ci_exercises_the_complete_released_two_domain_catalog() -> None:
+def test_ci_exercises_the_complete_released_three_domain_catalog() -> None:
     workflow = CI_WORKFLOW.read_text(encoding="utf-8")
-    assert "name: Exercise complete released two-domain catalog" in workflow
+    assert "name: Exercise complete released three-domain catalog" in workflow
+    assert "dist/adapters/vuoro_workspace-*.whl" in workflow
+    assert "validate_knowledge_catalog_composition.py" not in workflow
     for retired in (
         "validate_released_execution_adapter.py",
         "validate_released_knowledge_adapter.py",

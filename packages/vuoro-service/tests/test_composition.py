@@ -30,10 +30,11 @@ from vuoro_service.project_binding import load_project_bindings
 ROOT = Path(__file__).parents[1]
 
 
-def test_checked_in_manifest_pins_only_work_and_audit() -> None:
+def test_checked_in_manifest_pins_work_audit_and_knowledge() -> None:
     manifest = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json")
-    # S2 item 4 unbound the execution (ActionQ) and knowledge (kctl) domains.
-    assert {pin.domain for pin in manifest.adapters} == {"work", "audit"}
+    # S2 item 4 unbound the execution (ActionQ) and kctl knowledge domains;
+    # knowledge is now the released vuoro-workspace owner.
+    assert {pin.domain for pin in manifest.adapters} == {"work", "audit", "knowledge"}
     assert not {"actionq", "actionq-contracts", "kctl"} & {
         lock.distribution for lock in manifest.release_locks
     }
@@ -55,10 +56,11 @@ def test_shared_dependency_is_reusable_and_fetched_and_attested_once(tmp_path: P
     path.write_text(json.dumps(raw), encoding="utf-8")
     manifest = CompositionManifest.load(path)
     assert [lock.lock_id for lock in manifest.release_locks].count("vuoro-schema-runtime") == 1
+    # Shared by the audit and knowledge descriptors, locked, fetched and attested once.
     assert sum(
         "vuoro-schema-runtime" in descriptor.dependency_lock_ids
         for descriptor in manifest.runtime_descriptors
-    ) == 1
+    ) == 2
 
     fetch_spec = importlib.util.spec_from_file_location(
         "fetch_pins", ROOT.parents[1] / "scripts" / "fetch_pinned_adapters.py"
@@ -159,9 +161,12 @@ def test_v3_composition_fails_closed_on_duplicate_and_orphan_release_locks(
         CompositionManifest.load(path)
 
     raw = json.loads(source.read_text(encoding="utf-8"))
-    next(item for item in raw["runtime_descriptors"] if item["domain"] == "audit")[
-        "dependency_lock_ids"
-    ] = []
+    for item in raw["runtime_descriptors"]:
+        if item["domain"] in {"audit", "knowledge"}:
+            # Leaves the shared schema-runtime lock referenced by no descriptor.
+            item["dependency_lock_ids"] = [
+                lock_id for lock_id in item["dependency_lock_ids"] if lock_id != "vuoro-schema-runtime"
+            ]
     path.write_text(json.dumps(raw), encoding="utf-8")
     with pytest.raises(CompositionError, match="must be referenced|orphan"):
         CompositionManifest.load(path)
@@ -223,6 +228,33 @@ def test_checked_in_work_pin_is_the_release_actor_binding_release() -> None:
         "sprintctl.vuoro_adapter",
         "register_work_catalog",
     )
+
+
+def test_checked_in_knowledge_pin_is_vuoro_workspace_010_release() -> None:
+    manifest = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json")
+    pin = manifest.pin("knowledge")
+    assert (
+        pin.source_repository,
+        pin.source_revision,
+        pin.distribution,
+        pin.distribution_version,
+        pin.artifact_url,
+        pin.artifact_sha256,
+    ) == (
+        "https://github.com/bayleafwalker/vuoro",
+        "b3397927fedc453b034ede00aa6e28804a773908",
+        "vuoro-workspace",
+        "0.1.0",
+        "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-workspace-v0.1.0/vuoro_workspace-0.1.0-py3-none-any.whl",
+        "b563f5bfdda15d97ae1e89533fe9b0e906c5d2cd50edee371b1d3fc336e7b22f",
+    )
+    assert (pin.adapter_module, pin.register, pin.api_version, pin.schema_version) == (
+        "vuoro_workspace.vuoro_adapter",
+        "register_knowledge_catalog",
+        "vuoro-workspace/v1",
+        "knowledge-schema/v1",
+    )
+    assert {dependency.lock_id for dependency in pin.dependencies} == {"vuoro-adapter-kit", "vuoro-schema-runtime"}
 
 
 def test_checked_in_audit_pin_is_auditctl_019_with_released_shared_dependencies() -> None:
@@ -619,7 +651,7 @@ def test_artifact_verification_fails_closed_on_mismatch(tmp_path: Path) -> None:
     raw["runtime_descriptors"] = [raw["runtime_descriptors"][0]]
     path = tmp_path / "manifest.json"
     path.write_text(json.dumps(raw), encoding="utf-8")
-    with pytest.raises(CompositionError, match="must pin work and audit"):
+    with pytest.raises(CompositionError, match="must pin exactly work, audit and knowledge"):
         CompositionManifest.load(path)
     raw = json.loads(source.read_text(encoding="utf-8"))
     raw["release_locks"][0]["artifact_sha256"] = hashlib.sha256(artifact.read_bytes()).hexdigest()

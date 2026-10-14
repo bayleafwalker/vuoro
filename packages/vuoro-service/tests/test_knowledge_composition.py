@@ -1,9 +1,8 @@
-"""The knowledge domain (vuoro-workspace) is admitted by the composition gate.
+"""The knowledge domain (vuoro-workspace) is a required composition domain.
 
-Until vuoro-workspace's first release is pinned, the checked-in manifest stays
-work + audit; these tests graft a knowledge release lock onto it to prove the
-runtime gate, the fetcher and the attester all admit the third domain and
-still refuse anything else. The served knowledge operations themselves are
+The checked-in manifest pins the released vuoro-workspace 0.1.0 owner. These
+tests prove that the runtime gate, the fetcher and the attester all require
+exactly work, audit and knowledge and refuse anything else. The served knowledge operations themselves are
 exercised end to end in packages/vuoro-workspace/tests/test_vuoro_adapter_served.py.
 """
 
@@ -25,19 +24,6 @@ from vuoro_service.composition import (
 
 ROOT = Path(__file__).parents[1]
 SCRIPTS = ROOT.parents[1] / "scripts"
-KNOWLEDGE_LOCK = {
-    "lock_id": "knowledge-adapter",
-    "lock_kind": "adapter",
-    "source_repository": "https://github.com/bayleafwalker/vuoro",
-    "source_revision": "0" * 40,
-    "artifact_url": (
-        "https://github.com/bayleafwalker/vuoro/releases/download/"
-        "vuoro-workspace-v0.1.0/vuoro_workspace-0.1.0-py3-none-any.whl"
-    ),
-    "artifact_sha256": "a" * 64,
-    "distribution": "vuoro-workspace",
-    "distribution_version": "0.1.0",
-}
 KNOWLEDGE_DESCRIPTOR = {
     "domain": "knowledge",
     "lock_id": "knowledge-adapter",
@@ -50,10 +36,7 @@ KNOWLEDGE_DESCRIPTOR = {
 
 
 def _three_domain() -> dict:
-    raw = json.loads((ROOT / "composition" / "adapter-pins.json").read_text(encoding="utf-8"))
-    raw["release_locks"].append(dict(KNOWLEDGE_LOCK))
-    raw["runtime_descriptors"].append(json.loads(json.dumps(KNOWLEDGE_DESCRIPTOR)))
-    return raw
+    return json.loads((ROOT / "composition" / "adapter-pins.json").read_text(encoding="utf-8"))
 
 
 def _script(name: str):
@@ -70,13 +53,12 @@ def _load(tmp_path: Path, raw: dict) -> CompositionManifest:
     return CompositionManifest.load(path)
 
 
-def test_checked_in_manifest_does_not_pin_knowledge_before_its_release() -> None:
-    manifest = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json")
-    assert {pin.domain for pin in manifest.adapters} == {"work", "audit"}
-    assert "vuoro-workspace" not in {lock.distribution for lock in manifest.release_locks}
+def test_checked_in_descriptor_is_the_owner_registration() -> None:
+    raw = _three_domain()
+    assert [d for d in raw["runtime_descriptors"] if d["domain"] == "knowledge"] == [KNOWLEDGE_DESCRIPTOR]
 
 
-def test_runtime_fetcher_and_attester_admit_a_pinned_knowledge_domain(tmp_path: Path) -> None:
+def test_runtime_fetcher_and_attester_accept_the_three_domain_manifest(tmp_path: Path) -> None:
     raw = _three_domain()
     manifest = _load(tmp_path, raw)
     assert {pin.domain for pin in manifest.adapters} == {"work", "audit", "knowledge"}
@@ -90,14 +72,23 @@ def test_runtime_fetcher_and_attester_admit_a_pinned_knowledge_domain(tmp_path: 
     }
 
 
+def _drop(domain: str):
+    def mutate(raw: dict) -> None:
+        descriptor = [d for d in raw["runtime_descriptors"] if d["domain"] == domain][0]
+        raw["runtime_descriptors"].remove(descriptor)
+        raw["release_locks"] = [lock for lock in raw["release_locks"] if lock["lock_id"] != descriptor["lock_id"]]
+    return mutate
+
+
 @pytest.mark.parametrize("mutation, runtime_message, script_message", [
     (lambda raw: raw["runtime_descriptors"].append({**KNOWLEDGE_DESCRIPTOR}), "duplicate runtime domains",
-     "duplicate|two or three|may pin knowledge"),
+     "duplicate|exactly three|exactly work, audit and knowledge"),
     (lambda raw: [d for d in raw["runtime_descriptors"] if d["domain"] == "knowledge"][0].update(domain="search"),
-     "may pin knowledge", "may pin knowledge"),
-    (lambda raw: raw["runtime_descriptors"].__setitem__(
-        slice(None), [d for d in raw["runtime_descriptors"] if d["domain"] != "audit"]),
-     "may pin knowledge|orphan|referenced", "may pin knowledge|two or three|orphan|referenced"),
+     "exactly work, audit and knowledge", "exactly work, audit and knowledge"),
+    # Knowledge is required: a manifest without it is refused everywhere.
+    (_drop("knowledge"), "exactly work, audit and knowledge",
+     "exactly three|exactly work, audit and knowledge"),
+    (_drop("audit"), "exactly work, audit and knowledge", "exactly three|exactly work, audit and knowledge"),
 ])
 def test_domain_admission_is_closed_everywhere(tmp_path: Path, mutation, runtime_message, script_message) -> None:
     raw = _three_domain()

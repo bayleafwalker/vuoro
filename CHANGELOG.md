@@ -5,6 +5,22 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service 0.1.96 candidate: composes the released vuoro-workspace 0.1.0
+  knowledge owner (`vuoro-workspace-v0.1.0`, SHA-256
+  `b563f5bfdda15d97ae1e89533fe9b0e906c5d2cd50edee371b1d3fc336e7b22f`) as a
+  third required domain, `knowledge`. Its 18 `knowledge.*-v1` operations are
+  added, giving a 120-operation catalog, revision `270c8e6c…`. Every work and
+  audit descriptor is unchanged.
+  - Startup requires `VUORO_KNOWLEDGE_RUNTIME_DSN`,
+    `VUORO_KNOWLEDGE_RUNTIME_ROLE` and `VUORO_KNOWLEDGE_OBJECT_STORE`, and
+    gates the knowledge schema read-only. It never migrates. A deployment
+    must first run `vuoro-workspace migrate` as the knowledge migration role
+    (appservice P1c).
+  - The image adds the vuoro-workspace wheel `--no-deps` from the lock, plus
+    `boto3` for the S3 object store.
+  - Sprintctl 0.19.0, Auditctl 0.1.9, adapter-kit 0.2.2 and schema-runtime
+    0.1.0 stay pinned.
+
 - vuoro-mcp-edge: `list_ready_work` and `describe_work` accept an optional
   per-call `repo_id`. Calls default to the sole authorized repository and
   require an explicit authorized selection when the assertion covers multiple

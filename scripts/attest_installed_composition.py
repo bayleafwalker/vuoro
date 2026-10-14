@@ -18,10 +18,8 @@ import re
 from urllib.parse import urlsplit
 
 _LOCK_KINDS = {"adapter", "owner-dependency", "shared-dependency"}
-_DOMAINS = {"work", "audit"}
-# Admitted but not yet required: knowledge (vuoro-workspace) becomes required
-# in the same change that pins its first release (P1b follow-up).
-_ADMITTED_DOMAINS = _DOMAINS | {"knowledge"}
+_DOMAINS = {"work", "audit", "knowledge"}
+_ADMITTED_DOMAINS = _DOMAINS
 _SHARED_SOURCE = "https://github.com/bayleafwalker/vuoro"
 _SHARED_DISTRIBUTIONS = {"vuoro-schema-runtime", "vuoro-adapter-kit"}
 _LOCK_FIELDS = {"lock_id", "lock_kind", "source_repository", "source_revision", "artifact_url", "artifact_sha256", "distribution", "distribution_version"}
@@ -105,12 +103,12 @@ def _pinned(manifest: dict) -> list[dict]:
         not isinstance(descriptors, list)
         or not len(_DOMAINS) <= len(descriptors) <= len(_ADMITTED_DOMAINS)
     ):
-        raise SystemExit("composition must contain two or three runtime descriptors")
+        raise SystemExit("composition must contain exactly three runtime descriptors")
     if any(not isinstance(item, dict) or set(item) != _DESCRIPTOR_FIELDS for item in descriptors):
         raise SystemExit("runtime descriptor fields do not match the v3 contract")
     domains = [item["domain"] for item in descriptors]
     if len(domains) != len(set(domains)) or not _DOMAINS <= set(domains) <= _ADMITTED_DOMAINS:
-        raise SystemExit("composition must pin work and audit, and may pin knowledge")
+        raise SystemExit("composition must pin exactly work, audit and knowledge")
     referenced: list[str] = []
     primary_counts: dict[str, int] = {}
     dependency_counts: dict[str, int] = {}

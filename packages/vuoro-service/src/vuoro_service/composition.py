@@ -1,4 +1,4 @@
-"""Pinned Vuoro service composition: work and audit, plus knowledge when pinned.
+"""Pinned three-domain (work, audit, knowledge) Vuoro service composition.
 
 The service accepts domain adapters only through the checked-in composition
 manifest. Deployment supplies runtime DSNs and an environment-bound identity
@@ -47,14 +47,11 @@ from vuoro_service.project_binding import (
 )
 
 
-_REQUIRED_DOMAINS = frozenset({"work", "audit"})
-#: Domains the manifest may pin. ``knowledge`` (the vuoro-workspace owner
-#: adapter, docs/architecture/knowledge-workspace-composition.md) is admitted
-#: with its full runtime contract but cannot be *required* until its first
-#: release is pinned: the change that adds that release lock also moves it
-#: into ``_REQUIRED_DOMAINS``. Admission is decided by the immutable manifest
-#: baked into the image, never by deployment configuration.
-_ADMITTED_DOMAINS = _REQUIRED_DOMAINS | frozenset({"knowledge"})
+#: Every deployable composition pins exactly these domains. ``knowledge`` is
+#: the released vuoro-workspace owner adapter
+#: (docs/architecture/knowledge-workspace-composition.md).
+_REQUIRED_DOMAINS = frozenset({"work", "audit", "knowledge"})
+_ADMITTED_DOMAINS = _REQUIRED_DOMAINS
 _KNOWLEDGE_ADAPTER_MODULE = "vuoro_workspace.vuoro_adapter"
 _KNOWLEDGE_REGISTER = "register_knowledge_catalog"
 _DEPLOYABLE_ENVIRONMENT_CLASSES = frozenset({"development", "production"})
@@ -374,7 +371,7 @@ class CompositionManifest:
         domains = {descriptor.domain for descriptor in descriptors}
         if not _REQUIRED_DOMAINS <= domains <= _ADMITTED_DOMAINS:
             raise CompositionError(
-                "composition must pin work and audit, and may pin knowledge"
+                "composition must pin exactly work, audit and knowledge"
             )
         if len(descriptors) != len(domains):
             raise CompositionError("composition contains duplicate runtime domains")
@@ -1251,10 +1248,9 @@ def create_composed_app(
         "work": work_state,
         "audit": audit_state,
     }
-    if any(pin.domain == "knowledge" for pin in manifest.adapters):
-        domains["knowledge"] = _compose_knowledge(
-            manifest.pin("knowledge"), registry, environ
-        )
+    domains["knowledge"] = _compose_knowledge(
+        manifest.pin("knowledge"), registry, environ
+    )
     incompatible = [name for name, state in domains.items() if state.state != "compatible"]
     if incompatible:
         raise CompositionError("runtime compatibility failed for: " + ", ".join(incompatible))

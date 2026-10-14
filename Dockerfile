@@ -38,14 +38,19 @@ COPY packages/vuoro-evidence ./packages/vuoro-evidence
 # (click, psycopg) are installed above, and the shared adapter-kit is the one
 # lock entry rather than whichever release each owner's metadata names
 # (auditctl 0.1.9 names kit 0.2.0; Sprintctl 0.19.0 names kit 0.2.2). The
+# knowledge owner (vuoro-workspace 0.1.0) ships its `vuoro-workspace migrate`
+# operator entrypoint in the same wheel. The
 # attestation below verifies every installed pinned distribution.
-RUN python -m pip install --no-cache-dir "psycopg[binary]>=3.2,<4" "click>=8.1" \
+# boto3 serves the knowledge workspace's S3-compatible object store
+# (VUORO_KNOWLEDGE_OBJECT_STORE=s3://...); it is vuoro-workspace's `s3` extra.
+RUN python -m pip install --no-cache-dir "psycopg[binary]>=3.2,<4" "click>=8.1" "boto3>=1.34,<2" \
         ./packages/vuoro-service ./packages/vuoro-evidence ./packages/vuoro-mcp-edge \
     && python -m pip install --no-cache-dir --no-deps \
         /opt/vuoro/adapters/auditctl-*.whl \
         /opt/vuoro/adapters/sprintctl-*.whl \
         /opt/vuoro/adapters/vuoro_adapter_kit-*.whl \
         /opt/vuoro/adapters/vuoro_schema_runtime-*.whl \
+        /opt/vuoro/adapters/vuoro_workspace-*.whl \
     && python -m pip check \
     && python /usr/local/bin/attest-installed-composition \
         /opt/vuoro/composition/adapter-pins.json \

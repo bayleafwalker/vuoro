@@ -40,6 +40,16 @@
       "artifact_sha256": "7efb9992bc23e1d2bd747dcb8204ff9452487e3bd6d1b43206ba4976f5a9c5cf",
       "distribution": "auditctl",
       "distribution_version": "0.1.9"
+    },
+    {
+      "lock_id": "knowledge-adapter",
+      "lock_kind": "adapter",
+      "source_repository": "https://github.com/bayleafwalker/vuoro",
+      "source_revision": "b3397927fedc453b034ede00aa6e28804a773908",
+      "artifact_url": "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-workspace-v0.1.0/vuoro_workspace-0.1.0-py3-none-any.whl",
+      "artifact_sha256": "b563f5bfdda15d97ae1e89533fe9b0e906c5d2cd50edee371b1d3fc336e7b22f",
+      "distribution": "vuoro-workspace",
+      "distribution_version": "0.1.0"
     }
   ],
   "runtime_descriptors": [
@@ -65,6 +75,18 @@
       "register": "VuoroAuditAdapter.register",
       "api_version": "audit/v1",
       "schema_version": "audit-schema/v1"
+    },
+    {
+      "domain": "knowledge",
+      "lock_id": "knowledge-adapter",
+      "dependency_lock_ids": [
+        "vuoro-adapter-kit",
+        "vuoro-schema-runtime"
+      ],
+      "adapter_module": "vuoro_workspace.vuoro_adapter",
+      "register": "register_knowledge_catalog",
+      "api_version": "vuoro-workspace/v1",
+      "schema_version": "knowledge-schema/v1"
     }
   ]
 }
