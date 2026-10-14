@@ -27,6 +27,12 @@ from .protected_copy_codec import (
 _TOTAL_TIMEOUT_SECONDS = 15.0
 _LIST_PATH = "/v1/protected-effects/list-accepted"
 _COPY_PATH = "/v1/protected-effects/read-copy"
+_NATIVE_PATH = "/api/invoke/v1"
+_READ_POLICIES = {
+    _LIST_PATH: (LIST_MAX, True),
+    _COPY_PATH: (COPY_MAX, True),
+    _NATIVE_PATH: (4 * 1024 * 1024, False),
+}
 _TOKEN = re.compile(r"[A-Za-z0-9._~+/-]+=*")
 _HEADER_NAME = re.compile(rb"[!#$%&'*+.^_`|~0-9A-Za-z-]+")
 _HOST_LABEL = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?")
@@ -146,7 +152,7 @@ def _credentials(value, profile):
     return value
 
 
-async def _headers(reader):
+async def _headers(reader, *, require_no_store=True):
     total = 0
 
     async def line():
@@ -184,7 +190,8 @@ async def _headers(reader):
             b"application/json;charset=utf-8",
         )
     )
-    _need(fields.get(b"cache-control") == b"no-store")
+    if require_no_store:
+        _need(fields.get(b"cache-control") == b"no-store")
     return int(length)
 
 
@@ -217,7 +224,9 @@ class PrivateReadTransport:
             "cursor": cursor,
             "limit": limit,
         }
-        return await self._exchange(_LIST_PATH, _canonical(request), LIST_MAX)
+        return await _read_wire(
+            self.profile, self._credential_provider, _LIST_PATH, _canonical(request)
+        )
 
     @_async_fixed
     async def read_copy(self, acceptance_id):
@@ -227,55 +236,64 @@ class PrivateReadTransport:
             "namespace": _namespace_bytes(self.profile.namespace_utf8),
             "acceptance_id": acceptance_id,
         }
-        return await self._exchange(_COPY_PATH, _canonical(request), COPY_MAX)
+        return await _read_wire(
+            self.profile, self._credential_provider, _COPY_PATH, _canonical(request)
+        )
 
-    async def _exchange(self, path, request_utf8, maximum):
-        _need(path in (_LIST_PATH, _COPY_PATH) and len(request_utf8) <= 65536)
-        writer = None
-        loop = asyncio.get_running_loop()
-        deadline = loop.time() + _TOTAL_TIMEOUT_SECONDS
-        try:
-            async with asyncio.timeout_at(deadline):
-                credential = _credentials(
-                    await self._credential_provider.acquire(self.profile), self.profile
-                )
-                _need(loop.time() < deadline)
-                hostname, port, authority = _origin(self.profile.https_origin)
-                address = ipaddress.ip_address(self.profile.connect_ip)
-                reader, writer = await asyncio.open_connection(
-                    host=self.profile.connect_ip,
-                    port=port,
-                    family=socket.AF_INET if address.version == 4 else socket.AF_INET6,
-                    flags=socket.AI_NUMERICHOST,
-                    ssl=credential.ssl_context,
-                    server_hostname=hostname,
-                    ssl_handshake_timeout=max(0.001, deadline - loop.time()),
-                    limit=8192,
-                )
-                tls = writer.get_extra_info("ssl_object")
-                _need(
-                    tls is not None
-                    and tls.version() == "TLSv1.3"
-                    and tls.selected_alpn_protocol() in (None, "http/1.1")
-                )
-                head = (
-                    f"POST {path} HTTP/1.1\r\nHost: {authority}\r\nAuthorization: Bearer {credential.bearer_ascii}\r\nContent-Type: application/json\r\nContent-Length: {len(request_utf8)}\r\nAccept: application/json\r\nConnection: close\r\n\r\n"
-                ).encode("ascii")
-                writer.write(head + request_utf8)
-                await writer.drain()
-                length = await _headers(reader)
-                _need(0 < length <= maximum)
-                chunks = []
-                remaining = length
-                while remaining:
-                    chunk = await reader.read(min(65536, remaining))
-                    _need(bool(chunk))
-                    chunks.append(chunk)
-                    remaining -= len(chunk)
-                _need(await reader.read(1) == b"")
-                body = b"".join(chunks)
-                _need(loop.time() < deadline)
-                return body
-        finally:
-            if writer is not None:
-                writer.transport.abort()
+
+async def _read_wire(profile, credential_provider, path, request_utf8):
+    """Private fixed read paths; limits/header policy are selected by path only."""
+    _need(
+        path in _READ_POLICIES
+        and type(request_utf8) is bytes
+        and len(request_utf8) <= 65536
+    )
+    maximum, require_no_store = _READ_POLICIES[path]
+    writer = None
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + _TOTAL_TIMEOUT_SECONDS
+    try:
+        async with asyncio.timeout_at(deadline):
+            credential = _credentials(
+                await credential_provider.acquire(profile), profile
+            )
+            _need(loop.time() < deadline)
+            hostname, port, authority = _origin(profile.https_origin)
+            address = ipaddress.ip_address(profile.connect_ip)
+            reader, writer = await asyncio.open_connection(
+                host=profile.connect_ip,
+                port=port,
+                family=socket.AF_INET if address.version == 4 else socket.AF_INET6,
+                flags=socket.AI_NUMERICHOST,
+                ssl=credential.ssl_context,
+                server_hostname=hostname,
+                ssl_handshake_timeout=max(0.001, deadline - loop.time()),
+                limit=8192,
+            )
+            tls = writer.get_extra_info("ssl_object")
+            _need(
+                tls is not None
+                and tls.version() == "TLSv1.3"
+                and tls.selected_alpn_protocol() in (None, "http/1.1")
+            )
+            head = (
+                f"POST {path} HTTP/1.1\r\nHost: {authority}\r\nAuthorization: Bearer {credential.bearer_ascii}\r\nContent-Type: application/json\r\nContent-Length: {len(request_utf8)}\r\nAccept: application/json\r\nConnection: close\r\n\r\n"
+            ).encode("ascii")
+            writer.write(head + request_utf8)
+            await writer.drain()
+            length = await _headers(reader, require_no_store=require_no_store)
+            _need(0 < length <= maximum)
+            chunks = []
+            remaining = length
+            while remaining:
+                chunk = await reader.read(min(65536, remaining))
+                _need(bool(chunk))
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            _need(await reader.read(1) == b"")
+            body = b"".join(chunks)
+            _need(loop.time() < deadline)
+            return body
+    finally:
+        if writer is not None:
+            writer.transport.abort()
