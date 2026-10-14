@@ -25,6 +25,11 @@ components = ["auditctl", "sprintctl", "vuoro-core", "hostproto-consumer-vuoro-e
 # The portfolio status authority. Its lifecycle records that v3 is in force as
 # decided under delegation (owner decision D1, 2026-09-17); the owner should
 # confirm that reading.
+[[subjects]]
+id = "knowledge-workspace"
+title = "Knowledge and artifact workspace (proposed product)"
+components = ["vuoro-core", "knowledge-base"]
+
 [[documents]]
 path = "docs/direction/disposition-register.yaml"
 doc_id = "vuoro-disposition-register"
