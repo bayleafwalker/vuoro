@@ -22,6 +22,11 @@ id = "evidence-home"
 title = "Evidence home and S4 import"
 components = ["auditctl", "sprintctl", "vuoro-core", "hostproto-consumer-vuoro-evidence"]
 
+[[subjects]]
+id = "knowledge-workspace"
+title = "Knowledge and artifact workspace (proposed product)"
+components = ["vuoro-core", "knowledge-base"]
+
 # The portfolio status authority. Its lifecycle records that v3 is in force as
 # decided under delegation (owner decision D1, 2026-09-17); the owner should
 # confirm that reading.
