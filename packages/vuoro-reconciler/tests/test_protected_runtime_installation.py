@@ -426,3 +426,176 @@ def test_actual_missing_security_capability_is_normal(installed):
         module._executable_privileges(descriptor, os.fstat(descriptor))
     finally:
         os.close(descriptor)
+
+
+@pytest.mark.skipif(
+    os.environ.get("Q4_NIX_INSTALLATION_FIXTURE") != "1",
+    reason="explicit actual Nix installation fixture required",
+)
+def test_nix_store_exception_is_ancestor_only_actual_store():
+    store = Path("/nix/store")
+    info = store.lstat()
+    assert info.st_uid == 0 and stat.S_IMODE(info.st_mode) == 0o1775
+    module._ancestor_immutable(info, store)
+    with pytest.raises(ValueError):
+        module._directory(store)
+    executable = Path("/run/current-system/sw/bin/python3")
+    resolved, states = module._file(executable, executable=True)
+    assert resolved.is_relative_to(store)
+    assert "/nix/store" in states
+    module._recheck(states)
+
+
+@pytest.mark.parametrize(
+    "path,uid,kind,mode",
+    [
+        ("/tmp/other-store", 0, stat.S_IFDIR, 0o1775),
+        ("/nix/store", 1000, stat.S_IFDIR, 0o1775),
+        ("/nix/store", 0, stat.S_IFDIR, 0o775),
+        ("/nix/store", 0, stat.S_IFDIR, 0o1777),
+        ("/nix/store", 0, stat.S_IFREG, 0o1775),
+        ("/nix/store/child", 0, stat.S_IFDIR, 0o1775),
+        ("/nix/store/child", 0, stat.S_IFDIR, 0o775),
+        ("/nix/store/child", 1000, stat.S_IFDIR, 0o555),
+    ],
+)
+def test_nix_store_exception_refuses_other_writable_or_owned_paths(
+    path, uid, kind, mode
+):
+    with pytest.raises(ValueError):
+        module._ancestor_immutable(
+            SimpleNamespace(st_uid=uid, st_mode=kind | mode), Path(path)
+        )
+
+
+def test_nix_store_missing_target_refuses_without_creation():
+    path = Path("/nix/store/q4-missing-admission-target-20261014")
+    assert not path.exists()
+    with pytest.raises((FileNotFoundError, ValueError)):
+        module._file(path)
+    assert not path.exists()
+
+
+@pytest.mark.parametrize("field", ["st_mode", "st_uid", "st_ino", "st_mtime_ns"])
+@pytest.mark.skipif(
+    os.environ.get("Q4_NIX_INSTALLATION_FIXTURE") != "1",
+    reason="explicit actual Nix installation fixture required",
+)
+def test_nix_store_final_ancestor_metadata_drift_refuses(monkeypatch, field):
+    # Original real store ancestry is held in the admitted chain. Inject only
+    # changed final named metadata; a permissive sticky exception cannot erase
+    # original inode/ownership/timestamp joins.
+    _, states = module._chain(Path("/run/current-system/sw/bin/python3"))
+    original = module.os.lstat
+    info = original("/nix/store")
+    changed = SimpleNamespace(
+        **{
+            key: getattr(info, key)
+            for key in (
+                "st_dev",
+                "st_ino",
+                "st_mode",
+                "st_uid",
+                "st_gid",
+                "st_nlink",
+                "st_size",
+                "st_mtime_ns",
+                "st_ctime_ns",
+            )
+        }
+    )
+    setattr(changed, field, getattr(changed, field) + 1)
+    monkeypatch.setattr(
+        module.os,
+        "lstat",
+        lambda path: changed if str(path) == "/nix/store" else original(path),
+    )
+    with pytest.raises(ValueError):
+        module._recheck(states)
+
+
+def test_actual_store_symlink_replacement_and_writable_child_still_refuse(
+    installed, monkeypatch
+):
+    # Real replacement under a modeled root-owned parent; source ownership is
+    # explicitly modeled by the existing fixture, not claimed immutable.
+    _, root, _, _ = installed
+    target = root / "approved.py"
+    target.write_bytes(b"pass\n")
+    link = root / "current.py"
+    link.symlink_to(target.name)
+    _, states = module._chain(link)
+    link.unlink()
+    link.symlink_to("child.py")
+    with pytest.raises(ValueError):
+        module._recheck(states)
+
+
+@pytest.mark.skipif(
+    os.environ.get("Q4_NIX_INSTALLATION_FIXTURE") != "1",
+    reason="explicit actual Nix installation fixture required",
+)
+def test_actual_sticky_root_parent_peer_cannot_replace_existing_entries():
+    import subprocess
+    import sys
+
+    script = r"""
+import errno, os, pathlib, shutil, tempfile
+root = pathlib.Path(tempfile.mkdtemp(prefix='q4-sticky-admission-', dir='/tmp'))
+try:
+    os.chown(root, 0, 100)
+    os.chmod(root, 0o1775)
+    (root / 'approved').mkdir(mode=0o555)
+    (root / 'link').symlink_to('approved')
+    pid = os.fork()
+    if pid == 0:
+        os.setgroups([100])
+        os.setgid(100)
+        os.setuid(1000)
+        for name in ('approved', 'link'):
+            for remove in (False, True):
+                try:
+                    if not remove:
+                        os.rename(root / name, root / (name + '-replaced'))
+                    elif name == 'approved':
+                        os.rmdir(root / name)
+                    else:
+                        os.unlink(root / name)
+                except OSError as error:
+                    assert error.errno == errno.EPERM
+                else:
+                    os._exit(2)
+        (root / 'untrusted-new').mkdir()
+        assert (root / 'untrusted-new').stat().st_uid == 1000
+        os._exit(0)
+    assert os.waitpid(pid, 0)[1] == 0
+finally:
+    shutil.rmtree(root)
+"""
+    result = subprocess.run(
+        [
+            "/run/current-system/sw/bin/unshare",
+            "--map-auto",
+            "--map-root-user",
+            "--",
+            sys.executable,
+            "-I",
+            "-B",
+            "-c",
+            script,
+        ],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=10,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr.decode()
+    assert result.stdout == b""
+
+
+def test_portable_exact_nix_ancestor_metadata_admits_but_target_refuses():
+    info = SimpleNamespace(st_uid=0, st_mode=stat.S_IFDIR | 0o1775)
+    module._ancestor_immutable(info, Path("/nix/store"))
+    with pytest.raises(ValueError):
+        module._immutable(info)

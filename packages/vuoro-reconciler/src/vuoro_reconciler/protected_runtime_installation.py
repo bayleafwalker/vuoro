@@ -53,6 +53,21 @@ def _immutable(info):
         _need(not info.st_mode & 0o022)
 
 
+def _ancestor_immutable(info, path):
+    # Linux sticky semantics deny group members replacement of existing
+    # root-owned direct entries. New caller-owned entries remain untrusted.
+    # This sole exception applies to a traversed store ancestor, never a
+    # requested target; all child and symlink-target checks stay ordinary.
+    if (
+        path == Path("/nix/store")
+        and info.st_uid == 0
+        and stat.S_ISDIR(info.st_mode)
+        and stat.S_IMODE(info.st_mode) == 0o1775
+    ):
+        return
+    _immutable(info)
+
+
 def _chain(path):
     path = Path(path)
     _need(path.is_absolute() and ".." not in path.parts)
@@ -62,7 +77,10 @@ def _chain(path):
     links = 0
     while True:
         info = os.lstat(current)
-        _immutable(info)
+        if queue:
+            _ancestor_immutable(info, current)
+        else:
+            _immutable(info)
         link = os.readlink(current) if stat.S_ISLNK(info.st_mode) else None
         state = (_state(info), link)
         if str(current) in states:
@@ -92,7 +110,8 @@ def _chain(path):
 def _recheck(states):
     for path, expected in states.items():
         info = os.lstat(path)
-        _immutable(info)
+        # Returned chains contain /nix/store only as an admitted ancestor.
+        _ancestor_immutable(info, Path(path))
         link = os.readlink(path) if stat.S_ISLNK(info.st_mode) else None
         _need((_state(info), link) == expected)
 
