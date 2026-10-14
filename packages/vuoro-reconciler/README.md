@@ -186,3 +186,42 @@ delivery; regenerating a timestamp or chain position is a different request.
 An explicit confirmed chain conflict uses the producer's existing correction
 procedure. The owner rechecks the current Release at acceptance; a stale capture
 can remain evidence while being ineligible to authorize the changed work.
+
+## Q4 protected copy data (source only)
+
+`protected_copy_codec` independently decodes the closed private readout formats
+into immutable `ProtectedEffectData` and `AcceptedPageData` values. It checks
+canonical bytes, namespace and repository, every frozen envelope and native
+receipt, the original challenge/operator/requester joins, and the fixed receipt.
+The evidence reference kind is `protected-artifact-verification`; the copied
+actual document schema is `protected-effect-evidence-binding/v1`.
+
+These values describe validated **data**. They authenticate no caller, signature,
+or source, and confer no approval or execution grant. A future executor must
+obtain a fresh independently authenticated private broker read for every effect
+and recovery cycle. Public MCP results, files, caller-built dataclasses and
+matching hashes cannot replace that transport boundary.
+
+`protected_currentness` accepts only the closed `sprintctl-effect-basis/v1`
+RESULT JSON bytes, with strict duplicate/type checks, a 4 MiB raw bound and
+a 2 MiB canonical bound. Ordinary key order and whitespace are accepted and
+the DTO stores canonical bytes. Protected signed copies and documents retain
+exact canonical byte checks. Evidence identity is the native run ID plus item ID;
+chain positions are unique within each native run. It compares current full work revision and the selected Release's
+own revision independently with the frozen copy. Public proposed, accepted,
+rejected and applied states are data. Matching pending/active work returns
+`READY` data; blocked defers; done refuses new execution. A missing or changed
+basis refuses. The decoder reads no current evidence and never replaces frozen
+references. Malformed bytes or inconsistent constructed values produce fixed
+metadata refusals with no upstream error detail.
+
+This addition has no transport, credentials, Git, signing, checks, journal,
+CLI, runtime activation, or legacy acceptance integration. Discovery cursors
+carry ordering positions only: timestamp pagination is not a complete stream;
+future readers must restart and deduplicate permanent acceptance IDs.
+
+The copy fixture comes from the qualified D1 PostgreSQL 18 native export →
+protected approval → private read-copy route. Fixture provenance is recorded in
+`tests/test_protected_copy_codec.py`; hashes validate data integrity, not a fresh
+authenticated read or signature attestation. Listed metadata, when supplied,
+binds the permanent receipt ID; absent metadata cannot attest that ID.
