@@ -6,12 +6,16 @@ operations; otherwise the suite skips with the reason from unavailable_reason().
 Every contract call goes through WorkApplication.invoke; only setup, the clock
 shift and the held-commit hook use the disposable database or connection.
 
-Optional owner hooks, discovered by name, never assumed:
-  sprintctl.pg.shift_inbox_clock(store, seconds)  - move every stored inbox
-      timestamp back by `seconds` so the owner's clock reads as advanced
-      (CLOCK capability; absent -> clock-dependent tests skip).
+Clock: sprintctl.pg_testing.freeze_inbox_clock / shift_inbox_clock set the
+session setting `sprintctl.inbox_test_now` on a connection (the caller commits).
+Every scope connection is frozen when it opens, so exact-second freshness checks
+hold; advance_clock shifts every open scope. Without those functions the CLOCK
+capability is absent and clock-dependent tests skip.
 Restart reconnects the pool and application. The concurrent hook gates the
-sending connection's commit() so transaction A stays open while B runs.
+sending connection's commit() so transaction A stays open while B runs, and
+sender B uses its own connection, never the reader's.
+Owner stamps carry tag-prefixed workspace_id/repo_id; results are mapped back to
+the test's Ctx values.
 """
 import threading
 import uuid
@@ -108,7 +112,12 @@ class SprintctlInboxProvider:
         self.tag = "inbox-conformance-" + uuid.uuid4().hex
         self.scopes = {}
         self._sprint = {}
-        if hasattr(pg, "shift_inbox_clock"):
+        try:
+            from sprintctl import pg_testing
+        except ImportError:
+            pg_testing = None
+        self.testing = pg_testing
+        if pg_testing is not None and hasattr(pg_testing, "shift_inbox_clock"):
             self.capabilities = self.capabilities | {CLOCK}
         self._open_scope("repo-a")  # creates the schema and the first repository
 
@@ -122,11 +131,36 @@ class SprintctlInboxProvider:
             store = self.pg.get_connection(self.url)
             store.repo_id = self._repo(repo_id)
             self.pg.init_db(store)
+            self._freeze(store)
             app = WorkApplication.postgres(store)
             sprint = self.pg.create_sprint(store, "Inbox conformance", "Contract", "2026-01-01", "2026-12-31", "active")
             track = self.pg.get_or_create_track(store, sprint, "contract")
             self.scopes[repo_id] = (store, app, sprint, track)
         return self.scopes[repo_id]
+
+    def _freeze(self, store):
+        if CLOCK in self.capabilities:
+            self.testing.freeze_inbox_clock(store)
+            store.conn.commit()
+
+    def _extra_connection(self, repo_id):
+        """A separate connection to a repository, schema initialized, clock frozen."""
+        from sprintctl.application import WorkApplication
+        store = self.pg.get_connection(self.url)
+        store.repo_id = self._repo(repo_id)
+        self.pg.init_db(store)
+        self._freeze(store)
+        return store, WorkApplication.postgres(store)
+
+    def _plain(self, value):
+        """Map tag-prefixed workspace_id/repo_id stamps back to the test's values."""
+        prefix = self.tag + "-"
+        if isinstance(value, dict):
+            return {k: (v[len(prefix):] if k in ("workspace_id", "repo_id") and isinstance(v, str)
+                        and v.startswith(prefix) else self._plain(v)) for k, v in value.items()}
+        if isinstance(value, list):
+            return [self._plain(v) for v in value]
+        return value
 
     def close(self):
         for store, *_ in self.scopes.values():
@@ -141,7 +175,7 @@ class SprintctlInboxProvider:
         _, app, *_ = self._open_scope(ctx.repo_id)
         scoped = Ctx(f"{self.tag}-{ctx.workspace_id}", ctx.repo_id, ctx.principal_id)
         try:
-            return app.invoke(operation, arguments, _context(scoped))
+            return self._plain(app.invoke(operation, arguments, _context(scoped)))
         except self.rejection as error:
             # Owner codes are the contract codes; an unknown code fails the scenario that meets it.
             raise ContractRefusal(error.code, getattr(error, "details", None) or {}) from error
@@ -160,7 +194,7 @@ class SprintctlInboxProvider:
 
     def advance_clock(self, seconds):
         for store, *_ in self.scopes.values():
-            self.pg.shift_inbox_clock(store, seconds)
+            self.testing.shift_inbox_clock(store, seconds)
             store.conn.commit()
 
     def send_concurrently_reversed(self, sender, message_a, message_b, reader):
@@ -171,12 +205,10 @@ class SprintctlInboxProvider:
         numbers outside that lock lets B commit first, which is what the reader
         polling between the commits then exposes.
         """
-        from sprintctl.application import WorkApplication
-        store_a = self.pg.get_connection(self.url)
-        store_a.repo_id = self._repo(sender.repo_id)
+        store_a, app_a = self._extra_connection(sender.repo_id)
+        store_b, app_b = self._extra_connection(sender.repo_id)
         reached, release, done_a = threading.Event(), threading.Event(), threading.Event()
         store_a.conn = _GatedConnection(store_a.conn, reached, release)
-        app_a = WorkApplication.postgres(store_a)
         scoped = Ctx(f"{self.tag}-{sender.workspace_id}", sender.repo_id, sender.principal_id)
         failure = []
 
@@ -195,7 +227,7 @@ class SprintctlInboxProvider:
 
         def run_b():
             try:
-                self._invoke(sender, "work.message.send-v1", {"message": message_b})
+                app_b.invoke("work.message.send-v1", {"message": message_b}, _context(scoped))
             except Exception as error:
                 failure.append(error)
             finally:
@@ -210,6 +242,7 @@ class SprintctlInboxProvider:
         if failure:
             raise failure[0]
         store_a.conn._conn.close()
+        store_b.conn.close()
         committed = [message_b["message_id"], message_a["message_id"]] if b_first else [
             message_a["message_id"], message_b["message_id"]]
         second = self.read(reader, after_seq=first["next_after_seq"], limit=100)

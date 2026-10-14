@@ -142,15 +142,15 @@ class World:
         self.R = Ctx("ws-a", "repo-a", "github:2:0")
         self.X = Ctx("ws-a", "repo-a", "github:3:0")
         self.ins1, self.ins2 = new_instance_id(), new_instance_id()
-        self.p.register(self.R, instance_id=self.ins1, declaration=declaration(), idempotency_key="reg-1")
-        self.p.register(self.R, instance_id=self.ins2, declaration=declaration(), idempotency_key="reg-2")
+        self.p.register(self.R, instance_id=self.ins1, declaration=declaration(), idempotency_key="reg-key-1")
+        self.p.register(self.R, instance_id=self.ins2, declaration=declaration(), idempotency_key="reg-key-2")
         self.item = self.p.new_item(self.S)
         self.run = self.p.new_run(self.R)
         self._keys = 0
 
     def key(self):
         self._keys += 1
-        return f"k-{self._keys}"
+        return f"key-{self._keys:06d}"
 
     def message(self, *, instance=None, **overrides):
         recipient = {"principal_id": self.R.principal_id}
@@ -384,8 +384,8 @@ def test_07_foreign_scope_does_not_exist(w):
 def test_07b_list_never_returns_foreign_entries_and_instance_ids_are_per_scope(w):
     other = Ctx("ws-b", "repo-a", "github:9:0")
     elsewhere = Ctx("ws-a", "repo-b", w.R.principal_id)
-    w.p.register(other, instance_id=w.ins1, declaration=declaration(), idempotency_key="x")  # same id, other workspace
-    w.p.register(elsewhere, instance_id=w.ins1, declaration=declaration(), idempotency_key="y")  # other repository
+    w.p.register(other, instance_id=w.ins1, declaration=declaration(), idempotency_key="other-ws-key")  # same id, other workspace
+    w.p.register(elsewhere, instance_id=w.ins1, declaration=declaration(), idempotency_key="other-repo-key")  # other repository
     assert [e["principal_id"] for e in w.p.list(w.R)["entries"]] == [w.R.principal_id]
     assert [e["principal_id"] for e in w.p.list(other)["entries"]] == [other.principal_id]
     assert [e["principal_id"] for e in w.p.list(elsewhere)["entries"]] == [w.R.principal_id]
@@ -402,7 +402,7 @@ def test_08_stranger_sees_nothing_and_writes_nothing(w):
     expect("not-found", w.p.status, w.X, message_id=m)
     expect("not-found", w.p.receipt, w.X, message_id=m, instance_id=w.ins1, kind="observed")
     stranger_instance = new_instance_id()
-    w.p.register(w.X, instance_id=stranger_instance, declaration=declaration(), idempotency_key="sx")
+    w.p.register(w.X, instance_id=stranger_instance, declaration=declaration(), idempotency_key="stranger-key")
     expect("not-found", w.p.receipt, w.X, message_id=m, instance_id=stranger_instance, kind="acknowledged")
     refused(w.p.receipt, w.S, message_id=m, instance_id=w.ins1, kind="observed")  # sender is not the recipient
     assert w.p.read(w.X, after_seq=0, limit=100)["messages"] == []
@@ -429,7 +429,7 @@ def test_09_instances_belong_to_their_principal(w):
     # A principal cannot write receipts through another principal's instance.
     m = w.send()
     other = new_instance_id()
-    w.p.register(w.X, instance_id=other, declaration=declaration(), idempotency_key="sx")
+    w.p.register(w.X, instance_id=other, declaration=declaration(), idempotency_key="stranger-key")
     expect("instance-not-owned", w.rcpt, m, "observed", other)
     assert w.kinds(m) == []
 
@@ -437,12 +437,12 @@ def test_09_instances_belong_to_their_principal(w):
 @pytest.mark.essential_workflow
 def test_09b_registration_revisions_and_idempotency(w):
     revised = declaration(channels=("mcp", "tmux"))
-    first = w.p.register(w.R, instance_id=w.ins1, declaration=revised, idempotency_key="rev")
+    first = w.p.register(w.R, instance_id=w.ins1, declaration=revised, idempotency_key="revision-key")
     assert first["declaration_revision"] == 2 and first["replayed"] is False
-    again = w.p.register(w.R, instance_id=w.ins1, declaration=revised, idempotency_key="rev")
+    again = w.p.register(w.R, instance_id=w.ins1, declaration=revised, idempotency_key="revision-key")
     assert again["replayed"] is True and again["declaration_revision"] == 2
     expect("idempotency-conflict", w.p.register, w.R, instance_id=w.ins1, declaration=declaration(),
-           idempotency_key="rev")
+           idempotency_key="revision-key")
     instance = next(i for i in w.p.describe(w.S, principal_id=w.R.principal_id)["instances"]
                     if i["instance_id"] == w.ins1)
     assert instance["declaration"] == revised and instance["declaration_revision"] == 2
@@ -508,7 +508,7 @@ def test_10_expired_evidence_is_stale_never_absent_or_false(w):
 @pytest.mark.essential_safety
 def test_10b_non_interactive_instance_is_not_applicable_for_attended(w):
     robot = new_instance_id()
-    w.p.register(w.R, instance_id=robot, declaration=declaration(interactive=False, channels=()), idempotency_key="robot")
+    w.p.register(w.R, instance_id=robot, declaration=declaration(interactive=False, channels=()), idempotency_key="robot-key")
     expect("fact-not-applicable", w.p.observe, w.R, instance_id=robot, fact="attended", valid_for_seconds=60,
            idempotency_key=w.key())
     _, entry = instance_of(w, robot)
@@ -528,7 +528,10 @@ def test_10c_observation_arguments(w):
         expect("invalid-arguments", w.p.observe, w.R, **{**base, "idempotency_key": w.key(), **kw})
     expect("not-found", w.p.observe, w.R, instance_id=new_instance_id(), fact="observed", valid_for_seconds=5,
            idempotency_key=w.key())
-    same = dict(instance_id=w.ins1, fact="observed", valid_for_seconds=60, idempotency_key="same")
+    for key in ("short", "has space!", "k" * 129, None):
+        expect("invalid-arguments", w.p.observe, w.R, instance_id=w.ins1, fact="observed", valid_for_seconds=5,
+               idempotency_key=key)
+    same = dict(instance_id=w.ins1, fact="observed", valid_for_seconds=60, idempotency_key="same-key-1")
     first = w.p.observe(w.R, **same)
     assert w.p.observe(w.R, **same)["replayed"] is True
     assert w.p.observe(w.R, **same)["observed_at"] == first["observed_at"]
@@ -565,7 +568,7 @@ def test_11b_recipient_must_be_registered_in_scope(w):
     expect("recipient-unknown", w.p.send, w.S, message=w.message(
         recipient={"principal_id": w.R.principal_id, "instance_id": new_instance_id()}))
     mine = new_instance_id()
-    w.p.register(w.X, instance_id=mine, declaration=declaration(), idempotency_key="xx")
+    w.p.register(w.X, instance_id=mine, declaration=declaration(), idempotency_key="xx-key-001")
     expect("recipient-unknown", w.p.send, w.S, message=w.message(
         recipient={"principal_id": w.R.principal_id, "instance_id": mine}))  # belongs to another principal
     assert w.p.read(w.R, after_seq=0, limit=100)["messages"] == []
@@ -709,8 +712,8 @@ def test_15b_per_instance_receipts_and_prerequisites(w):
 def test_16_retired_instance_is_listed_but_inert(w):
     m = w.send()
     w.p.observe(w.R, instance_id=w.ins1, fact="observed", valid_for_seconds=600, idempotency_key=w.key())
-    retired = w.p.retire(w.R, instance_id=w.ins1, reason="host decommissioned", idempotency_key="ret")
-    assert w.p.retire(w.R, instance_id=w.ins1, reason="host decommissioned", idempotency_key="ret")["replayed"] is True
+    retired = w.p.retire(w.R, instance_id=w.ins1, reason="host decommissioned", idempotency_key="retire-key")
+    assert w.p.retire(w.R, instance_id=w.ins1, reason="host decommissioned", idempotency_key="retire-key")["replayed"] is True
     expect("instance-retired", w.p.retire, w.R, instance_id=w.ins1, reason="again", idempotency_key=w.key())
     expect("instance-retired", w.p.observe, w.R, instance_id=w.ins1, fact="observed", valid_for_seconds=60,
            idempotency_key=w.key())

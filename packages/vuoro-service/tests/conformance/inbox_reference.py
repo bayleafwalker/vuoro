@@ -22,6 +22,7 @@ _CHANNEL = re.compile(r"^[a-z][a-z0-9.-]{0,63}$")
 _CODE = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
 _WORK_LINK = re.compile(r"^vuoro-work://link/v1/[A-Za-z0-9_-]+$")
 _CORRELATION = re.compile(r"^[A-Za-z0-9._:-]{8,128}$")
+_KEY = re.compile(r"^[A-Za-z0-9._:-]{8,128}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 MAX_ENVELOPE_BYTES = 64 * 1024
 MAX_BODY_BYTES = 16 * 1024
@@ -87,7 +88,7 @@ class ReferenceInboxProvider:
         return scopes.get(key)
 
     def _idempotent(self, scope, ctx, op, key, args, run):
-        _bad(isinstance(key, str) and 1 <= len(key) <= 256)
+        _bad(isinstance(key, str) and _KEY.match(key))
         slot = f"{ctx.principal_id}|{op}|{key}"
         d = digest(args)
         if slot in scope["idem"]:
