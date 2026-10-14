@@ -22,6 +22,47 @@ keys = git_fixtures.keys
 certificates = tls_fixtures.certificates
 
 
+_PACKAGED_CREDCTL = Path("/run/current-system/sw/bin/credctl")
+_FIXTURE_CREDCTL_BYTES = b"#!/bin/sh\nexit 125\n"
+
+
+def _packaged_credctl_exists():
+    try:
+        _PACKAGED_CREDCTL.stat()
+    except FileNotFoundError:
+        return False
+    return True
+
+
+def _credctl_binary(tmp_path):
+    if _packaged_credctl_exists():
+        return _PACKAGED_CREDCTL
+    # Portable admission DATA only: this executable can never mint a token.
+    # The closed profile still carries the production fixed-path literal.
+    binary = tmp_path / "fixture-credctl"
+    if not binary.exists():
+        with binary.open("xb") as stream:
+            stream.write(_FIXTURE_CREDCTL_BYTES)
+        binary.chmod(0o700)
+    return binary
+
+
+def credctl_admission_bootstrap(tmp_path):
+    if _packaged_credctl_exists():
+        return ""
+    binary = _credctl_binary(tmp_path)
+    # Mirror ONLY the existing test-only parent admission remap in its isolated
+    # child. Original executable hash/mode/inode validation still runs.
+    return (
+        "fixture_check=registry._check_executable;"
+        "registry._check_executable=lambda path,expected:fixture_check("
+        + repr(str(binary))
+        + " if path=="
+        + repr(str(_PACKAGED_CREDCTL))
+        + " else path,expected);"
+    )
+
+
 def data(tmp_path, certificates, keys, *, artifact_root=None):
     root = artifact_root or tmp_path / "artifacts-root"
     if not root.exists():
@@ -54,17 +95,28 @@ def data(tmp_path, certificates, keys, *, artifact_root=None):
         ),
     }
     for name, path in {
-        "credctl": "/run/current-system/sw/bin/credctl",
+        "credctl": str(_PACKAGED_CREDCTL),
         "python": sys.executable,
         "git": shutil.which("git"),
         "gpg": shutil.which("gpg"),
     }.items():
         result[name + "_path"] = path
-        result[name + "_sha256"] = sha(Path(path).read_bytes())
+        binary = _credctl_binary(tmp_path) if name == "credctl" else Path(path)
+        result[name + "_sha256"] = sha(binary.read_bytes())
     return result
 
 
 def install_test_registry(tmp_path, monkeypatch, value):
+    if not _packaged_credctl_exists():
+        binary = _credctl_binary(tmp_path)
+        original = module._check_executable
+        monkeypatch.setattr(
+            module,
+            "_check_executable",
+            lambda path, expected: original(
+                str(binary) if path == str(_PACKAGED_CREDCTL) else path, expected
+            ),
+        )
     home = tmp_path / "pwd-home"
     directory = home / ".local/state/vuoro-reconciler"
     directory.mkdir(parents=True, mode=0o700)
@@ -477,3 +529,49 @@ def test_state_store_final_census_and_entry_state_drift_refuses(
     monkeypatch.setattr(module, "_bounded_state_names", census)
     with pytest.raises(ProviderRefused):
         module.load_installed_registry_snapshot("fixture")
+
+
+def test_portable_credctl_fixture_keeps_fixed_profile_path_and_real_pin(
+    tmp_path, monkeypatch, certificates, keys
+):
+    import subprocess
+
+    monkeypatch.setattr(sys.modules[__name__], "_packaged_credctl_exists", lambda: False)
+    value = data(tmp_path, certificates, keys)
+    binary = tmp_path / "fixture-credctl"
+    assert value["credctl_path"] == "/run/current-system/sw/bin/credctl"
+    assert value["credctl_sha256"] == sha(binary.read_bytes())
+    assert binary.read_bytes() == _FIXTURE_CREDCTL_BYTES
+    assert binary.stat().st_mode & 0o777 == 0o700
+    result = subprocess.run([str(binary)], capture_output=True, check=False)
+    assert result.returncode == 125 and result.stdout == result.stderr == b""
+    install_test_registry(tmp_path, monkeypatch, value)
+    assert module.load_installed_profile("fixture").data["credctl_path"] == str(
+        _PACKAGED_CREDCTL
+    )
+    bootstrap = credctl_admission_bootstrap(tmp_path)
+    assert repr(str(binary)) in bootstrap
+    assert repr(str(_PACKAGED_CREDCTL)) in bootstrap
+
+
+@pytest.mark.parametrize("tamper", ["bytes", "mode"])
+def test_portable_credctl_fixture_still_refuses_real_pin_and_mode_drift(
+    tmp_path, monkeypatch, certificates, keys, tamper
+):
+    monkeypatch.setattr(sys.modules[__name__], "_packaged_credctl_exists", lambda: False)
+    value = data(tmp_path, certificates, keys)
+    install_test_registry(tmp_path, monkeypatch, value)
+    binary = tmp_path / "fixture-credctl"
+    if tamper == "bytes":
+        binary.write_bytes(b"#!/bin/sh\nexit 126\n")
+    else:
+        binary.chmod(0o600)
+    with pytest.raises(ProviderRefused):
+        module.load_installed_profile("fixture")
+
+
+def test_packaged_credctl_fixture_branch_has_no_admission_remap(tmp_path, monkeypatch):
+    monkeypatch.setattr(sys.modules[__name__], "_packaged_credctl_exists", lambda: True)
+    assert _credctl_binary(tmp_path) == _PACKAGED_CREDCTL
+    assert credctl_admission_bootstrap(tmp_path) == ""
+    assert not (tmp_path / "fixture-credctl").exists()

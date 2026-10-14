@@ -723,6 +723,8 @@ def test_actual_https_race_two_distinct_signed_originals_has_one_ref_winner(
 def child_driver(value, launch=False):
     # Test-only process harness emulates installed identity/local durable FS.
     # Product CLI exposes no source, home, credential, or filesystem selector.
+    from test_protected_provider_registry import credctl_admission_bootstrap
+
     source = str(Path(module.__file__).parents[1])
     home = str(value.registry_path.parents[3])
     bootstrap = (
@@ -736,6 +738,7 @@ def child_driver(value, launch=False):
             if os.environ.get("Q4_PROVIDER_REAL_STATE_FS") == "1"
             else "realfs=registry._filesystem;registry._filesystem=lambda fd:realfs(fd) if os.readlink('/proc/self/fd/'+str(fd)).startswith('/sys/fs/cgroup/') else 'ext4';"
         )
+        + credctl_admission_bootstrap(value.registry_path.parents[4])
         + "from vuoro_reconciler import protected_provider_child as child;"
     )
     if launch:
