@@ -186,8 +186,10 @@ treating the rollout as cancelled. A Job that is `not-created` or `failed`
 while the schema is already at or above the target is reported as the anomaly
 `job-state-inconsistent-with-schema`. That state means an earlier rollout, an
 out-of-band migration or a commit before the failure, and a person must
-confirm which. A same-image redeploy with no migration also shows this
-anomaly.
+confirm which. The exception is a no-op redeploy: the Job is `not-created`,
+the current schema equals the target, and the `--served-image` range admits
+the target. In that case no anomaly is reported. Without `--served-image`
+this cannot be established, so the anomaly stays.
 | `image-revert` | The target is committed and the prior image's range still admits it. |
 | `forward-fix-or-restore` | The committed schema is outside the prior image's range. Recovery is a compatible forward image or a coordinated restore, not an old-image rollback. |
 

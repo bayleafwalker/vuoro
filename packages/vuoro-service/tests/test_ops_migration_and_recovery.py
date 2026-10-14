@@ -115,6 +115,23 @@ def test_job_state_inconsistent_with_schema_is_an_anomaly(job, current, flagged)
         assert result.status != "ok"
 
 
+@pytest.mark.parametrize(("job", "served", "served_range", "current", "flagged"), [
+    ("not-created", True, (25, 25), 25, False),   # no-op redeploy: served image admits the target
+    ("not-created", True, (24, 25), 25, False),
+    ("not-created", False, None, 25, True),       # no served image range: not established
+    ("not-created", True, (26, 26), 25, True),    # served image does not admit the target
+    ("not-created", True, (25, 26), 26, True),    # schema above target is never a no-op
+    ("failed", True, (25, 25), 25, True),         # a failed Job is never a no-op
+])
+def test_noop_redeploy_is_exempt_from_the_job_state_anomaly(job, served, served_range, current, flagged):
+    served_image = "served@sha256:" + "5" * 64
+    ranges = {CANDIDATE: (25, 26), PRIOR: (25, 26), served_image: served_range}
+    result = migration_preflight(candidate_image=CANDIDATE, prior_image=PRIOR, target_schema=25,
+                                 current_schema=current, job_state=job,
+                                 served_image=served_image if served else None, image_runner=runner_for(ranges))
+    assert ("job-state-inconsistent-with-schema" in result.result["anomalies"]) is flagged
+
+
 @pytest.mark.parametrize("job", ["in-flight", "absent", None])
 def test_unsettled_or_unobserved_job_yields_no_class(job):
     result = migration_preflight(candidate_image=CANDIDATE, prior_image=PRIOR, target_schema=25, current_schema=22,

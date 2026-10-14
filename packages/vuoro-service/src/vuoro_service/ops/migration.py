@@ -169,7 +169,13 @@ def migration_preflight(
         # migration step is transactional.  Neither owner publishes that as
         # machine-readable metadata, so it cannot be confirmed here.
         unknowns.append("non-transactional-step-possible")
-    if current_schema is not None and job_state in ("not-created", "failed") and current_schema >= target_schema:
+    # A no-op redeploy: no Job was created because the target is the schema
+    # already present and admitted by the image serving it.  Only an explicit
+    # --served-image range can establish that.
+    noop_redeploy = (job_state == "not-created" and current_schema == target_schema
+                     and admits(served_range, target_schema) is True)
+    if (current_schema is not None and job_state in ("not-created", "failed")
+            and current_schema >= target_schema and not noop_redeploy):
         # The target is already present although this rollout's Job never ran
         # or failed: an earlier rollout, an out-of-band migration, or a commit
         # that preceded the failure.  A person must confirm which.
