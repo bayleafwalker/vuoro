@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vuoro:agent-directory-entry:v1",
+  "title": "Vuoro agent directory entry v1",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "agent-directory-entry/v1"
+    },
+    "principal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "instances": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "instance_id": {
+            "type": "string",
+            "pattern": "^ins_[0-9A-HJKMNP-TV-Z]{26}$"
+          },
+          "declaration": {
+            "$ref": "urn:vuoro:agent-declaration:v1"
+          },
+          "declaration_revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "registered": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "enum": [
+                  "current",
+                  "retired"
+                ]
+              },
+              "registered_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "retired_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "retire_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "state",
+              "registered_at",
+              "retired_at",
+              "retire_reason"
+            ],
+            "additionalProperties": false
+          },
+          "observed": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "enum": [
+                  "current",
+                  "stale",
+                  "unknown"
+                ]
+              },
+              "observed_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "valid_until": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "state",
+              "observed_at",
+              "valid_until",
+              "source"
+            ],
+            "additionalProperties": false
+          },
+          "reachable": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "state": {
+                  "enum": [
+                    "current",
+                    "stale",
+                    "unknown"
+                  ]
+                },
+                "observed_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "valid_until": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "source": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "channel": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state",
+                "observed_at",
+                "valid_until",
+                "source"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "executing": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "enum": [
+                  "current",
+                  "stale",
+                  "unknown"
+                ]
+              },
+              "observed_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "valid_until": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "run_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "state",
+              "observed_at",
+              "valid_until",
+              "source"
+            ],
+            "additionalProperties": false
+          },
+          "attended": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "enum": [
+                  "current",
+                  "stale",
+                  "unknown",
+                  "not-applicable"
+                ]
+              },
+              "observed_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "valid_until": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "state",
+              "observed_at",
+              "valid_until",
+              "source"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "instance_id",
+          "declaration",
+          "declaration_revision",
+          "registered",
+          "observed",
+          "reachable",
+          "executing",
+          "attended"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "principal_id",
+    "evaluated_at",
+    "instances"
+  ],
+  "additionalProperties": false,
+  "$comment": "No fact has a false state; see contract section 2.3."
+}

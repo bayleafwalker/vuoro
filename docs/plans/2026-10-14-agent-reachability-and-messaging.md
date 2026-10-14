@@ -12,6 +12,12 @@ target-state claims (TS-1, TS-2) are quoted from review and from this
 repository's references to them; the agentops repository was not readable
 from this session, so recheck them there.
 
+Follow-up: the operator's roadmap
+(`docs/plans/2026-10-14-agent-coordination-roadmap.md`) and the M0 record
+(`docs/plans/2026-10-14-agent-coordination-m0-baseline.md`) supersede this
+note where they differ, notably on store placement (section 5.6) and on
+exclusive leases.
+
 ## 1. The question
 
 Give agents a way to find each other and coordinate among themselves across
