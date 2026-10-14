@@ -135,7 +135,7 @@ def test_member_set_preserves_agent_marker_unless_explicitly_cleared(env):
 
 
 # 8: reader leaks --------------------------------------------------------------
-def test_unpublished_tombstones_and_hidden_activity_are_invisible_to_readers(env):
+def test_s6_reader_feed_excludes_unpublished_work_and_watermark_moves_only_on_visible_events(env):
     e = env
     r = e.p["reader"]
     before = e.store.changes_since(r, e.ws)
@@ -413,3 +413,102 @@ def test_upload_refused_once_verifying(env):
     _strand(e, begun["version_id"])
     assert codes(lambda: e.store.artifact_upload(e.p["contrib"], e.ws, begun["version_id"], MD)) == "state-conflict"
 
+
+
+# re-review N2/N3/N4 ---------------------------------------------------------------
+def test_import_rederives_media_type_from_bytes(env):
+    e = env
+    out, m = _bundle(e)
+    version = m["artifacts"][0]["versions"][0]
+    html = b"<html><body><script>alert(1)</script></body></html>\n"
+    (out / version["path"]).write_bytes(html)
+    version.update(media_type="text/html", sha256=sha(html), size=len(html))
+    _rewrite(out, m)
+    imported = e.store.import_bundle(e.admin, str(out))
+    new_ws, vmap = imported["workspace_id"], imported["origin_map"]["artifact_version"]
+    amap = imported["origin_map"]["artifact"]
+    dl = e.store.download(e.admin, new_ws, amap[m["artifacts"][0]["artifact_id"]], vmap[version["version_id"]])
+    assert dl["media_type"] == "application/octet-stream" and dl["content_disposition"] == "attachment"
+    assert dl["extraction_state"] == "unsupported"
+    # Bytes that contradict the declared type are refused outright.
+    version.update(media_type="application/pdf")
+    _rewrite(out, m)
+    assert "contradicts its media type" in _import_problems(e, out)
+
+
+def test_export_import_carries_extraction_truncation(env):
+    e = env
+    data = " ".join(f"t{i}q" for i in range(250_000)).encode()
+    upload(e, "contrib", data=data, media="text/plain", name="big.txt")
+    out = e.tmp / "trunc"
+    e.store.export(e.admin, e.ws, str(out))
+    m = json.loads((out / "manifest.json").read_text())
+    assert m["artifacts"][0]["versions"][0]["extraction_truncated"] is True
+    new_ws = e.store.import_bundle(e.admin, str(out))["workspace_id"]
+    assert scalar(e, "SELECT bool_and(truncated) FROM extraction WHERE workspace_id = %s", new_ws) is True
+    assert scalar(e, "SELECT finalize_result->>'content_disposition' FROM artifact_version WHERE workspace_id = %s",
+                  new_ws) == "attachment"
+
+
+def test_finalize_key_race_loser_is_not_stranded(env):
+    e = env
+    c = e.p["contrib"]
+    v1, _ = upload(e, "contrib", finalize=False)
+    v2, _ = upload(e, "contrib", finalize=False)
+    s1, s2 = e.new_store(), e.new_store()
+    results, errors = run_concurrently(
+        lambda: s1.artifact_finalize(c, e.ws, v1["version_id"], idempotency_key="race-key-03"),
+        lambda: s2.artifact_finalize(c, e.ws, v2["version_id"], idempotency_key="race-key-03"),
+    )
+    loser = v2 if results[0] is not None else v1
+    assert scalar(e, "SELECT processing_state FROM artifact_version WHERE version_id = %s",
+                  loser["version_id"]) == "reserved"
+    assert e.store.artifact_finalize(c, e.ws, loser["version_id"])["processing_state"] == "ready"
+
+
+# contract scenarios 12 and 13 (phase0 §4, 896b502) ------------------------------
+def test_s12_review_refused_unless_processing_ready(env):
+    e = env
+    reviewer = e.p["reviewer"]
+    reserved, _ = upload(e, "contrib", finalize=False)
+    assert codes(lambda: e.store.artifact_review(reviewer, e.ws, reserved["version_id"], "approve")) == "state-conflict"
+    _strand(e, reserved["version_id"])  # verifying
+    assert codes(lambda: e.store.artifact_review(reviewer, e.ws, reserved["version_id"], "approve")) == "state-conflict"
+    rejected, result = upload(e, "contrib", expected_sha="0" * 64)
+    assert result["processing_state"] == "rejected"
+    assert codes(lambda: e.store.artifact_review(reviewer, e.ws, rejected["version_id"], "approve")) == "state-conflict"
+    expired, _ = upload(e, "contrib", finalize=False)
+    e.clock.advance(hours=2)
+    e.store.reconcile(e.admin, e.ws)
+    assert codes(lambda: e.store.artifact_review(reviewer, e.ws, expired["version_id"], "approve")) == "state-conflict"
+    assert scalar(e, "SELECT count(*) FROM artifact_version WHERE workspace_id = %s AND review_state <> 'unreviewed'",
+                  e.ws) == 0
+
+
+def test_s13_non_administrators_cannot_delete_export_or_import(env):
+    e = env
+    item = publish_item(e)
+    out = e.tmp / "s13"
+    e.store.export(e.admin, e.ws, str(out))
+    for who in ("reader", "contrib", "reviewer", "agent"):
+        p = e.p[who]
+        assert codes(lambda: e.store.delete(p, e.ws, "item", item["item_id"])) == "forbidden"
+        assert codes(lambda: e.store.export(p, e.ws, str(e.tmp / f"x-{who}"))) == "forbidden"
+    # Import creates a new workspace, so there is no membership yet: it needs knowledge:admin on a
+    # non-agent credential, which is what makes the caller that workspace's first administrator.
+    no_admin = Principal("reviewer", {"knowledge:read", "knowledge:contribute", "knowledge:review"})
+    assert codes(lambda: e.store.import_bundle(no_admin, str(out))) == "forbidden"
+    assert codes(lambda: e.store.import_bundle(e.p["agent"], str(out))) == "forbidden"
+    assert e.store.read(e.p["reader"], e.ws, item["item_id"])["state"] == "approved"
+
+
+def test_workspace_create_needs_admin_credential_and_creator_is_first_admin(env):
+    e = env
+    assert codes(lambda: e.store.workspace_create(Principal("u", {"knowledge:read", "knowledge:review"}), "W")) \
+        == "forbidden"
+    assert codes(lambda: e.store.workspace_create(Principal("bot", EVERY, is_agent=True), "W")) == "forbidden"
+    creator = Principal("founder", EVERY)
+    ws = e.store.workspace_create(creator, "W")["workspace_id"]
+    assert scalar(e, "SELECT role FROM workspace_member WHERE workspace_id = %s AND principal_id = 'founder'",
+                  ws) == "administrator"
+    assert codes(lambda: e.store.member_set(creator, ws, "founder", "reviewer")) == "state-conflict"

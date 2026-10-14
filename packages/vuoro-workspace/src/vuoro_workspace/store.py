@@ -244,9 +244,19 @@ class WorkspaceStore:
         return [v for v, auth in VISIBILITY_AUTHORITY.items() if access.can(auth)]
 
     def _visible_watermark(self, cur: Any, ws: str, access: Access) -> int:
-        """Highest event seq this caller may see; hidden activity never moves it."""
-        cur.execute("SELECT coalesce(max(seq), 0) AS seq FROM workspace_event "
-                    "WHERE workspace_id = %s AND visibility = ANY(%s)", (ws, self._visible(access)))
+        """Highest event seq this caller may see; hidden activity never moves it.
+
+        One max() per visibility class so each is an index-only backward scan
+        of (workspace_id, visibility, seq).
+        """
+        classes = self._visible(access)
+        parts = ", ".join(
+            "(SELECT max(seq) FROM workspace_event WHERE workspace_id = %s AND visibility = %s)" for _ in classes
+        )
+        params: list[Any] = []
+        for visibility in classes:
+            params += [ws, visibility]
+        cur.execute(f"SELECT coalesce(GREATEST({parts}), 0) AS seq", params)
         return int(cur.fetchone()["seq"])
 
     # ------------------------------------------------------- workspace/member
@@ -691,6 +701,20 @@ class WorkspaceStore:
             reasons.append("media-type-mismatch")
         extraction = extract(accepted_type, data) if not reasons and accepted_type else None
 
+        try:
+            return self._finalize_commit(p, ws, version_id, idempotency_key, op, digest, reasons, extraction,
+                                         actual_sha, actual_size, accepted_type, sniffed)
+        except WorkspaceError as exc:
+            if exc.code == E.IDEMPOTENCY_CONFLICT:
+                # The key went to another version first: release this one for a later finalize.
+                with self.conn.transaction(), self.conn.cursor() as cur:
+                    cur.execute("UPDATE artifact_version SET processing_state = 'reserved', verifying_since = NULL "
+                                "WHERE version_id = %s AND processing_state = 'verifying'", (version_id,))
+            raise
+
+    def _finalize_commit(self, p: Principal, ws: str, version_id: str, idempotency_key: str | None, op: str,
+                         digest: str, reasons: list[str], extraction: Any, actual_sha: str, actual_size: int,
+                         accepted_type: str | None, sniffed: str) -> dict[str, Any]:
         with self.conn.transaction(), self.conn.cursor() as cur:
             self._authorize(cur, p, ws, CONTRIBUTE)
             if idempotency_key:
@@ -898,20 +922,18 @@ class WorkspaceStore:
         with self.conn.transaction(), self.conn.cursor() as cur:
             access = self._authorize(cur, p, ws, READ)
             working = access.can(CONTRIBUTE)
-            if scope == "working" and not working:
-                raise WorkspaceError(E.FORBIDDEN, "working scope needs knowledge:contribute")
+            # Contract §3.2: working and history scopes require contributor or higher.
+            if scope != "approved" and not working:
+                raise WorkspaceError(E.FORBIDDEN, f"{scope} scope needs knowledge:contribute")
             if scope == "approved":
                 rev_filter = "r.revision_id = i.approved_revision_id"
                 art_filter = "v.version_id = a.approved_version_id AND v.review_state = 'approved'"
             elif scope == "working":
                 rev_filter = "(r.revision_id = i.approved_revision_id OR r.state IN ('draft','proposed'))"
                 art_filter = "v.review_state <> 'rejected'"
-            elif working:
+            else:
                 rev_filter = "TRUE"
                 art_filter = "TRUE"
-            else:
-                rev_filter = "r.state IN ('approved','superseded')"
-                art_filter = "v.review_state = 'approved'"
             cur.execute(
                 f"""
                 WITH q AS (SELECT websearch_to_tsquery('english', %(q)s) AS tsq),
@@ -927,8 +949,8 @@ class WorkspaceStore:
                   SELECT e.version_id, ts_rank(e.search_tsv, q.tsq) AS rank
                   FROM q, extraction e
                   WHERE e.workspace_id = %(ws)s AND e.search_tsv @@ q.tsq
-                    AND e.extractor_version = (SELECT max(e2.extractor_version) FROM extraction e2
-                                               WHERE e2.version_id = e.version_id AND e2.extractor = e.extractor)
+                    AND e.extractor_version::int = (SELECT max(e2.extractor_version::int) FROM extraction e2
+                                                    WHERE e2.version_id = e.version_id AND e2.extractor = e.extractor)
                   UNION ALL
                   SELECT v.version_id, ts_rank(to_tsvector('english'::regconfig, left(a.name, 1000)), q.tsq)
                   FROM q, artifact a
@@ -954,7 +976,7 @@ class WorkspaceStore:
                          CASE WHEN page.kind = 'item'
                               THEN (SELECT body_md FROM knowledge_revision WHERE revision_id = page.version_id)
                               ELSE coalesce((SELECT text_content FROM extraction x WHERE x.version_id = page.version_id
-                                             ORDER BY x.extractor_version DESC LIMIT 1), page.title)
+                                             ORDER BY x.extractor_version::int DESC LIMIT 1), page.title)
                          END, 200000), q.tsq, 'MaxFragments=1,MaxWords=24,MinWords=6') AS snippet
                 FROM page, q ORDER BY page.rank DESC, page.version_id
                 """,

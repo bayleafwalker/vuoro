@@ -54,8 +54,10 @@ def test_s1_reserved_version_is_invisible_then_expires(env):
     # The name contains the search term, so only the ready filter keeps it out of results.
     begun, _ = upload(e, "contrib", name="churn report", finalize=False)
     art, ver = begun["artifact_id"], begun["version_id"]
+    assert e.store.search(e.p["reader"], e.ws, "churn")["total"] == 0
+    for scope in ("working", "history"):
+        assert e.store.search(e.p["contrib"], e.ws, "churn", scope=scope)["total"] == 0
     for who in ("reader", "contrib"):
-        assert e.store.search(e.p[who], e.ws, "churn", scope="history")["total"] == 0
         assert codes(lambda: e.store.download(e.p[who], e.ws, art, ver)) == "not-found"
     assert codes(lambda: e.store.download(e.p["reader"], e.ws, art)) == "not-found"
     feed = e.store.changes_since(e.p["reader"], e.ws)
@@ -189,13 +191,14 @@ def test_s6_reader_never_sees_drafts_or_unreviewed_artifacts(env):
     approved_art, _ = upload(e, "contrib", data=b"churn table approved\n", media="text/plain", name="churn-final.txt")
     e.store.artifact_review(e.p["reviewer"], e.ws, approved_art["version_id"], "approve")
 
-    for scope in ("approved", "history"):
-        res = e.store.search(e.p["reader"], e.ws, "churn", scope=scope)
-        titles = sorted(r["title"] for r in res["results"])
-        assert titles == ["Approved churn", "churn-final.txt"], scope
-        assert res["total"] == 2
-        assert all(r["publication_state"] == "approved" for r in res["results"])
-    assert codes(lambda: e.store.search(e.p["reader"], e.ws, "churn", scope="working")) == "forbidden"
+    res = e.store.search(e.p["reader"], e.ws, "churn", scope="approved")
+    titles = sorted(r["title"] for r in res["results"])
+    assert titles == ["Approved churn", "churn-final.txt"]
+    assert res["total"] == 2
+    assert all(r["publication_state"] == "approved" for r in res["results"])
+    # Contract §3.2: working and history scopes need contributor or higher.
+    for scope in ("working", "history"):
+        assert codes(lambda: e.store.search(e.p["reader"], e.ws, "churn", scope=scope)) == "forbidden"
     working = e.store.search(e.p["contrib"], e.ws, "churn", scope="working")
     assert working["total"] == 5
     assert working["index_watermark"] == e.store.changes_since(e.admin, e.ws)["watermark"]
@@ -239,7 +242,7 @@ def test_s8_deleted_item_vanishes_and_feed_carries_tombstone(env):
         assert codes(lambda: e.store.read(e.p[who], e.ws, item["item_id"])) == "not-found"
         assert codes(lambda: e.store.read(e.p[who], e.ws, item["item_id"], item["revision_id"])) == "not-found"
         assert codes(lambda: e.store.download(e.p[who], e.ws, begun["artifact_id"])) == "not-found"
-        for scope in ("approved", "history"):
+        for scope in (("approved",) if who == "reader" else ("approved", "working", "history")):
             assert e.store.search(e.p[who], e.ws, "retention", scope=scope)["total"] == 0
     after = e.store.changes_since(e.p["reader"], e.ws, feed["cursor"])
     tombs = [(c["entity_kind"], c["entity_id"]) for c in after["changes"] if c["tombstone"]]

@@ -44,7 +44,7 @@ Operations (`WorkspaceStore` methods): `workspace_create`, `member_set`,
 `item_create`, `revision_draft`, `proposal_submit`, `proposal_review`,
 `proposal_withdraw`, `artifact_begin`, `artifact_upload` (Phase 1 transfer
 step through the store API), `artifact_finalize`, `artifact_review`, `read`,
-`download`, `search` (`approved` | `working` | `history`), `changes_since`,
+`download`, `search` (`approved`; `working` | `history` need contributor+), `changes_since`,
 `delete`, `export`, `import_bundle`, `reconcile`. Mutations accept an
 `idempotency_key` (`^[A-Za-z0-9._:-]{8,128}$`).
 

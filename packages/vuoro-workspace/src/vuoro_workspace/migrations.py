@@ -178,7 +178,7 @@ CREATE TABLE __SCHEMA__.extraction (
   workspace_id text NOT NULL,
   version_id text NOT NULL REFERENCES __SCHEMA__.artifact_version,
   extractor text NOT NULL,
-  extractor_version text NOT NULL,
+  extractor_version text NOT NULL CHECK (extractor_version ~ '^[0-9]{1,9}$'),
   text_content text NOT NULL CHECK (length(text_content) <= 1000000),
   truncated boolean NOT NULL DEFAULT false,
   anchors jsonb NOT NULL DEFAULT '[]'::jsonb,

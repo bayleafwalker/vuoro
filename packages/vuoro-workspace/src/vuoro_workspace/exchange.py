@@ -13,7 +13,7 @@ from . import errors as E
 from .errors import WorkspaceError
 from .extraction import EXTRACTOR, EXTRACTOR_VERSION, extract
 from .ids import is_ulid, new_ulid, normalize, request_digest
-from .objectstore import artifact_key
+from .objectstore import OCTET_STREAM, artifact_key, resolve_media_type
 
 if TYPE_CHECKING:
     from .store import Principal, WorkspaceStore
@@ -46,7 +46,10 @@ def export_workspace(store: "WorkspaceStore", p: "Principal", ws: str, dest: str
         proposals = cur.fetchall()
         cur.execute("SELECT * FROM artifact WHERE workspace_id = %s ORDER BY artifact_id", (ws,))
         artifacts = cur.fetchall()
-        cur.execute("SELECT * FROM artifact_version WHERE workspace_id = %s ORDER BY created_at, version_id", (ws,))
+        cur.execute(
+            "SELECT v.*, coalesce((SELECT bool_or(x.truncated) FROM extraction x WHERE x.version_id = v.version_id), "
+            "false) AS extraction_truncated FROM artifact_version v WHERE v.workspace_id = %s "
+            "ORDER BY v.created_at, v.version_id", (ws,))
         versions = cur.fetchall()
         cur.execute("SELECT * FROM relation WHERE workspace_id = %s ORDER BY relation_id", (ws,))
         relations = cur.fetchall()
@@ -97,7 +100,8 @@ def export_workspace(store: "WorkspaceStore", p: "Principal", ws: str, dest: str
             "size": v["size_bytes"] if v["size_bytes"] is not None else v["expected_size"],
             "media_type": v["media_type"] or v["declared_media_type"], "path": path,
             "processing_state": v["processing_state"], "review_state": v["review_state"],
-            "extraction_state": v["extraction_state"], "created_by": v["created_by"], "created_at": v["created_at"],
+            "extraction_state": v["extraction_state"], "extraction_truncated": v["extraction_truncated"],
+            "created_by": v["created_by"], "created_at": v["created_at"],
             "reviewed_by": v["reviewed_by"], "reviewed_at": v["reviewed_at"],
         })
 
@@ -236,6 +240,8 @@ def _load_bundle(root: Path) -> tuple[dict[str, Any], dict[str, bytes]]:
                 if data is not None:
                     if _sha(data) != v.get("sha256") or len(data) != v.get("size"):
                         problems.append(f"checksum or size mismatch for version {v['version_id']}")
+                    if not isinstance(v.get("media_type"), str) or resolve_media_type(v["media_type"], data)[0] is None:
+                        problems.append(f"content of version {v['version_id']} contradicts its media type")
                     files[v["path"]] = data
             elif v.get("processing_state") == "ready" and v["version_id"] not in missing:
                 problems.append(f"ready version {v['version_id']} has no file and no missing entry")
@@ -359,13 +365,18 @@ def import_workspace(store: "WorkspaceStore", p: "Principal", src: str, *, name:
                 elif state in ("reserved", "verifying"):
                     state = "expired"
                 extraction = None
+                media_type = v["media_type"]
                 if data is not None and state == "ready":
                     pending.append((key, data))
-                    extraction = extract(v["media_type"], data)
+                    # Never trust the manifest's type: re-derive it from the bytes (validated non-None).
+                    media_type = resolve_media_type(v["media_type"], data)[0] or OCTET_STREAM
+                    extraction = extract(media_type, data)
                     extraction_state = extraction.state
                 result = normalize({"artifact_id": aid, "version_id": vid, "processing_state": state,
                                     "review_state": "unreviewed", "extraction_state": extraction_state,
-                                    "sha256": v["sha256"], "size": v["size"], "media_type": v["media_type"],
+                                    "extraction_truncated": bool(extraction and extraction.truncated),
+                                    "sha256": v["sha256"], "size": v["size"], "media_type": media_type,
+                                    "content_disposition": "attachment",
                                     "reject_reasons": [reason] if reason else []})
                 cur.execute(
                     "INSERT INTO artifact_version (version_id, workspace_id, artifact_id, object_key, expected_sha256, "
@@ -374,7 +385,7 @@ def import_workspace(store: "WorkspaceStore", p: "Principal", src: str, *, name:
                     "reviewed_by, reviewed_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                     (vid, ws, aid, key, v["sha256"], v["size"], v["media_type"],
                      v["sha256"] if state == "ready" else None, v["size"] if state == "ready" else None,
-                     v["media_type"], state, review, extraction_state, reason,
+                     media_type, state, review, extraction_state, reason,
                      Jsonb(result) if state in ("ready", "rejected") else None, v["created_by"],
                      v.get("created_at") or store.now(), v.get("created_at") or store.now(),
                      store.now() if state in ("ready", "rejected") else None, v.get("reviewed_by"), v.get("reviewed_at")),
@@ -382,8 +393,8 @@ def import_workspace(store: "WorkspaceStore", p: "Principal", src: str, *, name:
                 if extraction is not None and extraction.state == "ready":
                     cur.execute(
                         "INSERT INTO extraction (extraction_id, workspace_id, version_id, extractor, extractor_version, "
-                        "text_content, anchors, created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
-                        (new_ulid(), ws, vid, EXTRACTOR, EXTRACTOR_VERSION, extraction.text,
+                        "text_content, truncated, anchors, created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                        (new_ulid(), ws, vid, EXTRACTOR, EXTRACTOR_VERSION, extraction.text, extraction.truncated,
                          Jsonb(extraction.anchors), store.now()),
                     )
             approved = art.get("approved_version_id")
