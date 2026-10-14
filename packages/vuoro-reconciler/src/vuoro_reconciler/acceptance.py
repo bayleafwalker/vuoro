@@ -57,6 +57,7 @@ __all__ = [
     "AutoAcceptPolicy",
     "OperatorAcceptance",
     "apply_auto_accept",
+    "legacy_execution_excluded",
     "scope_admits",
 ]
 
@@ -232,12 +233,31 @@ class AutoAcceptConfig:
         return None
 
 
+def legacy_execution_excluded(
+    intent: EffectIntent, protected_repositories: frozenset[str] = frozenset()
+) -> bool:
+    """Protected registration or owner proof excludes the legacy workflow.
+
+    A release binding alone and an explicit null verification retain ordinary
+    behavior. Malformed non-null verification is still an exclusion signal,
+    never acceptance or publication authority.
+    """
+    return intent.repository in protected_repositories or (
+        isinstance(intent.acceptance, Mapping)
+        and intent.acceptance.get("verification") is not None
+    )
+
+
 async def apply_auto_accept(
-    intent_source: IntentSource, config: AutoAcceptConfig | None
+    intent_source: IntentSource, config: AutoAcceptConfig | None,
+    *, protected_repositories: frozenset[str] = frozenset()
 ) -> list[tuple[str, PolicyAcceptor]]:
     """Accept every proposed intent a policy matches. Returns what was
     accepted. With no config, or no enabled policy, does nothing at all --
     not even a poll.
+
+    Protected registrations and non-null owner verification are skipped before
+    policy evaluation. A legacy policy cannot accept them.
 
     Never raises: a poll that fails, or one intent whose evaluation or
     `accept` fails (e.g. a lost compare-and-set race with an operator), is
@@ -253,6 +273,8 @@ async def apply_auto_accept(
     accepted = []
     for intent in proposed:
         try:
+            if legacy_execution_excluded(intent, protected_repositories):
+                continue
             acceptor = config.evaluate(intent)
             if acceptor is None:
                 continue
