@@ -68,6 +68,12 @@ not a kctl revival.
 - **Release.** It ships as its own wheel and is composed into vuoro-service as
   a pinned release, like sprintctl and auditctl.
 - **Location.** It lives in this repository because no other owner exists.
+  This is an exception to the `AGENTS.md` rule that domain state machines and
+  migrations stay in their owner repositories; the store PR amends
+  `AGENTS.md` to record `packages/vuoro-workspace` as the owner, and ratifying
+  this note confirms that exception. The `knowledge` schema and its roles were
+  provisioned for kctl's domain and are reassigned to the workspace; kctl
+  stays `retiring`.
 - **Dependencies.** `psycopg[binary]>=3.2` and `vuoro-schema-runtime`. There is
   no ORM. The S3 backend uses `boto3` as an optional extra.
 
@@ -88,12 +94,18 @@ authorities and the principal's current role in `knowledge.workspace_member`.
 - A principal marked as an agent is capped at contributor, so autonomous
   agents cannot publish.
 - A proposal's author cannot review it.
+- `workspace.create` requires `knowledge:admin` on the credential; the creator
+  becomes the first administrator. A workspace keeps at least one administrator.
+- Search scopes `working` and `history` require contributor or higher.
+  Contributors see all drafts in their workspace (there are no private drafts).
+- Delete, export and import require administrator.
 
 ### 3.3 State machines
 
 - **Knowledge revision.**
   - States: `draft` → `proposed` → `approved` | `rejected`, with
-    `proposed` → `withdrawn`.
+    `proposed` → `withdrawn` and `approved` → `superseded` when a newer
+    revision is approved.
   - Approval atomically checks `expected_base_revision_id = item.approved_revision_id`.
     It then moves the approved pointer, marks the prior approved revision
     `superseded`, and writes audit and outbox events.
@@ -103,7 +115,8 @@ authorities and the principal's current role in `knowledge.workspace_member`.
   `rejected` (checksum, size or type mismatch), and `reserved` → `expired`.
   Extraction is a separate dimension: `pending` → `ready` | `unsupported` |
   `failed`.
-- **Artifact version, review.** `unreviewed` → `approved` | `rejected`, held
+- **Artifact version, review.** `unreviewed` → `approved` | `rejected`, allowed
+  only once processing is `ready`. Held
   in a separate column from processing. An upload never implies approval.
 - **Deletion.** A tombstone (`deleted_at`, actor) removes the item from every
   read, search and count immediately. Purge is a later, separate step.
@@ -113,7 +126,8 @@ authorities and the principal's current role in `knowledge.workspace_member`.
 - **Event writes.** Every mutation's transaction writes its rows, one
   `workspace_event` (a monotonic per-workspace `seq` from a locked counter
   row), one `outbox` row and one `audit_event`.
-- **Idempotency.** Retryable mutations take an idempotency key matching
+- **Idempotency.** Retryable mutations take an idempotency key, scoped to (workspace, principal,
+  operation, key) and matching
   `^[A-Za-z0-9._:-]{8,128}$`, stored with the request digest and the result.
   A replay returns the stored result; the same key with a different digest
   returns `idempotency-conflict`.
@@ -143,6 +157,10 @@ authorities and the principal's current role in `knowledge.workspace_member`.
 `history`), `changes_since` (a cursor), `delete`, `export`, `import`,
 `reconcile`.
 
+`changes_since` returns only events the caller's current role may see:
+readers get published events (including tombstones of formerly approved
+records), contributors and above also get working events.
+
 Results carry stable ULIDs, version IDs, publication state, extraction state
 and the index watermark.
 
@@ -163,12 +181,17 @@ validates every reference and re-verifies every checksum.
 
 ## 4. Failure scenarios Phase 1 tests must cover
 
+Artifact processing and review both use the word `rejected`; they are
+separate columns and are always reported with their dimension.
+
 1. A version is reserved but never finalized: it stays invisible and then expires.
 2. Finalize with a wrong checksum or size: the version is `rejected` and never becomes ready.
 3. Finalize is retried, or the same idempotency key is reused: the result is one version and the same response.
 4. Two proposals share a base: the first approval wins and the second gets `stale-base`.
 5. A contributor or agent tries to approve, or an author tries to approve their own proposal: refused.
-6. A reader searches: drafts and unreviewed artifacts are absent from both results and counts.
+6. A reader searches or reads the change feed: drafts and unreviewed artifacts are absent from results, counts and `changes_since`, and watermarks advance only on events the reader may see.
+12. A reviewer tries to approve an artifact version whose processing is not `ready`: refused.
+13. A non-administrator tries delete, export or import: refused.
 7. A member is removed: their next read, search or `changes_since` is refused.
 8. An item is deleted: it is absent from reads and search, and the change feed carries a tombstone.
 9. An object is missing, or an object has no row: reconciliation reports it.
