@@ -225,3 +225,43 @@ protected approval → private read-copy route. Fixture provenance is recorded i
 `tests/test_protected_copy_codec.py`; hashes validate data integrity, not a fresh
 authenticated read or signature attestation. Listed metadata, when supplied,
 binds the permanent receipt ID; absent metadata cannot attest that ID.
+
+## Q4 installed protected runtime
+
+The protected runtime composes the private broker reader, native currentness
+reader, permanent journal, contained Git/signing authority and protected
+provider executor. The preceding copy-data section describes the original
+decoder addition; the runtime adds the authenticated transport and execution
+boundary. It has a separate fixed entrypoint:
+
+```bash
+python -I -B -m vuoro_reconciler.protected_runtime_cli list-accepted PROFILE_ID
+python -I -B -m vuoro_reconciler.protected_runtime_cli execute PROFILE_ID ACCEPTANCE_ID
+python -I -B -m vuoro_reconciler.protected_runtime_cli install-journal PROFILE_ID
+```
+
+Only an installed profile ID selects authority. There are no caller-selected
+factories, credential paths or executable overrides. Installation requires
+immutable admitted Python/package/tool origins, a nonroot process with zero
+capabilities, private regular owner files on an admitted local filesystem,
+and an existing delegated empty cgroup root. Registry and runtime profile
+digests bind the journal and every contained operation. Journal installation
+is explicit and exclusive; startup never repairs, migrates or resets state.
+
+Private credential reads and local Git/signing operations start only after
+durable active state and containment are established. The signer uses an
+existing OpenPGP agent without generating keys, starting an agent, prompting
+for a PIN or unlocking a key. Uncertain cleanup retains active state for owner
+inspection. The original approved artifact and publication attempt remain
+permanently bound; an uncertain transmission is never automatically resent.
+
+`APPLIED` records the original branch and pull-request publication. Merge,
+deployment and work completion have their own owners. `UNAVAILABLE` conveys
+no publication conclusion; recovery requires the journal and fresh protected
+observations. Accepted-page cursors are discovery positions: restart and
+deduplicate permanent acceptance IDs rather than treating a page as a complete
+stream.
+
+Source and disposable fixtures qualify these contracts. Production profile
+installation, broker grants, immutable host packaging and hardware-backed
+approval/signing require separate deployment qualification.
