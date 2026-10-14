@@ -50,12 +50,18 @@ jobs:
       - run: uv build --package vuoro-workspace --wheel --out-dir dist/vuoro-workspace
   test:
     runs-on: ubuntu-latest
+    env:
+      # vuoro-ops isolated-restore tests fail, never skip, without PostgreSQL 16.
+      VUORO_OPS_REQUIRE_PG16: "1"
+      VUORO_PG_BIN: /usr/lib/postgresql/16/bin
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v8.3.2
         with:
           python-version: "3.12"
           enable-cache: true
+      - name: Install disposable PostgreSQL 16 tools
+        run: sudo apt-get update && sudo apt-get install -y postgresql-16
       - run: uv sync --all-packages --all-extras
       - run: uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests
       - run: uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests

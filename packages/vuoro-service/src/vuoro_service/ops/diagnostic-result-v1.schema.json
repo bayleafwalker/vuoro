@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/bayleafwalker/vuoro/schemas/vuoro-diagnostic-result-v1.json",
+  "title": "vuoro-diagnostic-result/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "operation", "version", "status", "composition", "work_refs", "observed_at", "result", "unknowns"],
+  "properties": {
+    "schema_version": {"const": "vuoro-diagnostic-result/v1"},
+    "operation": {"enum": ["uncertain-effects", "provider-outcome-check", "role-probe", "catalog-probe", "migration-preflight", "recovery-export", "isolated-restore"]},
+    "version": {"type": "string", "pattern": "^[1-9][0-9]*$"},
+    "status": {"enum": ["ok", "attention", "error"]},
+    "composition": {
+      "type": "object",
+      "required": ["pins_path", "pins_sha256", "pins_schema_version", "locks", "runtime_descriptors", "service_version", "installed_attestation"],
+      "properties": {
+        "pins_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "locks": {"type": "array"},
+        "runtime_descriptors": {"type": "array"},
+        "service_version": {"type": "string"},
+        "installed_attestation": {
+          "type": "object",
+          "required": ["path", "state"],
+          "properties": {"state": {"enum": ["absent", "unreadable", "present"]}}
+        }
+      }
+    },
+    "work_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "id"],
+        "properties": {"kind": {"type": "string", "minLength": 1}, "id": {"type": "string", "minLength": 1}}
+      }
+    },
+    "observed_at": {"type": "string", "minLength": 20},
+    "result": {"type": "object"},
+    "unknowns": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+  }
+}

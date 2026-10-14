@@ -25,6 +25,7 @@ test = [
 
 [project.scripts]
 vuoro-service = "vuoro_service.cli:main"
+vuoro-ops = "vuoro_service.ops.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/vuoro_service"]
