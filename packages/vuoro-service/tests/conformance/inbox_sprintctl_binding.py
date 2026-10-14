@@ -17,6 +17,7 @@ sender B uses its own connection, never the reader's.
 Owner stamps carry tag-prefixed workspace_id/repo_id; results are mapped back to
 the test's Ctx values.
 """
+import re
 import threading
 import uuid
 from types import SimpleNamespace
@@ -119,9 +120,23 @@ class SprintctlInboxProvider:
         self.testing = pg_testing
         if pg_testing is not None and hasattr(pg_testing, "shift_inbox_clock"):
             self.capabilities = self.capabilities | {CLOCK}
+        self._mark_disposable()
         self._open_scope("repo-a")  # creates the schema and the first repository
 
     # -- plumbing ----------------------------------------------------------
+    def _mark_disposable(self):
+        """The owner honours its test clock only on a database commented as disposable."""
+        name = urlsplit(self.url).path.lstrip("/")
+        if not re.fullmatch(r"inbox_conformance[A-Za-z0-9_]*", name):
+            raise ValueError("database must be inbox_conformance*")
+        store = self.pg.get_connection(self.url)
+        try:
+            with store.conn.cursor() as cursor:
+                cursor.execute(f"COMMENT ON DATABASE {name} IS 'sprintctl:disposable-integration-test'")
+            store.conn.commit()
+        finally:
+            store.conn.close()
+
     def _repo(self, repo_id):
         return f"{self.tag}-{repo_id}"
 
