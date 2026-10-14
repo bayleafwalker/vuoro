@@ -933,3 +933,30 @@ def test_actual_tls12_only_server_is_refused_before_request(certificates):
             assert server.requests == []
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize(
+    "operation,args",
+    [("list_accepted", {}), ("read_copy", {"acceptance_id": ACCEPTANCE_ID})],
+)
+def test_d1_no_store_mandatory_even_after_distinct_native_wire_policy(
+    certificates, operation, args
+):
+    async def run():
+        async def emit(reader, writer):
+            writer.write(
+                response(
+                    headers=[b"Content-Length: 2", b"Content-Type: application/json"]
+                )
+            )
+            await writer.drain()
+
+        async with Loopback(certificates, emit) as server:
+            transport = PrivateReadTransport(
+                profile(server.port, certificates=certificates),
+                Credentials(client_context(certificates)),
+            )
+            with pytest.raises(ProtectedReadRefused):
+                await getattr(transport, operation)(**args)
+
+    asyncio.run(run())
