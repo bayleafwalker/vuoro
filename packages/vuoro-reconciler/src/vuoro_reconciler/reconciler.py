@@ -24,7 +24,9 @@ import shutil
 import tempfile
 import time
 
-from .acceptance import AutoAcceptConfig, apply_auto_accept, scope_admits
+from .acceptance import (
+    AutoAcceptConfig, apply_auto_accept, scope_admits, legacy_execution_excluded,
+)
 from .verification import PreflightRefused, validate_verification
 from .diff_policy import (
     DiffPolicy,
@@ -87,8 +89,8 @@ _EMPTY_DIFF_POLICY = DiffPolicy()
 class ReconcilerConfig:
     """What this reconciler is allowed to touch.
 
-    `repository_allowlist` is checked before anything else -- before even
-    a clone is attempted -- so an intent for an unlisted repository never
+    `repository_allowlist` is checked before legacy Git or provider calls,
+    so an intent for an unlisted repository never
     reaches git or the provider at all. `protected_branches` (plus each
     repository's default branch, always) is the second, independent guard
     against ever pushing a default/protected branch (the first is that
@@ -114,6 +116,16 @@ class ReconcilerConfig:
     #: `deferred` outcomes.
     max_lookup_deferral_seconds: float = 1800.0
 
+    #: Registered protected repositories use the durable protected executor.
+    protected_repositories: frozenset[str] = frozenset()
+
+    def __post_init__(self):
+        if type(self.protected_repositories) is not frozenset or not all(
+            type(repository) is str and repository
+            for repository in self.protected_repositories
+        ):
+            raise ValueError("protected-repositories-invalid")
+
     def branch_for(self, intent: EffectIntent) -> str:
         return f"{self.branch_prefix}/{intent.intent_id}"
 
@@ -124,7 +136,9 @@ class ReconcilerConfig:
 @dataclass(frozen=True)
 class Outcome:
     intent_id: str
-    #: "applied" | "failed" | "duplicate" | "deferred". "duplicate" means
+    #: "applied" | "failed" | "duplicate" | "deferred" | "excluded". "excluded"
+    #: is a local result only: protected effects never enter the legacy path.
+    #: "duplicate" means
     #: another consumer created the intent's branch or PR first; nothing was
     #: recorded, and that consumer (or, if it dies, the next run) finishes
     #: the intent. "deferred" (reason `provider-lookup-failed`) means a
@@ -180,7 +194,10 @@ class Reconciler:
         continues). Only a failing `poll_accepted` -- no work to do at
         all -- propagates."""
 
-        await apply_auto_accept(self.intent_source, self.auto_accept)
+        await apply_auto_accept(
+            self.intent_source, self.auto_accept,
+            protected_repositories=self.config.protected_repositories,
+        )
         intents = await self.intent_source.poll_accepted()
         self._reachable.clear()
         outcomes = []
@@ -216,6 +233,8 @@ class Reconciler:
         )
 
     async def _process(self, intent: EffectIntent) -> Outcome:
+        if legacy_execution_excluded(intent, self.config.protected_repositories):
+            return Outcome(intent.intent_id, "excluded", reason="protected-executor-required")
         acceptor = intent.acceptor
         if acceptor is None:
             raise _Refused("no-acceptor")
