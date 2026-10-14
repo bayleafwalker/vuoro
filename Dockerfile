@@ -33,12 +33,17 @@ COPY packages/vuoro-evidence ./packages/vuoro-evidence
 # packages, never an index (neither name is published; resolving them from
 # an index would install whatever someone else registered under that name);
 # it serves `vuoro-service mcp-serve --port 8081` from the same image.
+# Owner and shared wheels are installed --no-deps from the hash-verified
+# composition lock, as in CI: the owners' third-party runtime dependencies
+# (click, psycopg) are installed above, and the shared adapter-kit is the one
+# lock entry rather than whichever release each owner's metadata names
+# (auditctl 0.1.9 names kit 0.2.0; Sprintctl 0.19.0 names kit 0.2.2). The
+# attestation below verifies every installed pinned distribution.
 RUN python -m pip install --no-cache-dir "psycopg[binary]>=3.2,<4" "click>=8.1" \
         ./packages/vuoro-service ./packages/vuoro-evidence ./packages/vuoro-mcp-edge \
-    && python -m pip install --no-cache-dir \
+    && python -m pip install --no-cache-dir --no-deps \
         /opt/vuoro/adapters/auditctl-*.whl \
         /opt/vuoro/adapters/sprintctl-*.whl \
-    && python -m pip install --no-cache-dir --no-deps \
         /opt/vuoro/adapters/vuoro_adapter_kit-*.whl \
         /opt/vuoro/adapters/vuoro_schema_runtime-*.whl \
     && python -m pip check \
