@@ -194,7 +194,7 @@ made it.
 | `accepted` | the receiver decided to act, under its own authorization | none | one decision per message, `accepted` or `refused`. Another instance, or the same instance with a different decision or reason, is refused with `already-decided`, and the error names the deciding instance and kind |
 | `refused` | the receiver decided not to act | `reason` (`code`, `text`) | as `accepted` |
 | `run-linked` | a run is processing it | `run_id`, which must exist in scope (`run-not-found`) | requires `accepted` by the same instance (`not-accepted`); one per message; a different `run_id` is refused with `run-already-linked` |
-| `launch-ambiguous` | the receiver attempted a launch whose outcome it cannot establish, and it will not relaunch automatically | `detail` (at most 2 KiB) | requires `run-linked` by the same instance; one per (message, instance); a different `detail` is refused with `already-recorded` |
+| `launch-ambiguous` | the receiver attempted a launch, or a run registration, whose outcome it cannot establish, and it will not relaunch automatically | `detail` (at most 2 KiB), optional `run_id` | requires `accepted` by the same instance (`not-accepted`); a `run_id`, when given, must exist in scope; one per (message, instance); a different `detail` or `run_id` is refused with `already-recorded` |
 | `result-linked` | processing ended, and this is what actually happened | `outcome`, `evidence_refs[]` (kind and ref, at most 32), `summary` (at most 2 KiB), `reason` (`code`, `text`; required when `outcome` is `not-started`) | one per message; a different digest is refused with `already-resulted` |
 
 `result-linked` outcomes are `completed`, `failed`, `canceled`, `abandoned`
@@ -247,7 +247,7 @@ the receiver's pinned configuration:
 The work owner's ledger then yields one run per `(principal, message)`,
 however many times the receiver retries. If the configuration changed between
 retries, the owner answers `idempotency-conflict`. The receiver records
-`launch-ambiguous` and does not mint a new key.
+`launch-ambiguous` without a `run_id` and does not mint a new key.
 
 The successor's owner writes use keys that the receiver fixes in the launch
 prompt, which it generates deterministically from the envelope. A manual

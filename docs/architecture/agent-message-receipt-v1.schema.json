@@ -254,6 +254,10 @@
         "detail": {
           "type": "string",
           "maxLength": 2048
+        },
+        "run_id": {
+          "type": "string",
+          "pattern": "^run_[0-9A-HJKMNP-TV-Z]{26}$"
         }
       },
       "required": [

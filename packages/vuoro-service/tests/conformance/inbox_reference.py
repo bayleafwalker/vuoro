@@ -30,7 +30,7 @@ _DECISIONS = ("accepted", "refused")
 _OUTCOMES = ("completed", "failed", "canceled", "abandoned", "not-started")
 _RECEIPT_FIELDS = {
     "observed": set(), "acknowledged": set(), "accepted": set(), "refused": {"reason"},
-    "run-linked": {"run_id"}, "launch-ambiguous": {"detail"},
+    "run-linked": {"run_id"}, "launch-ambiguous": {"detail", "run_id"},
     "result-linked": {"outcome", "evidence_refs", "summary", "reason"},
 }
 
@@ -459,7 +459,11 @@ class ReferenceInboxProvider:
             return {"run_id": fields["run_id"]}
         if kind == "launch-ambiguous":
             _bad(isinstance(fields.get("detail"), str) and len(fields["detail"].encode()) <= 2048)
-            return {"detail": fields["detail"]}
+            own = {"detail": fields["detail"]}
+            if "run_id" in fields:
+                _bad(isinstance(fields["run_id"], str) and _RUN.match(fields["run_id"]))
+                own["run_id"] = fields["run_id"]
+            return own
         if kind == "result-linked":
             _bad(fields.get("outcome") in _OUTCOMES)
             refs = fields.get("evidence_refs", [])
@@ -502,7 +506,7 @@ class ReferenceInboxProvider:
             found = self._find(record, "launch-ambiguous", instance_id)
             if found is None:
                 return None
-            if found["detail"] == own["detail"]:
+            if digest(self._own(found)) == digest(own):
                 return found
             raise ContractRefusal("already-recorded")
         found = self._find(record, "result-linked")
@@ -520,9 +524,10 @@ class ReferenceInboxProvider:
             if accepted is None or accepted["instance_id"] != instance_id:
                 raise ContractRefusal("not-accepted")
         elif kind == "launch-ambiguous":
-            linked = self._find(record, "run-linked")
-            if linked is None or linked["instance_id"] != instance_id:
+            if accepted is None or accepted["instance_id"] != instance_id:
                 raise ContractRefusal("not-accepted")
+            if "run_id" in own and own["run_id"] not in scope["runs"]:
+                raise ContractRefusal("run-not-found")
         elif kind == "result-linked":
             if accepted is None:
                 raise ContractRefusal("not-accepted")

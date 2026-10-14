@@ -66,7 +66,7 @@ def valid_stamped(stamped):
     envelope = {k: v for k, v in stamped.items() if k not in extra}
     VALIDATORS["message"].validate(envelope)
     valid_stamps(stamped)
-    assert stamped["envelope_digest"].removeprefix("sha256:") == hashlib.sha256(canonical(envelope)).hexdigest()
+    assert stamped["envelope_digest"] == hashlib.sha256(canonical(envelope)).hexdigest()
     times = [valid_receipt(r)["recorded_at"] for r in stamped["receipts"]]
     assert times == sorted(times), "receipts must be in recorded_at order"
     return stamped
@@ -218,7 +218,7 @@ def test_01_retry_replays_same_stamps_and_changed_envelope_is_refused(w):
     assert {k: first[k] for k in STAMPS} == {k: again[k] for k in STAMPS}
     assert first["sender_principal_id"] == w.S.principal_id
     assert (first["workspace_id"], first["repo_id"]) == ("ws-a", "repo-a")
-    assert first["envelope_digest"].removeprefix("sha256:") == hashlib.sha256(canonical(message)).hexdigest()
+    assert first["envelope_digest"] == hashlib.sha256(canonical(message)).hexdigest()
     changed = {**message, "body": {"text": "something else"}}
     expect("message-id-conflict", w.p.send, w.S, message=changed)
     expect("message-id-conflict", w.p.send, w.X, message=message)  # different sender, same id
@@ -697,9 +697,8 @@ def test_15b_per_instance_receipts_and_prerequisites(w):
     w.rcpt(m, "observed", w.ins1)
     w.rcpt(m, "observed", w.ins2)  # natural key is (message, instance)
     assert w.kinds(m) == ["observed", "observed"]
-    refused(w.rcpt, m, "launch-ambiguous", w.ins1, detail="x")  # requires run-linked
     w.accept_and_link(m)
-    refused(w.rcpt, m, "launch-ambiguous", w.ins2, detail="x")  # requires run-linked by the same instance
+    refused(w.rcpt, m, "launch-ambiguous", w.ins2, detail="x")  # requires accepted by the same instance
     expect("invalid-arguments", w.rcpt, m, "mystery")
     expect("invalid-arguments", w.rcpt, m, "observed", run_id=w.run)
 
@@ -740,3 +739,31 @@ def test_not_after_binds_the_receiver_not_the_store(w):
     assert w.p.status(w.S, message_id=m) == before
     assert [x["message_id"] for x in w.p.read(w.R, after_seq=0, limit=100)["messages"]] == [m]
     assert w.kinds(m) == []
+
+
+@pytest.mark.essential_workflow
+def test_15c_launch_ambiguous_needs_acceptance_not_a_run(w):
+    m = w.send()
+    expect("not-accepted", w.rcpt, m, "launch-ambiguous", w.ins1, detail="spawn timed out")
+    w.rcpt(m, "accepted", w.ins1)
+    expect("not-accepted", w.rcpt, m, "launch-ambiguous", w.ins2, detail="spawn timed out")
+    expect("run-not-found", w.rcpt, m, "launch-ambiguous", w.ins1, detail="d", run_id="run_" + "0" * 26)
+    first = w.rcpt(m, "launch-ambiguous", w.ins1, detail="registration timed out")
+    assert first["replayed"] is False and "run_id" not in first
+    again = w.rcpt(m, "launch-ambiguous", w.ins1, detail="registration timed out")
+    assert again["replayed"] is True and again["recorded_at"] == first["recorded_at"]
+    expect("already-recorded", w.rcpt, m, "launch-ambiguous", w.ins1, detail="different")
+    expect("already-recorded", w.rcpt, m, "launch-ambiguous", w.ins1, detail="registration timed out", run_id=w.run)
+    assert w.kinds(m) == ["accepted", "launch-ambiguous"]
+
+
+@pytest.mark.essential_workflow
+def test_15d_launch_ambiguous_may_name_a_run(w):
+    m = w.send()
+    w.rcpt(m, "accepted", w.ins1)
+    first = w.rcpt(m, "launch-ambiguous", w.ins1, detail="launched, outcome unknown", run_id=w.run)
+    assert first["run_id"] == w.run
+    assert w.rcpt(m, "launch-ambiguous", w.ins1, detail="launched, outcome unknown", run_id=w.run)["replayed"] is True
+    expect("already-recorded", w.rcpt, m, "launch-ambiguous", w.ins1, detail="launched, outcome unknown",
+           run_id=w.p.new_run(w.R))
+    expect("already-recorded", w.rcpt, m, "launch-ambiguous", w.ins1, detail="launched, outcome unknown")
