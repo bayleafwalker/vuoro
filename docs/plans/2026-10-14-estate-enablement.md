@@ -51,7 +51,8 @@ prior images; it is never asserted.
 ## Constraints that still hold
 
 vuoro-cloud's gates are unchanged. Cluster mutation, Terraform apply, Flux
-reconcile, promotion and billable infrastructure each need explicit
+reconcile, promotion, DNS or tunnel changes (CLAUDE.md) and billable
+infrastructure (AGENTS.md) each need explicit
 authorization, and promotion signing needs the owner's hardware key. The
 priority 1 code lands through review, and the live qualification against the
 held Cloud cluster runs as an authorized step with the exact commands named in
@@ -65,7 +66,7 @@ resulting state and recovery operations estate-wide.
 
 | Priority | State |
 |---|---|
-| 1 | implementation in progress (vuoro-cloud PR) |
-| 2 | implementation in progress (agentops PRs) |
-| 3 | implementation in progress (agentops PR) |
-| 4 | implementation in progress (vuoro PR) |
+| 1 | implementation dispatched 2026-10-14; vuoro-cloud PR not yet opened |
+| 2 | implementation dispatched 2026-10-14; agentops PRs not yet opened |
+| 3 | implementation dispatched 2026-10-14; agentops PR not yet opened |
+| 4 | implementation dispatched 2026-10-14; vuoro PR not yet opened |
