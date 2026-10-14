@@ -88,7 +88,7 @@ have none. See `successor-notes.txt`.
    observation and run registration would all have failed. Fixed in
    `acc58e5`, with a regression test.
 2. **Session-note reference.** The adapter looked for a `note_<ULID>`
-   reference, but the owner returns an integer, run-scoped `note_id`. The
+   reference, but the owner returns an integer `note_id` (a global sequence, not per run). The
    first matching id in the session text is also the predecessor's, because
    the context read prints it first. Fixed in `42932e5` by taking the last
    JSON `note_id` (live from F1 onward, `run_91YN…/note/4`), then superseded
@@ -111,7 +111,9 @@ temporary policy states. All fixed in `3a1b4a3` (85/85 adapter and hook tests).
   `sprintctl run note *`. Probed against opencode 1.18.33 on devbox before the change:
   without the ruleset `touch` in the project directory succeeded (control); with it,
   `touch`, `sprintctl --version`, `sprintctl run context … && touch …` and a
-  `$(touch …)` substitution inside an allowed `run note` were all denied, files absent.
+  `$(touch …)` substitution inside an allowed `run note` were denied, files absent.
+  These are commands the bash parser sees as separate commands. What the two allow
+  rules did **not** deny is recorded in round 3 below.
 - **Negative test on the fixed build.** A session made by the adapter's own
   `create_session` (ruleset verified on the session) was told to run `touch /tmp/x`,
   `touch /projects/dev/agentops/.m2c-m1-x` and `cat /etc/hostname`: 3/3 tool calls
@@ -123,6 +125,53 @@ temporary policy states. All fixed in `3a1b4a3` (85/85 adapter and hook tests).
 - **Post-fix success path** (`msg_01M4XF55TMQZSS2H0EP3JAEAKY`, unit): completed, note 19,
   5 receipts; `result-linked` evidence is the run and the session.
 - The state database of the running adapter gained the new columns in place on start.
+- Owner records for these two messages (status, 5 receipts each, and the successor notes
+  read back through a reader run) are in `records-postfix.json`.
+
+## Review round 3 (agentops #343 at `6a10a24`), re-verified live
+
+The round-2 ruleset (deny `*`, allow the two `sprintctl run` patterns) admits shell
+syntax that is not a separate command. Probed on devbox with sessions made by the
+adapter's own `create_session`; every result is in `permission-probes.json`.
+
+| Probe (inside an allowed `sprintctl run note …`) | Round-2 ruleset | + metacharacter denies | Sandbox only (round-2 ruleset) |
+|---|---|---|---|
+| `> /tmp/m2c-redir` | ran, file written | denied | ran into the private /tmp; host file absent |
+| `> <dir>/file`, `>> <dir>/file` | ran, files written | denied | session dir read-only: "Read-only file system" |
+| `--note "$(< /etc/hostname)"`, `--note $(</etc/hostname)` | ran (file read) | denied | — |
+| `--note "${HOME}"` | — | ran (added `$` deny) | — |
+| newline then `touch` | — | denied | — |
+| `<(cat …)`, `<<< …` | — | denied | — |
+
+The final ruleset in `6a10a24` ends with bash denies for any command containing
+`>` `<` `$` `` ` `` `;` `&` `|`. The last matching rule wins, so these override the two
+allows. On the deployed build, 7/7 hostile forms were denied, 0 files were written, and a
+plain `run note` still reached the owner (`run-not-found` for the dummy run). For the
+read probes the model refused to run the overtly hostile reads in the sandbox-only
+column, so those cells were checked by entering the service's namespaces directly
+(`nsenter`). There ~/.ssh, ~/.config/{git-pat,claude-token}.env, the other Vuoro
+credentials, `/projects/dev/appservice` and `/projects/dev/vuoro` were unreadable (7/7),
+and writes to `.bashrc`, the agentops checkout and the sprintctl venv failed read-only.
+The inbox credential is readable inside the sandbox because sprintctl needs it; the
+`<` and `$` denies keep it out of notes.
+
+**OS containment.** `opencode serve` runs as the sandboxed user unit
+`ops/systemd/opencode-serve-inbox.service`:
+
+- home and `/projects/dev` are empty tmpfs mounts;
+- opencode's data, state and cache directories are bound back read-write;
+- the agentops checkout, the sprintctl tool env, the inbox profile and its credential
+  are bound back read-only;
+- `ProtectSystem=strict`, `PrivateTmp`, `NoNewPrivileges` and `RestrictSUIDSGID` are set.
+
+A user unit cannot apply the IP allow/deny lines ("not running as root"); the
+gitops-nixos system unit is expected to enforce them.
+
+**Adoption still works with the ruleset check.** F4 was re-run on `6a10a24` against the
+sandboxed server (`msg_01M4XG686K2QSC121P1NT5CXPW`, unit after an in-process crash at
+`session_created`). The single title-matched session carried exactly the ruleset and was
+adopted. The successor ran only `run context` and `run note` and wrote note 21; 5 receipts,
+`completed`.
 
 ## Not exercised
 

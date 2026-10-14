@@ -2552,8 +2552,8 @@ items:
         (to_version 25, compatible true), sprintctl doctor schema listing
       verdict: confirmed
     - claim: One recorded cross-runtime continuation plus ten induced failure histories completed live through the
-        inbox (9 messages, 49 receipts), and after the review fixes a hostile-body message and a success path (2 more);
-        every chain reconstructible from owner records.
+        inbox (9 messages, 49 receipts), and after the review fixes a hostile-body message, a success path and an F4
+        re-run (3 more, records-postfix.json); every chain reconstructible from owner records.
       source: docs/evidence/2026-10-14-agent-inbox-m2c/
       verdict: confirmed
   divergence: 'Instances are not separately authenticated (instance_id is self-asserted under the principal); writes
@@ -2583,14 +2583,15 @@ items:
     date: '2026-10-14'
     observations:
     - claim: The adapter runs as a systemd user unit on devbox (instance ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y) and
-        completed 11 live messages; crash, policy-change and re-delivery histories were induced in-process against
+        completed 12 live messages; crash, policy-change and re-delivery histories were induced in-process against
         the same state directory, the rest ran in the unit. Successor sessions carry a server-side permission
-        ruleset (only sprintctl run context/note); a direct touch attempt was denied 3/3 live.
-      source: docs/evidence/2026-10-14-agent-inbox-m2c/ (adapter_status.json, records.json)
+        ruleset (two sprintctl run allows, then denies for shell metacharacters) inside a sandboxed opencode
+        serve unit; 7/7 hostile probes denied on the deployed build.
+      source: docs/evidence/2026-10-14-agent-inbox-m2c/ (records.json, records-postfix.json, permission-probes.json)
       verdict: confirmed
-  divergence: 'Deployed from agentops PR #343 at 3a1b4a3 until that PR merges. Run time limit and operator close of
-    a stuck launched record exist (3a1b4a3) but were not induced live; opencode serve crash behaviour and gateway
-    outage not exercised.'
+  divergence: 'Deployed from agentops PR #343 at 6a10a24 until that PR merges. Run time limit and operator close of
+    a stuck launched record exist (3a1b4a3) but were not induced live; the IP allow/deny lines need the system unit;
+    opencode serve crash behaviour and gateway outage not exercised.'
   confidence: medium
   goal_state:
     reviewed: '2026-10-14'
