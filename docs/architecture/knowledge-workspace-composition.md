@@ -74,6 +74,19 @@ records how the domain is bound, configured, migrated and released.
   token or any other identity without the marker is an agent. A membership
   row can also mark a principal as an agent. The marker is not passed on as
   an authority.
+
+  `knowledge:human` is only as strong as its issuer's policy. Vuoro
+  verifies that a trusted issuer minted the credential, but it cannot verify
+  that a person is behind it. Two issuers are allowed:
+  - the operator-controlled static identity registry (`VUORO_IDENTITIES_FILE`),
+    which must grant the marker only to identities a person uses directly;
+  - Vuoro Cloud, which must grant it only to interactive human sessions,
+    never to a connector, an OAuth client or a workspace token.
+
+  An issuer that grants the marker to an automated credential lets that
+  automation review and publish. Granting the marker is therefore an
+  operator decision, made under the same review as granting
+  `knowledge:review`.
 - **Idempotency keys.** The shell accepts envelope keys of 1–256 characters,
   and the store's ledger takes `^[A-Za-z0-9._:-]{8,128}$`. A key that already
   matches passes through unchanged. Any other key becomes
@@ -100,7 +113,12 @@ records how the domain is bound, configured, migrated and released.
 - **Concurrency.** Handlers are synchronous store calls, and they run in a
   worker thread (`asyncio.to_thread`), never on the service event loop.
   Connections come from a bounded pool of runtime-role connections (8 by
-  default). The store's schema check runs once, when a pooled connection is
+  default). A caller waits at most 10 s for a free connection; after that it
+  gets `knowledge-unavailable` (503). Each connection has a 5 s
+  `connect_timeout` and a 30 s `statement_timeout`. Before an idle
+  connection is reused, the pool probes it with `SELECT 1` and replaces it
+  if it is dead. The pool also discards a connection after any non-domain
+  failure. The store's schema check runs once, when a pooled connection is
   opened, not on every call.
 
 ### Contract deviation: export and import are not served
@@ -139,8 +157,10 @@ startup refuses, exactly as for work and audit.
 The gate also refuses an owner or migration DSN. The connecting role must
 equal the configured `VUORO_KNOWLEDGE_RUNTIME_ROLE`. If the runtime role is
 unset, schema-runtime's `role_not_configured` makes the check fail closed.
-The gate further rejects a connection that owns the schema
-(`runtime_role_owns_schema`) or is a superuser (`runtime_role_is_superuser`).
+The gate further rejects a connection that owns the schema or is a member of
+its owner role (`runtime_role_owns_schema`, checked with
+`pg_has_role(current_user, nspowner, 'USAGE')`), and a connection that is a
+superuser (`runtime_role_is_superuser`).
 
 ## Migration entrypoint
 

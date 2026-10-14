@@ -479,6 +479,34 @@ def store_idempotency_key(context: Any) -> str | None:
 
 # -------------------------------------------------------------- application
 
+#: Connection bounds for served calls: a connect attempt and every statement
+#: are time-limited so a stalled database cannot hold a worker thread forever.
+CONNECT_TIMEOUT_SECONDS = 5
+STATEMENT_TIMEOUT_MS = 30_000
+
+
+class PoolExhaustedError(RuntimeError):
+    """No pooled connection became free within the acquire timeout."""
+
+
+def _close_quietly(conn: Any) -> None:
+    try:
+        conn.close()
+    except Exception:  # pragma: no cover - best effort
+        pass
+
+
+def _alive(conn: Any) -> bool:
+    """Cheap liveness probe for an idle pooled connection (``SELECT 1``)."""
+    if conn.closed or getattr(conn, "broken", False):
+        return False
+    try:
+        conn.execute("SELECT 1")
+        return True
+    except Exception:
+        return False
+
+
 #: Store error code -> (HTTP status, details keys a caller may see).
 _SERVED_ERRORS: dict[str, tuple[int, frozenset[str]]] = {
     E.FORBIDDEN: (403, frozenset()),
@@ -553,6 +581,7 @@ class KnowledgeApplication:
         runtime_role: str,
         schema: str = DEFAULT_SCHEMA,
         max_connections: int = 8,
+        acquire_timeout: float = 10.0,
         rejection_factory: RejectionFactory = _load_rejection,
         store_kwargs: Mapping[str, Any] | None = None,
     ) -> None:
@@ -566,16 +595,34 @@ class KnowledgeApplication:
         self.runtime_role = runtime_role
         self._reject_factory = rejection_factory
         self._store_kwargs = dict(store_kwargs or {})
+        if not isinstance(acquire_timeout, (int, float)) or acquire_timeout <= 0:
+            raise ValueError("acquire_timeout must be a positive number of seconds")
+        self.acquire_timeout = float(acquire_timeout)
         self._slots = threading.BoundedSemaphore(max_connections)
         self._idle: list[WorkspaceStore] = []
         self._lock = threading.Lock()
 
     @classmethod
-    def from_dsn(cls, dsn: str, object_store: ObjectStore, **kwargs: Any) -> "KnowledgeApplication":
+    def from_dsn(
+        cls,
+        dsn: str,
+        object_store: ObjectStore,
+        *,
+        connect_timeout: int = CONNECT_TIMEOUT_SECONDS,
+        statement_timeout_ms: int = STATEMENT_TIMEOUT_MS,
+        **kwargs: Any,
+    ) -> "KnowledgeApplication":
+        """Connections bound how long a connect and each statement may take."""
+
         def connect() -> Any:
             import psycopg
 
-            return psycopg.connect(dsn, autocommit=True)
+            return psycopg.connect(
+                dsn,
+                autocommit=True,
+                connect_timeout=connect_timeout,
+                options=f"-c statement_timeout={int(statement_timeout_ms)}",
+            )
 
         return cls(connect, object_store, **kwargs)
 
@@ -589,7 +636,8 @@ class KnowledgeApplication:
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT r.rolsuper AS superuser, "
-                    "coalesce((SELECT n.nspowner = r.oid FROM pg_namespace n WHERE n.nspname = %s), false) AS owner "
+                    "coalesce((SELECT pg_has_role(current_user, n.nspowner, 'USAGE') FROM pg_namespace n "
+                    "WHERE n.nspname = %s), false) AS owner "
                     "FROM pg_roles r WHERE r.rolname = current_user",
                     (self.schema,),
                 )
@@ -620,9 +668,14 @@ class KnowledgeApplication:
         raise self._reject_factory(code, message, status, details)
 
     def _acquire(self) -> WorkspaceStore:
-        with self._lock:
-            if self._idle:
-                return self._idle.pop()
+        while True:
+            with self._lock:
+                store = self._idle.pop() if self._idle else None
+            if store is None:
+                break
+            if _alive(store.conn):
+                return store
+            _close_quietly(store.conn)  # a dead idle connection is replaced, not reused
         conn = self._connect()
         try:
             return WorkspaceStore(conn, self.objects, schema=self.schema, runtime_role=self.runtime_role,
@@ -637,14 +690,15 @@ class KnowledgeApplication:
             with self._lock:
                 self._idle.append(store)
             return
-        try:
-            conn.close()
-        except Exception:  # pragma: no cover - best effort
-            pass
+        _close_quietly(conn)
 
     @contextmanager
     def _store(self) -> Iterator[WorkspaceStore]:
-        with self._slots:
+        # Bounded wait: callers beyond the pool size queue for at most
+        # acquire_timeout seconds, then get knowledge-unavailable (503).
+        if not self._slots.acquire(timeout=self.acquire_timeout):
+            raise PoolExhaustedError("no knowledge store connection became free in time")
+        try:
             store = self._acquire()
             healthy = False
             try:
@@ -655,6 +709,8 @@ class KnowledgeApplication:
                 raise
             finally:
                 self._release(store, healthy)
+        finally:
+            self._slots.release()
 
     def close(self) -> None:
         with self._lock:
@@ -682,6 +738,9 @@ class KnowledgeApplication:
         except SchemaCompatibilityError as error:
             LOGGER.error("knowledge schema check failed: %s", error)
             self._reject("knowledge-unavailable", "the knowledge store is unavailable", 503)
+        except PoolExhaustedError as error:
+            LOGGER.warning("knowledge pool exhausted: %s", error)
+            self._reject("knowledge-unavailable", "the knowledge store is busy; retry later", 503)
 
     # -- handlers (arguments are already schema-validated by the registry)
 
