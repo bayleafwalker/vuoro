@@ -714,7 +714,7 @@ def test_a_shell_restart_does_not_reset_the_proofed_use_cap(tmp_path: Path) -> N
         after(_request(token, proof=_proof(token), body=BODY))
     assert excinfo.value.code == "identity-replayed"
     # An assertion minted after the restart is served as usual.
-    fresh = _token(private, iat=now, nbf=now - 1)
+    fresh = _token(private, iat=now, nbf=now - 1, exp=now + 30)
     after(_request(fresh, proof=_proof(fresh), body=BODY))
 
 
