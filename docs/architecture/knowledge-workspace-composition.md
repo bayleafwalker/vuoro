@@ -45,10 +45,10 @@ records how the domain is bound, configured, migrated and released.
   | `item.read`, `artifact.download`, `workspace.search`, `workspace.changes` | `knowledge:read` | read | not-allowed |
 
   The knowledge-only catalog revision is
-  `9cb96b1ef795c9cafb59d6532513052fe841226b74d172345c13c24a2be0be52`. Together
+  `133e24ad0490a7e3302d510f22c59b7f3dd37456d7ae2892c4bd8d4d2fd21767`. Together
   with the pinned work (97) and audit (5) operations, the three-domain catalog
   has 120 operations, revision
-  `7353fe7fb6130dc34f586484eb94a1180b18a6f9f5c7be6a83aadc9c327e615e`
+  `01e47ad04f9be5a0c1e9d5b5657fdba4712d4d9d1b15b56f9a231941659b103c`
   (`scripts/validate_knowledge_catalog_composition.py`). The served catalog
   stays at 102 operations until the pin lands.
 - **Authority.** The shell checks the coarse credential authority

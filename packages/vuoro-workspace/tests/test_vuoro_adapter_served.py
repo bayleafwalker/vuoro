@@ -40,7 +40,7 @@ EVERY = ("knowledge:read", "knowledge:contribute", "knowledge:review", "knowledg
 
 #: Pinned so any change to a knowledge operation's served contract is a
 #: deliberate, reviewed catalog revision change.
-KNOWLEDGE_CATALOG_REVISION = "9cb96b1ef795c9cafb59d6532513052fe841226b74d172345c13c24a2be0be52"
+KNOWLEDGE_CATALOG_REVISION = "133e24ad0490a7e3302d510f22c59b7f3dd37456d7ae2892c4bd8d4d2fd21767"
 EXPECTED_OPERATIONS = {
     "knowledge.workspace.create-v1": ("knowledge:admin", "write", "required"),
     "knowledge.member.set-v1": ("knowledge:admin", "write", "required"),
@@ -256,6 +256,39 @@ def test_upload_finalize_review_download_round_trip(served) -> None:
     assert base64.b64decode(got["content_base64"]) == data
     assert got["media_type"] == "text/markdown" and got["sha256"] == hashlib.sha256(data).hexdigest()
     assert got["review_state"] == "approved" and got["extraction_state"] == "ready"
+    assert got["content_disposition"] == "attachment" and final["content_disposition"] == "attachment"
+    assert final["extraction_truncated"] is False
+
+
+def test_active_content_is_never_served_as_its_declared_type(served) -> None:
+    s = served
+    data = b"<html><script>alert(1)</script></html>"
+    begun = s.ok("t-contrib", "knowledge.artifact.begin-v1", {
+        "workspace_id": s.ws, "expected_sha256": hashlib.sha256(data).hexdigest(), "expected_size": len(data),
+        "media_type": "text/html", "name": "page.html"})
+    s.ok("t-contrib", "knowledge.artifact.upload-v1", {
+        "workspace_id": s.ws, "version_id": begun["version_id"], "content_base64": base64.b64encode(data).decode()})
+    s.ok("t-contrib", "knowledge.artifact.finalize-v1", {"workspace_id": s.ws, "version_id": begun["version_id"]})
+    got = s.ok("t-contrib", "knowledge.artifact.download-v1",
+               {"workspace_id": s.ws, "artifact_id": begun["artifact_id"], "version": begun["version_id"]})
+    assert got["media_type"] != "text/html"
+    assert got["content_disposition"] == "attachment"
+    assert base64.b64decode(got["content_base64"]) == data
+
+
+def test_cursor_and_body_limits_map_to_stable_codes(served) -> None:
+    s = served
+    import json as _json
+
+    ahead = base64.urlsafe_b64encode(_json.dumps({"v": 1, "w": s.ws, "s": 10_000},
+                                                 separators=(",", ":")).encode()).decode().rstrip("=")
+    assert s.code("t-reader", "knowledge.workspace.changes-v1", {"workspace_id": s.ws, "cursor": ahead}) \
+        == (400, "knowledge-invalid-cursor")
+    assert s.code("t-reader", "knowledge.workspace.changes-v1", {"workspace_id": s.ws, "cursor": "garbage"}) \
+        == (400, "knowledge-invalid-cursor")
+    assert s.code("t-contrib", "knowledge.item.create-v1",
+                  {"workspace_id": s.ws, "title": "Big", "body_md": "x" * 1_000_001}) \
+        == (422, "schema-validation-failed")
 
 
 def test_upload_cap_and_bad_base64_are_refused(served) -> None:
@@ -325,7 +358,7 @@ def test_delete_tombstones_and_changes_feed(served) -> None:
     assert s.code("t-reader", "knowledge.item.read-v1", {"workspace_id": s.ws, "item_id": item["item_id"]}) \
         == (404, "knowledge-not-found")
     report = s.ok("t-admin", "knowledge.workspace.reconcile-v1", {"workspace_id": s.ws})
-    assert report["workspace_id"] == s.ws
+    assert report["workspace_id"] == s.ws and report["reset_verifications"] == []
 
 
 def test_compatibility_gate_is_read_only(pg_dsn: str, pg_conn: Any, schema: str, tmp_path: Path,

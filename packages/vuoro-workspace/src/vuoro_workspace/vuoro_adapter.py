@@ -142,11 +142,15 @@ _FINALIZE_RESULT = {
     "processing_state": _PROCESSING,
     "review_state": _REVIEW,
     "extraction_state": _EXTRACTION,
+    "extraction_truncated": {"type": "boolean"},
     "sha256": _SHA256,
     "size": {"type": "integer", "minimum": 0},
     "media_type": {"type": "string"},
+    "content_disposition": {"const": "attachment"},
     "reject_reasons": {"type": "array", "items": {"type": "string"}},
 }
+_FINALIZE_REQUIRED = ("artifact_id", "version_id", "processing_state", "review_state", "extraction_state",
+                      "sha256", "size", "media_type", "reject_reasons")
 _READ_RESULT = {
     "workspace_id": _ULID,
     "item_id": _ULID,
@@ -172,6 +176,7 @@ _DOWNLOAD_RESULT = {
     "version_id": _ULID,
     "name": {"type": "string"},
     "media_type": {"type": "string"},
+    "content_disposition": {"const": "attachment"},
     "size": {"type": "integer", "minimum": 0},
     "sha256": _SHA256,
     "review_state": _REVIEW,
@@ -324,7 +329,7 @@ _OPERATIONS: tuple[dict[str, Any], ...] = (
     _spec(
         "knowledge.artifact.finalize-v1", authority=CONTRIBUTE, semantics=_W, idempotency="required",
         input_schema=_obj({**_WS, "version_id": _ULID}, ("workspace_id", "version_id")),
-        result_schema=_result(_FINALIZE_RESULT),
+        result_schema=_result(_FINALIZE_RESULT, _FINALIZE_REQUIRED),
         handler="artifact_finalize",
     ),
     _spec(
@@ -332,7 +337,9 @@ _OPERATIONS: tuple[dict[str, Any], ...] = (
         input_schema=_obj({**_WS, "version_id": _ULID, "decision": _DECISION, "note": _NULLABLE_TEXT},
                           ("workspace_id", "version_id", "decision")),
         result_schema=_result({"artifact_id": _ULID, "version_id": _ULID,
-                               "review_state": {"enum": ["approved", "rejected"]}}),
+                               "review_state": {"enum": ["approved", "rejected"]},
+                               "approved_version_id": _NULLABLE_ULID},
+                              ("artifact_id", "version_id", "review_state")),
         handler="artifact_review",
     ),
     _spec(
@@ -391,8 +398,10 @@ _OPERATIONS: tuple[dict[str, Any], ...] = (
         input_schema=_obj({**_WS, "grace_seconds": {"type": "integer", "minimum": 0, "maximum": 30 * 86400},
                            "delete_orphans": {"type": "boolean"}}, ("workspace_id",)),
         result_schema=_result({"workspace_id": _ULID, "expired_versions": {"type": "array", "items": _ULID},
+                               "reset_verifications": {"type": "array"},
                                "missing_objects": {"type": "array", "items": {"type": "object"}},
-                               "orphans": {"type": "array", "items": {"type": "object"}}}),
+                               "orphans": {"type": "array", "items": {"type": "object"}}},
+                              ("workspace_id", "expired_versions", "missing_objects", "orphans")),
         handler="workspace_reconcile",
     ),
 )
@@ -603,7 +612,7 @@ class KnowledgeApplication:
                 p, a["workspace_id"], expected_sha256=a["expected_sha256"], expected_size=a["expected_size"],
                 media_type=a["media_type"], name=a.get("name"), artifact_id=a.get("artifact_id"),
                 relations=a.get("relations", []), idempotency_key=ctx.idempotency_key)
-            return {k: result[k] for k in ("artifact_id", "version_id", "processing_state", "expires_at")}
+            return result
 
         return self._call(ctx, run)
 
@@ -626,7 +635,7 @@ class KnowledgeApplication:
     def artifact_finalize(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
         def run(s: WorkspaceStore, p: Principal) -> dict[str, Any]:
             result = s.artifact_finalize(p, a["workspace_id"], a["version_id"], idempotency_key=ctx.idempotency_key)
-            return {k: result[k] for k in _FINALIZE_RESULT}
+            return result
 
         return self._call(ctx, run)
 
@@ -638,7 +647,7 @@ class KnowledgeApplication:
     def item_read(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
         def run(s: WorkspaceStore, p: Principal) -> dict[str, Any]:
             result = s.read(p, a["workspace_id"], a["item_id"], a.get("version", "latest-approved"))
-            return {k: result[k] for k in _READ_RESULT}
+            return result
 
         return self._call(ctx, run)
 
@@ -650,7 +659,7 @@ class KnowledgeApplication:
                 raise WorkspaceError("payload-too-large", "artifact exceeds the Phase 1 served download cap")
             # Bytes travel only as base64 inside the JSON envelope with the
             # recorded media type; nothing is ever served as an HTTP body.
-            served = {k: result[k] for k in _DOWNLOAD_RESULT if k != "content_base64"}
+            served = dict(result)
             served["content_base64"] = base64.b64encode(data).decode("ascii")
             return served
 
@@ -685,10 +694,27 @@ def register_knowledge_catalog(
     *,
     operation_definition_factory: OperationDefinitionFactory = _load_operation_definition,
 ) -> None:
-    """Register every ``knowledge.*`` operation in a protocol-v1 catalog registry."""
+    """Register every ``knowledge.*`` operation in a protocol-v1 catalog registry.
+
+    Each handler's result is projected onto its declared result properties, so
+    a store that grows a result field neither leaks it nor fails the catalog
+    schema until the served contract declares it.
+    """
     for raw_spec in catalog_operation_specs():
         handler_name = raw_spec.pop("_handler_name")
-        registry.register(operation_definition_factory(**raw_spec), getattr(application, handler_name))
+        properties = frozenset(raw_spec["result_schema"]["properties"])
+        registry.register(
+            operation_definition_factory(**raw_spec),
+            _projecting(getattr(application, handler_name), properties),
+        )
+
+
+def _projecting(handler: Callable[[Any, Any], dict[str, Any]], properties: frozenset[str]) -> Callable[..., Any]:
+    def project(arguments: Any, context: Any) -> dict[str, Any]:
+        return {key: value for key, value in handler(arguments, context).items() if key in properties}
+
+    project.__name__ = getattr(handler, "__name__", "knowledge_handler")
+    return project
 
 
 __all__ = [
