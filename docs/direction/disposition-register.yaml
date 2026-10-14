@@ -2589,9 +2589,10 @@ items:
         serve unit; 7/7 hostile probes denied on the deployed build.
       source: docs/evidence/2026-10-14-agent-inbox-m2c/ (records.json, records-postfix.json, permission-probes.json)
       verdict: confirmed
-  divergence: 'Deployed from agentops PR #343 at 6a10a24 until that PR merges. Run time limit and operator close of
-    a stuck launched record exist (3a1b4a3) but were not induced live; the IP allow/deny lines need the system unit;
-    opencode serve crash behaviour and gateway outage not exercised.'
+  divergence: 'Deployed from agentops main at 182a796f (PR #343 merged; /projects/dev/agentops on devbox, running
+    host_adapter.py blob verified against main). Run time limit and operator close of a stuck launched record exist but
+    were not induced live; the IP allow/deny lines need the system unit; opencode serve crash behaviour and gateway
+    outage not exercised.'
   confidence: medium
   goal_state:
     reviewed: '2026-10-14'
