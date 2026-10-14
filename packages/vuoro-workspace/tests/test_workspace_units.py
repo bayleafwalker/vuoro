@@ -124,7 +124,13 @@ def test_resolve_media_type_rules():
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", b"PK\x03\x04")[0] is not None
     assert resolve_media_type("application/pdf", b"# not a pdf")[0] is None
     assert resolve_media_type("image/png", b"%PDF-")[0] is None
-    assert resolve_media_type("application/x-custom", b"\x00\x01\xff")[0] == "application/x-custom"
+    # Anything outside the text allowlist and the magic-verified types is stored as octet-stream.
+    assert resolve_media_type("application/x-custom", b"\x00\x01\xff")[0] == "application/octet-stream"
+    assert resolve_media_type("text/html", b"<html><script>x</script>")[0] == "application/octet-stream"
+    assert resolve_media_type("image/svg+xml", b"<svg onload=alert(1)>")[0] == "application/octet-stream"
+    assert resolve_media_type("text/csv", b"a,b\n1,2\n")[0] == "text/csv"
+    assert resolve_media_type("text/plain", b"%PDF-1.4")[0] is None
+    assert resolve_media_type("application/x-custom", b"%PDF-1.4")[0] is None
 
 
 def test_extraction_states():
@@ -132,6 +138,9 @@ def test_extraction_states():
     assert md.state == "ready" and [a["text"] for a in md.anchors] == ["Head", "Sub"]
     assert extract("text/plain", b"plain").text == "plain"
     assert extract("image/png", b"\x89PNG").state == "unsupported"
+    assert extract("application/octet-stream", b"<html>").state == "unsupported"
+    big = extract("text/plain", b"word " * 300_000)
+    assert big.state == "ready" and big.truncated and len(big.text) == 1_000_000
     assert extract("text/plain", b"\xff\xfe").state == "failed"
     pdf = extract("application/pdf", b"%PDF-1.4 broken")
     try:

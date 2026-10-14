@@ -98,7 +98,7 @@ CREATE TABLE __SCHEMA__.knowledge_revision (
   item_id text NOT NULL,
   parent_revision_id text REFERENCES __SCHEMA__.knowledge_revision,
   title text NOT NULL,
-  body_md text NOT NULL,
+  body_md text NOT NULL CHECK (length(body_md) <= 1000000),
   content_sha256 text NOT NULL,
   author_id text NOT NULL,
   sources jsonb NOT NULL DEFAULT '[]'::jsonb,
@@ -106,9 +106,10 @@ CREATE TABLE __SCHEMA__.knowledge_revision (
   reviewed_by text,
   reviewed_at timestamptz,
   created_at timestamptz NOT NULL,
+  -- Only a bounded prefix is indexed: a tsvector is limited to 1 MB.
   search_tsv tsvector GENERATED ALWAYS AS (
-    setweight(to_tsvector('english'::regconfig, title), 'A') ||
-    setweight(to_tsvector('english'::regconfig, body_md), 'B')
+    setweight(to_tsvector('english'::regconfig, left(title, 1000)), 'A') ||
+    setweight(to_tsvector('english'::regconfig, left(body_md, 200000)), 'B')
   ) STORED,
   FOREIGN KEY (workspace_id, item_id) REFERENCES __SCHEMA__.knowledge_item (workspace_id, item_id)
 );
@@ -143,6 +144,7 @@ CREATE TABLE __SCHEMA__.artifact (
   deleted_by text,
   UNIQUE (workspace_id, artifact_id)
 );
+CREATE INDEX artifact_name_tsv ON __SCHEMA__.artifact USING gin (to_tsvector('english'::regconfig, left(name, 1000)));
 CREATE TABLE __SCHEMA__.artifact_version (
   version_id text PRIMARY KEY,
   workspace_id text NOT NULL,
@@ -159,6 +161,7 @@ CREATE TABLE __SCHEMA__.artifact_version (
   extraction_state text NOT NULL DEFAULT 'pending' CHECK (extraction_state IN ('pending','ready','unsupported','failed')),
   reject_reason text,
   finalize_result jsonb,
+  verifying_since timestamptz,
   created_by text NOT NULL,
   created_at timestamptz NOT NULL,
   expires_at timestamptz NOT NULL,
@@ -176,10 +179,11 @@ CREATE TABLE __SCHEMA__.extraction (
   version_id text NOT NULL REFERENCES __SCHEMA__.artifact_version,
   extractor text NOT NULL,
   extractor_version text NOT NULL,
-  text_content text NOT NULL,
+  text_content text NOT NULL CHECK (length(text_content) <= 1000000),
+  truncated boolean NOT NULL DEFAULT false,
   anchors jsonb NOT NULL DEFAULT '[]'::jsonb,
   created_at timestamptz NOT NULL,
-  search_tsv tsvector GENERATED ALWAYS AS (to_tsvector('english'::regconfig, text_content)) STORED,
+  search_tsv tsvector GENERATED ALWAYS AS (to_tsvector('english'::regconfig, left(text_content, 200000))) STORED,
   UNIQUE (version_id, extractor, extractor_version)
 );
 CREATE INDEX extraction_tsv ON __SCHEMA__.extraction USING gin (search_tsv);
@@ -225,6 +229,7 @@ CREATE TABLE __SCHEMA__.workspace_event (
   created_at timestamptz NOT NULL,
   PRIMARY KEY (workspace_id, seq)
 );
+CREATE INDEX workspace_event_visibility ON __SCHEMA__.workspace_event (workspace_id, visibility, seq);
 CREATE TABLE __SCHEMA__.outbox (
   outbox_id text PRIMARY KEY,
   workspace_id text NOT NULL,
@@ -348,11 +353,13 @@ def migrate_schema(conn: Any, schema: str = DEFAULT_SCHEMA) -> MigrationResult:
     applied: list[int] = []
     with conn.transaction():
         with conn.cursor() as cur:
-            cur.execute("SELECT pg_advisory_xact_lock(%s, %s)", SCHEMA_MIGRATION_LOCK_KEYS)
+            # lock_timeout first, so neither the advisory lock nor a DDL lock
+            # can queue indefinitely; the operator or Job retries.
             cur.execute(
                 "SELECT set_config('lock_timeout', %s, true)",
                 (os.environ.get(MIGRATION_LOCK_TIMEOUT_ENV, "5s"),),
             )
+            cur.execute("SELECT pg_advisory_xact_lock(%s, %s)", SCHEMA_MIGRATION_LOCK_KEYS)
             version, ledger = read_schema_state(cur, schema)
             if version is not None and version > CURRENT_SCHEMA_VERSION:
                 raise SchemaMigrationError(

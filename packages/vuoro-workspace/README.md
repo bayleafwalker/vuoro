@@ -53,6 +53,18 @@ client=...)` (`pip install 'vuoro-workspace[s3]'` for boto3). PDF text
 extraction needs the `pdf` extra (`pypdf`); without it PDFs are stored and
 downloadable with extraction state `unsupported`.
 
+Content safety and limits: only allow-listed text types (plain, Markdown,
+CSV, TSV, JSON, YAML) and magic-verified binaries keep their declared media
+type; anything else (HTML, SVG, XML, unknown binaries) is stored as
+`application/octet-stream`, and `download()` always reports
+`content_disposition: attachment`. `body_md` is capped at 1,000,000
+characters and extracted text is truncated to the same size
+(`extraction_truncated`); only a 200,000-character prefix is indexed,
+because a PostgreSQL tsvector is limited to 1 MB. Version pointers
+(`latest_version_id`, `approved_version_id`) only move forward in reservation
+order. A finalize stranded in `verifying` is re-verified by any retry, and
+`reconcile` resets it (or expires it) after `verify_timeout`.
+
 ## Migrations
 
 ```bash

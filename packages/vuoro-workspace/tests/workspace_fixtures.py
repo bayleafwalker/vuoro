@@ -95,6 +95,16 @@ def env(pg_dsn: str, pg_conn: Any, schema: str, clock: Clock, tmp_path: Path) ->
 
     e = Env()
     e.store, e.objects, e.clock, e.schema, e.tmp = store, objects, clock, schema, tmp_path
+    e.dsn = pg_dsn
+    extra = []
+
+    def new_store():
+        """A second store on its own connection (for concurrency tests)."""
+        s2 = WorkspaceStore(psycopg.connect(pg_dsn, autocommit=True), objects, schema=schema, clock=clock)
+        extra.append(s2)
+        return s2
+
+    e.new_store = new_store
     e.admin = Principal("admin", every)
     e.ws = store.workspace_create(e.admin, "Research")["workspace_id"]
     e.p = {}
@@ -105,3 +115,5 @@ def env(pg_dsn: str, pg_conn: Any, schema: str, clock: Clock, tmp_path: Path) ->
         e.p[name] = Principal(name, every, is_agent=agent)
     yield e
     store.close()
+    for s2 in extra:
+        s2.close()

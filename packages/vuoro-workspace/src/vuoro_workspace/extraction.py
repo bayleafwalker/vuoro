@@ -14,6 +14,9 @@ from typing import Any
 
 EXTRACTOR = "vuoro-workspace-extract"
 EXTRACTOR_VERSION = "1"
+# Stored extracted text is capped (the schema CHECKs it); only a 200k-char
+# prefix is indexed, because a PostgreSQL tsvector is limited to 1 MB.
+MAX_TEXT_CHARS = 1_000_000
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$", re.MULTILINE)
 
 
@@ -23,6 +26,14 @@ class Extraction:
     text: str = ""
     anchors: list[dict[str, Any]] = field(default_factory=list)
     error: str | None = None
+    truncated: bool = False
+
+
+def _bounded(state: str, text: str, anchors: list[dict[str, Any]]) -> Extraction:
+    if len(text) <= MAX_TEXT_CHARS:
+        return Extraction(state, text, anchors)
+    kept = [a for a in anchors if a.get("offset", 0) < MAX_TEXT_CHARS]
+    return Extraction(state, text[:MAX_TEXT_CHARS], kept, truncated=True)
 
 
 def _markdown_anchors(text: str) -> list[dict[str, Any]]:
@@ -47,20 +58,22 @@ def _pdf(data: bytes) -> Extraction:
             anchors.append({"kind": "page", "page": number, "offset": offset})
             parts.append(text)
             offset += len(text) + 1
-        return Extraction("ready", "\n".join(parts), anchors)
+        return _bounded("ready", "\n".join(parts), anchors)
     except Exception as exc:  # malformed PDFs must not break finalize
         return Extraction("failed", error=f"{type(exc).__name__}: {exc}"[:500])
 
 
 def extract(media_type: str, data: bytes) -> Extraction:
-    if media_type in {"text/markdown", "text/x-markdown"} or media_type.startswith("text/"):
+    from .objectstore import TEXT_TYPES
+
+    if media_type in TEXT_TYPES:
         try:
             text = data.decode("utf-8")
         except UnicodeDecodeError as exc:
             return Extraction("failed", error=str(exc)[:500])
         text = text.replace("\x00", "")
         anchors = _markdown_anchors(text) if "markdown" in media_type else []
-        return Extraction("ready", text, anchors)
+        return _bounded("ready", text, anchors)
     if media_type == "application/pdf":
         return _pdf(data)
     return Extraction("unsupported")

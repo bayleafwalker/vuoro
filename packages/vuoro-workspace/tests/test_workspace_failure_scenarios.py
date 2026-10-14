@@ -51,7 +51,8 @@ def codes(fn):
 # 1 -------------------------------------------------------------------------
 def test_s1_reserved_version_is_invisible_then_expires(env):
     e = env
-    begun, _ = upload(e, "contrib", finalize=False)
+    # The name contains the search term, so only the ready filter keeps it out of results.
+    begun, _ = upload(e, "contrib", name="churn report", finalize=False)
     art, ver = begun["artifact_id"], begun["version_id"]
     for who in ("reader", "contrib"):
         assert e.store.search(e.p[who], e.ws, "churn", scope="history")["total"] == 0
@@ -84,13 +85,13 @@ def test_s1_finalize_after_ttl_expires_instead_of_verifying(env):
 def test_s2_wrong_checksum_size_or_type_is_rejected(env, variant):
     e = env
     if variant == "checksum":
-        begun, result = upload(e, "contrib", expected_sha="0" * 64)
+        begun, result = upload(e, "contrib", expected_sha="0" * 64, name="churn report")
         reason = "checksum-mismatch"
     elif variant == "size":
-        begun, result = upload(e, "contrib", expected_size=len(MD) + 1)
+        begun, result = upload(e, "contrib", expected_size=len(MD) + 1, name="churn report")
         reason = "size-mismatch"
     else:
-        begun, result = upload(e, "contrib", data=MD, media="application/pdf", name="fake.pdf")
+        begun, result = upload(e, "contrib", data=MD, media="application/pdf", name="churn report pdf")
         reason = "media-type-mismatch"
     assert result["processing_state"] == "rejected"
     assert reason in result["reject_reasons"]

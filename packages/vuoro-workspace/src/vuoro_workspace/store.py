@@ -89,6 +89,7 @@ class WorkspaceStore:
         clock: Callable[[], datetime] = _utcnow,
         reservation_ttl: timedelta = timedelta(hours=1),
         max_artifact_bytes: int = 100 * 1024 * 1024,
+        verify_timeout: timedelta = timedelta(minutes=15),
         runtime_role: str | None = None,
     ) -> None:
         if not conn.autocommit:
@@ -103,6 +104,7 @@ class WorkspaceStore:
         self._clock = clock
         self.reservation_ttl = reservation_ttl
         self.max_artifact_bytes = max_artifact_bytes
+        self.verify_timeout = verify_timeout
 
     @classmethod
     def connect(cls, dsn: str, object_store: ObjectStore, **kwargs: Any) -> "WorkspaceStore":
@@ -185,7 +187,7 @@ class WorkspaceStore:
     def _ledger_store(self, cur: Any, ws: str, p: Principal, operation: str, key: str, digest: str, result: Any) -> None:
         cur.execute(
             "INSERT INTO idempotency_ledger (workspace_id, principal_id, operation, idempotency_key, "
-            "request_digest, result, created_at) VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
+            "request_digest, result, created_at) VALUES (%s, %s, %s, %s, %s, %s, %s)",
             (ws, p.principal_id, operation, key, digest, Jsonb(result), self.now()),
         )
 
@@ -237,6 +239,16 @@ class WorkspaceStore:
         cur.execute("SELECT last_seq FROM workspace_seq WHERE workspace_id = %s", (ws,))
         return int(cur.fetchone()["last_seq"])
 
+    @staticmethod
+    def _visible(access: Access) -> list[str]:
+        return [v for v, auth in VISIBILITY_AUTHORITY.items() if access.can(auth)]
+
+    def _visible_watermark(self, cur: Any, ws: str, access: Access) -> int:
+        """Highest event seq this caller may see; hidden activity never moves it."""
+        cur.execute("SELECT coalesce(max(seq), 0) AS seq FROM workspace_event "
+                    "WHERE workspace_id = %s AND visibility = ANY(%s)", (ws, self._visible(access)))
+        return int(cur.fetchone()["seq"])
+
     # ------------------------------------------------------- workspace/member
 
     def workspace_create(self, p: Principal, name: str, *, tenant_id: str = "default",
@@ -271,9 +283,13 @@ class WorkspaceStore:
             (ws, actor, actor, now),
         )
 
-    def member_set(self, p: Principal, ws: str, principal_id: str, role: str | None, *, is_agent: bool = False,
-                   idempotency_key: str | None = None) -> dict[str, Any]:
-        """Add, change (``role``) or remove (``role=None``) a member."""
+    def member_set(self, p: Principal, ws: str, principal_id: str, role: str | None, *,
+                   is_agent: bool | None = None, idempotency_key: str | None = None) -> dict[str, Any]:
+        """Add, change (``role``) or remove (``role=None``) a member.
+
+        ``is_agent=None`` keeps an existing member's agent marker (new members
+        default to non-agent); clearing the marker needs an explicit False.
+        """
         _text(principal_id, "principal_id")
         if role is not None and role not in ROLES:
             raise WorkspaceError(E.INVALID, f"role must be one of {ROLES}")
@@ -281,11 +297,18 @@ class WorkspaceStore:
             raise WorkspaceError(E.INVALID, "agent principals are capped at contributor")
 
         def run(cur: Any, _: Access | None) -> dict[str, Any]:
+            # Serialize membership changes per workspace (the counter row is
+            # every mutation's lock), then re-check the caller under the lock.
+            cur.execute("SELECT 1 FROM workspace_seq WHERE workspace_id = %s FOR UPDATE", (ws,))
+            self._authorize(cur, p, ws, ADMIN)
             cur.execute(
-                "SELECT role FROM workspace_member WHERE workspace_id = %s AND principal_id = %s FOR UPDATE",
+                "SELECT role, is_agent FROM workspace_member WHERE workspace_id = %s AND principal_id = %s FOR UPDATE",
                 (ws, principal_id),
             )
             current = cur.fetchone()
+            agent = bool(current["is_agent"]) if (is_agent is None and current) else bool(is_agent)
+            if role is not None and agent and ROLE_RANK[role] > AGENT_RANK_CAP:
+                raise WorkspaceError(E.INVALID, "agent principals are capped at contributor")
             if current and current["role"] == "administrator" and role != "administrator":
                 cur.execute(
                     "SELECT count(*) AS n FROM workspace_member WHERE workspace_id = %s AND role = 'administrator'",
@@ -304,9 +327,9 @@ class WorkspaceStore:
                     "VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (workspace_id, principal_id) DO UPDATE SET "
                     "role = EXCLUDED.role, is_agent = EXCLUDED.is_agent, updated_by = EXCLUDED.updated_by, "
                     "updated_at = EXCLUDED.updated_at",
-                    (ws, principal_id, role, is_agent, p.principal_id, self.now()),
+                    (ws, principal_id, role, agent, p.principal_id, self.now()),
                 )
-            result = {"principal_id": principal_id, "role": role, "is_agent": is_agent if role else None}
+            result = {"principal_id": principal_id, "role": role, "is_agent": agent if role else None}
             self._emit(cur, ws, p.principal_id, "member.removed" if role is None else "member.set", "member",
                        principal_id, visibility="admin", payload=result)
             return result
@@ -593,59 +616,68 @@ class WorkspaceStore:
         return self._mutate(p, ws, "artifact.begin", CONTRIBUTE, request, idempotency_key, run)
 
     def artifact_upload(self, p: Principal, ws: str, version_id: str, data: bytes) -> dict[str, Any]:
-        """Transfer step: write a reserved version's bytes through the store API (Phase 1)."""
+        """Transfer step: write a reserved version's bytes through the store API (Phase 1).
+
+        The version row stays locked while the bytes are written, so a
+        concurrent finalize cannot start verifying half-written content, and
+        an upload is refused once verification has begun.
+        """
         if not isinstance(data, (bytes, bytearray)):
             raise WorkspaceError(E.INVALID, "data must be bytes")
         if len(data) > self.max_artifact_bytes:
             raise WorkspaceError(E.INVALID, "artifact exceeds the size limit")
         with self.conn.transaction(), self.conn.cursor() as cur:
             self._authorize(cur, p, ws, CONTRIBUTE)
-            cur.execute("SELECT * FROM artifact_version WHERE version_id = %s AND workspace_id = %s",
-                        (version_id, ws))
-            row = cur.fetchone()
-        if row is None:
-            raise WorkspaceError(E.NOT_FOUND, "version not found")
-        if row["created_by"] != p.principal_id:
-            raise WorkspaceError(E.FORBIDDEN, "only the reserving principal can upload this version")
-        if row["processing_state"] != "reserved":
-            raise WorkspaceError(E.STATE_CONFLICT, f"version is {row['processing_state']}")
-        if row["expires_at"] <= self.now():
-            raise WorkspaceError(E.RESERVATION_EXPIRED, "reservation expired")
-        self.objects.put(row["object_key"], bytes(data))
+            row = self._version_for_update(cur, ws, version_id)
+            if row["created_by"] != p.principal_id:
+                raise WorkspaceError(E.FORBIDDEN, "only the reserving principal can upload this version")
+            if row["processing_state"] != "reserved":
+                raise WorkspaceError(E.STATE_CONFLICT, f"version is {row['processing_state']}")
+            if row["expires_at"] <= self.now():
+                raise WorkspaceError(E.RESERVATION_EXPIRED, "reservation expired")
+            self.objects.put(row["object_key"], bytes(data))
         return {"version_id": version_id, "object_key": row["object_key"], "size": len(data)}
 
     def artifact_finalize(self, p: Principal, ws: str, version_id: str, *,
                           idempotency_key: str | None = None) -> dict[str, Any]:
-        """Verify stored bytes (sha256, size, sniffed type) and mark ready or rejected. Idempotent."""
+        """Verify stored bytes (sha256, size, sniffed type) and mark ready or rejected. Idempotent.
+
+        A version left in ``verifying`` (a crash between the two transactions)
+        is re-verified by any later finalize; reconcile resets or expires one
+        that nobody retries within ``verify_timeout``.
+        """
         if idempotency_key is not None and not IDEMPOTENCY_KEY_RE.fullmatch(idempotency_key):
             raise WorkspaceError(E.INVALID, "idempotency key must match ^[A-Za-z0-9._:-]{8,128}$")
-        digest = request_digest("artifact.finalize", {"version_id": version_id})
+        op = "artifact.finalize"
+        digest = request_digest(op, {"version_id": version_id})
         expired = False
         with self.conn.transaction(), self.conn.cursor() as cur:
             self._authorize(cur, p, ws, CONTRIBUTE)
             if idempotency_key:
-                replay = self._ledger_lookup(cur, ws, p, "artifact.finalize", idempotency_key, digest)
+                replay = self._ledger_lookup(cur, ws, p, op, idempotency_key, digest)
                 if replay is not None:
                     return replay
             row = self._version_for_update(cur, ws, version_id)
             state = row["processing_state"]
             if state in ("ready", "rejected"):
+                if idempotency_key:
+                    self._ledger_store(cur, ws, p, op, idempotency_key, digest, row["finalize_result"])
                 return row["finalize_result"]
             if state == "expired":
                 raise WorkspaceError(E.RESERVATION_EXPIRED, "reservation expired")
             if state == "reserved" and row["expires_at"] <= self.now():
                 self._expire_version(cur, ws, p.principal_id, row)
                 expired = True
-            elif state == "reserved":
-                cur.execute("UPDATE artifact_version SET processing_state = 'verifying' WHERE version_id = %s",
-                            (version_id,))
+            else:  # reserved, or a stranded verifying being retried
+                cur.execute("UPDATE artifact_version SET processing_state = 'verifying', verifying_since = %s "
+                            "WHERE version_id = %s", (self.now(), version_id))
         if expired:
             raise WorkspaceError(E.RESERVATION_EXPIRED, "reservation expired")
 
         data = self.objects.get(row["object_key"])
         if data is None:
             with self.conn.transaction(), self.conn.cursor() as cur:
-                cur.execute("UPDATE artifact_version SET processing_state = 'reserved' "
+                cur.execute("UPDATE artifact_version SET processing_state = 'reserved', verifying_since = NULL "
                             "WHERE version_id = %s AND processing_state = 'verifying'", (version_id,))
             raise WorkspaceError(E.OBJECT_MISSING, "no bytes stored for this version yet", object_key=row["object_key"])
         actual_sha, actual_size = _sha256(data), len(data)
@@ -661,6 +693,11 @@ class WorkspaceStore:
 
         with self.conn.transaction(), self.conn.cursor() as cur:
             self._authorize(cur, p, ws, CONTRIBUTE)
+            if idempotency_key:
+                # Re-take the key lock: a concurrent first use must conflict or replay, never double-store.
+                replay = self._ledger_lookup(cur, ws, p, op, idempotency_key, digest)
+                if replay is not None:
+                    return replay
             row = self._version_for_update(cur, ws, version_id)
             if row["processing_state"] in ("ready", "rejected"):
                 result = row["finalize_result"]
@@ -670,35 +707,59 @@ class WorkspaceStore:
                 now = self.now()
                 ready = not reasons
                 extraction_state = extraction.state if extraction else "pending"
+                if ready and extraction and extraction.state == "ready":
+                    try:
+                        with self.conn.transaction():  # savepoint: indexing never fails finalize
+                            cur.execute(
+                                "INSERT INTO extraction (extraction_id, workspace_id, version_id, extractor, "
+                                "extractor_version, text_content, truncated, anchors, created_at) "
+                                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
+                                (new_ulid(), ws, version_id, EXTRACTOR, EXTRACTOR_VERSION, extraction.text,
+                                 extraction.truncated, Jsonb(extraction.anchors), now),
+                            )
+                    except psycopg.Error:
+                        extraction_state = "failed"
                 result = normalize({
                     "artifact_id": row["artifact_id"], "version_id": version_id,
                     "processing_state": "ready" if ready else "rejected",
                     "review_state": "unreviewed", "extraction_state": extraction_state,
+                    "extraction_truncated": bool(extraction and extraction.truncated and extraction_state == "ready"),
                     "sha256": actual_sha, "size": actual_size, "media_type": accepted_type or sniffed,
-                    "reject_reasons": reasons,
+                    "content_disposition": "attachment", "reject_reasons": reasons,
                 })
                 cur.execute(
                     "UPDATE artifact_version SET processing_state = %s, sha256 = %s, size_bytes = %s, media_type = %s, "
-                    "extraction_state = %s, reject_reason = %s, finalize_result = %s, finalized_at = %s "
-                    "WHERE version_id = %s",
+                    "extraction_state = %s, reject_reason = %s, finalize_result = %s, finalized_at = %s, "
+                    "verifying_since = NULL WHERE version_id = %s",
                     (result["processing_state"], actual_sha, actual_size, result["media_type"], extraction_state,
                      ",".join(reasons) or None, Jsonb(result), now, version_id),
                 )
                 if ready:
-                    if extraction and extraction.state == "ready":
-                        cur.execute(
-                            "INSERT INTO extraction (extraction_id, workspace_id, version_id, extractor, extractor_version, "
-                            "text_content, anchors, created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
-                            (new_ulid(), ws, version_id, EXTRACTOR, EXTRACTOR_VERSION, extraction.text,
-                             Jsonb(extraction.anchors), now),
-                        )
-                    cur.execute("UPDATE artifact SET latest_version_id = %s WHERE artifact_id = %s",
-                                (version_id, row["artifact_id"]))
+                    self._advance_pointer(cur, "latest_version_id", row["artifact_id"], version_id)
                 self._emit(cur, ws, p.principal_id, "artifact.ready" if ready else "artifact.rejected", "artifact",
                            row["artifact_id"], version_id=version_id, payload=result)
             if idempotency_key:
-                self._ledger_store(cur, ws, p, "artifact.finalize", idempotency_key, digest, result)
+                self._ledger_store(cur, ws, p, op, idempotency_key, digest, result)
             return result
+
+    def _advance_pointer(self, cur: Any, column: str, artifact_id: str, version_id: str) -> None:
+        """Move ``latest_version_id``/``approved_version_id`` forward only.
+
+        Rule: versions are ordered by reservation (``created_at``, then the
+        ULID ``version_id``). A pointer moves to a version only if it is not
+        older than the version it currently names, so finalizing or approving
+        an older version never regresses it.
+        """
+        if column not in ("latest_version_id", "approved_version_id"):
+            raise ValueError(column)
+        cur.execute("SELECT 1 FROM artifact WHERE artifact_id = %s FOR UPDATE", (artifact_id,))
+        cur.execute(
+            f"UPDATE artifact a SET {column} = n.version_id FROM artifact_version n "
+            f"WHERE n.version_id = %s AND a.artifact_id = %s AND (a.{column} IS NULL OR NOT EXISTS ("
+            f"  SELECT 1 FROM artifact_version c WHERE c.version_id = a.{column} "
+            f"  AND (c.created_at, c.version_id) > (n.created_at, n.version_id)))",
+            (version_id, artifact_id),
+        )
 
     def _version_for_update(self, cur: Any, ws: str, version_id: str) -> dict[str, Any]:
         cur.execute(
@@ -712,8 +773,8 @@ class WorkspaceStore:
         return row
 
     def _expire_version(self, cur: Any, ws: str, actor: str, row: Mapping[str, Any]) -> None:
-        cur.execute("UPDATE artifact_version SET processing_state = 'expired' WHERE version_id = %s",
-                    (row["version_id"],))
+        cur.execute("UPDATE artifact_version SET processing_state = 'expired', verifying_since = NULL "
+                    "WHERE version_id = %s", (row["version_id"],))
         self._emit(cur, ws, actor, "artifact.expired", "artifact", row["artifact_id"], version_id=row["version_id"],
                    payload={"expires_at": row["expires_at"]})
 
@@ -733,12 +794,14 @@ class WorkspaceStore:
             cur.execute("UPDATE artifact_version SET review_state = %s, reviewed_by = %s, reviewed_at = %s "
                         "WHERE version_id = %s", (state, p.principal_id, self.now(), version_id))
             if state == "approved":
-                cur.execute("UPDATE artifact SET approved_version_id = %s WHERE artifact_id = %s",
-                            (version_id, row["artifact_id"]))
+                self._advance_pointer(cur, "approved_version_id", row["artifact_id"], version_id)
+            cur.execute("SELECT approved_version_id FROM artifact WHERE artifact_id = %s", (row["artifact_id"],))
+            approved = cur.fetchone()["approved_version_id"]
             self._emit(cur, ws, p.principal_id, f"artifact.{state}", "artifact", row["artifact_id"],
                        version_id=version_id, visibility="published" if state == "approved" else "working",
-                       payload={"note": note})
-            return {"artifact_id": row["artifact_id"], "version_id": version_id, "review_state": state}
+                       payload={"note": note, "approved_version_id": approved})
+            return {"artifact_id": row["artifact_id"], "version_id": version_id, "review_state": state,
+                    "approved_version_id": approved}
 
         return self._mutate(p, ws, "artifact.review", REVIEW, {"version_id": version_id, "decision": decision,
                                                                 "note": note}, idempotency_key, run)
@@ -762,11 +825,25 @@ class WorkspaceStore:
                 raise WorkspaceError(E.NOT_FOUND, "revision not available")
             if rev["state"] not in ("approved", "superseded") and not access.can(CONTRIBUTE):
                 raise WorkspaceError(E.NOT_FOUND, "revision not available")
-            cur.execute("SELECT relation_id, kind, target_kind, target_id, target_ref FROM relation "
-                        "WHERE workspace_id = %s AND source_kind = 'revision' AND source_id = %s ORDER BY relation_id",
-                        (ws, revision_id))
+            # Relations are filtered by what this caller may see: a reader never
+            # learns the ids of drafts, unreviewed versions or deleted targets.
+            cur.execute(
+                "SELECT rel.relation_id, rel.kind, rel.target_kind, rel.target_id, rel.target_ref FROM relation rel "
+                "LEFT JOIN knowledge_revision tr ON rel.target_kind = 'revision' AND tr.revision_id = rel.target_id "
+                "LEFT JOIN knowledge_item ti ON ti.item_id = tr.item_id "
+                "LEFT JOIN artifact_version tv ON rel.target_kind = 'artifact_version' AND tv.version_id = rel.target_id "
+                "LEFT JOIN artifact ta ON ta.artifact_id = tv.artifact_id "
+                "WHERE rel.workspace_id = %(ws)s AND rel.source_kind = 'revision' AND rel.source_id = %(src)s AND ("
+                " rel.target_kind = 'repository_document'"
+                " OR (rel.target_kind = 'revision' AND ti.deleted_at IS NULL"
+                "     AND (%(working)s OR tr.state IN ('approved','superseded')))"
+                " OR (rel.target_kind = 'artifact_version' AND ta.deleted_at IS NULL AND tv.processing_state = 'ready'"
+                "     AND (%(working)s OR tv.review_state = 'approved'))"
+                ") ORDER BY rel.relation_id",
+                {"ws": ws, "src": revision_id, "working": access.can(CONTRIBUTE)},
+            )
             relations = cur.fetchall()
-            watermark = self._watermark(cur, ws)
+            watermark = self._visible_watermark(cur, ws, access)
         return normalize({
             **rev, "workspace_id": ws, "publication_state": rev["state"],
             "approved_revision_id": item["approved_revision_id"], "sources_supplied": True,
@@ -774,7 +851,12 @@ class WorkspaceStore:
         })
 
     def download(self, p: Principal, ws: str, artifact_id: str, version: str = "latest-approved") -> dict[str, Any]:
-        """Authenticated download; bytes are re-verified against the recorded checksum."""
+        """Authenticated download; bytes are re-verified against the recorded checksum.
+
+        Callers serving the bytes over HTTP must use ``content_disposition``
+        (always ``attachment``) and ``media_type``; stored content is never
+        rendered inline.
+        """
         with self.conn.transaction(), self.conn.cursor() as cur:
             access = self._authorize(cur, p, ws, READ)
             cur.execute("SELECT * FROM artifact WHERE artifact_id = %s AND workspace_id = %s AND deleted_at IS NULL",
@@ -795,13 +877,19 @@ class WorkspaceStore:
             raise WorkspaceError(E.OBJECT_MISSING, "stored object is missing or corrupt", version_id=version_id)
         return {
             "artifact_id": artifact_id, "version_id": version_id, "name": art["name"], "media_type": row["media_type"],
+            "content_disposition": "attachment",
             "size": row["size_bytes"], "sha256": row["sha256"], "review_state": row["review_state"],
             "processing_state": row["processing_state"], "extraction_state": row["extraction_state"], "data": data,
         }
 
     def search(self, p: Principal, ws: str, query: str, *, scope: str = "approved", limit: int = 20,
                offset: int = 0) -> dict[str, Any]:
-        """FTS over titles, Markdown bodies and extracted text, with access filters in the same query."""
+        """FTS over titles, Markdown bodies, artifact names and extracted text.
+
+        Publication and access filters are applied in the same query, before
+        ranking, counting and snippets; snippets are computed only for the
+        returned page.
+        """
         if scope not in SCOPES:
             raise WorkspaceError(E.INVALID, f"scope must be one of {SCOPES}")
         if not isinstance(query, str) or not query.strip():
@@ -827,35 +915,54 @@ class WorkspaceStore:
             cur.execute(
                 f"""
                 WITH q AS (SELECT websearch_to_tsquery('english', %(q)s) AS tsq),
-                hits AS (
-                  SELECT 'item' AS kind, i.item_id AS entity_id, r.revision_id AS version_id, r.title,
+                rev_hits AS (
+                  SELECT 'item'::text AS kind, i.item_id AS entity_id, r.revision_id AS version_id, r.title,
                          r.state AS publication_state, NULL::text AS extraction_state,
-                         ts_rank(r.search_tsv, q.tsq) AS rank,
-                         ts_headline('english', r.body_md, q.tsq, 'MaxFragments=1,MaxWords=24,MinWords=6') AS snippet
-                  FROM knowledge_revision r
-                  JOIN knowledge_item i ON i.item_id = r.item_id AND i.workspace_id = r.workspace_id, q
+                         ts_rank(r.search_tsv, q.tsq) AS rank
+                  FROM q, knowledge_revision r
+                  JOIN knowledge_item i ON i.item_id = r.item_id AND i.workspace_id = r.workspace_id
                   WHERE r.workspace_id = %(ws)s AND i.deleted_at IS NULL AND r.search_tsv @@ q.tsq AND {rev_filter}
+                ),
+                art_matches AS (
+                  SELECT e.version_id, ts_rank(e.search_tsv, q.tsq) AS rank
+                  FROM q, extraction e
+                  WHERE e.workspace_id = %(ws)s AND e.search_tsv @@ q.tsq
+                    AND e.extractor_version = (SELECT max(e2.extractor_version) FROM extraction e2
+                                               WHERE e2.version_id = e.version_id AND e2.extractor = e.extractor)
                   UNION ALL
-                  SELECT 'artifact', a.artifact_id, v.version_id, a.name,
-                         v.review_state, v.extraction_state,
-                         ts_rank(coalesce(e.search_tsv, ''::tsvector) || to_tsvector('english', a.name), q.tsq),
-                         ts_headline('english', coalesce(e.text_content, a.name), q.tsq,
-                                     'MaxFragments=1,MaxWords=24,MinWords=6')
-                  FROM artifact_version v
+                  SELECT v.version_id, ts_rank(to_tsvector('english'::regconfig, left(a.name, 1000)), q.tsq)
+                  FROM q, artifact a
+                  JOIN artifact_version v ON v.artifact_id = a.artifact_id AND v.workspace_id = a.workspace_id
+                  WHERE a.workspace_id = %(ws)s AND to_tsvector('english'::regconfig, left(a.name, 1000)) @@ q.tsq
+                ),
+                art_hits AS (
+                  SELECT 'artifact'::text, a.artifact_id, v.version_id, a.name, v.review_state, v.extraction_state,
+                         max(m.rank)
+                  FROM art_matches m
+                  JOIN artifact_version v ON v.version_id = m.version_id
                   JOIN artifact a ON a.artifact_id = v.artifact_id AND a.workspace_id = v.workspace_id
-                  LEFT JOIN extraction e ON e.version_id = v.version_id AND e.workspace_id = v.workspace_id, q
                   WHERE v.workspace_id = %(ws)s AND a.deleted_at IS NULL AND v.processing_state = 'ready'
-                    AND (coalesce(e.search_tsv, ''::tsvector) || to_tsvector('english', a.name)) @@ q.tsq
                     AND {art_filter}
+                  GROUP BY a.artifact_id, v.version_id, a.name, v.review_state, v.extraction_state
+                ),
+                page AS (
+                  SELECT h.*, count(*) OVER () AS total
+                  FROM (SELECT * FROM rev_hits UNION ALL SELECT * FROM art_hits) h
+                  ORDER BY h.rank DESC, h.version_id LIMIT %(limit)s OFFSET %(offset)s
                 )
-                SELECT *, count(*) OVER () AS total FROM hits
-                ORDER BY rank DESC, version_id LIMIT %(limit)s OFFSET %(offset)s
+                SELECT page.*, ts_headline('english', left(
+                         CASE WHEN page.kind = 'item'
+                              THEN (SELECT body_md FROM knowledge_revision WHERE revision_id = page.version_id)
+                              ELSE coalesce((SELECT text_content FROM extraction x WHERE x.version_id = page.version_id
+                                             ORDER BY x.extractor_version DESC LIMIT 1), page.title)
+                         END, 200000), q.tsq, 'MaxFragments=1,MaxWords=24,MinWords=6') AS snippet
+                FROM page, q ORDER BY page.rank DESC, page.version_id
                 """,
                 {"q": query, "ws": ws, "limit": limit, "offset": max(0, int(offset))},
             )
             rows = cur.fetchall()
             total = rows[0]["total"] if rows else 0
-            watermark = self._watermark(cur, ws)
+            watermark = self._visible_watermark(cur, ws, access)
         results = [
             {"kind": r["kind"], "id": r["entity_id"], "version_id": r["version_id"], "title": r["title"],
              "publication_state": r["publication_state"], "extraction_state": r["extraction_state"],
@@ -868,19 +975,22 @@ class WorkspaceStore:
     # ------------------------------------------------------------ change feed
 
     def changes_since(self, p: Principal, ws: str, cursor: str | None = None, *, limit: int = 100) -> dict[str, Any]:
-        """Visible changes and tombstones after ``cursor``. Cursors never grant access."""
+        """Visible changes and tombstones after ``cursor``. Cursors never grant access.
+
+        The watermark and cursor only advance over events the caller may see,
+        so hidden activity is not observable through them.
+        """
         limit = max(1, min(int(limit), 1000))
         after = 0 if cursor is None else _decode_cursor(cursor, ws)
         with self.conn.transaction(), self.conn.cursor() as cur:
             access = self._authorize(cur, p, ws, READ)
-            watermark = self._watermark(cur, ws)
+            watermark = self._visible_watermark(cur, ws, access)
             if after > watermark:
-                raise WorkspaceError(E.INVALID_CURSOR, "cursor is ahead of this workspace")
-            visible = [v for v, auth in VISIBILITY_AUTHORITY.items() if access.can(auth)]
+                raise WorkspaceError(E.INVALID_CURSOR, "cursor is ahead of what this caller can see; resynchronize")
             cur.execute(
                 "SELECT seq, kind, entity_kind, entity_id, version_id, tombstone, payload, created_at FROM workspace_event "
                 "WHERE workspace_id = %s AND seq > %s AND seq <= %s AND visibility = ANY(%s) ORDER BY seq LIMIT %s",
-                (ws, after, watermark, visible, limit + 1),
+                (ws, after, watermark, self._visible(access), limit + 1),
             )
             rows = cur.fetchall()
         has_more = len(rows) > limit
@@ -893,22 +1003,29 @@ class WorkspaceStore:
 
     def delete(self, p: Principal, ws: str, kind: str, entity_id: str, *,
                idempotency_key: str | None = None) -> dict[str, Any]:
-        """Tombstone an item or artifact: gone from every read, search and count at once."""
-        tables = {"item": ("knowledge_item", "item_id"), "artifact": ("artifact", "artifact_id")}
+        """Tombstone an item or artifact: gone from every read, search and count at once.
+
+        The tombstone event is published only if the entity was ever
+        published; deleting a never-approved draft stays in the working feed.
+        """
+        tables = {"item": ("knowledge_item", "item_id", "approved_revision_id"),
+                  "artifact": ("artifact", "artifact_id", "approved_version_id")}
         if kind not in tables:
             raise WorkspaceError(E.INVALID, "kind must be item or artifact")
-        table, column = tables[kind]
+        table, column, approved = tables[kind]
 
         def run(cur: Any, _: Access | None) -> dict[str, Any]:
             now = self.now()
             cur.execute(
                 f"UPDATE {table} SET deleted_at = %s, deleted_by = %s "
-                f"WHERE {column} = %s AND workspace_id = %s AND deleted_at IS NULL RETURNING {column}",
+                f"WHERE {column} = %s AND workspace_id = %s AND deleted_at IS NULL RETURNING {approved} AS approved",
                 (now, p.principal_id, entity_id, ws),
             )
-            if cur.fetchone() is None:
+            row = cur.fetchone()
+            if row is None:
                 raise WorkspaceError(E.NOT_FOUND, f"{kind} not found")
-            self._emit(cur, ws, p.principal_id, f"{kind}.deleted", kind, entity_id, visibility="published",
+            self._emit(cur, ws, p.principal_id, f"{kind}.deleted", kind, entity_id,
+                       visibility="published" if row["approved"] else "working",
                        tombstone=True, payload={"deleted_at": now})
             return {"kind": kind, "id": entity_id, "deleted_at": now}
 
@@ -916,16 +1033,32 @@ class WorkspaceStore:
 
     def reconcile(self, p: Principal, ws: str, *, grace: timedelta = timedelta(hours=1),
                   delete_orphans: bool = False) -> dict[str, Any]:
-        """Expire stale reservations; report missing objects and orphans.
+        """Expire stale reservations, recover stranded verifications, report missing objects and orphans.
 
+        A ``verifying`` version older than ``verify_timeout`` (a finalize that
+        crashed between its transactions) is reset to ``reserved`` so it can
+        be finalized again, or expired if its reservation has lapsed.
         An orphan (object with no live row, older than ``grace``) is deleted
         only when ``delete_orphans`` is set *and* an earlier pass recorded it.
         """
         now = self.now()
         with self.conn.transaction(), self.conn.cursor() as cur:
             self._authorize(cur, p, ws, ADMIN)
-            cur.execute("SELECT * FROM artifact_version WHERE workspace_id = %s AND processing_state = 'reserved' "
-                        "AND expires_at <= %s FOR UPDATE", (ws, now))
+            cur.execute("SELECT * FROM artifact_version WHERE workspace_id = %s AND processing_state = 'verifying' "
+                        "AND verifying_since <= %s ORDER BY version_id FOR UPDATE", (ws, now - self.verify_timeout))
+            stranded = cur.fetchall()
+            reset = []
+            for row in stranded:
+                if row["expires_at"] > now:
+                    cur.execute("UPDATE artifact_version SET processing_state = 'reserved', verifying_since = NULL "
+                                "WHERE version_id = %s", (row["version_id"],))
+                    self._emit(cur, ws, p.principal_id, "artifact.verification-reset", "artifact", row["artifact_id"],
+                               version_id=row["version_id"], payload={"verifying_since": row["verifying_since"]})
+                    reset.append(row["version_id"])
+            cur.execute("SELECT * FROM artifact_version WHERE workspace_id = %s AND processing_state IN "
+                        "('reserved','verifying') AND expires_at <= %s AND (processing_state = 'reserved' "
+                        "OR verifying_since <= %s) ORDER BY version_id FOR UPDATE",
+                        (ws, now, now - self.verify_timeout))
             expired = cur.fetchall()
             for row in expired:
                 self._expire_version(cur, ws, p.principal_id, row)
@@ -962,11 +1095,11 @@ class WorkspaceStore:
                                 (ws, orphan["object_key"], now))
             report = normalize({
                 "workspace_id": ws, "expired_versions": [r["version_id"] for r in expired],
-                "missing_objects": missing, "orphans": orphans,
+                "reset_verifications": reset, "missing_objects": missing, "orphans": orphans,
             })
             self._emit(cur, ws, p.principal_id, "workspace.reconciled", "workspace", ws, visibility="admin",
-                       payload={"expired": len(expired), "missing": len(missing), "orphans": len(orphans),
-                                "deleted": sum(o["status"] == "deleted" for o in orphans)})
+                       payload={"expired": len(expired), "reset": len(reset), "missing": len(missing),
+                                "orphans": len(orphans), "deleted": sum(o["status"] == "deleted" for o in orphans)})
         return report
 
     # ------------------------------------------------------- export/import
@@ -991,9 +1124,14 @@ def _text(value: Any, field_name: str) -> None:
         raise WorkspaceError(E.INVALID, f"{field_name} must be a non-empty string of at most 1000 characters")
 
 
+MAX_BODY_CHARS = 1_000_000
+
+
 def _body(value: Any) -> None:
     if not isinstance(value, str) or "\x00" in value:
         raise WorkspaceError(E.INVALID, "body_md must be text")
+    if len(value) > MAX_BODY_CHARS:
+        raise WorkspaceError(E.INVALID, f"body_md exceeds {MAX_BODY_CHARS} characters; store it as an artifact")
 
 
 def _encode_cursor(ws: str, seq: int) -> str:

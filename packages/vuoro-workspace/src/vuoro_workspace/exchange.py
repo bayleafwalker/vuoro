@@ -167,25 +167,42 @@ def _load_bundle(root: Path) -> tuple[dict[str, Any], dict[str, bytes]]:
     files: dict[str, bytes] = {}
     problems: list[str] = []
 
+    resolved_root = root.resolve()
+
     def read(path: Any) -> bytes | None:
-        if not isinstance(path, str) or path.startswith("/") or ".." in Path(path).parts:
+        if (not isinstance(path, str) or not path or path.startswith(("/", "\\")) or "\\" in path
+                or ".." in Path(path).parts):
+            problems.append(f"unsafe path {path!r}")
+            return None
+        target = (root / path).resolve()
+        if not target.is_relative_to(resolved_root) or target == resolved_root / MANIFEST:
             problems.append(f"unsafe path {path!r}")
             return None
         try:
-            return (root / path).read_bytes()
+            return target.read_bytes()
         except OSError:
             problems.append(f"missing file {path}")
             return None
 
-    revision_ids: set[str] = set()
+    revision_states = {"draft", "proposed", "approved", "rejected", "withdrawn", "superseded"}
+    revision_item: dict[str, str] = {}
     version_ids: set[str] = set()
+    item_ids: set[str] = set()
     for item in manifest.get("items", []):
+        if not is_ulid(item.get("item_id")) or item["item_id"] in item_ids:
+            problems.append(f"bad or duplicate item id {item.get('item_id')!r}")
+            continue
+        item_ids.add(item["item_id"])
         revs = item.get("revisions", [])
         ids = {r.get("revision_id") for r in revs}
         for rev in revs:
-            if not is_ulid(rev.get("revision_id")) or rev["revision_id"] in revision_ids:
+            if not is_ulid(rev.get("revision_id")) or rev["revision_id"] in revision_item:
                 problems.append(f"bad or duplicate revision id {rev.get('revision_id')!r}")
-            revision_ids.add(rev.get("revision_id"))
+                continue
+            revision_item[rev["revision_id"]] = item["item_id"]
+            if rev.get("state") not in revision_states or not isinstance(rev.get("title"), str) \
+                    or not isinstance(rev.get("author_id"), str):
+                problems.append(f"revision {rev['revision_id']} has an invalid state, title or author")
             data = read(rev.get("path"))
             if data is not None:
                 if _sha(data) != rev.get("content_sha256"):
@@ -193,17 +210,27 @@ def _load_bundle(root: Path) -> tuple[dict[str, Any], dict[str, bytes]]:
                 files[rev["path"]] = data
             if rev.get("parent_revision_id") is not None and rev["parent_revision_id"] not in ids:
                 problems.append(f"revision {rev['revision_id']} has a parent outside its item")
+        try:
+            _topological(revs)
+        except (WorkspaceError, KeyError, TypeError):
+            problems.append(f"item {item['item_id']} has a revision parent cycle or dangling parent")
         for pointer in ("approved_revision_id", "latest_revision_id"):
             if item.get(pointer) is not None and item[pointer] not in ids:
                 problems.append(f"item {item.get('item_id')} {pointer} not in bundle")
     missing = {m.get("version_id") for m in manifest.get("missing", [])}
+    artifact_ids: set[str] = set()
     for art in manifest.get("artifacts", []):
+        if not is_ulid(art.get("artifact_id")) or art["artifact_id"] in artifact_ids:
+            problems.append(f"bad or duplicate artifact id {art.get('artifact_id')!r}")
+            continue
+        artifact_ids.add(art["artifact_id"])
         vers = art.get("versions", [])
         ids = {v.get("version_id") for v in vers}
         for v in vers:
             if not is_ulid(v.get("version_id")) or v["version_id"] in version_ids:
                 problems.append(f"bad or duplicate version id {v.get('version_id')!r}")
-            version_ids.add(v.get("version_id"))
+                continue
+            version_ids.add(v["version_id"])
             if v.get("path") is not None:
                 data = read(v["path"])
                 if data is not None:
@@ -215,39 +242,52 @@ def _load_bundle(root: Path) -> tuple[dict[str, Any], dict[str, bytes]]:
         for pointer in ("approved_version_id", "latest_version_id"):
             if art.get(pointer) is not None and art[pointer] not in ids:
                 problems.append(f"artifact {art.get('artifact_id')} {pointer} not in bundle")
+    proposal_ids: set[str] = set()
     for pr in manifest.get("proposals", []):
-        if pr.get("revision_id") not in revision_ids or (
-            pr.get("expected_base_revision_id") is not None and pr["expected_base_revision_id"] not in revision_ids
-        ):
-            problems.append(f"proposal {pr.get('proposal_id')} references a revision outside the bundle")
-    known = revision_ids | version_ids
+        pid, item_id = pr.get("proposal_id"), pr.get("item_id")
+        base = pr.get("expected_base_revision_id")
+        if not is_ulid(pid) or pid in proposal_ids:
+            problems.append(f"bad or duplicate proposal id {pid!r}")
+        proposal_ids.add(pid)
+        if item_id not in item_ids:
+            problems.append(f"proposal {pid} names an item outside the bundle")
+        elif revision_item.get(pr.get("revision_id")) != item_id or (
+                base is not None and revision_item.get(base) != item_id):
+            problems.append(f"proposal {pid} references a revision outside its item")
+    kinds = {**{r: "revision" for r in revision_item}, **{v: "artifact_version" for v in version_ids}}
     for rel in manifest.get("relations", []):
-        if rel.get("source_id") not in known or (rel.get("target_kind") != "repository_document"
-                                                  and rel.get("target_id") not in known):
-            problems.append(f"relation {rel.get('relation_id')} references an id outside the bundle")
+        rid = rel.get("relation_id")
+        if kinds.get(rel.get("source_id")) != rel.get("source_kind"):
+            problems.append(f"relation {rid} source is not a {rel.get('source_kind')} in the bundle")
+        if rel.get("target_kind") == "repository_document":
+            if rel.get("target_id") is not None or not isinstance(rel.get("target_ref"), dict):
+                problems.append(f"relation {rid} repository citation is malformed")
+        elif kinds.get(rel.get("target_id")) != rel.get("target_kind"):
+            problems.append(f"relation {rid} target is not a {rel.get('target_kind')} in the bundle")
     if problems:
         raise WorkspaceError(E.IMPORT_INVALID, "bundle failed validation", problems=problems[:50])
     return manifest, files
 
 
 def _topological(revs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Order revisions parents-first, iteratively; raises on a cycle."""
     by_id = {r["revision_id"]: r for r in revs}
     ordered: list[dict[str, Any]] = []
     done: set[str] = set()
-
-    def visit(rev: dict[str, Any], depth: int = 0) -> None:
-        if rev["revision_id"] in done:
-            return
-        if depth > len(revs):
-            raise WorkspaceError(E.IMPORT_INVALID, "revision parent cycle")
-        parent = rev.get("parent_revision_id")
-        if parent is not None:
-            visit(by_id[parent], depth + 1)
-        done.add(rev["revision_id"])
-        ordered.append(rev)
-
-    for rev in revs:
-        visit(rev)
+    for start in revs:
+        chain: list[dict[str, Any]] = []
+        on_chain: set[str] = set()
+        node: dict[str, Any] | None = start
+        while node is not None and node["revision_id"] not in done:
+            if node["revision_id"] in on_chain:
+                raise WorkspaceError(E.IMPORT_INVALID, "revision parent cycle")
+            chain.append(node)
+            on_chain.add(node["revision_id"])
+            parent = node.get("parent_revision_id")
+            node = by_id[parent] if parent is not None else None
+        for rev in reversed(chain):
+            done.add(rev["revision_id"])
+            ordered.append(rev)
     return ordered
 
 
@@ -320,7 +360,7 @@ def import_workspace(store: "WorkspaceStore", p: "Principal", src: str, *, name:
                     state = "expired"
                 extraction = None
                 if data is not None and state == "ready":
-                    store.objects.put(key, data)
+                    pending.append((key, data))
                     extraction = extract(v["media_type"], data)
                     extraction_state = extraction.state
                 result = normalize({"artifact_id": aid, "version_id": vid, "processing_state": state,
@@ -367,10 +407,31 @@ def import_workspace(store: "WorkspaceStore", p: "Principal", src: str, *, name:
             for source_id, local_id in pairs.items():
                 cur.execute("INSERT INTO origin_map (workspace_id, entity_kind, source_id, local_id) VALUES (%s,%s,%s,%s)",
                             (ws, kind, source_id, local_id))
+        # Every row is written; only now do bytes go to the object store. If a
+        # put or anything after it fails, the transaction rolls back and the
+        # objects written so far are deleted (best effort, reported).
+        for key, data in pending:
+            store.objects.put(key, data)
+            written.append(key)
         store._emit(cur, ws, p.principal_id, "workspace.imported", "workspace", ws, visibility="published",
                     payload={"source_workspace_id": origin["source_workspace_id"],
                              "snapshot_seq": origin["snapshot_seq"]})
         return {"workspace_id": ws, "origin": origin, "origin_map": mapping,
                 "counts": {k: len(v) for k, v in mapping.items()}}
 
-    return store._mutate(p, GLOBAL_SCOPE, "import", ADMIN, request, idempotency_key, run, authorize=False)
+    pending: list[tuple[str, bytes]] = []
+    written: list[str] = []
+    try:
+        return store._mutate(p, GLOBAL_SCOPE, "import", ADMIN, request, idempotency_key, run, authorize=False)
+    except BaseException as exc:
+        leftovers = []
+        for key in written:
+            try:
+                store.objects.delete(key)
+            except Exception:  # noqa: BLE001 - cleanup is best effort and reported
+                leftovers.append(key)
+        if isinstance(exc, WorkspaceError):
+            exc.details["cleanup_failed_objects"] = leftovers
+        elif leftovers:
+            exc.add_note(f"import cleanup left objects behind: {leftovers}")
+        raise

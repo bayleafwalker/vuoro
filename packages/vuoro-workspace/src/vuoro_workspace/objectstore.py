@@ -179,7 +179,13 @@ _ZIP_CONTAINERS = {
     "application/vnd.oasis.opendocument.spreadsheet",
     "application/epub+zip",
 }
-_TEXTUAL = ("text/", "application/json", "application/xml", "application/yaml", "application/x-yaml")
+OCTET_STREAM = "application/octet-stream"
+# Text subtypes stored, extracted and indexed as text. Others (text/html,
+# image/svg+xml, application/xml, ...) are stored as octet-stream.
+TEXT_TYPES = frozenset({
+    "text/plain", "text/markdown", "text/x-markdown", "text/csv", "text/tab-separated-values",
+    "application/json", "application/yaml", "application/x-yaml", "text/yaml",
+})
 _MAGIC_TYPES = {t for _, t in _MAGIC} | _ZIP_CONTAINERS
 
 
@@ -204,15 +210,23 @@ def sniff_media_type(data: bytes) -> str:
 
 
 def resolve_media_type(declared: str, data: bytes) -> tuple[str | None, str]:
-    """Return (accepted media type or None on mismatch, sniffed type)."""
+    """Return (stored media type or None on mismatch, sniffed type).
+
+    Only allow-listed text types and magic-verified binary types keep their
+    declared type. Anything else that does not contradict its content (HTML,
+    SVG, XML, unknown binaries) is stored as ``application/octet-stream``:
+    the workspace never serves active content, and every download is
+    delivered as an attachment.
+    """
     declared = declared.split(";", 1)[0].strip().lower()
     sniffed = sniff_media_type(data)
-    if sniffed == declared:
-        return declared, sniffed
-    if sniffed == "application/zip" and declared in _ZIP_CONTAINERS:
-        return declared, sniffed
-    if sniffed == "text/plain" and declared.startswith(_TEXTUAL):
-        return declared, sniffed
-    if sniffed == "application/octet-stream" and declared not in _MAGIC_TYPES and not declared.startswith(_TEXTUAL):
-        return declared, sniffed
-    return None, sniffed
+    if declared in TEXT_TYPES:
+        return (declared if sniffed == "text/plain" else None), sniffed
+    if declared in _MAGIC_TYPES:
+        if sniffed == declared or (sniffed == "application/zip" and declared in _ZIP_CONTAINERS):
+            return declared, sniffed
+        return None, sniffed
+    if sniffed in _MAGIC_TYPES:
+        # A known binary format declared as something else is a mismatch.
+        return None, sniffed
+    return OCTET_STREAM, sniffed
