@@ -530,6 +530,11 @@ def provider_outcome_check(
     refs = list(work_refs or []) + [{"kind": "effect-attempt", "id": attempt_id}]
     if not ATTEMPT_ID.fullmatch(attempt_id):
         return DiagnosticResult("provider-outcome-check", "1", "error", {"invalid_attempt_id": attempt_id})
+    api = urllib.parse.urlsplit(github_api)
+    if allow_token_for_api and (api.scheme != "https" or not api.hostname or api.username or api.password):
+        return DiagnosticResult("provider-outcome-check", "1", "error", {
+            "attempt_id": attempt_id,
+            "refused": "--allow-token-for-github-api requires an https --github-api without userinfo"})
     status, body = source(attempt_id)
     if status != 200 or not isinstance(body, dict):
         return DiagnosticResult("provider-outcome-check", "1", "error",
