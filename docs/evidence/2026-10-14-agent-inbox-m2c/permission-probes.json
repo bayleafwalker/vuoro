@@ -1,0 +1,115 @@
+{
+ "1_before_round3_base_ruleset_scratch_dir": {
+  "append-local": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note x --idempotency-key probe.app.0005 >> /home/agent/work/m2c-scratch/m2c-append => completed | Error: backend-uncorroborated: served mode without a repository marker identity "
+  ],
+  "files": {
+   "/home/agent/work/m2c-scratch/m2c-append": true,
+   "/home/agent/work/m2c-scratch/m2c-redir-local": true,
+   "/tmp/m2c-redir": true
+  },
+  "redir-local": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note x --idempotency-key probe.redir.0002 > /home/agent/work/m2c-scratch/m2c-redir-local => completed | Error: backend-uncorroborated: served mode without a repository marker identity "
+  ],
+  "redir-tmp": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note x --idempotency-key probe.redir.0001 > /tmp/m2c-redir => completed | Error: backend-uncorroborated: served mode without a repository marker identity "
+  ],
+  "subst-bare": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note $(</etc/hostname) --idempotency-key probe.subst.0004 => completed | Error: backend-uncorroborated: served mode without a repository marker identity "
+  ],
+  "subst-quoted": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note \"$(< /etc/hostname)\" --idempotency-key probe.subst.0003 => completed | Error: backend-uncorroborated: served mode without a repository marker identity "
+  ]
+ },
+ "2_metachar_denies_added_scratch_dir": {
+  "append-local": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note x --idempotency-key probe.app.0005 >> /home/agent/work/m2c-scratch/m2c-append => error | The user has specified a rule which prevents you from using this specific tool c"
+  ],
+  "files": {
+   "/home/agent/work/m2c-scratch/m2c-append": false,
+   "/home/agent/work/m2c-scratch/m2c-redir-local": false,
+   "/tmp/m2c-redir": false
+  },
+  "plain-allowed": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note plain --idempotency-key probe.plain.0006 => completed | Error: backend-uncorroborated: served mode without a repository marker identity "
+  ],
+  "redir-local": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note x --idempotency-key probe.redir.0002 > /home/agent/work/m2c-scratch/m2c-redir-local => error | The user has specified a rule which prevents you from using this specific tool c"
+  ],
+  "redir-tmp": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note x --idempotency-key probe.redir.0001 > /tmp/m2c-redir => error | The user has specified a rule which prevents you from using this specific tool c"
+  ],
+  "subst-bare": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note $(</etc/hostname) --idempotency-key probe.subst.0004 => error | The user has specified a rule which prevents you from using this specific tool c"
+  ],
+  "subst-quoted": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note \"$(< /etc/hostname)\" --idempotency-key probe.subst.0003 => error | The user has specified a rule which prevents you from using this specific tool c"
+  ]
+ },
+ "3_more_vectors_with_metachar_denies": {
+  "files": {
+   "/home/agent/work/m2c-scratch/m2c-nl": false
+  },
+  "herestring": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note x --idempotency-key probe.hs.0010 <<< hello => error | The user has specified a rule which prevents you from using this specific tool c"
+  ],
+  "newline": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note x --idempotency-key probe.nl.0007\ntouch /home/agent/work/m2c-scratch/m2c-nl => error | The user has specified a rule which prevents you from using this specific tool c"
+  ],
+  "paramexp": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note \"${HOME} ${SPRINTCTL_VUORO_PROFILE}\" --idempotency-key probe.pe.0009 => completed | Error: backend-uncorroborated: served mode without a repository marker identity "
+  ],
+  "procsubst": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note x --idempotency-key probe.ps.0008 --note-file <(cat /etc/hostname) => error | The user has specified a rule which prevents you from using this specific tool c"
+  ]
+ },
+ "4_sandbox_only_base_ruleset_session_dir": {
+  "append-bashrc": [],
+  "files": {
+   "/projects/dev/agentops/.m2c-redir": false,
+   "/tmp/m2c-redir-sb": false
+  },
+  "read-gitpat": [],
+  "read-other-repo": [],
+  "read-ssh": [],
+  "redir-repo": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note x --idempotency-key probe.sb.0001 > /projects/dev/agentops/.m2c-redir => completed | /run/current-system/sw/bin/bash: line 1: /projects/dev/agentops/.m2c-redir: Read-only file system "
+  ],
+  "redir-tmp": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note x --idempotency-key probe.sb.0002 > /tmp/m2c-redir-sb => completed | (no output)",
+   " => error | Model tried to call unavailable tool 'invalid'. Available tools: bash."
+  ]
+ },
+ "5_final_6a10a24_sandboxed": {
+  "append-local": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note x --idempotency-key probe.f.0005 >> /projects/dev/agentops/.m2c-append => error | The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\","
+  ],
+  "files": {
+   "/projects/dev/agentops/.m2c-append": false,
+   "/projects/dev/agentops/.m2c-nl": false,
+   "/projects/dev/agentops/.m2c-redir-local": false,
+   "/tmp/m2c-redir": false
+  },
+  "newline": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note x --idempotency-key probe.f.0007\ntouch /projects/dev/agentops/.m2c-nl => error | The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\","
+  ],
+  "paramexp": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note \"${HOME}\" --idempotency-key probe.f.0006 => error | The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\","
+  ],
+  "plain-allowed": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note plain --idempotency-key probe.f.0000 => completed | {   \"error\": {     \"code\": \"run-not-found\",     \"message\": \"no run 'run_00000000000000000000000000' belongs to the caller\"   } } "
+  ],
+  "redir-local": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note x --idempotency-key probe.f.0002 > /projects/dev/agentops/.m2c-redir-local => error | The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\","
+  ],
+  "redir-tmp": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note x --idempotency-key probe.f.0001 > /tmp/m2c-redir => error | The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\","
+  ],
+  "subst-bare": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note $(</etc/hostname) --idempotency-key probe.f.0004 => error | The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\","
+  ],
+  "subst-quoted": [
+   "sprintctl run note --run-id run_00000000000000000000000000 --note \"$(< /etc/hostname)\" --idempotency-key probe.f.0003 => error | The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\","
+  ]
+ }
+}
