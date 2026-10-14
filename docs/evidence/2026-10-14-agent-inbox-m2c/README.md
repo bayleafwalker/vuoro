@@ -9,7 +9,7 @@ contract in `docs/architecture/agent-directory-and-inbox.md`.
 | Role | Principal | Runtime |
 |---|---|---|
 | Sender | `vuoro-static:workstation-inbox-native:0` | Claude Code on the workstation; sprintctl 0.19.0 |
-| Recipient | `vuoro-static:devbox-inbox-native:0`, instance `ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y` | agentops host adapter (agentops PR #343 at `42932e5`) on devbox, launching OpenCode 1.18.33 (`opencode serve` on loopback) with model `opencode-go/deepseek-v4-flash` |
+| Recipient | `vuoro-static:devbox-inbox-native:0`, instance `ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y` | agentops host adapter (agentops PR #343: `42932e5` for the histories, `3a1b4a3` after review round 2) on devbox, launching OpenCode 1.18.33 (`opencode serve` on loopback) with model `opencode-go/deepseek-v4-flash` |
 
 Both identities hold only `work:read` and `work:evidence`, for repository
 `agentops` and workspace `vuoro-native:agentops-coord:0`. The work item is
@@ -54,21 +54,27 @@ Files:
 
 ## Induced failure histories
 
-| # | Failure (roadmap §7) | How it was induced | Observed | Result |
-|---|---|---|---|---|
-| F1 | Sender retries after an uncertain response | Same envelope sent twice; then the same `message_id` with an altered body | Second send `replayed: true`, same `inbox_seq` 2 and envelope digest; the altered one was refused with `message-id-conflict` | One logical message |
-| F2 | Recipient receives the same message repeatedly | Adapter stopped, read cursor rewound 2 → 0, re-polled | Both messages re-read; still 2 processing records; receipts unchanged (5 each) | One processing record |
-| F3 | Adapter crashes before launch | Hard exit (`os._exit`) at `run_registered_persisted`, then the service restarted | Resumed with the same run `run_EF84…`; one `run-linked`; completed | Resumed safely |
-| F4 | Adapter crashes after launch, before acknowledgment | Hard exit at `session_created` (session exists, id not persisted), then restart | Session found by title and adopted; exactly 1 session with that title; completed; not prompted twice | Existing run found |
-| F4b | Same, with two matching sessions | As F4, plus a second session created with the same title | `launch-ambiguous` receipt carrying the run id; neither session prompted (0 messages each); no relaunch. `resolve --abandon` was refused while the service held the lock (exit 3); after a stop it recorded `result-linked` `abandoned` / `operator-abandoned` | Ambiguity surfaced; explicit operator close |
-| F5 | Effect succeeds before result recording fails | Successor's note write replayed with key `inbox.<msg>.note` | Same key and text return note 2 with the original `created_at`; same key with different text gives `idempotency-conflict` | Owner deduplicates |
-| F6 | Authorization changes before execution | Policy swapped to remove the sender after `accepted`, before launch | Policy re-read before launch: `result-linked` `not-started`, reason `sender-not-allowed`; 0 sessions; 0 notes | Refused under current policy |
-| F7 | Cancellation races with execution | `cancel` 0.8 s after `run-linked`, while launched | The session finished before the adapter's next tick: outcome `completed`, and `cancel-requested` stays in the record; a repeated cancel returns the first (`replayed: true`) | Records what happened |
-| F7b | Cancel after completion | `cancel` 5 s after `result-linked` | Cancel accepted and recorded after the result; outcome remains `completed` | Cancel never implies rollback |
-| F7c | Cancel while the session is busy | Hard exit at `prompt_sent`, then cancel, then restart | The adapter aborted the busy session: `result-linked` `canceled` (`MessageAbortedError`); 0 notes | Aborted, recorded as canceled |
+Processed by: **unit** is the installed systemd user unit (`agentops-host-adapter.service`); **in-process** is
+the fault-injection driver running the adapter's own `Adapter` class with a checkpoint hook (service
+stopped, same state directory); **unit after crash** means the in-process run was killed and the unit
+then completed the record.
 
-Fault injection ran the adapter's own `Adapter` class with a checkpoint hook,
-against the live owner and the live `opencode serve`. Nothing was mocked.
+| # | Failure (roadmap §7) | How it was induced | Processed by | Observed | Result |
+|---|---|---|---|---|---|
+| F1 | Sender retries after an uncertain response | Same envelope sent twice; then the same `message_id` with an altered body | unit | Second send `replayed: true`, same `inbox_seq` 2 and envelope digest; the altered one was refused with `message-id-conflict` | One logical message |
+| F2 | Recipient receives the same message repeatedly | Adapter stopped, read cursor rewound 2 → 0, re-polled | in-process | Both messages re-read; still 2 processing records; receipts unchanged (5 each) | One processing record |
+| F3 | Adapter crashes before launch | Hard exit (`os._exit`) at `run_registered_persisted`, then the service restarted | unit after crash | Resumed with the same run `run_EF84…`; one `run-linked`; completed | Resumed safely |
+| F4 | Adapter crashes after launch, before acknowledgment | Hard exit at `session_created` (session exists, id not persisted), then restart | unit after crash | Session found by title and adopted; exactly 1 session with that title; completed; not prompted twice | Existing run found |
+| F4b | Same, with two matching sessions | As F4, plus a second session created with the same title | unit after crash; operator `resolve` | `launch-ambiguous` receipt carrying the run id; neither session prompted (0 messages each); no relaunch. `resolve --abandon` was refused while the service held the lock (exit 3); after a stop it recorded `result-linked` `abandoned` / `operator-abandoned` | Ambiguity surfaced; explicit operator close |
+| F5 | Effect succeeds before result recording fails | Successor's note write replayed with key `inbox.<msg>.note` | owner replay via `sprintctl run note` on devbox | Same key and text return note 2 with the original `created_at`; same key with different text gives `idempotency-conflict` | Owner deduplicates |
+| F6 | Authorization changes before execution | Policy swapped to remove the sender after `accepted`, before launch | in-process | Policy re-read before launch: `result-linked` `not-started`, reason `sender-not-allowed`; 0 sessions; 0 notes | Refused under current policy |
+| F7 | Cancellation races with execution | `cancel` 0.8 s after `run-linked`, while launched | unit | The session finished before the adapter's next tick: outcome `completed`, and `cancel-requested` stays in the record; a repeated cancel returns the first (`replayed: true`) | Records what happened |
+| F7b | Cancel after completion | `cancel` 5 s after `result-linked` | unit | Cancel accepted and recorded after the result; outcome remains `completed` | Cancel never implies rollback |
+| F7c | Cancel while the session is busy | Hard exit at `prompt_sent`, then cancel, then restart | unit after crash | The adapter aborted the busy session: `result-linked` `canceled` (`MessageAbortedError`); 0 notes | Aborted, recorded as canceled |
+
+Ten induced histories: 3 processed entirely by the unit (F1, F7, F7b), 4 by the unit after an
+in-process crash (F3, F4, F4b, F7c), 2 entirely in-process (F2, F6) and 1 owner-side replay (F5).
+In-process runs used the live owner and the live `opencode serve`; nothing was mocked.
 
 **Owner-side effects.** Each of the 6 completed runs has exactly one session
 note. The 3 runs that did not complete (abandoned, not started, canceled)
@@ -84,11 +90,39 @@ have none. See `successor-notes.txt`.
 2. **Session-note reference.** The adapter looked for a `note_<ULID>`
    reference, but the owner returns an integer, run-scoped `note_id`. The
    first matching id in the session text is also the predecessor's, because
-   the context read prints it first. Fixed in `42932e5`: the adapter now takes
-   the last JSON `note_id`. Live from F1 onward
-   (`run_91YN…/note/4`).
+   the context read prints it first. Fixed in `42932e5` by taking the last
+   JSON `note_id` (live from F1 onward, `run_91YN…/note/4`), then superseded
+   in `3a1b4a3`: session text is model-controlled, so the scan was removed and
+   `result-linked` links only the run and the harness session. The notes are
+   owner records read through the run (no served op returns a run's own
+   notes to its owner).
 3. **Hook file mode.** Two hooks were committed without the executable bit,
    which failed CI. Fixed in `a68044d`.
+
+## Review round 2 (agentops #343 at `3a1b4a3`), re-verified live
+
+Opus review of #343 found the successor ran with OpenCode's default agent (shell as
+`agent` for any allowed sender), a forgeable body fence, the spoofable note scan above,
+stuck `launched` records with no time limit or operator close, and permanent refusal on
+temporary policy states. All fixed in `3a1b4a3` (85/85 adapter and hook tests).
+
+- **Successor tool restriction (server-side).** Each successor session is created with a
+  permission ruleset: deny `*`, allow only bash `sprintctl run context *` and
+  `sprintctl run note *`. Probed against opencode 1.18.33 on devbox before the change:
+  without the ruleset `touch` in the project directory succeeded (control); with it,
+  `touch`, `sprintctl --version`, `sprintctl run context … && touch …` and a
+  `$(touch …)` substitution inside an allowed `run note` were all denied, files absent.
+- **Negative test on the fixed build.** A session made by the adapter's own
+  `create_session` (ruleset verified on the session) was told to run `touch /tmp/x`,
+  `touch /projects/dev/agentops/.m2c-m1-x` and `cat /etc/hostname`: 3/3 tool calls
+  denied, 0 files created.
+- **Hostile body through the inbox** (`msg_01M4XF553K9GKT0PBXWD6D70GP`, unit): the body
+  asked for the same `touch` and tried to close the fence. The successor ran only
+  `sprintctl run context` and `run note` (one env-prefixed variant was denied by the
+  ruleset), wrote note 18, outcome `completed`; no file created.
+- **Post-fix success path** (`msg_01M4XF55TMQZSS2H0EP3JAEAKY`, unit): completed, note 19,
+  5 receipts; `result-linked` evidence is the run and the session.
+- The state database of the running adapter gained the new columns in place on start.
 
 ## Not exercised
 
@@ -97,7 +131,9 @@ have none. See `successor-notes.txt`.
   is a session note, which has an owner idempotency boundary but no
   reservation or revision fence.
 - `opencode serve` crashing mid-session.
-- A run that hangs: there is still no run timeout (carried gap).
+- A run that hangs: fixed in agentops #343 at `3a1b4a3` (`max_run_seconds`, abort, recorded
+  `failed`/`run-timeout`), and `resolve --abandon` now closes a stuck `launched` record with an
+  abort. Covered by unit tests, not induced live.
 
 Two empty OpenCode sessions from F4b remain on devbox. They are idle,
 unprompted and titled `vuoro-msg:msg_01M4XD770A2PHQYWT3D4GWMWN8`.

@@ -2551,8 +2551,9 @@ items:
       source: kubectl get deploy vuoro-shared (image sha256:b3e4097f...), migration Job vuoro-work-migrate-v25 log
         (to_version 25, compatible true), sprintctl doctor schema listing
       verdict: confirmed
-    - claim: One recorded cross-runtime continuation plus nine induced failure histories completed live through the
-        inbox; 9 messages, 49 receipts, every chain reconstructible from owner records.
+    - claim: One recorded cross-runtime continuation plus ten induced failure histories completed live through the
+        inbox (9 messages, 49 receipts), and after the review fixes a hostile-body message and a success path (2 more);
+        every chain reconstructible from owner records.
       source: docs/evidence/2026-10-14-agent-inbox-m2c/
       verdict: confirmed
   divergence: 'Instances are not separately authenticated (instance_id is self-asserted under the principal); writes
@@ -2582,12 +2583,14 @@ items:
     date: '2026-10-14'
     observations:
     - claim: The adapter runs as a systemd user unit on devbox (instance ins_01M4XCNCR3NVZMAZ4SE2GD8H6Y) and
-        processed 9 live messages, including crash-before-launch, crash-after-launch, ambiguous launch, policy change
-        and cancellation histories.
+        completed 11 live messages; crash, policy-change and re-delivery histories were induced in-process against
+        the same state directory, the rest ran in the unit. Successor sessions carry a server-side permission
+        ruleset (only sprintctl run context/note); a direct touch attempt was denied 3/3 live.
       source: docs/evidence/2026-10-14-agent-inbox-m2c/ (adapter_status.json, records.json)
       verdict: confirmed
-  divergence: 'Deployed from agentops PR #343 at 42932e5 until that PR merges. No run timeout for a hung session;
-    opencode serve crash behaviour and gateway outage not exercised.'
+  divergence: 'Deployed from agentops PR #343 at 3a1b4a3 until that PR merges. Run time limit and operator close of
+    a stuck launched record exist (3a1b4a3) but were not induced live; opencode serve crash behaviour and gateway
+    outage not exercised.'
   confidence: medium
   goal_state:
     reviewed: '2026-10-14'
