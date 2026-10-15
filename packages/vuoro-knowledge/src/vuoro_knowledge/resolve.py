@@ -60,6 +60,7 @@ REQUEST_KEYS = (
     "require",
     "as_of",
     "max_observation_age_days",
+    "operations", "audiences", "tasks", "required_sources", "include_sources",
 )
 
 
@@ -68,7 +69,7 @@ def normalize_request(request: dict[str, Any]) -> dict[str, Any]:
     if unknown:
         raise ValueError(f"unknown request keys: {unknown}")
     out: dict[str, Any] = {"topic": str(request.get("topic") or "")}
-    for key in ("subjects", "components", "repos", "environments", "questions", "require"):
+    for key in ("subjects", "components", "repos", "environments", "questions", "require", "operations", "audiences", "tasks", "required_sources", "include_sources"):
         values = request.get(key) or []
         out[key] = sorted({values} if isinstance(values, str) else {str(v) for v in values})
     out["versions"] = {str(k): str(v) for k, v in sorted((request.get("versions") or {}).items())}
@@ -94,7 +95,7 @@ def _applicability(doc: Document, request: dict[str, Any]) -> tuple[str | None, 
 
     applies = doc.metadata.applies_to
     unchecked = []
-    for dimension in ("repos", "components", "environments"):
+    for dimension in ("repos", "components", "environments", "operations", "audiences", "tasks"):
         declared = applies.get(dimension)
         if not declared or "*" in declared:
             continue
@@ -102,10 +103,9 @@ def _applicability(doc: Document, request: dict[str, Any]) -> tuple[str | None, 
         if dimension == "components":
             wanted = request["_components"]
         if not wanted:
-            if dimension == "environments":
-                unchecked.append(dimension)
+            unchecked.append(dimension)
             continue
-        if dimension != "components" and not set(declared) & set(wanted):
+        if not set(declared) & set(wanted):
             return f"applies to {dimension} {declared}, work targets {wanted}", unchecked
     for component, spec in (applies.get("versions") or {}).items():
         version = request["versions"].get(component)
@@ -177,6 +177,11 @@ def resolve_context(catalog: Catalog, request: dict[str, Any]) -> dict[str, Any]
     excluded: list[dict[str, Any]] = []
 
     def consider(doc: Document, why: list[str]) -> None:
+        if doc.metadata.consumption == "excluded-by-default" and doc.doc_id not in explicit:
+            excluded.append({"doc_id": doc.doc_id, "reason": "excluded-by-default; explicit inclusion required", "why_considered": why})
+            if any(w.startswith("authority:") for w in why):
+                unresolved.append(_issue("required-context-unavailable", "question authority requires explicit source inclusion", doc_id=doc.doc_id))
+            return
         reason, unchecked = _applicability(doc, req)
         if reason:
             excluded.append({"doc_id": doc.doc_id, "reason": reason, "why_considered": why})
@@ -186,8 +191,30 @@ def resolve_context(catalog: Catalog, request: dict[str, Any]) -> dict[str, Any]
         if unchecked:
             entry["unchecked"] = sorted(set(entry.get("unchecked", [])) | set(unchecked))
 
+    required = set(req["required_sources"])
+    explicit = required | set(req["include_sources"])
     for doc in sorted(catalog.documents.values(), key=lambda d: d.doc_id):
         why = []
+        mode = doc.metadata.consumption
+        if mode == "excluded-by-default" and doc.doc_id not in explicit:
+            # Still searchable/readable; exclusion is not an access-control decision.
+            continue
+        reason, unchecked = _applicability(doc, req)
+        selectors = doc.metadata.applies_to
+        contexts = {k: req[k] for k in ("repos", "environments", "operations", "audiences", "tasks")}
+        contexts["components"] = req["_components"]
+        matched = any(
+            bool(set(selectors.get(k, [])) & set(values))
+            or ("*" in selectors.get(k, []) and bool(values))
+            for k, values in contexts.items()
+        )
+        matched = matched or bool(set(doc.metadata.subjects) & set(req["subjects"]))
+        matched = matched or bool(set(selectors.get("versions", {})) & set(req["versions"]))
+        if reason is None and (mode == "bootstrap" or (mode == "required-on-match" and matched)):
+            required.add(doc.doc_id)
+            why.append("consumption: " + mode)
+        if doc.doc_id in explicit:
+            why.append("explicit source")
         doc_components = set(doc.metadata.applies_to.get("components", []))
         if doc_components & components:
             why.append("component: " + ", ".join(sorted(doc_components & components)))
@@ -230,6 +257,8 @@ def resolve_context(catalog: Catalog, request: dict[str, Any]) -> dict[str, Any]
             unresolved.append(_issue("no-authority", f"{question!r} is delegated to {sources[0]!r}, which is not in the catalog", question=question))
             continue
         authorities.append({"question": question, "source": source.doc_id, "declared_by": sorted({d.declared_by for d in delegations})})
+        if question in req["questions"]:
+            required.add(source.doc_id)
         consider(source, [f"authority: {question}"])
         for delegation in delegations:
             declarer = catalog.documents.get(delegation.declared_by)
@@ -351,11 +380,44 @@ def resolve_context(catalog: Catalog, request: dict[str, Any]) -> dict[str, Any]
                             )
         component_states.append(state)
 
-    # 5. Required guidance.
+    def required_issues(doc: Document) -> list[str]:
+        issues = []
+        if placed[doc.doc_id] in ("proposals", "historical", "unclassified") or doc.metadata.lifecycle != "ratified":
+            issues.append("not-effective-guidance")
+        effective = _date(doc.metadata.effective)
+        if effective is not None and effective > as_of:
+            issues.append("not-yet-effective")
+        if selected[doc.doc_id].get("unchecked"):
+            issues.append("applicability-unchecked")
+        return issues
+
+    # 5. A purpose obligation needs one fully applicable, effective source.
+    # Keep the deterministic chosen source in the manifest so recheck tracks it.
     for purpose in req["require"]:
-        bucket = {"decision": "governing", "specification": "references", "runbook": "guidance", "explanation": "background", "observation": "observations"}.get(purpose)
-        if bucket is None or not buckets[bucket]:
+        candidates = sorted(
+            doc_id for doc_id in selected
+            if catalog.documents[doc_id].metadata.purpose == purpose
+            and not required_issues(catalog.documents[doc_id])
+        )
+        if not candidates:
             unresolved.append(_issue("missing-guidance", f"no applicable ratified {purpose} for this work context", purpose=purpose))
+        else:
+            required.add(candidates[0])
+
+    # Required context is an obligation, never an authority or permission grant.
+    required_records = []
+    for doc_id in sorted(required):
+        doc = catalog.find(doc_id)
+        issues = []
+        if doc is None:
+            issues.append("missing")
+        elif doc.doc_id not in selected:
+            issues.append("inapplicable")
+        else:
+            issues = required_issues(doc)
+        required_records.append({"doc_id": doc_id, "status": "blocked" if issues else "ready", "reasons": issues})
+        if issues:
+            unresolved.append(_issue("required-context-unavailable", f"required source {doc_id!r}: {', '.join(issues)}", doc_id=doc_id, reasons=issues))
 
     if not selected:
         unresolved.append(_issue("no-sources", "no catalogued source matched the work context"))
@@ -365,15 +427,22 @@ def resolve_context(catalog: Catalog, request: dict[str, Any]) -> dict[str, Any]
         for record in buckets[bucket]:
             doc = catalog.documents[record["doc_id"]]
             ref = doc.source_ref()
-            sources.append({"doc_id": doc.doc_id, "role": bucket, **ref})
+            sources.append({"doc_id": doc.doc_id, "role": bucket, "required": doc.doc_id in required, "metadata": doc.metadata.to_dict(), **ref})
 
     request_out = {k: v for k, v in req.items() if not k.startswith("_")}
+    blocking_codes = {"missing-guidance", "no-authority", "required-context-unavailable", "no-sources"}
+    context_blocked = (
+        any(r["status"] == "blocked" for r in required_records)
+        or bool(errors or conflicts)
+        or any(i["code"] in blocking_codes for i in unresolved)
+    )
     body = {
         "schema": MANIFEST_SCHEMA,
         "resolver": RESOLVER,
         "request": request_out,
         "expanded_components": req["_components"],
         "catalog": {"digest": catalog.digest(), "roots": catalog.roots},
+        "consumption": {"status": "blocked" if context_blocked else "ready", "required": required_records},
         "authorities": authorities,
         "component_states": component_states,
         **buckets,
@@ -417,6 +486,14 @@ def recheck(catalog: Catalog, manifest: dict[str, Any]) -> dict[str, Any]:
         else:
             if old["sha256"] != new["sha256"]:
                 changes.append({"doc_id": doc_id, "change": "content", "role": new["role"]})
+            if old.get("required", False) != new.get("required", False):
+                changes.append({"doc_id": doc_id, "change": "consumption", "role": new["role"]})
+            if old.get("required") or new.get("required"):
+                if old.get("metadata") != new.get("metadata"):
+                    changes.append({"doc_id": doc_id, "change": "metadata", "role": new["role"]})
+                provenance_keys = ("repo", "path", "revision", "blob", "dirty")
+                if any(old.get(k) != new.get(k) for k in provenance_keys):
+                    changes.append({"doc_id": doc_id, "change": "provenance", "role": new["role"]})
             if old["role"] != new["role"]:
                 changes.append({"doc_id": doc_id, "change": "role", "from": old["role"], "to": new["role"]})
 
@@ -431,8 +508,9 @@ def recheck(catalog: Catalog, manifest: dict[str, Any]) -> dict[str, Any]:
         for item in sorted(cleared):
             changes.append({"change": f"{key}-cleared", "item": json.loads(item)})
     governing_roles = {"governing", "references", "guidance"}
+    required_ids = {s["doc_id"] for s in manifest["sources"] + current["sources"] if s.get("required")}
     requires_review = any(
-        c.get("role") in governing_roles or c.get("from") in governing_roles or c.get("to") in governing_roles or c["change"].startswith("conflicts")
+        c.get("doc_id") in required_ids or c["change"].startswith("unresolved") or c.get("role") in governing_roles or c.get("from") in governing_roles or c.get("to") in governing_roles or c["change"].startswith("conflicts")
         for c in changes
     )
     return {

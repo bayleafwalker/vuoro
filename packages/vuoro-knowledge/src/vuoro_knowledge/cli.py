@@ -90,7 +90,7 @@ def _request(args: argparse.Namespace) -> dict[str, Any]:
     request: dict[str, Any] = {}
     if args.request:
         request = json.loads(Path(args.request).read_text())
-    for key in ("subjects", "components", "repos", "environments", "questions", "require"):
+    for key in ("subjects", "components", "repos", "environments", "questions", "require", "operations", "audiences", "tasks", "required_sources", "include_sources"):
         values = getattr(args, key)
         if values:
             request[key] = sorted(set(request.get(key, [])) | set(values))
@@ -194,6 +194,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--environment", dest="environments", action="append")
     p.add_argument("--question", dest="questions", action="append")
     p.add_argument("--require", action="append", help="purpose that must have applicable guidance")
+    for option in ("operation", "audience", "task", "required-source", "include-source"):
+        dest = {"required-source": "required_sources", "include-source": "include_sources"}.get(option, option + "s")
+        p.add_argument("--" + option, dest=dest, action="append")
     p.add_argument("--version", action="append", help="component=version")
     p.add_argument("--revision", action="append", help="repo=commit the work targets")
     p.add_argument("--as-of")
