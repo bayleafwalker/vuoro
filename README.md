@@ -8,6 +8,15 @@ Vuoro is a reusable governed-work substrate. It keeps machine-local effects on
 the machine while serving shared work and audit
 capabilities through one versioned runtime.
 
+## Product direction
+
+The [2026-10-15 owner direction](docs/direction/2026-10-15-product-direction.md)
+packages shipped agentic products around four portable contracts: work identity,
+evidence, authority and learning. Its provisioning ledger separates supplier
+capabilities from Vuoro-owned semantics and defers new multi-tenant expansion.
+This is product direction; the status below describes bounded implementation
+and evidence.
+
 ## Project status
 
 | | Status |
@@ -17,7 +26,7 @@ capabilities through one versioned runtime.
 | **Bounded MI-1 proof** | Real hosted Claude → isolated native Codex continuation, protected exact-artifact publication, interruption/recovery and independent authorization reconstruction are accepted. P1–P4 include a bounded completeness baseline with explicit capture/attribution failures. See [proof and limits](https://github.com/bayleafwalker/agentops/blob/main/docs/evidence/2026-10-09-mi1-bindery/README.md). |
 | **Not yet established** | Whole-estate capture coverage, direct hosted owner registration, legacy Auditctl import (S4), hardware/ERH-006 repetition and unqualified resource-owner horizons. The original vendor comparison was retired by the operator; no comparative result is claimed. |
 | **Delivered milestone** | [Market integration milestone MI-1](docs/plans/2026-10-05-market-integration-milestone.md): an end-to-end proof across real harnesses, provider evidence ingestion, a reconstruction view, and an evidence-completeness measure. |
-| **Where current truth lives** | Target state: agentops `docs/plans/2026-09-17-target-state.md`. Component status: [disposition register](docs/direction/disposition-register.yaml). Estate shape (a 2026-09-12 snapshot): [The agentic estate](docs/architecture/agentic-estate.md). Where older plans conflict, those win. |
+| **Where current truth lives** | Product sourcing and learning scope: [2026-10-15 direction](docs/direction/2026-10-15-product-direction.md). Target state and its product amendment: agentops `docs/plans/2026-09-17-target-state.md`. Component status: [disposition register](docs/direction/disposition-register.yaml). Estate shape (a 2026-09-12 snapshot): [The agentic estate](docs/architecture/agentic-estate.md). Where older plans conflict, those win. |
 | **Project overview** | [Vuoro on kotona.app](https://kotona.app/projects/vuoro/) |
 
 Vuoro is one product with three surfaces and unchanged internal owners: **work
