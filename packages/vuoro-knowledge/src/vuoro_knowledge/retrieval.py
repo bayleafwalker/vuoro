@@ -86,6 +86,7 @@ def summary(doc: Document) -> dict[str, Any]:
         "doc_id": doc.doc_id,
         "title": doc.title,
         "purpose": meta.purpose,
+        "consumption": meta.consumption,
         "lifecycle": meta.lifecycle,
         "source": doc.source_ref(),
     }

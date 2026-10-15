@@ -36,3 +36,21 @@ changed and the work needs an explicit refresh.
 The package reads only the checkouts passed with `--root` and writes nothing
 to them. It holds no work, review or publication state. It depends on PyYAML
 for frontmatter and registers.
+
+Consumption policy is independent of purpose and authority. Authored
+`consumption` is `bootstrap`, `required-on-match`, `discoverable` (default),
+or `excluded-by-default`. Operation/audience/task applicability extends the
+existing component/environment scope. For example:
+
+```sh
+vuoro-knowledge resolve --root . --operation migration --environment production \
+  --required-source consumer-schema-contract --out context.json
+vuoro-knowledge recheck --root . context.json
+```
+
+Inspect `consumption.status` before a consequential action: `blocked` identifies
+unavailable mandatory context; it does not prohibit independent investigation.
+Resolve emits a report with exit 0; recheck exits 3 when refresh/review is needed.
+A delivery obligation grants no question authority, publication approval or
+permission. The harness retains instruction loading and action enforcement.
+See the architecture contract's consumption-policy section for matching rules.

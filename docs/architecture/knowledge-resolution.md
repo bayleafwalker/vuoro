@@ -88,7 +88,8 @@ required.
 | `doc_id`, `subjects` | Identity that survives a file move; subjects are cross-repository entities declared in `knowledge.toml` (`[[subjects]] id, components`). |
 | `purpose`: `decision · specification · runbook · explanation · observation · proposal` | A proposal is never served as a procedure; an observation is never served as current state. |
 | `lifecycle`: `draft · proposed · ratified · superseded · withdrawn` | Separates guidance in force from suggestions. Legacy `status:` maps only where the mapping needs no judgement (the five same-named values); every other value is reported as unmapped. |
-| `applies_to`: `repos`, `components`, `environments`, `versions` (`{component: ">=0.1.40,<0.1.50"}`) | Guidance for one deployment or software generation is excluded for another, and the result says why. If a document is constrained on a dimension the work context does not state, that is disclosed as unchecked. |
+| `consumption`: `bootstrap · required-on-match · discoverable · excluded-by-default` | Orthogonal delivery policy; omitted means discoverable. It grants neither authority nor permissions. |
+| `applies_to`: `repos`, `components`, `environments`, `operations`, `audiences`, `tasks`, `versions` (`{component: ">=0.1.40,<0.1.50"}`) | Guidance for one deployment or software generation is excluded for another, and the result says why. If a document is constrained on a dimension the work context does not state, that is disclosed as unchecked. |
 | `effective`, `ratified_at`, `observed`, `verified` | A recent edit is not a recent verification. Observations carry their age relative to `as_of`. |
 | `supersedes` (`doc_id`, `doc_id:fragment`, or `{doc, in_part, scope}`), `implements`, `supported_by`, `related`, `superseded_by` (back-reference, checked for agreement) | Explicit supersession and traceability. |
 | `delegates: [{question, source, scope}]` | Question-scoped authority (§5). |
@@ -117,6 +118,58 @@ Three kinds of metadata are kept apart:
 A document must not carry both frontmatter and a sidecar entry. The validator
 rejects this. Ratified records are annotated through the sidecar so their bytes
 stay untouched.
+
+### Consumption policy (local resolver increment, 2026-10-15)
+
+Purpose, applicability, authority/status, consumption and source availability
+are independent dimensions. Locality describes how a session can retrieve an
+item; it establishes no organizational authority. Repository, system, project
+and workspace boundaries need not coincide.
+
+`bootstrap` sources are supplied without a topic match, within their declared
+scope. Keep this set small. `required-on-match` requires a declared subject or
+applicability selector. A matching operation, component, repository, subject,
+audience or task makes the source mandatory without relying on search rank.
+All stated applicability dimensions must agree; a missing environment or
+version is unchecked and cannot satisfy the obligation. Components expand
+through the existing subject relationships. Cross-component dependencies can
+be expressed by authoring the relevant component/subject selectors and by the
+caller's explicit `required_sources` IDs, including consumer contracts in
+another repository. This increment does not infer an architecture dependency
+graph or path rules.
+
+`discoverable` preserves existing relevance-based selection. Sources marked
+`excluded-by-default` stay searchable and readable but require explicit
+`include_sources` or `required_sources` in resolution. An audience selector is
+relevance metadata, never an access-control list. The local resolver still
+reads only caller-provided, caller-readable roots. Any future shared surface
+must authorize before catalog construction and before emitting snippets,
+counts or relationships; this library adds no hosted permission mechanism.
+
+Resolve accepts `operations`, `audiences`, `tasks`, `required_sources` and
+`include_sources` (CLI: `--operation`, `--audience`, `--task`,
+`--required-source`, `--include-source`). It returns `consumption.required`
+with ready/blocked reasons and an aggregate `consumption.status`. Missing,
+inapplicable, unchecked, proposed or historical required sources block the
+dependent consequential action. Required-purpose requests bind one deterministic, fully applicable ratified
+source of that purpose; unchecked or draft observations cannot satisfy them.
+A future effective date cannot satisfy a mandatory obligation. Missing required
+question authority, required purpose guidance, conflicts and invalid catalogs
+also block readiness. Useful
+investigation can continue. The harness must enforce this result at its
+consequential-action boundary; resolver output is not an execution permission.
+Resolve remains a report-producing command (exit 0), so callers must inspect
+readiness. No instruction profile or prompt is compiled.
+
+Required sources are marked in the exact source manifest. Recheck returns
+`review-required` (exit 3) when they change or disappear, including mandatory
+explanations, or when an obligation changes through sidecar metadata. Source
+entries retain the normalized authored metadata alongside source provenance.
+Recheck compares required metadata and provenance (including dates, scope,
+revision and path), even when document bytes stay identical. Older v1 manifests
+without a mandatory source metadata snapshot require an explicit refresh.
+Recheck also requires review when unresolved conditions change. Sources supplied are
+observable input records, not proof of understanding or compliance.
 
 ## 5. Authority is scoped to a question
 
