@@ -12,7 +12,7 @@ import sys
 import tempfile
 
 from .fixture import fixture
-from .scenario import scenario, worker
+from .preflight import QUALIFIED_VERSIONS, diagnose
 
 
 class DemoInterrupted(Exception):
@@ -22,11 +22,15 @@ class DemoInterrupted(Exception):
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if argv == ["_worker"]:
+        from .scenario import worker
         value = json.load(sys.stdin)
         asyncio.run(worker(value["endpoint"], value["token"], value["item"]))
         return 0
     parser = argparse.ArgumentParser(prog="vuoro")
     sub = parser.add_subparsers(dest="command", required=True)
+    doctor = sub.add_parser("doctor", help="Check disposable-demo prerequisites without starting it")
+    doctor.add_argument("--pg-bin", type=Path)
+    doctor.add_argument("--json", action="store_true", help="Emit vuoro-demo-preflight/v1 JSON")
     demo = sub.add_parser("demo", help="Run only an owned disposable loopback fixture")
     demo.add_argument("--pg-bin", type=Path)
     demo.add_argument("--receipt", type=Path, required=True)
@@ -34,6 +38,17 @@ def main(argv: list[str] | None = None) -> int:
     demo.add_argument("--omit-required-check", action="store_true")
     demo.add_argument("--wrong-artifact-digest", action="store_true")
     args = parser.parse_args(argv)
+    if args.command == "doctor":
+        report = diagnose(args.pg_bin)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print("Demo prerequisites: " + report["status"])
+            for check in report["checks"]:
+                print(f"  {check['status']}: {check['name']}" +
+                    (": " + check["detail"] if check["status"] == "blocked" else ""))
+            print(report["qualification"])
+        return 0 if report["status"] == "ready" else 1
     try:
         # Refuse an existing/symlinked output before starting any fixture process.
         fd = os.open(args.receipt, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -70,6 +85,8 @@ def main(argv: list[str] | None = None) -> int:
                 loop.call_soon_threadsafe(task.cancel)
 
     async def consume(endpoint, tokens):
+        # Doctor must remain usable when owner/client dependencies are missing.
+        from .scenario import scenario
         nonlocal task, loop
         task, loop = asyncio.current_task(), asyncio.get_running_loop()
         try:
@@ -88,8 +105,7 @@ def main(argv: list[str] | None = None) -> int:
         # Broken/missing installed metadata must produce an incomplete receipt.
         receipt["versions"] = {name: version(name) for name in
             ("vuoro-client", "vuoro-service", "sprintctl")}
-        expected = {"vuoro-client": "0.1.2", "vuoro-service": "0.1.92", "sprintctl": "0.18.0"}
-        if receipt["versions"] != expected:
+        if receipt["versions"] != QUALIFIED_VERSIONS:
             raise ValueError("install the qualified released owner/client versions")
         root = Path(tempfile.mkdtemp(prefix="vuoro-demo-", dir="/tmp"))
         root.chmod(0o700)
