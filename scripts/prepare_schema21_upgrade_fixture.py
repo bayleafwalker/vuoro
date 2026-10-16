@@ -44,7 +44,10 @@ def main() -> None:
     subprocess.run(["uv", "pip", "install", "--python", str(interpreter), "--no-deps",
                     *(str(wheels / p["artifact_url"].rsplit("/", 1)[-1]) for p in pins)], check=True)
     subprocess.run(["uv", "pip", "check", "--python", str(interpreter)], check=True)
+    # The old closures predate the knowledge domain: attest them as the
+    # historical work + audit compositions they are.
     subprocess.run([str(interpreter), "-I", str(root / "scripts/attest_installed_composition.py"),
+                    "--historical-two-domain-closure",
                     str(manifest), str(wheels), str(output / "installed.json")], check=True)
 
 

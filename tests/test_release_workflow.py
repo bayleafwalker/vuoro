@@ -123,9 +123,11 @@ def test_ci_exercises_the_released_audit_composition() -> None:
     assert "scripts/validate_released_audit_adapter.py" in workflow
 
 
-def test_ci_exercises_the_complete_released_two_domain_catalog() -> None:
+def test_ci_exercises_the_complete_released_three_domain_catalog() -> None:
     workflow = CI_WORKFLOW.read_text(encoding="utf-8")
-    assert "name: Exercise complete released two-domain catalog" in workflow
+    assert "name: Exercise complete released three-domain catalog" in workflow
+    assert "dist/adapters/vuoro_workspace-*.whl" in workflow
+    assert "validate_knowledge_catalog_composition.py" not in workflow
     for retired in (
         "validate_released_execution_adapter.py",
         "validate_released_knowledge_adapter.py",
@@ -255,13 +257,16 @@ def _workspace_requirements() -> dict[str, dict[str, set[str]]]:
 
 
 def test_service_image_never_resolves_a_workspace_name_from_an_index() -> None:
-    """Every workspace package the image's local installs need is local too.
+    """Every workspace package the image's local installs need is supplied.
 
     pip ignores `[tool.uv.sources] workspace = true`, so a workspace dependency
-    that is not itself passed as a local path in the *same* resolving install
-    is looked up on the index, where the name is unregistered (0.1.76:
-    vuoro-evidence) and could be claimed by anyone. The shared wheels installed
-    --no-deps from the verified adapter wheelhouse are local files as well.
+    that is not itself supplied is looked up on the index, where the name is
+    unregistered (0.1.76: vuoro-evidence) and could be claimed by anyone.
+    The local install is --no-deps, so every workspace dependency must come
+    from one of three places:
+    - a local path in that install;
+    - the verified adapter wheelhouse;
+    - a hash-pinned URL requirement in the hash-locked image requirements.
     """
     import re
 
@@ -271,14 +276,26 @@ def test_service_image_never_resolves_a_workspace_name_from_an_index() -> None:
     with_local = [
         segment for segment in installs if re.search(r"\./packages/", segment)
     ]
-    # One resolution only: a workspace path in a later install would resolve
-    # its workspace dependencies without the earlier local paths in view.
     assert len(with_local) == 1, (
         "pass every ./packages/ path to one pip install; found them in "
         f"{len(with_local)} installs"
     )
     resolving_install = with_local[0]
-    assert "--no-deps" not in resolving_install
+    # Nothing resolves: third-party distributions come only from the
+    # hash-locked requirements, and every install is --no-deps.
+    for segment in installs:
+        assert "--no-deps" in segment.split("&&", 1)[0], segment
+    locked = [segment for segment in installs if "-r /opt/vuoro/image-requirements.txt" in segment]
+    assert len(locked) == 1 and "--require-hashes" in locked[0].split("&&", 1)[0]
+    assert "COPY deploy/image/requirements.txt /opt/vuoro/image-requirements.txt" in dockerfile
+    pinned_urls = {
+        _canonical(name)
+        for name in re.findall(
+            r"^([A-Za-z0-9_.-]+) @ https://\S+#sha256=[0-9a-f]{64}",
+            (ROOT / "deploy" / "image" / "requirements.txt").read_text(encoding="utf-8"),
+            flags=re.MULTILINE,
+        )
+    }
     local: dict[str, set[str]] = {}
     for name, extras in re.findall(
         r"\./packages/([A-Za-z0-9_.-]+)(?:\[([^\]]*)\])?", resolving_install
@@ -303,7 +320,7 @@ def test_service_image_never_resolves_a_workspace_name_from_an_index() -> None:
             for dependency in requirements[name][group] - needed:
                 needed.add(dependency)
                 frontier.append((dependency, set()))
-    from_index = needed - local.keys() - wheelhouse
+    from_index = needed - local.keys() - wheelhouse - pinned_urls
     assert not from_index, (
         f"workspace packages {sorted(from_index)} would resolve from an index; "
         "COPY them and pass their ./packages/ path in the same pip install"
@@ -322,3 +339,21 @@ def test_ci_builds_and_inspects_the_service_image() -> None:
     assert "- check \"${names[@]}\" < scripts/validate_service_image.py" in job
     assert "-m pip check" in job
     assert "mcp-serve --help" in job
+
+
+def test_image_requirements_are_the_current_export_of_uv_lock() -> None:
+    """The hash-locked image requirements cannot drift from uv.lock."""
+    import shutil
+    import subprocess
+    import sys
+
+    assert shutil.which("uv"), "uv is required to verify the image requirements export"
+    completed = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "export_image_requirements.py"), "--check"],
+        capture_output=True, text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    requirements = (ROOT / "deploy" / "image" / "requirements.txt").read_text(encoding="utf-8")
+    for name in ("boto3==", "botocore==", "s3transfer==", "click==", "psycopg==", "psycopg-binary==",
+                 "fastapi==", "vuoro-client @ "):
+        assert name in requirements

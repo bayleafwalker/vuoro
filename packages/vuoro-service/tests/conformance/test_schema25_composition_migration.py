@@ -28,12 +28,13 @@ from psycopg import sql
 
 from vuoro_service.composition import CompositionError, create_composed_app
 from .inbox_contract import new_instance_id
+from .knowledge_fixture import provision_knowledge, validate_knowledge_urls
 from .test_bound_proposal_http import assert_installed_composition
 
 pytestmark = pytest.mark.essential_safety
 
-CATALOG_REVISION = 'fd49d79de14a0ec630dde511928cc76e3aceb2e159266f883dcbe6ab14853d2b'
-CATALOG_TOTAL = 102
+CATALOG_REVISION = '270c8e6c34563b7abb8e7fad54bfd9be522a3a2cec2f256cd91784142066fb8b'
+CATALOG_TOTAL = 120
 INBOX_OPERATIONS = ('work.agent.register-v1', 'work.agent.observe-v1', 'work.agent.retire-v1',
                     'work.agent.list-v1', 'work.agent.describe-v1', 'work.message.send-v1',
                     'work.message.read-v1', 'work.message.status-v1', 'work.message.receipt-v1',
@@ -48,7 +49,8 @@ NAMES = ('VUORO_SCHEMA25_MIGRATION_PG_URL', 'VUORO_SCHEMA25_RUNTIME_PG_URL',
          'VUORO_SCHEMA22_OWNER_PYTHON', 'VUORO_SCHEMA25_MANIFEST', 'VUORO_SCHEMA25_WHEEL_DIR',
          'VUORO_SCHEMA25_ATTESTATION', 'VUORO_SCHEMA25_AUDIT_MIGRATION_PG_URL',
          'VUORO_SCHEMA25_AUDIT_RUNTIME_PG_URL', 'VUORO_SCHEMA22_MANIFEST',
-         'VUORO_SCHEMA22_WHEEL_DIR', 'VUORO_SCHEMA22_ATTESTATION')
+         'VUORO_SCHEMA22_WHEEL_DIR', 'VUORO_SCHEMA22_ATTESTATION',
+         'VUORO_SCHEMA25_KNOWLEDGE_MIGRATION_PG_URL', 'VUORO_SCHEMA25_KNOWLEDGE_RUNTIME_PG_URL')
 
 
 def validate_fixture_urls(urls):
@@ -176,11 +178,13 @@ def test_actual_schema22_refusal_explicit25_cli_migration_and_runtime_ddl_denial
         pytest.skip('requires separately provisioned disposable schema25 migration/runtime fixture')
     assert_installed_composition()
     (migration, runtime, old_python, manifest, wheels, attestation, audit_migration, audit_runtime,
-     old_manifest, old_wheels, old_attestation) = (os.environ[x] for x in NAMES)
+     old_manifest, old_wheels, old_attestation, knowledge_migration, knowledge_runtime) = (
+        os.environ[x] for x in NAMES)
     for name in ('PGSERVICE', 'PGSERVICEFILE', 'PGHOST', 'PGHOSTADDR', 'PGPORT',
                  'PGDATABASE', 'PGUSER', 'PGOPTIONS', 'SPRINTCTL_URL'):
         assert not os.environ.get(name), 'inherited libpq routing configuration is forbidden'
     validate_fixture_urls((migration, runtime, audit_migration, audit_runtime))
+    validate_knowledge_urls(knowledge_migration, knowledge_runtime, 'lease_conformance_schema25')
     # The released owner's own console script, installed in this composition.
     owner_cli = Path(sys.executable).parent / 'sprintctl'
     assert owner_cli.is_file(), 'the new composition must install the released owner CLI'
@@ -210,6 +214,8 @@ def test_actual_schema22_refusal_explicit25_cli_migration_and_runtime_ddl_denial
                 for table in tables}
 
     audit_before = audit_rows()
+    # The third required domain, prepared through its owner's operator entrypoint.
+    knowledge_env = provision_knowledge(knowledge_migration, knowledge_runtime, tmp_path / 'knowledge-objects')
     for role_url in (migration, runtime, audit_migration, audit_runtime):
         with psycopg.connect(role_url) as conn:
             assert not any(conn.execute('SELECT rolsuper,rolcreatedb,rolcreaterole,rolreplication,rolbypassrls '
@@ -268,7 +274,8 @@ def test_actual_schema22_refusal_explicit25_cli_migration_and_runtime_ddl_denial
     env = {'VUORO_ENVIRONMENT_NAME': 'schema25-fixture', 'VUORO_ENVIRONMENT_CLASS': 'development',
            'VUORO_WORK_REPOSITORY_ID': 'agentops', 'VUORO_WORK_RUNTIME_DSN': runtime,
            'VUORO_AUDIT_RUNTIME_DSN': audit_runtime, 'VUORO_AUDIT_SCHEMA': 'audit',
-           'VUORO_INSTALLED_COMPOSITION_PATH': attestation, 'VUORO_WORK_RESOURCE_OBSERVERS_FILE': str(observers)}
+           'VUORO_INSTALLED_COMPOSITION_PATH': attestation, 'VUORO_WORK_RESOURCE_OBSERVERS_FILE': str(observers),
+           **knowledge_env}
 
     def factory():
         return create_composed_app(manifest_path=Path(manifest), wheel_dir=Path(wheels),
@@ -313,7 +320,7 @@ def test_actual_schema22_refusal_explicit25_cli_migration_and_runtime_ddl_denial
         response = client.get('/api/meta/v1/handshake', headers={'X-Vuoro-Client-Protocol': '1'})
         assert response.status_code == 200, response.json()
         handshake = response.json()
-        assert handshake['service_version'] == '0.1.95' and handshake['compatibility']['state'] == 'compatible'
+        assert handshake['service_version'] == '0.1.96' and handshake['compatibility']['state'] == 'compatible'
         assert all(x['state'] == 'compatible' for x in handshake['compatibility']['domains'].values())
         catalog = client.get('/api/catalog/v1', headers={'X-Vuoro-Client-Protocol': '1'}).json()
         assert len(catalog['operations']) == CATALOG_TOTAL

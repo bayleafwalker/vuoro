@@ -42,7 +42,8 @@ def dump(tmp_path_factory):
     path = tmp_path_factory.mktemp("dump") / "vuoro.dump"
     with disposable_cluster(BINS) as source:
         psql(source, "CREATE ROLE work_migration LOGIN; CREATE ROLE work_runtime LOGIN; "
-                     "CREATE ROLE audit_migration LOGIN; CREATE ROLE audit_runtime LOGIN")
+                     "CREATE ROLE audit_migration LOGIN; CREATE ROLE audit_runtime LOGIN; "
+                     "CREATE ROLE knowledge_migration LOGIN; CREATE ROLE knowledge_runtime LOGIN")
         psql(source, "CREATE DATABASE src")
         psql(source, "CREATE SCHEMA work AUTHORIZATION work_migration; "
                      "CREATE SCHEMA audit AUTHORIZATION audit_migration; "
@@ -52,7 +53,12 @@ def dump(tmp_path_factory):
                      "INSERT INTO audit.schema_migration VALUES (3); RESET ROLE; "
                      "GRANT USAGE ON SCHEMA work TO work_runtime; GRANT SELECT ON work.schema_version TO work_runtime; "
                      "GRANT USAGE ON SCHEMA audit TO audit_runtime; "
-                     "GRANT SELECT ON audit.schema_migration TO audit_runtime", "src")
+                     "GRANT SELECT ON audit.schema_migration TO audit_runtime; "
+                     "CREATE SCHEMA knowledge AUTHORIZATION knowledge_migration; "
+                     "SET ROLE knowledge_migration; CREATE TABLE knowledge.schema_migration(version int NOT NULL); "
+                     "INSERT INTO knowledge.schema_migration VALUES (1); RESET ROLE; "
+                     "GRANT USAGE ON SCHEMA knowledge TO knowledge_runtime; "
+                     "GRANT SELECT ON knowledge.schema_migration TO knowledge_runtime", "src")
         subprocess.run([str(BINS / "pg_dump"), "-Fc", "-h", source["socket_dir"], "-p", str(source["port"]),
                         "-U", source["admin"], "-d", "src", "-f", str(path)], check=True)
         source_socket = source["socket_dir"]
@@ -63,14 +69,16 @@ def reading_probe(script, env):
     """Stand-in for the pinned owners: read each ledger as the handed DSN's role."""
     assert "compatibility_handshake" in script
     domains = {}
-    for domain, table in (("work", "schema_version"), ("audit", "schema_migration")):
+    for domain, table in (("work", "schema_version"), ("audit", "schema_migration"),
+                          ("knowledge", "schema_migration")):
         dsn = env[f"VUORO_OPS_{domain.upper()}_DSN"]
+        assert env[f"VUORO_OPS_{domain.upper()}_ROLE"] == f"{domain}_runtime"
         assert urlsplit(dsn).hostname is None and "host=%2F" in dsn  # Unix socket only, never TCP
         completed = subprocess.run([str(BINS / "psql"), "-X", "-At", dsn, "-c",
                                     f"SELECT current_user || ':' || max(version) FROM {table}"],
                                    capture_output=True, text=True)
         role, _, version = completed.stdout.strip().partition(":")
-        domains[domain] = {"compatible": version == {"work": "25", "audit": "3"}[domain],
+        domains[domain] = {"compatible": version == {"work": "25", "audit": "3", "knowledge": "1"}[domain],
                            "reason": None if completed.returncode == 0 else completed.stderr.strip()[-120:],
                            "handshake": {"remote_schema": {"actual": int(version) if version else None},
                                          "role": role}}
@@ -95,9 +103,11 @@ def test_restore_runs_the_pinned_check_as_runtime_roles_on_a_throwaway_copy(dump
     body = result.result
     assert result.status == "ok", body
     assert body["restore"]["pg_restore_exit"] == 0
-    assert body["restore"]["restored_schemas"] == ["audit", "public", "work"]
-    assert set(body["restore"]["roles_created"]) >= {"work_runtime", "work_migration", "audit_runtime"}
-    assert body["compatibility"]["roles"] == {"work": "work_runtime", "audit": "audit_runtime"}
+    assert body["restore"]["restored_schemas"] == ["audit", "knowledge", "public", "work"]
+    assert set(body["restore"]["roles_created"]) >= {"work_runtime", "work_migration", "audit_runtime",
+                                                     "knowledge_runtime"}
+    assert body["compatibility"]["roles"] == {"work": "work_runtime", "audit": "audit_runtime",
+                                              "knowledge": "knowledge_runtime"}
     assert body["compatibility"]["domains"]["work"]["schema"] == {"actual": 25}
     assert body["live_database_touched"] is False and body["restore"]["cluster_torn_down"] is True
     assert source_socket.replace("/", "%2F") not in seen["VUORO_OPS_WORK_DSN"]
@@ -105,6 +115,20 @@ def test_restore_runs_the_pinned_check_as_runtime_roles_on_a_throwaway_copy(dump
     pins = json.loads(seen["VUORO_OPS_PINS"])
     assert pins["sprintctl"] and pins["auditctl"]
     assert {"kind": "dump", "id": "sha256:" + body["restore"]["dump_sha256"]} in result.work_refs
+
+
+def test_an_unprobed_knowledge_domain_is_an_unknown_not_ok(dump):
+    path, _ = dump
+
+    def probe(script, env):
+        observation = reading_probe(script, env)
+        observation["domains"].pop("knowledge")
+        observation["unknowns"] = ["domain-not-checked:knowledge"]
+        return observation
+
+    result = isolated_restore(path, manifest_path=PINS, probe_runner=probe, bin_dir=BINS)
+    assert result.status == "attention" and result.result["compatibility"]["state"] == "unknown"
+    assert result.unknowns.count("domain-not-checked:knowledge") == 1
 
 
 def test_incompatible_restored_state_is_attention(dump):
@@ -133,7 +157,8 @@ def test_missing_runtime_role_never_falls_back_to_a_superuser(dump):
 
     def probe(script, env):
         seen.update(env)
-        observation = reading_probe(script, {**env, "VUORO_OPS_AUDIT_DSN": env["VUORO_OPS_WORK_DSN"]})
+        observation = reading_probe(script, {**env, "VUORO_OPS_AUDIT_DSN": env["VUORO_OPS_WORK_DSN"],
+                                             "VUORO_OPS_AUDIT_ROLE": "audit_runtime"})
         observation["domains"].pop("audit")
         return observation
 
@@ -165,18 +190,20 @@ def test_superuser_only_statements_cannot_run_during_restore(tmp_path):
     assert "event trigger" in result.result["restore"]["pg_restore_error"]
 
 
-def test_runtime_roles_never_receive_create_grants(dump, tmp_path):
+@pytest.mark.parametrize("runtime_role", ["work_runtime", "audit_runtime", "knowledge_runtime"])
+def test_runtime_roles_never_receive_create_grants(dump, tmp_path, runtime_role):
     path, _ = dump
     result = isolated_restore(path, manifest_path=PINS, probe_runner=reading_probe, bin_dir=BINS)
     restore = result.result["restore"]
-    assert set(restore["create_withheld_from_runtime_roles"]) == {"work_runtime", "audit_runtime"}
-    assert not set(restore["public_schema_create_granted_to_object_owners"]) & {"work_runtime", "audit_runtime"}
+    runtime_roles = {"work_runtime", "audit_runtime", "knowledge_runtime"}
+    assert set(restore["create_withheld_from_runtime_roles"]) == runtime_roles
+    assert not set(restore["public_schema_create_granted_to_object_owners"]) & runtime_roles
 
     hostile = tmp_path / "runtime-owner.dump"
     with disposable_cluster(BINS) as source:
-        psql(source, "CREATE ROLE work_runtime LOGIN; CREATE ROLE audit_runtime LOGIN")
+        psql(source, f"CREATE ROLE {runtime_role} LOGIN")
         psql(source, "CREATE DATABASE src")
-        psql(source, "CREATE TABLE public.t(x int); ALTER TABLE public.t OWNER TO work_runtime", "src")
+        psql(source, f"CREATE TABLE public.t(x int); ALTER TABLE public.t OWNER TO {runtime_role}", "src")
         subprocess.run([str(BINS / "pg_dump"), "-Fc", "-h", source["socket_dir"], "-p", str(source["port"]),
                         "-U", source["admin"], "-d", "src", "-f", str(hostile)], check=True)
     refused = isolated_restore(hostile, manifest_path=PINS, bin_dir=BINS,

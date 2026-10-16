@@ -18,11 +18,12 @@ BOUND = 'work.effect.propose-bound-v1'
 
 
 def assert_installed_composition():
-    expected = {'vuoro-service': ('vuoro_service','0.1.95'),
+    expected = {'vuoro-service': ('vuoro_service','0.1.96'),
                 'sprintctl': ('sprintctl','0.19.0'),
                 'vuoro-adapter-kit': ('vuoro_adapter_kit','0.2.2'),
                 'vuoro-schema-runtime': ('vuoro_schema_runtime','0.1.0'),
-                'auditctl': ('auditctl','0.1.9')}
+                'auditctl': ('auditctl','0.1.9'),
+                'vuoro-workspace': ('vuoro_workspace','0.1.0')}
     for distribution,(module,release) in expected.items():
         assert version(distribution) == release
         assert '/site-packages/' in importlib.import_module(module).__file__

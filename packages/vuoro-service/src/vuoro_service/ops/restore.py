@@ -288,6 +288,7 @@ def isolated_restore(
                 used_roles[domain] = role
                 env[f"VUORO_OPS_{domain.upper()}_DSN"] = _dsn(socket_dir, role, schema)
                 env[f"VUORO_OPS_{domain.upper()}_SCHEMA"] = schema
+                env[f"VUORO_OPS_{domain.upper()}_ROLE"] = role
             compatibility["roles"] = used_roles
             mode = None
             observation = None
@@ -314,6 +315,7 @@ def isolated_restore(
                 compatibility["domains"] = {
                     domain: _domain_summary(value) for domain, value in (observation.get("domains") or {}).items()
                 }
+                unknowns.extend(str(item) for item in observation.get("unknowns") or ())
     restore["cluster_torn_down"] = not keep
     domain_states = compatibility.get("domains") or {}
     unchecked = [domain for domain in domains if domain not in domain_states]

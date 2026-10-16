@@ -23,29 +23,43 @@ COPY packages/vuoro-service/composition/project-bindings.json /opt/vuoro/composi
 RUN python /usr/local/bin/fetch-pinned-adapters /opt/vuoro/composition/adapter-pins.json /opt/vuoro/adapters
 
 COPY README.md pyproject.toml uv.lock ./
+COPY deploy/image/requirements.txt /opt/vuoro/image-requirements.txt
 COPY packages/vuoro-service ./packages/vuoro-service
 COPY packages/vuoro-mcp-edge ./packages/vuoro-mcp-edge
 COPY packages/vuoro-evidence ./packages/vuoro-evidence
 # A build log showing the right wheels being fetched is not evidence of what
 # ended up installed, so verify it and keep the result in the image.
-# vuoro-mcp-edge is installed beside vuoro-service and vuoro-evidence in one
-# resolution so its workspace dependencies are satisfied by the local
-# packages, never an index (neither name is published; resolving them from
-# an index would install whatever someone else registered under that name);
-# it serves `vuoro-service mcp-serve --port 8081` from the same image.
-# Owner and shared wheels are installed --no-deps from the hash-verified
-# composition lock, as in CI: the owners' third-party runtime dependencies
-# (click, psycopg) are installed above, and the shared adapter-kit is the one
-# lock entry rather than whichever release each owner's metadata names
-# (auditctl 0.1.9 names kit 0.2.0; Sprintctl 0.19.0 names kit 0.2.2). The
-# attestation below verifies every installed pinned distribution.
-RUN python -m pip install --no-cache-dir "psycopg[binary]>=3.2,<4" "click>=8.1" \
+#
+# Nothing is resolved against an index. Three installs, all --no-deps:
+# 1. Every third-party runtime distribution, from the hash-locked export of
+#    uv.lock (deploy/image/requirements.txt, regenerated and checked by
+#    scripts/export_image_requirements.py). That covers the service, the MCP
+#    edge (`vuoro-service mcp-serve --port 8081`), the owners' runtime
+#    dependencies (click, psycopg) and boto3 for the knowledge workspace's
+#    S3-compatible object store. It also covers the released, hash-pinned
+#    vuoro-client that operator-projection requires.
+# 2. The workspace's local source trees: vuoro-service, vuoro-evidence,
+#    vuoro-mcp-edge. Their workspace dependencies are satisfied by installs 1
+#    and 3, never by an index (neither name is published; resolving them from
+#    an index would install whatever someone else registered under that name).
+# 3. The owner and shared wheels, from the hash-verified composition lock, as
+#    in CI. The shared adapter-kit is the one lock entry, not whichever
+#    release each owner's metadata names (auditctl 0.1.9 names kit 0.2.0;
+#    Sprintctl 0.19.0 names kit 0.2.2). The knowledge owner
+#    (vuoro-workspace 0.1.0) ships its `vuoro-workspace migrate` operator
+#    entrypoint in the same wheel.
+# `pip check` then proves the closure is complete. The attestation below
+# verifies every installed pinned distribution.
+RUN python -m pip install --no-cache-dir --require-hashes --no-deps \
+        -r /opt/vuoro/image-requirements.txt \
+    && python -m pip install --no-cache-dir --no-deps \
         ./packages/vuoro-service ./packages/vuoro-evidence ./packages/vuoro-mcp-edge \
     && python -m pip install --no-cache-dir --no-deps \
         /opt/vuoro/adapters/auditctl-*.whl \
         /opt/vuoro/adapters/sprintctl-*.whl \
         /opt/vuoro/adapters/vuoro_adapter_kit-*.whl \
         /opt/vuoro/adapters/vuoro_schema_runtime-*.whl \
+        /opt/vuoro/adapters/vuoro_workspace-*.whl \
     && python -m pip check \
     && python /usr/local/bin/attest-installed-composition \
         /opt/vuoro/composition/adapter-pins.json \

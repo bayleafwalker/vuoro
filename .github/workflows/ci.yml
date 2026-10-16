@@ -141,43 +141,23 @@ jobs:
             scripts/validate_released_audit_adapter.py \
             packages/vuoro-service/composition/adapter-pins.json \
             dist/adapters
-      - name: Exercise complete released two-domain catalog
+      - name: Exercise complete released three-domain catalog
         shell: bash
         run: |
-          uv venv --python 3.12 /tmp/vuoro-released-two-domain-wheel
-          uv pip install --no-config --python /tmp/vuoro-released-two-domain-wheel/bin/python \
-            dist/vuoro-service/*.whl \
-            'httpx>=0.27,<1' 'click>=8.1'
-          uv pip install --no-config --python /tmp/vuoro-released-two-domain-wheel/bin/python \
-            --no-deps \
-            dist/adapters/vuoro_adapter_kit-*.whl \
-            dist/adapters/vuoro_schema_runtime-*.whl \
-            dist/adapters/sprintctl-*.whl \
-            dist/adapters/auditctl-*.whl
-          uv pip check --python /tmp/vuoro-released-two-domain-wheel/bin/python
-          /tmp/vuoro-released-two-domain-wheel/bin/python \
-            scripts/validate_released_catalog_composition.py
-      - name: Exercise three-domain catalog with the local knowledge owner wheel
-        # vuoro-workspace is not released yet: until its pin lands, the
-        # knowledge adapter is the wheel built from this checkout, composed
-        # with the pinned released work and audit owners.
-        shell: bash
-        run: |
-          uv build --package vuoro-workspace --wheel --out-dir dist/vuoro-workspace
-          uv venv --python 3.12 /tmp/vuoro-knowledge-three-domain-wheel
-          uv pip install --no-config --python /tmp/vuoro-knowledge-three-domain-wheel/bin/python \
+          uv venv --python 3.12 /tmp/vuoro-released-three-domain-wheel
+          uv pip install --no-config --python /tmp/vuoro-released-three-domain-wheel/bin/python \
             dist/vuoro-service/*.whl \
             'httpx>=0.27,<1' 'click>=8.1' 'psycopg[binary]>=3.2,<4'
-          uv pip install --no-config --python /tmp/vuoro-knowledge-three-domain-wheel/bin/python \
+          uv pip install --no-config --python /tmp/vuoro-released-three-domain-wheel/bin/python \
             --no-deps \
             dist/adapters/vuoro_adapter_kit-*.whl \
             dist/adapters/vuoro_schema_runtime-*.whl \
             dist/adapters/sprintctl-*.whl \
             dist/adapters/auditctl-*.whl \
-            dist/vuoro-workspace/*.whl
-          uv pip check --python /tmp/vuoro-knowledge-three-domain-wheel/bin/python
-          /tmp/vuoro-knowledge-three-domain-wheel/bin/python \
-            scripts/validate_knowledge_catalog_composition.py
+            dist/adapters/vuoro_workspace-*.whl
+          uv pip check --python /tmp/vuoro-released-three-domain-wheel/bin/python
+          /tmp/vuoro-released-three-domain-wheel/bin/python \
+            scripts/validate_released_catalog_composition.py
       - run: python -m json.tool vuoro.dispatch.json >/dev/null
 
   settlement-scenario:
@@ -300,6 +280,8 @@ jobs:
           VUORO_SCHEMA22_RUNTIME_PG_URL: postgresql://schema22_work_runtime:schema22-ci-only@127.0.0.1:5432/lease_conformance_schema22_ci?options=-csearch_path%3Dwork%2Cpg_catalog
           VUORO_SCHEMA22_AUDIT_MIGRATION_PG_URL: postgresql://schema22_audit_migration:schema22-ci-only@127.0.0.1:5432/lease_conformance_schema22_ci
           VUORO_SCHEMA22_AUDIT_RUNTIME_PG_URL: postgresql://schema22_audit_runtime:schema22-ci-only@127.0.0.1:5432/lease_conformance_schema22_ci
+          VUORO_SCHEMA22_KNOWLEDGE_MIGRATION_PG_URL: postgresql://schema22_knowledge_migration:schema22-ci-only@127.0.0.1:5432/lease_conformance_schema22_ci
+          VUORO_SCHEMA22_KNOWLEDGE_RUNTIME_PG_URL: postgresql://schema22_knowledge_runtime:schema22-ci-only@127.0.0.1:5432/lease_conformance_schema22_ci
         run: |
           set -euo pipefail
           # Separate roles and database; no production endpoint or inherited schema.
@@ -308,9 +290,11 @@ jobs:
           CREATE ROLE schema22_work_runtime LOGIN PASSWORD 'schema22-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
           CREATE ROLE schema22_audit_migration LOGIN PASSWORD 'schema22-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
           CREATE ROLE schema22_audit_runtime LOGIN PASSWORD 'schema22-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          CREATE ROLE schema22_knowledge_migration LOGIN PASSWORD 'schema22-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          CREATE ROLE schema22_knowledge_runtime LOGIN PASSWORD 'schema22-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
           CREATE DATABASE lease_conformance_schema22_ci;
-          GRANT CONNECT,CREATE ON DATABASE lease_conformance_schema22_ci TO schema22_work_migration,schema22_audit_migration;
-          GRANT CONNECT ON DATABASE lease_conformance_schema22_ci TO schema22_work_runtime,schema22_audit_runtime;
+          GRANT CONNECT,CREATE ON DATABASE lease_conformance_schema22_ci TO schema22_work_migration,schema22_audit_migration,schema22_knowledge_migration;
+          GRANT CONNECT ON DATABASE lease_conformance_schema22_ci TO schema22_work_runtime,schema22_audit_runtime,schema22_knowledge_runtime;
           SQL
           psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U m14 -d lease_conformance_schema22_ci \
             -c 'CREATE SCHEMA work AUTHORIZATION schema22_work_migration'
@@ -336,6 +320,8 @@ jobs:
           VUORO_SCHEMA25_RUNTIME_PG_URL: postgresql://schema25_work_runtime:schema25-ci-only@127.0.0.1:5432/lease_conformance_schema25_ci?options=-csearch_path%3Dwork%2Cpg_catalog
           VUORO_SCHEMA25_AUDIT_MIGRATION_PG_URL: postgresql://schema25_audit_migration:schema25-ci-only@127.0.0.1:5432/lease_conformance_schema25_ci
           VUORO_SCHEMA25_AUDIT_RUNTIME_PG_URL: postgresql://schema25_audit_runtime:schema25-ci-only@127.0.0.1:5432/lease_conformance_schema25_ci
+          VUORO_SCHEMA25_KNOWLEDGE_MIGRATION_PG_URL: postgresql://schema25_knowledge_migration:schema25-ci-only@127.0.0.1:5432/lease_conformance_schema25_ci
+          VUORO_SCHEMA25_KNOWLEDGE_RUNTIME_PG_URL: postgresql://schema25_knowledge_runtime:schema25-ci-only@127.0.0.1:5432/lease_conformance_schema25_ci
         run: |
           set -euo pipefail
           # Separate roles and database; no production endpoint or inherited schema.
@@ -344,9 +330,11 @@ jobs:
           CREATE ROLE schema25_work_runtime LOGIN PASSWORD 'schema25-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
           CREATE ROLE schema25_audit_migration LOGIN PASSWORD 'schema25-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
           CREATE ROLE schema25_audit_runtime LOGIN PASSWORD 'schema25-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          CREATE ROLE schema25_knowledge_migration LOGIN PASSWORD 'schema25-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          CREATE ROLE schema25_knowledge_runtime LOGIN PASSWORD 'schema25-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
           CREATE DATABASE lease_conformance_schema25_ci;
-          GRANT CONNECT,CREATE ON DATABASE lease_conformance_schema25_ci TO schema25_work_migration,schema25_audit_migration;
-          GRANT CONNECT ON DATABASE lease_conformance_schema25_ci TO schema25_work_runtime,schema25_audit_runtime;
+          GRANT CONNECT,CREATE ON DATABASE lease_conformance_schema25_ci TO schema25_work_migration,schema25_audit_migration,schema25_knowledge_migration;
+          GRANT CONNECT ON DATABASE lease_conformance_schema25_ci TO schema25_work_runtime,schema25_audit_runtime,schema25_knowledge_runtime;
           SQL
           psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U m14 -d lease_conformance_schema25_ci \
             -c 'CREATE SCHEMA work AUTHORIZATION schema25_work_migration'

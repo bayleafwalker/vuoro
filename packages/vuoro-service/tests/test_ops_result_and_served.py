@@ -47,6 +47,8 @@ def _handshake(**overrides):
         "compatibility": {"state": "compatible", "domains": {
             "work": {"api_version": "work-api/v1", "schema_version": "sprintctl-work-compatibility/v1", "state": "compatible", "reason": None},
             "audit": {"api_version": "audit/v1", "schema_version": "audit-schema/v1", "state": "compatible", "reason": None},
+            "knowledge": {"api_version": "vuoro-workspace/v1", "schema_version": "knowledge-schema/v1",
+                          "state": "compatible", "reason": None},
         }},
         "service_release": {"distribution": "vuoro-service", "version": "9.9.9"},
     }
@@ -63,6 +65,9 @@ OPERATIONS = [
      "result_schema": {}, "required_authority": "work:write", "execution_semantics": "write", "idempotency": "required"},
     {"name": "audit.read.events", "owning_domain": "audit", "input_schema": {"type": "object"},
      "result_schema": {}, "required_authority": "audit:read", "execution_semantics": "read", "idempotency": "not-allowed"},
+    {"name": "knowledge.workspace.search-v1", "owning_domain": "knowledge", "input_schema": {"type": "object"},
+     "result_schema": {}, "required_authority": "knowledge:read", "execution_semantics": "read",
+     "idempotency": "not-allowed"},
 ]
 
 
@@ -226,9 +231,9 @@ def test_profile_that_denies_production_is_refused(tmp_path):
 def test_catalog_probe_compares_expected_identity(tmp_path):
     server = FakeServer()
     ok = _document(catalog_probe(_profile(tmp_path), manifest_path=PINS, transport=server, token="test-token",
-                                 expected={"revision": REVISION, "total": 4}, local_version="9.9.9"), tmp_path)
+                                 expected={"revision": REVISION, "total": 5}, local_version="9.9.9"), tmp_path)
     assert ok["status"] == "ok"
-    assert ok["result"]["catalog"]["domain_counts"] == {"audit": 1, "work": 3}
+    assert ok["result"]["catalog"]["domain_counts"] == {"audit": 1, "knowledge": 1, "work": 3}
     bad = _document(catalog_probe(_profile(tmp_path), manifest_path=PINS, transport=FakeServer(catalog_revision="b" * 64),
                                   token="test-token", expected={"revision": REVISION}, local_version="9.9.9"), tmp_path)
     kinds = {item["kind"] for item in bad["result"]["mismatches"]}
@@ -236,7 +241,7 @@ def test_catalog_probe_compares_expected_identity(tmp_path):
 
 
 def test_catalog_probe_derives_expected_operations_from_an_image(tmp_path):
-    derived = {"revision": REVISION, "total": 5, "domain_counts": {"work": 4, "audit": 1},
+    derived = {"revision": REVISION, "total": 6, "domain_counts": {"work": 4, "audit": 1, "knowledge": 1},
                "operations": sorted([op["name"] for op in OPERATIONS] + ["work.missing.op"])}
     calls = []
 

@@ -18,10 +18,8 @@ _ARTIFACT_FIELDS = {
 _LOCK_KINDS = {"adapter", "owner-dependency", "shared-dependency"}
 _CANONICAL_VUORO_SOURCE_REPOSITORY = "https://github.com/bayleafwalker/vuoro"
 _SHARED_DEPENDENCY_DISTRIBUTIONS = {"vuoro-schema-runtime", "vuoro-adapter-kit"}
-_REQUIRED_DOMAINS = {"work", "audit"}
-# Admitted but not yet required: knowledge (vuoro-workspace) becomes required
-# in the same change that pins its first release (P1b follow-up).
-_ADMITTED_DOMAINS = _REQUIRED_DOMAINS | {"knowledge"}
+_REQUIRED_DOMAINS = {"work", "audit", "knowledge"}
+_ADMITTED_DOMAINS = _REQUIRED_DOMAINS
 _DESCRIPTOR_FIELDS = {
     "domain", "lock_id", "dependency_lock_ids", "adapter_module", "register",
     "api_version", "schema_version",
@@ -113,7 +111,7 @@ def artifact_pins(manifest: object) -> list[tuple[str, dict[str, str]]]:
         <= {descriptor["domain"] for descriptor in descriptors}
         <= _ADMITTED_DOMAINS
     ):
-        raise SystemExit("composition must pin work and audit, and may pin knowledge")
+        raise SystemExit("composition must pin exactly work, audit and knowledge")
     referenced: list[str] = []
     primary_references: dict[str, int] = {}
     dependency_references: dict[str, int] = {}

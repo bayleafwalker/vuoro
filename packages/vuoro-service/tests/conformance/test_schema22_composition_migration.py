@@ -21,6 +21,8 @@ from psycopg import sql
 
 from vuoro_service.composition import CompositionError, create_composed_app
 from .test_bound_proposal_http import assert_installed_composition
+from .knowledge_fixture import provision_knowledge, validate_knowledge_urls
+from .test_schema25_composition_migration import CATALOG_REVISION, CATALOG_TOTAL
 
 pytestmark = pytest.mark.essential_safety
 
@@ -75,17 +77,19 @@ def test_actual_schema21_refusal_explicit22_migration_and_runtime_ddl_denial(tmp
            'VUORO_SCHEMA21_OWNER_PYTHON','VUORO_SCHEMA22_MANIFEST','VUORO_SCHEMA22_WHEEL_DIR',
            'VUORO_SCHEMA22_ATTESTATION','VUORO_SCHEMA22_AUDIT_MIGRATION_PG_URL',
            'VUORO_SCHEMA22_AUDIT_RUNTIME_PG_URL','VUORO_SCHEMA21_MANIFEST',
-           'VUORO_SCHEMA21_WHEEL_DIR','VUORO_SCHEMA21_ATTESTATION')
+           'VUORO_SCHEMA21_WHEEL_DIR','VUORO_SCHEMA21_ATTESTATION',
+           'VUORO_SCHEMA22_KNOWLEDGE_MIGRATION_PG_URL','VUORO_SCHEMA22_KNOWLEDGE_RUNTIME_PG_URL')
     if not all(os.environ.get(x) for x in names):
         if os.environ.get('VUORO_SCHEMA22_COMPOSITION_PROOF')=='1':
             pytest.fail('mandatory schema22 upgrade fixture is incompletely configured')
         pytest.skip('requires separately provisioned disposable schema22 migration/runtime fixture')
     assert_installed_composition()
-    migration,runtime,old_python,manifest,wheels,attestation,audit_migration,audit_runtime,old_manifest,old_wheels,old_attestation=(os.environ[x] for x in names)
+    migration,runtime,old_python,manifest,wheels,attestation,audit_migration,audit_runtime,old_manifest,old_wheels,old_attestation,knowledge_migration,knowledge_runtime=(os.environ[x] for x in names)
     for name in ('PGSERVICE', 'PGSERVICEFILE', 'PGHOST', 'PGHOSTADDR', 'PGPORT',
                  'PGDATABASE', 'PGUSER', 'PGOPTIONS'):
         assert not os.environ.get(name), 'inherited libpq routing configuration is forbidden'
     validate_fixture_urls((migration,runtime,audit_migration,audit_runtime))
+    validate_knowledge_urls(knowledge_migration,knowledge_runtime,'lease_conformance_schema22')
     child_env=dict(os.environ,SCHEMA22_PROOF_DSN=migration)
     old_setup='''import os
 from importlib.metadata import version
@@ -142,6 +146,8 @@ s.conn.close()
             return {table: sorted((r[0] for r in conn.execute(sql.SQL('SELECT to_jsonb(t) FROM {} t').format(sql.Identifier('audit',table))).fetchall()),key=lambda v:json.dumps(v,sort_keys=True)) for table in tables}
 
     audit_before=audit_rows()
+    # The third required domain, prepared through its owner's operator entrypoint.
+    knowledge_env=provision_knowledge(knowledge_migration,knowledge_runtime,tmp_path/'knowledge-objects')
     for role_url in (migration,runtime,audit_migration,audit_runtime):
         with psycopg.connect(role_url) as conn:
             assert not any(conn.execute('SELECT rolsuper,rolcreatedb,rolcreaterole,rolreplication,rolbypassrls FROM pg_roles WHERE rolname=current_user').fetchone())
@@ -182,7 +188,8 @@ s.conn.close()
     env={'VUORO_ENVIRONMENT_NAME':'schema22-fixture','VUORO_ENVIRONMENT_CLASS':'development',
         'VUORO_WORK_REPOSITORY_ID':'agentops','VUORO_WORK_RUNTIME_DSN':runtime,
         'VUORO_AUDIT_RUNTIME_DSN':audit_runtime,'VUORO_AUDIT_SCHEMA':'audit',
-        'VUORO_INSTALLED_COMPOSITION_PATH':attestation,'VUORO_WORK_RESOURCE_OBSERVERS_FILE':str(observers)}
+        'VUORO_INSTALLED_COMPOSITION_PATH':attestation,'VUORO_WORK_RESOURCE_OBSERVERS_FILE':str(observers),
+        **knowledge_env}
     def factory():
         return create_composed_app(manifest_path=Path(manifest),wheel_dir=Path(wheels),
             identity_path=identity,project_bindings_path=bindings,environ=env)
@@ -231,11 +238,11 @@ else:
         response=client.get('/api/meta/v1/handshake',headers={'X-Vuoro-Client-Protocol':'1'})
         assert response.status_code==200,response.json()
         handshake=response.json()
-        assert handshake['service_version']=='0.1.95' and handshake['compatibility']['state']=='compatible'
+        assert handshake['service_version']=='0.1.96' and handshake['compatibility']['state']=='compatible'
         assert all(x['state']=='compatible' for x in handshake['compatibility']['domains'].values())
         catalog=client.get('/api/catalog/v1',headers={'X-Vuoro-Client-Protocol':'1'}).json()
-        assert len(catalog['operations'])==102
-        assert handshake['catalog_revision']=='fd49d79de14a0ec630dde511928cc76e3aceb2e159266f883dcbe6ab14853d2b'
+        assert len(catalog['operations'])==CATALOG_TOTAL
+        assert handshake['catalog_revision']==CATALOG_REVISION
         response=client.get('/health/ready')
         assert response.status_code==200
     with psycopg.connect(runtime) as conn:
@@ -265,7 +272,7 @@ else:
             response=client.post('/api/invoke/v1',headers={'X-Vuoro-Client-Protocol':'1',
                 'Authorization':'Bearer '+'a'*40},json={'schema_version':'invocation/v1',
                 'request_id':uuid.uuid4().hex,'repo_id':'agentops',
-                'catalog_revision':'fd49d79de14a0ec630dde511928cc76e3aceb2e159266f883dcbe6ab14853d2b',
+                'catalog_revision':CATALOG_REVISION,
                 'operation':operation,'arguments':arguments})
             assert response.status_code==200,response.json()
             return response.json()['result']
