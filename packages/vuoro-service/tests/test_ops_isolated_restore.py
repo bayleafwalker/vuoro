@@ -190,6 +190,29 @@ def test_superuser_only_statements_cannot_run_during_restore(tmp_path):
     assert "event trigger" in result.result["restore"]["pg_restore_error"]
 
 
+@pytest.mark.parametrize("runtime_role", ["work_runtime", "audit_runtime", "knowledge_runtime"])
+def test_runtime_roles_never_receive_create_grants(dump, tmp_path, runtime_role):
+    path, _ = dump
+    result = isolated_restore(path, manifest_path=PINS, probe_runner=reading_probe, bin_dir=BINS)
+    restore = result.result["restore"]
+    runtime_roles = {"work_runtime", "audit_runtime", "knowledge_runtime"}
+    assert set(restore["create_withheld_from_runtime_roles"]) == runtime_roles
+    assert not set(restore["public_schema_create_granted_to_object_owners"]) & runtime_roles
+
+    hostile = tmp_path / "runtime-owner.dump"
+    with disposable_cluster(BINS) as source:
+        psql(source, f"CREATE ROLE {runtime_role} LOGIN")
+        psql(source, "CREATE DATABASE src")
+        psql(source, f"CREATE TABLE public.t(x int); ALTER TABLE public.t OWNER TO {runtime_role}", "src")
+        subprocess.run([str(BINS / "pg_dump"), "-Fc", "-h", source["socket_dir"], "-p", str(source["port"]),
+                        "-U", source["admin"], "-d", "src", "-f", str(hostile)], check=True)
+    refused = isolated_restore(hostile, manifest_path=PINS, bin_dir=BINS,
+                               probe_runner=lambda script, env: {"pins_satisfied": True, "domains": {}})
+    assert refused.status == "error" and refused.result["restore"]["pg_restore_exit"] != 0
+    assert refused.result["restore"]["public_schema_create_granted_to_object_owners"] == []
+    assert "permission denied for schema public" in refused.result["restore"]["pg_restore_error"]
+
+
 def test_a_non_16_bin_dir_is_refused(tmp_path):
     fake = tmp_path / "bin"
     fake.mkdir()

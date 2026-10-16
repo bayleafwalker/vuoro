@@ -163,6 +163,23 @@ def migration_preflight(
         if value is None:
             unknowns.append(f"gate-unknown:{name}")
     now_class, now_reason = recovery_class(current_schema, target_schema, prior_range, job_state)
+    anomalies: list[str] = []
+    if current_schema is not None and job_state == "failed" and current_schema < target_schema:
+        # "Failed and still below target" means nothing applied only if every
+        # migration step is transactional.  Neither owner publishes that as
+        # machine-readable metadata, so it cannot be confirmed here.
+        unknowns.append("non-transactional-step-possible")
+    # A no-op redeploy: no Job was created because the target is the schema
+    # already present and admitted by the image serving it.  Only an explicit
+    # --served-image range can establish that.
+    noop_redeploy = (job_state == "not-created" and current_schema == target_schema
+                     and admits(served_range, target_schema) is True)
+    if (current_schema is not None and job_state in ("not-created", "failed")
+            and current_schema >= target_schema and not noop_redeploy):
+        # The target is already present although this rollout's Job never ran
+        # or failed: an earlier rollout, an out-of-band migration, or a commit
+        # that preceded the failure.  A person must confirm which.
+        anomalies.append("job-state-inconsistent-with-schema")
     after_class, after_reason = committed_class(target_schema, prior_range)
     blocking = ["candidate_admits_target", "target_not_behind_current"]
     if current_schema is not None and current_schema < target_schema:
@@ -176,7 +193,7 @@ def migration_preflight(
     proof = startup_proof(candidate_image, target_schema, startup_proof_script) if run_startup_proof else {
         "state": "not-requested"}
     status = "error" if blocked or now_class is None or after_class is None else (
-        "attention" if after_class == "forward-fix-or-restore" else "ok")
+        "attention" if after_class == "forward-fix-or-restore" or anomalies else "ok")
     result = {
         "domain": domain,
         "target_schema": target_schema,
@@ -198,6 +215,7 @@ def migration_preflight(
         },
         "gates": gates,
         "blocked_by": blocked,
+        "anomalies": anomalies,
         "recovery_class": now_class,
         "recovery_class_reason": now_reason,
         "recovery_class_after_commit": after_class,

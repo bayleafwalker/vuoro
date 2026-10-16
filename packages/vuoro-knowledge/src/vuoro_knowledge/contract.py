@@ -35,6 +35,8 @@ PURPOSES = (
 # Document lifecycle. Deliberately separate from component status (owned by a
 # status authority such as the disposition register) and from evidence status
 # (owned by observations and the work/evidence store).
+CONSUMPTION_MODES = ("bootstrap", "required-on-match", "discoverable", "excluded-by-default")
+
 LIFECYCLES = ("draft", "proposed", "ratified", "superseded", "withdrawn")
 
 # Legacy ``status:`` values seen across the estate that map without judgement.
@@ -49,7 +51,7 @@ LEGACY_STATUS = {
 
 RELATION_KINDS = ("supersedes", "implements", "supported_by", "related")
 
-APPLICABILITY_DIMENSIONS = ("repos", "components", "environments", "versions")
+APPLICABILITY_DIMENSIONS = ("repos", "components", "environments", "versions", "operations", "audiences", "tasks")
 
 DOC_ID = re.compile(r"^[a-z0-9][a-z0-9._-]*[a-z0-9]$")
 QUESTION_ID = re.compile(r"^[a-z0-9][a-z0-9-]*[a-z0-9]$")
@@ -59,6 +61,7 @@ KNOWN_FIELDS = frozenset(
     {
         "doc_id",
         "purpose",
+        "consumption",
         "lifecycle",
         "status",
         "title",
@@ -184,6 +187,7 @@ class Metadata:
     doc_id: str
     purpose: str | None
     lifecycle: str | None
+    consumption: str = "discoverable"
     title: str | None = None
     lifecycle_source: str = "lifecycle"
     ratified_at: str | None = None
@@ -214,6 +218,7 @@ class Metadata:
         out: dict[str, Any] = {
             "doc_id": self.doc_id,
             "purpose": self.purpose,
+            "consumption": self.consumption,
             "lifecycle": self.lifecycle,
             "lifecycle_source": self.lifecycle_source,
         }
@@ -315,6 +320,12 @@ def parse_metadata(raw: dict[str, Any], location: str) -> tuple[Metadata | None,
         purpose = str(purpose)
         if purpose not in PURPOSES:
             problem("error", "invalid-purpose", f"purpose {purpose!r} not in {list(PURPOSES)}")
+
+    consumption = raw.get("consumption", "discoverable")
+    if consumption not in CONSUMPTION_MODES:
+        problem("error", "invalid-consumption", f"consumption must be one of {CONSUMPTION_MODES}")
+    if consumption == "required-on-match" and not raw.get("applies_to") and not raw.get("subjects"):
+        problem("error", "unscoped-required-context", "required-on-match needs applies_to or subjects; use bootstrap for universal context")
 
     lifecycle = raw.get("lifecycle")
     lifecycle_source = "lifecycle"
@@ -421,6 +432,7 @@ def parse_metadata(raw: dict[str, Any], location: str) -> tuple[Metadata | None,
     metadata = Metadata(
         doc_id=doc_id,
         purpose=purpose,
+        consumption=consumption,
         lifecycle=lifecycle,
         title=raw.get("title"),
         lifecycle_source=lifecycle_source,

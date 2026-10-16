@@ -78,3 +78,31 @@ title = "Disposition register corrections"
 purpose = "observation"
 lifecycle = "ratified"
 observed = "2026-09-01"
+
+[[subjects]]
+id = "product-direction"
+title = "Product sourcing, portable contracts and learning direction"
+components = ["vuoro-core", "agentops"]
+
+[[documents]]
+path = "docs/direction/2026-10-15-product-direction.md"
+doc_id = "vuoro-product-direction-2026-10-15"
+title = "Vuoro product direction"
+purpose = "decision"
+lifecycle = "ratified"
+ratified_at = "2026-10-15"
+effective = "2026-10-15"
+subjects = ["product-direction", "evidence-home"]
+supersedes = [
+  { doc = "vuoro-long-term-direction", in_part = true, scope = "product sourcing and portable learning contract intentions only" },
+  { doc = "vuoro-disposition-register", in_part = true, scope = "learning intention exclusions only; dated component observations and statuses unchanged" },
+]
+
+[[documents]]
+path = "docs/assessments/2026-10-15-product-direction-assessment.md"
+doc_id = "vuoro-product-direction-assessment-2026-10-15"
+title = "Assessment of the 2026-10-15 product direction"
+purpose = "observation"
+lifecycle = "proposed"
+observed = "2026-10-15"
+subjects = ["product-direction"]

@@ -42,8 +42,16 @@ replace the repositories where that knowledge is authored") resolves by
 scope, as the design's own rule "implement one authority per content
 collection" requires:
 
-- **Repository-authored knowledge.** Docs that must change atomically with
-  code, plus plans, decisions and runbooks, stay Git-authoritative. They are
+- **Ownership clarification (operator proposal intake, 2026-10-15).** Choose
+  the canonical store by the owning review process and version lifecycle,
+  rather than document type or physical locality. A cross-system ADR can
+  belong in an architecture repository; a research conclusion can belong in
+  a workspace. Other surfaces cite or project the original. Publication
+  approval, engineering authority and work acceptance remain separate claims.
+- **Repository-authored knowledge.** Docs whose owning review process and
+  version lifecycle belong with engineering governance stay Git-authoritative.
+  This includes code-coupled contracts and repository-owned plans, decisions
+  and runbooks. They are
   resolved by `vuoro-knowledge` exactly as before. The workspace never writes
   them and never mirrors them as a second writable copy.
 - **Workspace collections.** Research, deliverables, reviewed conclusions, and

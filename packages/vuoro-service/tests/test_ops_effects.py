@@ -259,6 +259,16 @@ def test_github_token_only_goes_to_the_default_api(remote):
     assert allowed.calls[0][1] == {"Authorization": "Bearer secret"}
 
 
+@pytest.mark.parametrize("api", ["http://ghe.example", "https://u:p@ghe.example", "ghe.example"])
+def test_token_allowlist_requires_https_api(remote, api):
+    bare, head, _ = remote
+    entry = attempt("A", "redeemed")
+    calls = _pulls()
+    result = provider_outcome_check("attempt_" + "A" * 26, source_for(entry), journal_dir=None, remote=str(bare),
+                                    github_token="secret", github_api=api, allow_token_for_api=True, http_get=calls)
+    assert result.status == "error" and "https" in result.result["refused"] and calls.calls == []
+
+
 def test_ls_remote_refuses_option_shaped_operands():
     from vuoro_service.ops.effects import ls_remote_head
 
