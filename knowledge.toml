@@ -106,3 +106,21 @@ purpose = "observation"
 lifecycle = "proposed"
 observed = "2026-10-15"
 subjects = ["product-direction"]
+
+[[documents]]
+path = "docs/architecture/reference-distribution-contract.md"
+doc_id = "vuoro-reference-distribution-contract"
+title = "Candidate reference-distribution contract"
+purpose = "proposal"
+lifecycle = "proposed"
+observed = "2026-10-17"
+subjects = ["product-direction", "estate-enablement"]
+
+[[documents]]
+path = "docs/architecture/workload-identity-and-policy-sourcing.md"
+doc_id = "vuoro-workload-identity-policy-sourcing"
+title = "Workload identity and policy sourcing decision"
+purpose = "proposal"
+lifecycle = "proposed"
+observed = "2026-10-17"
+subjects = ["product-direction", "estate-enablement"]
