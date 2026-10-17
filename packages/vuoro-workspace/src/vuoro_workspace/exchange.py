@@ -211,6 +211,10 @@ def _load_bundle(root: Path) -> tuple[dict[str, Any], dict[str, bytes]]:
             if data is not None:
                 if _sha(data) != rev.get("content_sha256"):
                     problems.append(f"checksum mismatch for revision {rev['revision_id']}")
+                try:
+                    data.decode("utf-8")
+                except UnicodeDecodeError:
+                    problems.append(f"revision {rev['revision_id']} is not UTF-8 Markdown")
                 files[rev["path"]] = data
             if rev.get("parent_revision_id") is not None and rev["parent_revision_id"] not in ids:
                 problems.append(f"revision {rev['revision_id']} has a parent outside its item")
@@ -221,6 +225,9 @@ def _load_bundle(root: Path) -> tuple[dict[str, Any], dict[str, bytes]]:
         for pointer in ("approved_revision_id", "latest_revision_id"):
             if item.get(pointer) is not None and item[pointer] not in ids:
                 problems.append(f"item {item.get('item_id')} {pointer} not in bundle")
+        approved = item.get("approved_revision_id")
+        if approved is not None and any(r.get("revision_id") == approved and r.get("state") != "approved" for r in revs):
+            problems.append(f"item {item['item_id']} approved_revision_id does not name an approved revision")
     missing = {m.get("version_id") for m in manifest.get("missing", [])}
     artifact_ids: set[str] = set()
     for art in manifest.get("artifacts", []):
@@ -248,6 +255,10 @@ def _load_bundle(root: Path) -> tuple[dict[str, Any], dict[str, bytes]]:
         for pointer in ("approved_version_id", "latest_version_id"):
             if art.get(pointer) is not None and art[pointer] not in ids:
                 problems.append(f"artifact {art.get('artifact_id')} {pointer} not in bundle")
+        approved = art.get("approved_version_id")
+        if approved is not None and any(v.get("version_id") == approved and (
+                v.get("processing_state") != "ready" or v.get("review_state") != "approved") for v in vers):
+            problems.append(f"artifact {art['artifact_id']} approved_version_id does not name a ready, approved version")
     proposal_ids: set[str] = set()
     for pr in manifest.get("proposals", []):
         pid, item_id = pr.get("proposal_id"), pr.get("item_id")

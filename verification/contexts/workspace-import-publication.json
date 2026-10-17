@@ -1,0 +1,79 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.workspace-import-publication",
+  "owner_repo": "vuoro",
+  "subject": "Portable bundle publication-state preflight and approved reader search",
+  "contract_ref": {
+    "doc_id": "vuoro-knowledge-workspace-phase0",
+    "revision": "sha256:3628943d23346a398ff6437249bb08f6a1b8469f4e54c734ea908c09a172f102"
+  },
+  "source_of_truth": "Workspace owner publication state in PostgreSQL and original object bytes; imported pointer fields cannot override review state.",
+  "depth": 2,
+  "backends": [
+    "PostgreSQL 16",
+    "disposable local object store"
+  ],
+  "actors": [
+    "administrator importer",
+    "reader",
+    "contributor"
+  ],
+  "initial_state": [
+    "Exported bundle with approved revisions and unreviewed artifacts",
+    "Current workspace memberships"
+  ],
+  "operations": [
+    {
+      "name": "import after bundle preflight",
+      "actors": [
+        "administrator importer"
+      ],
+      "synchronization": "References and bytes checked before mutation"
+    },
+    {
+      "name": "search approved or working scope",
+      "actors": [
+        "reader",
+        "contributor"
+      ]
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "Publication pointer, review state and reader projection"
+  },
+  "assumptions": {
+    "isolation": "Disposable schema and fixture store; no concurrent hostile bundle-directory mutation",
+    "clock": "No lease or freshness claim"
+  },
+  "bounds": {
+    "new_counterexamples": 3,
+    "legacy_pointer_cases": 1
+  },
+  "invariants": [
+    "Approved pointers name approved revisions or ready approved artifact versions",
+    "Invalid encoding fails before database or object-store mutation",
+    "Approved search excludes legacy-pointer drafts",
+    "Authorized working search preserves drafts"
+  ],
+  "faults": [
+    "Draft approved_revision_id",
+    "Unreviewed approved_version_id",
+    "Checksum-valid non-UTF-8 revision",
+    "Legacy inconsistent database pointer"
+  ],
+  "oracles": [
+    "test_workspace_hardening.py: import-invalid and unchanged workspace count",
+    "test_approved_search_does_not_trust_a_legacy_inconsistent_pointer",
+    "tests/test_distribution_boundaries.py"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-workspace/src/vuoro_workspace/exchange.py:_load_bundle",
+    "packages/vuoro-workspace/src/vuoro_workspace/store.py:WorkspaceStore.search",
+    "packages/vuoro-workspace/tests/test_workspace_hardening.py"
+  ],
+  "expansions": [
+    "semantic-doc",
+    "fault-scenario"
+  ]
+}
