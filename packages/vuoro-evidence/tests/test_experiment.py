@@ -164,6 +164,9 @@ def test_rejected_pending_and_missing_work_remain_in_population_burden():
     assert s["population_burden"]["effort"]["review_seconds"] == {
         "known_total": 60, "known_cases": 1, "unknown_cases": 3}
     assert s["burden_by_disposition"]["rejected"]["cost"]["known_totals"] == {"EUR": "10.00"}
+    assert s["observations"][1]["owner_record_ref"] == rejected.owner_record_ref
+    assert s["observations"][1]["known_cost"] == "10.00"
+    assert s["observations"][2]["disposition"] == "pending"
     assert s["burden_by_disposition"]["pending"]["effort"]["recovery_seconds"]["known_total"] == 300
 
 
