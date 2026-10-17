@@ -475,6 +475,7 @@ class GatewayAssertionIdentityResolver:
             grant_id=grant_id,
             invocation_id=invocation_id,
             attempt_id=attempt_id,
+            expires_at=datetime.fromtimestamp(claims["exp"], UTC),
         )
 
     def _refuse_before_replay_window(self, claims: Mapping[str, Any]) -> None:

@@ -505,3 +505,11 @@ def test_any_client_chosen_request_id_the_gateway_signs_is_accepted(
     assert identity.actor == "github:123"
     with pytest.raises(IdentityResolutionError, match="already used"):
         resolver(_request(token, request_id=request_id, invocation_request_id=request_id))
+
+
+def test_verified_gateway_expiry_is_carried_to_child_credential_owner(tmp_path):
+    path, private = _key_file(tmp_path)
+    claims = _claims()
+    token = _token(private, **claims)
+    identity = _resolver(path)(_request(token))
+    assert identity.expires_at == datetime.fromtimestamp(claims["exp"], UTC)
