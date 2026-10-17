@@ -127,6 +127,15 @@ uv run --package vuoro-mcp-edge --extra test pytest packages/vuoro-mcp-edge/test
 
 ### Run it locally
 
+To **evaluate settlement without a Cloud account**, use the optional
+[disposable native settlement demo](packages/vuoro-demo/README.md). It has a
+source-pinned install path and a separate `vuoro` entrypoint; the current source
+also supplies `vuoro doctor`. It starts its own disposable PG16 cluster and
+loopback service, demonstrates takeover, late-result refusal, verification and
+dependency release, then removes fixture state after confirmed shutdown.
+Python 3.12+, PostgreSQL 16 tools, Git and a non-root Unix user are required.
+This is an evaluation consumer, not a persistent Vuoro Local installation.
+
 The installed console scripts are `vuoro-service` and `vuoro-client` (the
 client's own `--help` reports its argparse prog name as `vuoro`):
 
@@ -149,6 +158,13 @@ For a local client/service/PostgreSQL evaluation stack, see
 [`deploy/compose/README.md`](deploy/compose/README.md). That Compose stack is
 a disposable local packaging check, not a `vuoro-dev` deployment, and must not
 receive production endpoints, credentials, mounts, or identities.
+
+The hosted pilot is [vuoro.cloud](https://vuoro.cloud/). Its dated recordings,
+illustrations and local proofs describe different scopes; source availability
+does not establish a hosted deployment. The
+[operational adoption plan](docs/plans/2026-10-16-operational-adoption.md) covers
+onboarding, thin adapters, acceptance checks, self-hosting/portability and
+visibility against current owner direction.
 
 See [`docs/architecture/packaging.md`](docs/architecture/packaging.md) for the
 enforced dependency and ownership boundaries and

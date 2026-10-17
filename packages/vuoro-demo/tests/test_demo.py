@@ -123,7 +123,7 @@ def test_signal_during_synchronous_scratch_cleanup_records_incomplete(tmp_path, 
         remove(root)
 
     monkeypatch.setattr("vuoro_demo.cli.fixture", finished_fixture)
-    monkeypatch.setattr("vuoro_demo.cli.scenario", finished_scenario)
+    monkeypatch.setattr("vuoro_demo.scenario.scenario", finished_scenario)
     monkeypatch.setattr("vuoro_demo.cli.shutil.rmtree", interrupted_cleanup)
     receipt = tmp_path / "receipt.json"
     assert main(["demo", "--receipt", str(receipt)]) == 1
