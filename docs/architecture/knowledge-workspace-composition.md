@@ -44,9 +44,9 @@ records how the domain is bound, configured, migrated and released.
 
   The knowledge-only catalog revision is
   `e651dd978f73772e520f28f5ab9b6f46b77578ecc459d171d01eb4c204e75e49`. Together
-  with the pinned work (97) and audit (5) operations, the three-domain catalog
-  has 120 operations, revision
-  `270c8e6c34563b7abb8e7fad54bfd9be522a3a2cec2f256cd91784142066fb8b`
+  with the pinned work (103) and audit (5) operations, the three-domain catalog
+  has 126 operations, revision
+  `37292f51f8cbc643e34c57cd122dcb584e97bca3ca001adaa1fc430b14d02ebc`
   (`scripts/validate_released_catalog_composition.py`, run against the
   released wheels). This is the served catalog from vuoro-service 0.1.96.
 - **Authority.** The shell checks the coarse credential authority

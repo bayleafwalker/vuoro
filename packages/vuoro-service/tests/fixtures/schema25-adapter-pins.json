@@ -1,0 +1,70 @@
+{
+  "schema_version": "vuoro-composition/v3",
+  "release_locks": [
+    {
+      "lock_id": "work-adapter",
+      "lock_kind": "adapter",
+      "source_repository": "https://github.com/bayleafwalker/sprintctl",
+      "source_revision": "ad66ddd030dac7134e212df328f2cb5b82639bdc",
+      "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/v0.19.0/sprintctl-0.19.0-py3-none-any.whl",
+      "artifact_sha256": "6d819cf607ccbeb65d5c6d56705388b2b005fa82bdaa30d7bd975573026b8f26",
+      "distribution": "sprintctl",
+      "distribution_version": "0.19.0"
+    },
+    {
+      "lock_id": "vuoro-adapter-kit",
+      "lock_kind": "shared-dependency",
+      "source_repository": "https://github.com/bayleafwalker/vuoro",
+      "source_revision": "380f11a851422f108feca1c82272f236b43aa1b3",
+      "artifact_url": "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-adapter-kit-v0.2.2/vuoro_adapter_kit-0.2.2-py3-none-any.whl",
+      "artifact_sha256": "6d78c2f05a8e3a72c480b0e333232bc90ccee1a36b71fba09f5bc8fc8e5377fa",
+      "distribution": "vuoro-adapter-kit",
+      "distribution_version": "0.2.2"
+    },
+    {
+      "lock_id": "vuoro-schema-runtime",
+      "lock_kind": "shared-dependency",
+      "source_repository": "https://github.com/bayleafwalker/vuoro",
+      "source_revision": "a002e503dc1fa2f04858b04b581f5fcdfa0e7f3c",
+      "artifact_url": "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-schema-runtime-v0.1.0/vuoro_schema_runtime-0.1.0-py3-none-any.whl",
+      "artifact_sha256": "b66c9357c99aa9e1a7353991ce54105a8621958ecfac47f8c121d80b90b77912",
+      "distribution": "vuoro-schema-runtime",
+      "distribution_version": "0.1.0"
+    },
+    {
+      "lock_id": "audit-adapter",
+      "lock_kind": "adapter",
+      "source_repository": "https://github.com/bayleafwalker/auditctl",
+      "source_revision": "8fd32c1a1d75db055d09b00ee464874d402213ac",
+      "artifact_url": "https://github.com/bayleafwalker/auditctl/releases/download/auditctl-v0.1.9/auditctl-0.1.9-py3-none-any.whl",
+      "artifact_sha256": "7efb9992bc23e1d2bd747dcb8204ff9452487e3bd6d1b43206ba4976f5a9c5cf",
+      "distribution": "auditctl",
+      "distribution_version": "0.1.9"
+    }
+  ],
+  "runtime_descriptors": [
+    {
+      "domain": "work",
+      "lock_id": "work-adapter",
+      "dependency_lock_ids": [
+        "vuoro-adapter-kit"
+      ],
+      "adapter_module": "sprintctl.vuoro_adapter",
+      "register": "register_work_catalog",
+      "api_version": "work-api/v1",
+      "schema_version": "work-schema/v1"
+    },
+    {
+      "domain": "audit",
+      "lock_id": "audit-adapter",
+      "dependency_lock_ids": [
+        "vuoro-adapter-kit",
+        "vuoro-schema-runtime"
+      ],
+      "adapter_module": "auditctl.vuoro_adapter",
+      "register": "VuoroAuditAdapter.register",
+      "api_version": "audit/v1",
+      "schema_version": "audit-schema/v1"
+    }
+  ]
+}
