@@ -1,0 +1,95 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.run-delegation-shell",
+  "contract_ref": {
+    "doc_id": "vuoro-run-scoped-delegation",
+    "revision": "sha256:3889a6018f40f1de09aaad065d97760c45702b567b06d0f2b0f02e8b094f8b4f"
+  },
+  "implementation_sha": "8fda4a41b59c31548dc5746ec8ad804a7c8f95aa",
+  "depth": 2,
+  "environment": {
+    "backend": "Vuoro in-process HTTP service with clean Sprintctl source owner and dedicated disposable PostgreSQL16 database",
+    "isolation": "source-only service checkout; owner database guarded by Sprintctl disposable role/database checks; no production endpoint or state",
+    "tool_versions": {
+      "python": "3.12.14",
+      "pytest": "8.4.2",
+      "postgresql": "16.15"
+    }
+  },
+  "execution": {
+    "seed": null,
+    "histories": 1,
+    "bounds": {
+      "full_suite_passed": 2911,
+      "full_suite_skipped": 155,
+      "full_suite_failed": 0,
+      "source_owner_commit": "eca00421761a42da41e3e787cee51d732b8087eb",
+      "same_run_http_successes": 1,
+      "wrong_run_http_refusals": 1,
+      "same_key_session_note_rows_after_retry": 1,
+      "post_revoke_cached_read_refusals": 1,
+      "post_revoke_cached_write_refusals": 1,
+      "session_note_rows_after_refused_write": 1,
+      "released_owner_pin_changed": false
+    },
+    "faults_exercised": [
+      "delegated request names a different run",
+      "same-key session-note retry after successful write",
+      "cached delegated identity used after owner revocation",
+      "post-revocation session-note write attempt"
+    ]
+  },
+  "claims": [
+    {
+      "property": "The service accepts a permitted same-run delegated HTTP read, rejects a different run, and carries the immutable Sprintctl owner binding through the request.",
+      "result": "example-tested",
+      "evidence": [
+        "scripts/qualify_run_delegation_owner.py",
+        "packages/vuoro-service/tests/test_run_delegation.py",
+        "packages/vuoro-service/tests/conformance/test_run_delegation_owner_pg.py"
+      ]
+    },
+    {
+      "property": "A same-key delegated session-note retry leaves exactly one owner row; after owner revocation, both a previously authenticated cached-context read and write are refused, and the row count remains one.",
+      "result": "example-tested",
+      "evidence": [
+        "scripts/qualify_run_delegation_owner.py",
+        "packages/vuoro-service/src/vuoro_service/run_delegation.py",
+        "packages/vuoro-service/src/vuoro_service/app.py"
+      ]
+    },
+    {
+      "property": "The feature branch leaves the released adapter pin unchanged; this source conformance does not qualify a released or installed Vuoro artifact.",
+      "result": "documented-only",
+      "evidence": [
+        "packages/vuoro-service/composition/adapter-pins.json",
+        "verification/contexts/run-delegation-shell.json"
+      ]
+    },
+    {
+      "property": "The rebased Vuoro repository suite passes with optional fixtures requiring separate owner, cgroup, or Nix installations skipped.",
+      "result": "example-tested",
+      "evidence": [
+        "UV_CACHE_DIR=/workspace/tools/uv-cache VUORO_WORKSPACE_TEST_PG_BIN=/workspace/tools/postgres16/bin uv run pytest -q",
+        "verification/contexts/run-delegation-shell.json"
+      ]
+    },
+    {
+      "property": "Revoking an upstream parent grant alone does not revoke an already-minted child; the operator or adapter must revoke it through the owner or rely on bounded owner TTL/settlement/creator-retirement revocation.",
+      "result": "documented-only",
+      "evidence": [
+        "docs/architecture/run-scoped-delegation.md",
+        "packages/vuoro-service/src/vuoro_service/run_delegation.py"
+      ]
+    }
+  ],
+  "counterexamples": [],
+  "notes": [
+    "Owner conformance ran against clean Sprintctl source commit eca00421761a42da41e3e787cee51d732b8087eb and a dedicated disposable service PostgreSQL16 database. The owner commit was verified before the run; no URL, token, or credential contents are recorded.",
+    "The source-only HTTP proof exercised same-run read, wrong-run refusal, session-note write/retry with one committed row, revocation, and refusal of cached-context read/write after revocation.",
+    "The full suite command used the repository-required PostgreSQL16 binary directory and completed with 2911 passed, 155 skipped, and zero failures. The skips are optional fixtures requiring separate owner databases, protected cgroups, or actual Nix installations.",
+    "The immutable adapter pin file is not modified by this feature branch. Released/installed artifact qualification, deployment, and production state remain unknown and were not exercised.",
+    "This result packet is an evidence-only follow-up for implementation commit 8fda4a41b59c31548dc5746ec8ad804a7c8f95aa.",
+    "Parent binding is a scope snapshot, not live upstream grant introspection; verified gateway expiry bounds mint but does not propagate post-mint upstream revocation."
+  ]
+}
