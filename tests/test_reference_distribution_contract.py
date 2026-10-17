@@ -67,6 +67,23 @@ def test_service_version_and_lifecycle_claims_remain_source_qualified():
         for item in lifecycle.values()
         for reference in item["procedure"]
     )
-    assert lifecycle["removal"]["source_status"] == "undefined"
+    assert lifecycle["removal"]["source_status"] == "candidate-owner-disposition-procedure"
+    assert lifecycle["removal"]["qualification"] == "not-exercised-as-a-reference-distribution"
     assert contract["support"]["status"] == "not-committed"
     assert contract["support"]["response_sla"] == "none"
+
+
+def test_removal_and_upgrade_policy_keep_owner_data_and_qualification_open():
+    contract = _load("deploy/reference-distribution.toml")
+    lifecycle = {item["operation"]: item for item in contract["lifecycle"]}
+    removal = " ".join((ROOT / lifecycle["removal"]["procedure"][0]).read_text().lower().split())
+    assert "silence is not consent to delete" in removal
+    assert "no step in this runbook defaults to purge" in removal
+    assert "independently exercised or qualified" in removal
+    assert "unresolved orphan" in removal
+
+    upgrade = contract["upgrade_policy"]
+    assert upgrade["status"] == "candidate-compatibility-rules"
+    assert upgrade["automatic_migration"] is False
+    assert upgrade["upgrade_grace_period"] == "not-committed"
+    assert upgrade["qualification"] == "not-exercised-as-a-reference-distribution"

@@ -103,10 +103,21 @@ boundary = "Off-image diagnostics report a missing installed-composition attesta
 
 [[lifecycle]]
 operation = "removal"
-source_status = "undefined"
-procedure = []
-qualification = "not-defined"
-boundary = "No neutral uninstall, retention, owner-data disposition, or post-removal verification procedure is established."
+source_status = "candidate-owner-disposition-procedure"
+procedure = ["docs/operations/reference-distribution-removal.md"]
+qualification = "not-exercised-as-a-reference-distribution"
+boundary = "The procedure stops delivery and inventories neutral resources, but retains data by default; no owner has authorized purge and no independent removal/reconstruction has been qualified."
+
+[upgrade_policy]
+status = "candidate-compatibility-rules"
+composition_unit = "one immutable service release plus the exact adapter pins in its composition manifest"
+adapter_pin_changes = "review-and-qualify-as-a-composition"
+schema_migration_owner = "domain-owner"
+automatic_migration = false
+upgrade_grace_period = "not-committed"
+incompatible_upgrade_action = "freeze-delivery-until-owner-compatible-upgrade-or-coordinated-restore"
+rollback_rule = "previous-image-only-while-it-admits-the-current-schema"
+qualification = "not-exercised-as-a-reference-distribution"
 
 [qualification]
 required_evidence = ["EE-02", "EE-03", "EE-10", "EE-11"]

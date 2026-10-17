@@ -57,8 +57,31 @@ qualification state and explicit limit:
 - **Diagnostics:** `vuoro-ops` exposes structured read-only checks. A source
   checkout without the installed composition attestation reports that absence
   as unknown and cannot establish live state.
-- **Removal:** a neutral removal procedure has not been established. Retention,
-  owner data disposition and verification after removal are open.
+- **Removal:** a conservative candidate procedure is recorded in
+  `docs/operations/reference-distribution-removal.md`. It inventories neutral
+  and live resources, stops delivery before compute removal, requires owner
+  disposition for every data store, retains data by default, and checks for
+  remaining or orphaned runtime resources. It authorizes no purge and has not
+  been independently exercised or qualified.
+
+## Version relationship and compatibility policy
+
+The candidate release unit is one immutable Vuoro service artifact together
+with the exact adapter artifacts, revisions and digests in its composition
+manifest. Adapter pins are reviewed and qualified as a composition; installing
+an individual adapter's latest release is not an upgrade procedure. Domain
+owners remain responsible for schema versions and migrations. Migrations stay
+explicit and owner-run, and service startup must reject unsupported schema
+compatibility without applying DDL.
+
+There is no committed upgrade grace period or public support promise. If the
+new service and current schema are incompatible, freeze delivery while the
+schema owner provides a compatible forward upgrade or the installation
+executes its coordinated restore plan. Roll back the image alone only while
+the previous image accepts the current schema. A source compatibility check
+or pinned version relation does not establish runtime qualification; the
+candidate policy and open qualification are recorded in
+`deploy/reference-distribution.toml`.
 
 ## Support and product claims
 
