@@ -1,7 +1,8 @@
 # Run-scoped delegated credentials
 
-Status: design note, proposed 2026-10-14. Not implemented. Store owner work is
-for Sprintctl; resolver and catalog work is for Vuoro. The work is motivated by
+Status: source implementation staged 2026-10-17; release, deployment and host
+qualification remain pending. Store ownership remains with Sprintctl; resolver
+and catalog composition remain with Vuoro. The work is motivated by
 the agentops host adapter (agentops `scripts/host_adapter.py`, PR #343) and by
 its bounded execution environment (agentops
 `docs/architecture/bounded-execution-environment.md`, gitops-nixos
@@ -67,7 +68,7 @@ A new owner table holds one row per delegation:
 | `repo_id`, `run_id` | the one run this delegation acts within |
 | `parent_binding` | the run's `(principal_id, workspace_id, client_id, grant_id)`, copied from the run at mint time |
 | `operations` | closed allowlist; v1 permits only the run-scoped set in 3.3 |
-| `expires_at` | owner clock; at most `min(requested, run max, 4h)` |
+| `expires_at` | owner clock; integer TTL 1–14400 seconds, bounded by verified parent credential expiry when present |
 | `token_sha256` | digest of the bearer secret; the secret itself is never stored |
 | `revoked_at`, `revoked_reason` | set by revoke, by run settlement or by parent retire |
 | `created_by`, `created_at` | the parent identity that minted it |
@@ -81,9 +82,9 @@ A new owner table holds one row per delegation:
 | `work.run.delegation-get-v1` `{delegation_id}` | the parent binding | `work:read` | Returns the record without the token (diagnosis). |
 
 Settlement also revokes a run's delegation: the inbox `result-linked`
-receipt for the run, or the run's terminal note, and
-`work.agent.retire` of the instance that minted it, all revoke without a
-separate call.
+receipt for the run and `work.agent.retire` of the exact creator instance
+revoke without a separate call. Session notes have no typed terminal semantics
+and therefore do not trigger settlement or revocation.
 
 ### 3.3 What a delegated identity can do
 
@@ -199,3 +200,32 @@ revokes it in any case), then removes the run directory.
 5. **gitops-nixos:** stop binding the inbox credential into
    `opencode-serve-inbox`, rotate the inbox principal epoch, and only then
    enable launches on devbox.
+
+## 6. Staged source consumer and remaining gates
+
+The shell implementation is `vuoro_service.run_delegation`. It composes the
+released work application's internal `resolve_run_delegation_digest` API,
+passing only SHA-256(token). The owner resolves the digest within its configured
+database and returns the exact repository and parent binding. The shell keeps
+the immutable owner context, narrows authorities, checks expiry and the closed
+operation/run pair, and applies normal repository checks. Hosted composition
+also requires the configured workspace and project-repository boundary, so a
+digest lookup across the owner database cannot bypass tenant routing. Every
+request resolves current owner state; the owner revalidates again in the action
+transaction, including a cached context after revocation.
+
+`Identity.expires_at` preserves a verified gateway assertion's expiry for the
+owner's mint bound. An assertion cannot mint a child that outlives that bound.
+Static principals without a verified expiry retain the documented parent
+rotation/revocation limitation; the child remains bounded by owner TTL and
+explicit owner revocation. No authenticated workload/host identity is inferred
+from the actor, model, harness or provider description.
+
+The immutable composition pin is unchanged. Older owner releases have no
+lookup API and reserved `vrd_` credentials fail closed without falling back to
+static or gateway authentication. This source support does not expose a new
+operation before a qualified owner release is composed. Schema27 migration,
+release/pin selection, host handoff/profile lookup, decision-credential removal
+and epoch rotation, real harness continuation, and enabling launches are
+separate qualification/deployment steps. No migration or launch is authorized
+by this source implementation.

@@ -1254,6 +1254,18 @@ def create_composed_app(
     incompatible = [name for name, state in domains.items() if state.state != "compatible"]
     if incompatible:
         raise CompositionError("runtime compatibility failed for: " + ", ".join(incompatible))
+    # Source support is staged without changing the immutable work-owner pin.
+    # Older owners have no lookup and refuse reserved credentials. Once a
+    # qualified owner release supplies the API, it owns all record checks.
+    from vuoro_service.run_delegation import DelegatedBearerIdentityResolver
+    resolver = DelegatedBearerIdentityResolver(
+        resolver, environment=environment_name,
+        lookup=getattr(work_application, "resolve_run_delegation_digest", None),
+        expected_workspace_id=(
+            _runtime_env("VUORO_WORKSPACE_ID", environ) if gateway_key_value is not None else None
+        ),
+        allowed_repo_ids=(frozenset(project_binding.repo_ids) if gateway_key_value is not None else None),
+    )
     return create_app(
         settings=ServiceSettings(
             environment_name=environment_name,

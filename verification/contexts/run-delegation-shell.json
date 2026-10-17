@@ -1,0 +1,89 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.run-delegation-shell",
+  "owner_repo": "vuoro",
+  "subject": "Staged run-scoped owner credential consumer and dual refusal boundary",
+  "contract_ref": {
+    "doc_id": "vuoro-run-scoped-delegation",
+    "revision": "sha256:fe228b9748c9e21bdabc27d1daf53112d1084d7d183335c7c894675dff40695a"
+  },
+  "source_of_truth": "Sprintctl owns token digests, live run bindings, expiry/revocation and transactional revalidation; Vuoro composes its released API and enforces shell scope.",
+  "depth": 2,
+  "backends": [
+    "In-process HTTP service and trusted owner resolver callback",
+    "Disposable PostgreSQL16 owner source conformance when explicitly configured"
+  ],
+  "actors": [
+    "parent launcher",
+    "run delegate",
+    "hosted tenant requester"
+  ],
+  "initial_state": [
+    "Existing static or gateway primary resolver",
+    "Owner-returned immutable run scope and binding or unsupported old owner pin"
+  ],
+  "operations": [
+    {
+      "name": "resolve reserved bearer through owner digest API",
+      "actors": [
+        "run delegate"
+      ]
+    },
+    {
+      "name": "invoke permitted same-run operation",
+      "actors": [
+        "run delegate"
+      ],
+      "synchronization": "Owner revalidates in read/write transaction; shell grants no durable credential cache"
+    },
+    {
+      "name": "refuse different operation, run, repository or hosted workspace",
+      "actors": [
+        "hosted tenant requester",
+        "run delegate"
+      ]
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "Request identity projection and dispatch before owner action"
+  },
+  "assumptions": {
+    "isolation": "Source fixtures and disposable owner database; no production endpoints or migrations",
+    "clock": "Credential expiry from verified authenticator; shell UTC bound supplements owner clock checks"
+  },
+  "invariants": [
+    "Reserved credentials never fall back to primary authentication",
+    "Only token hash enters owner lookup and failures disclose neither token nor owner details",
+    "Exact parent binding and singleton repository survive identity projection",
+    "Hosted workspace/project boundary cannot be bypassed by global digest lookup",
+    "Closed operation allowlist and exact run are checked before handler",
+    "Owner revalidation remains required after authentication and after revocation",
+    "Gateway verified expiry bounds child mint; primary source pins remain unchanged"
+  ],
+  "faults": [
+    "Unsupported old owner",
+    "Malformed token",
+    "Owner unavailable",
+    "Expired or revoked owner record",
+    "Unknown/wildcard repository",
+    "Foreign workspace or project repository",
+    "Wrong run or forbidden operation",
+    "Malformed invocation arguments"
+  ],
+  "oracles": [
+    "packages/vuoro-service/tests/test_run_delegation.py",
+    "packages/vuoro-service/tests/test_gateway_identity.py:test_verified_gateway_expiry_is_carried_to_child_credential_owner",
+    "packages/vuoro-service/tests/conformance/test_run_delegation_owner_pg.py"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-service/src/vuoro_service/run_delegation.py",
+    "packages/vuoro-service/src/vuoro_service/app.py:_dispatch_after_rate_limit",
+    "packages/vuoro-service/src/vuoro_service/composition.py:create_composed_app",
+    "packages/vuoro-service/src/vuoro_service/gateway_identity.py"
+  ],
+  "expansions": [
+    "semantic-doc",
+    "fault-scenario"
+  ]
+}
