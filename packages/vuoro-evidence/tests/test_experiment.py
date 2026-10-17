@@ -64,7 +64,7 @@ def test_cost_is_exact_and_currency_is_never_silently_converted():
     observations = (outcome(known_cost=Decimal("0.10"), currency="EUR", review_seconds=0),
                     outcome("c2", "r2", known_cost=Decimal("0.20"), currency="USD"),
                     outcome("c3", "r3", known_cost=Decimal("0.20"), currency="EUR"))
-    s = record(observations, (run(), run("r2"), run("r3")), ("c1", "c2", "c3")).summarize(review_policy_ref="owner:review-policy@rev1", reviewer_ref="reviewer:1", 
+    s = record(observations, (run(), run("r2"), run("r3")), ("c1", "c2", "c3")).summarize(review_policy_ref="owner:review-policy@rev1", reviewer_ref="reviewer:1",
         min_accepted_cases=3, min_capture=Fraction(1))
     assert s["accepted_cost"]["known_totals"] == {"EUR": "0.30", "USD": "0.20"}
     assert s["accepted_effort"]["review_seconds"] == {"known_total": 0, "known_cases": 1, "unknown_cases": 2}
@@ -76,7 +76,7 @@ def test_cost_is_exact_and_currency_is_never_silently_converted():
 def test_run_identity_and_observed_composition_survive_summary_without_changing_manifests():
     manifest = run()
     before = manifest.composition()
-    s = record(manifests=(manifest,), population=("c1",)).summarize(review_policy_ref="owner:review-policy@rev1", reviewer_ref="reviewer:1", 
+    s = record(manifests=(manifest,), population=("c1",)).summarize(review_policy_ref="owner:review-policy@rev1", reviewer_ref="reviewer:1",
         min_accepted_cases=1, min_capture=Fraction(1))
     assert s["run_compositions"]["r1"] == {"digest": manifest.composition_digest(), "composition": before}
     assert manifest.composition() == before and not manifest.grant_ids
