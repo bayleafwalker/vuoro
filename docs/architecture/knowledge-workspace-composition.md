@@ -177,6 +177,13 @@ vuoro-workspace check --dsn "$VUORO_KNOWLEDGE_RUNTIME_DSN" --schema knowledge \
 The runtime role needs `USAGE` on the schema and DML on its tables. P1c owns
 the grants.
 
+The physical schema is installation configuration. Before migration, inspect
+its ownership, tables and migration ledger. An existing knowledge service may
+already use the default `knowledge` namespace with an incompatible ledger.
+Preserve that namespace and choose a separate schema for Workspace; pass the
+same explicit name to the owner CLI, runtime configuration and grant scripts.
+Schema coexistence does not import or migrate the legacy service's data.
+
 ## Release and pin
 
 - `vuoro-workspace` is released like the other in-repo packages: tag
@@ -213,9 +220,25 @@ Before deploying it, appservice must provide:
 
 1. the knowledge migration Job, which runs `vuoro-workspace migrate` as the
    knowledge migration role and has completed;
-2. the knowledge runtime DSN (`VUORO_KNOWLEDGE_RUNTIME_DSN`), the object
-   store (`VUORO_KNOWLEDGE_OBJECT_STORE` plus a bucket-scoped credential) and
-   the runtime grants.
+2. the knowledge runtime DSN (`VUORO_KNOWLEDGE_RUNTIME_DSN`), the configured
+   object store (`VUORO_KNOWLEDGE_OBJECT_STORE`) and the runtime grants.
+
+The storage choice is installation-specific. S3 deployments need a
+bucket-scoped credential. The supported filesystem backend needs a persistent
+volume at the configured absolute path, writable by the service UID under its
+normal containment settings. Neither choice grants callers knowledge scopes
+or workspace membership.
+
+Recovery must cover both the database and object store. Establish a writer
+fence before creating a paired recovery point; record the exact database and
+object-store backup identities together, and qualify restoring both together
+before granting knowledge write access. Independent scheduled database dumps
+and volume snapshots do not establish a coherent pair. Preserve existing
+domain data and grants throughout the cutover.
+
+This storage requirement supersedes the earlier P1c assumption that every
+installation would use a bucket-scoped credential. Deployment-specific volume,
+backup and retention configuration belongs in appservice.
 
 Deploying the pinned image before both are in place fails startup closed. It
 does not degrade.
