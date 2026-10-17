@@ -65,25 +65,42 @@ def main():
 
             async def exercise():
                 async with httpx.AsyncClient(transport=httpx.ASGITransport(app=service), base_url="http://fixture") as client:
-                    async def invoke(run):
+                    async def invoke(run, operation="work.run.resolve-v1", key=None):
+                        arguments = {"run_id": run}
+                        if key is not None:
+                            arguments.update(note="source-only delegated write", idempotency_key=key)
                         return await client.post("/api/invoke/v1", headers={
                             "authorization": "Bearer " + issued["token"], "X-Vuoro-Client-Protocol": "1"},
                             json={"schema_version": "invocation/v1", "request_id": "source-conformance-1",
-                                  "operation": "work.run.resolve-v1", "arguments": {"run_id": run}, "repo_id": repo_id})
+                                  "operation": operation, "arguments": arguments, "repo_id": repo_id})
                     allowed = await invoke(run_id)
                     assert allowed.status_code == 200, allowed.status_code
                     wrong_run = await invoke("run_" + "A" * 26)
                     assert wrong_run.status_code == 403
+                    key = _key()
+                    written = await invoke(run_id, "work.session-note.write-v1", key)
+                    assert written.status_code == 200, written.text
+                    replay = await invoke(run_id, "work.session-note.write-v1", key)
+                    assert replay.status_code == 200, replay.text
+                    with conn.cursor() as cursor:
+                        cursor.execute("SELECT count(*) AS n FROM session_note WHERE repo_id=%s AND run_id=%s", (repo_id, run_id))
+                        assert cursor.fetchone()["n"] == 1
+                    conn.rollback()
                     application.invoke(delegation.OP_REVOKE, {"delegation_id": issued["delegation_id"],
                         "reason": "source-conformance", "idempotency_key": _key()}, parent_context)
                     refused = await invoke(run_id)
                     assert refused.status_code == 401, refused.status_code
                     assert refused.json()["error"]["code"] == "credential-invalid"
+                    refused_write = await invoke(run_id, "work.session-note.write-v1", _key())
+                    assert refused_write.status_code == 401, refused_write.text
+                    with conn.cursor() as cursor:
+                        cursor.execute("SELECT count(*) AS n FROM session_note WHERE repo_id=%s AND run_id=%s", (repo_id, run_id))
+                        assert cursor.fetchone()["n"] == 1
             asyncio.run(exercise())
         finally:
             conn.rollback()
             cleanup_test_repositories(conn, [repo_id])
-    print(f"source owner {actual}: HTTP same-run, wrong-run and cached-context revocation conformance passed")
+    print(f"source owner {actual}: HTTP same-run, wrong-run, idempotent note and cached-context revocation conformance passed")
 
 
 if __name__ == "__main__":

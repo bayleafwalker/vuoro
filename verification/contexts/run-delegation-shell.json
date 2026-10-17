@@ -2,7 +2,7 @@
   "schema_version": "test-context/v1",
   "id": "vuoro.run-delegation-shell",
   "owner_repo": "vuoro",
-  "subject": "Staged run-scoped owner credential consumer and dual refusal boundary",
+  "subject": "Run-scoped delegated identity through the service shell and Sprintctl owner",
   "contract_ref": {
     "doc_id": "vuoro-run-scoped-delegation",
     "revision": "sha256:fe228b9748c9e21bdabc27d1daf53112d1084d7d183335c7c894675dff40695a"
@@ -30,18 +30,32 @@
       ]
     },
     {
-      "name": "invoke permitted same-run operation",
+      "name": "invoke permitted same-run read through HTTP",
+      "actors": [
+        "run delegate"
+      ]
+    },
+    {
+      "name": "invoke permitted session-note write and retry same idempotency key",
       "actors": [
         "run delegate"
       ],
-      "synchronization": "Owner revalidates in read/write transaction; shell grants no durable credential cache"
+      "synchronization": "One owner row is committed; exact retry replays without a second effect"
     },
     {
-      "name": "refuse different operation, run, repository or hosted workspace",
+      "name": "refuse different run, repository or hosted workspace/project",
       "actors": [
         "hosted tenant requester",
         "run delegate"
       ]
+    },
+    {
+      "name": "revoke through parent identity, then retry cached delegated read and write",
+      "actors": [
+        "parent launcher",
+        "run delegate"
+      ],
+      "synchronization": "Owner revalidates the cached context and refuses post-revoke operations"
     }
   ],
   "consistency": {
@@ -59,7 +73,9 @@
     "Hosted workspace/project boundary cannot be bypassed by global digest lookup",
     "Closed operation allowlist and exact run are checked before handler",
     "Owner revalidation remains required after authentication and after revocation",
-    "Gateway verified expiry bounds child mint; primary source pins remain unchanged"
+    "Gateway verified expiry bounds child mint; primary source pins remain unchanged",
+    "Same-key session-note retry creates exactly one owner row",
+    "A previously resolved cached identity cannot read or write after owner revocation"
   ],
   "faults": [
     "Unsupported old owner",
@@ -74,7 +90,8 @@
   "oracles": [
     "packages/vuoro-service/tests/test_run_delegation.py",
     "packages/vuoro-service/tests/test_gateway_identity.py:test_verified_gateway_expiry_is_carried_to_child_credential_owner",
-    "packages/vuoro-service/tests/conformance/test_run_delegation_owner_pg.py"
+    "packages/vuoro-service/tests/conformance/test_run_delegation_owner_pg.py",
+    "scripts/qualify_run_delegation_owner.py"
   ],
   "implementation_anchors": [
     "packages/vuoro-service/src/vuoro_service/run_delegation.py",
