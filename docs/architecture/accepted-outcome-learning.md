@@ -35,7 +35,7 @@ selection. A provider completion event cannot be an accepted disposition.
 
 Acceptance time, review, rework, recovery effort and cost may be unknown.
 Measurements use nonnegative integer seconds and exact Decimal amounts with
-canonical uppercase three-letter currency codes. Unknown
+uppercase three-letter currency identifiers. Unknown
 cost is never zero. Known totals retain separate currencies; no exchange rate is
 invented. Effort and cost summaries explicitly cover **accepted cases**, with
 known and unknown counts for each measure; rejected and pending cases retain

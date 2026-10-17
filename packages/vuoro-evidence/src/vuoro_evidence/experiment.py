@@ -97,7 +97,7 @@ class OutcomeObservation:
             if not isinstance(self.known_cost, Decimal) or not self.known_cost.is_finite() or self.known_cost < 0:
                 raise ExperimentError("known_cost must be a finite nonnegative Decimal or unknown")
             if not isinstance(self.currency, str) or not re.fullmatch(r"[A-Z]{3}", self.currency):
-                raise ExperimentError("currency must be a canonical uppercase three-letter currency code")
+                raise ExperimentError("currency must be a uppercase three-letter currency identifier")
         elif self.currency is not None:
             raise ExperimentError("currency without known cost is ambiguous")
 
