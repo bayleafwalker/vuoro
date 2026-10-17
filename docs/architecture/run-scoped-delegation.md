@@ -221,6 +221,14 @@ rotation/revocation limitation; the child remains bounded by owner TTL and
 explicit owner revocation. No authenticated workload/host identity is inferred
 from the actor, model, harness or provider description.
 
+Parent binding is a scope snapshot, not live upstream grant introspection. If an
+OAuth grant or parent identity is revoked after mint, that event alone does not
+revoke an already-issued run credential. The operator or adapter must revoke
+the child through Sprintctl, or wait for a settlement/result-linked receipt,
+retirement of the exact creator instance, or the child's bounded owner TTL to
+end. A verified gateway expiry limits how long the child may be minted for; it
+does not propagate an upstream revocation event after mint.
+
 The immutable composition pin is unchanged. Older owner releases have no
 lookup API and reserved `vrd_` credentials fail closed without falling back to
 static or gateway authentication. This source support does not expose a new

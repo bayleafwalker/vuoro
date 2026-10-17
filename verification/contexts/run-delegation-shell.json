@@ -5,9 +5,9 @@
   "subject": "Run-scoped delegated identity through the service shell and Sprintctl owner",
   "contract_ref": {
     "doc_id": "vuoro-run-scoped-delegation",
-    "revision": "sha256:fe228b9748c9e21bdabc27d1daf53112d1084d7d183335c7c894675dff40695a"
+    "revision": "sha256:3889a6018f40f1de09aaad065d97760c45702b567b06d0f2b0f02e8b094f8b4f"
   },
-  "source_of_truth": "Sprintctl owns token digests, live run bindings, expiry/revocation and transactional revalidation; Vuoro composes its released API and enforces shell scope.",
+  "source_of_truth": "Sprintctl owns token digests, live run bindings, expiry/revocation and transactional revalidation; Vuoro composes its released API and enforces shell scope. Parent grant revocation after child mint is not live-introspected; explicit child-owner revocation or owner TTL/lifecycle event is required.",
   "depth": 2,
   "backends": [
     "In-process HTTP service and trusted owner resolver callback",
@@ -75,7 +75,8 @@
     "Owner revalidation remains required after authentication and after revocation",
     "Gateway verified expiry bounds child mint; primary source pins remain unchanged",
     "Same-key session-note retry creates exactly one owner row",
-    "A previously resolved cached identity cannot read or write after owner revocation"
+    "A previously resolved cached identity cannot read or write after owner revocation",
+    "Upstream parent-grant revocation alone does not revoke a minted child credential; child-owner revocation, settlement, exact-creator retirement, or expiry is required"
   ],
   "faults": [
     "Unsupported old owner",
@@ -85,7 +86,8 @@
     "Unknown/wildcard repository",
     "Foreign workspace or project repository",
     "Wrong run or forbidden operation",
-    "Malformed invocation arguments"
+    "Malformed invocation arguments",
+    "Upstream parent grant revoked after mint without child-owner revoke"
   ],
   "oracles": [
     "packages/vuoro-service/tests/test_run_delegation.py",
