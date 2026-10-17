@@ -5,7 +5,7 @@
     "doc_id": "vuoro-knowledge-workspace-phase0",
     "revision": "sha256:3628943d23346a398ff6437249bb08f6a1b8469f4e54c734ea908c09a172f102"
   },
-  "implementation_sha": "515d0e5296240abc6f02e19c5c706d02990cb2d5",
+  "implementation_sha": "e77e7de408d28f2a3cd8f176ef85ce7522c6536c",
   "depth": 2,
   "environment": {
     "backend": "Disposable PostgreSQL 16.15 (Docker postgres:16) and local fixture object store",
@@ -21,8 +21,8 @@
     "bounds": {
       "workspace_tests_passed": 100,
       "distribution_wheels_built": 4,
-      "full_suite_passed": 2877,
-      "full_suite_failed": 12,
+      "full_suite_passed": 2889,
+      "full_suite_failed": 0,
       "full_suite_skipped": 140
     },
     "faults_exercised": [
@@ -70,8 +70,8 @@
   ],
   "notes": [
     "Independent read-only review found no blocking defect; importer validation precedes _mutate/object writes.",
-    "Local full suite is not green: 12 failures in preexisting protected_runtime_local_child tests, reproduced separately on origin/main; separate repair in progress. 140 skips require unconfigured owner/cgroup/install fixtures.",
-    "Workspace suite itself passed all 100 tests without skips. Full hosted CI pending; no runtime qualification, release or deployment.",
+    "Initial full suite had 12 preexisting runtime-child failures, reproduced on origin/main. Separate repair merged in PR244 (83ed516). Rebased full suite passed 2889 tests with 140 unconfigured owner/cgroup/install fixture skips; four wheel builds preceded checks.",
+    "Workspace suite itself passed all 100 tests without skips. Full hosted CI gates remain separately recorded in the PR; no runtime qualification, release or deployment.",
     "No claim about hostile concurrent bundle-directory mutation, arbitrary object-store recovery, or physical power-loss durability."
   ]
 }
