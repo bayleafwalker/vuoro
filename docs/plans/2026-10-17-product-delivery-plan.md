@@ -100,6 +100,12 @@ Maintain a swap ledger for the first-use workflow. Test an execution harness/pro
 
 Prepare an isolated self-hosted reference distribution that runs without a proprietary coordination service and a hosted pilot path with clear separation of customer-controlled execution and protected authority. Make install, onboarding, upgrade, rollback, backup, restore, export and removal reproducible from released artifacts. Publish adapter capabilities/conformance, supported versions, compatibility and maturity. Add first-use documentation and support boundaries; define who responds to upgrade failures and data recovery.
 
+The current source-only maturity and lifecycle contract is recorded in
+[`reference-distribution-contract.md`](../architecture/reference-distribution-contract.md)
+and [`reference-distribution.toml`](../../deploy/reference-distribution.toml).
+It is not a supported-release claim; EE-02, EE-03, EE-10 and EE-11 remain
+qualification gates.
+
 Evaluate a small invited pilot with people beyond the operator. Capture first successful scoped read, workflow completion, second-agent continuation, accepted outcomes, restore/export rehearsal, support burden, operator time, cost per active workspace, adoption/repeat use, and evidence completeness with denominators. Keep user and workspace data portable. Pilot population and gates are set from current capacity and safety evidence; no public expansion follows automatically.
 
 **Acceptance:** an independent user completes onboarding and the reference workflow without operator shell/database edits; a provider swap is evidenced; a tenant can export/import and restore to the declared target; rollback and upgrade can be performed from the same release contract; support and cost limits are stated; adoption and operational-burden results are sufficient for an explicit continue, narrow, or stop decision. Distribution is a product only if repeat use justifies its ongoing release, support and recovery obligations.
@@ -117,6 +123,9 @@ Produce a design package for tenant identity, organization boundaries, membershi
 **Owner:** Vuoro identity/authority contract owner with the runtime and broker owners. **Depends on:** B and D's participant/delegation model and evidence from the reference workflow.
 
 Test whether the current authenticated principal, runtime, session/attempt and delegation can be distinguished strongly enough for the reference workflow and its protected operation. Document the trust chain, spoofing boundary, lifecycle, revocation/expiry and evidence available at each enforcement point. Compare workload-identity or attestation foundations only against a concrete failure the current system cannot detect; do not adopt SPIFFE/SPIRE or another control plane by default. If needed, define a bounded adapter and proof that preserves customer custody and does not treat a model name or self-description as identity.
+
+The bounded current-state review and open sourcing choices are recorded in
+[`workload-identity-and-policy-sourcing.md`](../architecture/workload-identity-and-policy-sourcing.md).
 
 **Acceptance:** the threat model names which identities are authenticated, which are only reported, and what an attacker with a copied token or compromised host can do; a negative test demonstrates refusal or explicitly records the residual risk; provider/runtime changes invalidate only the qualifications that depend on them; the operator can revoke or expire the relevant authority at the actual enforcement point. Without a material uncovered risk in the selected workflow, retain the documented gap and do not add attestation infrastructure.
 
