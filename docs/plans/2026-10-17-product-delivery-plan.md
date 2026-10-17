@@ -1,11 +1,11 @@
 ---
 doc_id: vuoro-product-delivery-plan-2026-10-17
 title: Vuoro product delivery plan
-purpose: plan
-lifecycle: accepted
+purpose: proposal
+lifecycle: ratified
 effective: 2026-10-17
 subjects: [product, work-identity, evidence, authority, learning, knowledge-workspace, distribution]
-related: [2026-10-15-product-direction, vuoro-knowledge-workspace-phase0, vuoro-knowledge-workspace-roadmap]
+related: [vuoro-knowledge-workspace-phase0, vuoro-knowledge-workspace-roadmap]
 ---
 
 # Vuoro product delivery plan
