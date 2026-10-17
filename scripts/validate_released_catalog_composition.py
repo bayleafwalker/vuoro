@@ -11,9 +11,9 @@ from vuoro_workspace import FsObjectStore
 from vuoro_workspace.vuoro_adapter import KnowledgeApplication, register_knowledge_catalog
 
 
-EXPECTED_TOTAL = 120
-EXPECTED_REVISION = "270c8e6c34563b7abb8e7fad54bfd9be522a3a2cec2f256cd91784142066fb8b"
-EXPECTED_DOMAIN_COUNTS = {"work": 97, "audit": 5, "knowledge": 18}
+EXPECTED_TOTAL = 126
+EXPECTED_REVISION = "37292f51f8cbc643e34c57cd122dcb584e97bca3ca001adaa1fc430b14d02ebc"
+EXPECTED_DOMAIN_COUNTS = {"work": 103, "audit": 5, "knowledge": 18}
 
 
 class WorkStub:

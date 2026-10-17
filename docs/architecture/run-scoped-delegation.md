@@ -1,7 +1,8 @@
 # Run-scoped delegated credentials
 
-Status: source implementation staged 2026-10-17; release, deployment and host
-qualification remain pending. Store ownership remains with Sprintctl; resolver
+Status: source implementation staged 2026-10-17; owner release and immutable
+service composition are being qualified. Deployment and host qualification
+remain pending. Store ownership remains with Sprintctl; resolver
 and catalog composition remain with Vuoro. The work is motivated by
 the agentops host adapter (agentops `scripts/host_adapter.py`, PR #343) and by
 its bounded execution environment (agentops
@@ -229,11 +230,34 @@ retirement of the exact creator instance, or the child's bounded owner TTL to
 end. A verified gateway expiry limits how long the child may be minted for; it
 does not propagate an upstream revocation event after mint.
 
-The immutable composition pin is unchanged. Older owner releases have no
-lookup API and reserved `vrd_` credentials fail closed without falling back to
+Sprintctl 0.20.0 supplies the schema27 owner lookup and delegation catalog.
+The qualified service composition pins its immutable release wheel and digest.
+Older owner releases have no lookup API and reserved `vrd_` credentials fail closed without falling back to
 static or gateway authentication. This source support does not expose a new
-operation before a qualified owner release is composed. Schema27 migration,
-release/pin selection, host handoff/profile lookup, decision-credential removal
+operation before a qualified owner release is composed. Schema27 production migration,
+service deployment, host handoff/profile lookup, decision-credential removal
 and epoch rotation, real harness continuation, and enabling launches are
 separate qualification/deployment steps. No migration or launch is authorized
 by this source implementation.
+
+## 7. Released-owner composition qualification
+
+The service 0.1.96 candidate composes Sprintctl 0.20.0 alongside the existing
+Auditctl 0.1.9 and Workspace 0.1.0 pins. Its catalog has 126 operations
+(work 103, audit 5, knowledge 18), fingerprint
+`37292f51f8cbc643e34c57cd122dcb584e97bca3ca001adaa1fc430b14d02ebc`.
+`test_released_run_delegation_http.py` uses installed wheels and disposable
+PostgreSQL to exercise mint/replay, run and operation refusal, note idempotency,
+live revocation and a cached edge identity after revocation. Delegate and revoke
+require matching invocation-envelope and argument idempotency keys; existing
+run registration and note operations retain argument-only keys.
+
+`test_schema27_composition_migration.py` starts from the actual hash-pinned
+service 0.1.95/Sprintctl 0.19.0 schema25 closure. New startup refuses it without
+DDL; explicit owner CLI migration applies 26 and 27 once. The test preserves
+existing work and audit rows, serves the three-domain catalog under separate
+runtime roles, proves runtime DDL refusal, and proves the old closure refuses
+the migrated store. Schema27 cannot be rolled back to service0.1.95 by changing
+the image alone; recovery needs a compatible forward release or coordinated
+restore. These are disposable qualification results, not production rollout
+or host-launch acceptance.

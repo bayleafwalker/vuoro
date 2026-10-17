@@ -1,0 +1,117 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.run-delegation-composition",
+  "owner_repo": "vuoro",
+  "subject": "Published Sprintctl0.20.0 schema27 composed in service0.1.96",
+  "contract_ref": {
+    "doc_id": "run-scoped-delegation",
+    "revision": "sha256:7a13f236b87259826fda1cced94ab54bae8f774d7f37a00faea8b3373275e134"
+  },
+  "source_of_truth": "immutable published owner wheels and installed service composition",
+  "depth": 2,
+  "backends": [
+    "installed published owner wheels",
+    "disposable PostgreSQL16",
+    "source workspace"
+  ],
+  "actors": [
+    "parent principal",
+    "delegated session",
+    "cached edge identity",
+    "runtime role",
+    "migration role",
+    "old released service and owner"
+  ],
+  "initial_state": [
+    "actual released service0.1.95/Sprintctl0.19.0 schema25 closure",
+    "published Sprintctl0.20.0 schema27 wheel",
+    "no production state"
+  ],
+  "operations": [
+    {
+      "name": "mint and idempotent replay",
+      "actors": [
+        "parent principal"
+      ]
+    },
+    {
+      "name": "run-scoped read and idempotent note",
+      "actors": [
+        "delegated session"
+      ]
+    },
+    {
+      "name": "revoke and reject stale edge context",
+      "actors": [
+        "parent principal",
+        "cached edge identity"
+      ]
+    },
+    {
+      "name": "explicit schema25 to27 CLI migration",
+      "actors": [
+        "runtime role",
+        "migration role",
+        "old released service and owner"
+      ],
+      "synchronization": "separate runtime and migration roles; sequential refusal/migration/readiness"
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "owner delegation/revocation, schema compatibility and preserved rows"
+  },
+  "assumptions": {
+    "isolation": "loopback disposable PostgreSQL; installed wheels",
+    "clock": "PostgreSQL owner clock; no production clock alteration",
+    "fairness": "none"
+  },
+  "bounds": {
+    "catalog_operations": 126,
+    "work_operations": 103,
+    "audit_operations": 5,
+    "knowledge_operations": 18,
+    "histories": 2
+  },
+  "invariants": [
+    "published wheel hash and installed version match manifest",
+    "mint replay never reveals bearer twice",
+    "wrong run and forbidden operation cannot reach owner",
+    "one delegated note for an idempotent retry",
+    "revoked identity refused including cached edge context",
+    "new startup refuses old25 without DDL",
+    "explicit migration applies26 and27 once",
+    "preexisting owner work and audit rows preserved",
+    "runtime roles cannot DDL or inherit migration role",
+    "old closure refuses schema27"
+  ],
+  "faults": [
+    "wrong run",
+    "forbidden operation",
+    "revoked bearer",
+    "cached edge identity after owner revoke",
+    "old schema startup",
+    "migration retry",
+    "runtime DDL attempt",
+    "old runtime after migration",
+    "libpq URL routing override"
+  ],
+  "oracles": [
+    "test_released_owner_delegation_is_run_scoped_and_revocable",
+    "test_actual_schema25_refusal_explicit27_cli_migration_and_runtime_ddl_denial",
+    "exact installed catalog fingerprint and manifest assertions"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-service/composition/adapter-pins.json",
+    "packages/vuoro-service/tests/conformance/test_released_run_delegation_http.py",
+    "packages/vuoro-service/tests/conformance/test_schema27_composition_migration.py",
+    "packages/vuoro-service/tests/fixtures/schema25-adapter-pins.json",
+    "packages/vuoro-service/tests/fixtures/schema25-service.json",
+    "scripts/validate_released_catalog_composition.py",
+    ".github/workflows/ci.yml"
+  ],
+  "expansions": [
+    "semantic-doc",
+    "fault-scenario"
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.run-delegation-composition",
+  "contract_ref": {
+    "doc_id": "run-scoped-delegation",
+    "revision": "sha256:7a13f236b87259826fda1cced94ab54bae8f774d7f37a00faea8b3373275e134"
+  },
+  "implementation_sha": "cd92c95cfca36de52b88bb665d68da4e68f1c3f5",
+  "depth": 2,
+  "environment": {
+    "backend": "published immutable Sprintctl0.20.0/Auditctl0.1.9/Workspace0.1.0 plus local service0.1.96 wheel; actual published old0.1.95 closure; disposable PostgreSQL16",
+    "isolation": "loopback disposable role-separated clusters, no production endpoint or state",
+    "tool_versions": {
+      "python": "3.12.14",
+      "pytest": "8.4.2",
+      "postgresql": "16.15"
+    }
+  },
+  "execution": {
+    "seed": null,
+    "histories": 2,
+    "bounds": {
+      "installed_delegation_http_passed": 1,
+      "actual_schema25_to27_upgrade_passed": 8,
+      "source_service_passed": 494,
+      "source_service_skipped": 57,
+      "source_workspace_passed": 2852,
+      "source_workspace_skipped": 222,
+      "pin_assertions_passed": 61,
+      "release_wheels_built": 4
+    },
+    "faults_exercised": [
+      "wrong run",
+      "forbidden operation",
+      "revoked bearer",
+      "cached edge identity after owner revoke",
+      "old schema startup",
+      "migration retry",
+      "runtime DDL attempt",
+      "old runtime after migration",
+      "libpq URL routing override"
+    ]
+  },
+  "claims": [
+    {
+      "property": "Published Sprintctl0.20.0 wheel hash3c04f265ffc8cbc4c1720d753186000dced40c584d775a59afb176c2502b9025 and GitHub attestation verified; installed126-operation catalog fingerprint37292f51f8cbc643e34c57cd122dcb584e97bca3ca001adaa1fc430b14d02ebc",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/composition/adapter-pins.json",
+        "scripts/validate_released_work_adapter.py",
+        "scripts/validate_released_catalog_composition.py"
+      ]
+    },
+    {
+      "property": "Installed published owner admits single-run delegation and idempotent note; wrong-run and nonallowlisted operation fail; revoke invalidates bearer and cached edge identity including writes",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/tests/conformance/test_released_run_delegation_http.py"
+      ]
+    },
+    {
+      "property": "Actual released two-domain0.1.95/0.19 schema25 store is refused without DDL; explicit owner CLI applies26,27 once; preexisting work/audit rows preserved; new knowledge separately provisioned through its owner; runtime roles cannot DDL and old closure refuses27",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/tests/conformance/test_schema27_composition_migration.py",
+        "packages/vuoro-service/tests/fixtures/schema25-adapter-pins.json",
+        "packages/vuoro-service/tests/fixtures/schema25-service.json"
+      ]
+    },
+    {
+      "property": "Production service deployment, production knowledge storage/restore policy, host credential removal/epoch rotation and real harness continuation",
+      "result": "unknown",
+      "evidence": [
+        "docs/architecture/run-scoped-delegation.md"
+      ]
+    }
+  ],
+  "counterexamples": [],
+  "notes": [
+    "The full workspace run skipped unconfigured PostgreSQL optional fixtures; mandatory new installed HTTP and upgrade cases ran separately without skips.",
+    "Source gates and disposable installed release composition do not prove production deployment or launch acceptance.",
+    "The0.1.96 service adds a required third domain; old two-domain startup and new knowledge initialization are distinct in the upgrade fixture.",
+    "The first local HTTP test deliberately exposed required delegation envelope keys; a blanket key addition then exposed legacy not-allowed contracts. The final fixture preserves each exact operation contract.",
+    "Old released work validator97-operation expectation failed against the new published owner before its count/digest were updated.",
+    "implementation_sha pins source/test-context changes; this result is an evidence-only follow-up."
+  ]
+}
