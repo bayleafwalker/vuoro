@@ -32,6 +32,8 @@ const (
 	OwnerOperations_ReadArtifact_FullMethodName            = "/ec00.oa.v1.OwnerOperations/ReadArtifact"
 	OwnerOperations_ListRequests_FullMethodName            = "/ec00.oa.v1.OwnerOperations/ListRequests"
 	OwnerOperations_Watch_FullMethodName                   = "/ec00.oa.v1.OwnerOperations/Watch"
+	OwnerOperations_ListRequestsV2_FullMethodName          = "/ec00.oa.v1.OwnerOperations/ListRequestsV2"
+	OwnerOperations_WatchV2_FullMethodName                 = "/ec00.oa.v1.OwnerOperations/WatchV2"
 )
 
 // OwnerOperationsClient is the client API for OwnerOperations service.
@@ -51,6 +53,8 @@ type OwnerOperationsClient interface {
 	ReadArtifact(ctx context.Context, in *ReadArtifactRequest, opts ...grpc.CallOption) (*ArtifactRead, error)
 	ListRequests(ctx context.Context, in *PageRequest, opts ...grpc.CallOption) (*RequestPage, error)
 	Watch(ctx context.Context, in *PageRequest, opts ...grpc.CallOption) (*WatchPage, error)
+	ListRequestsV2(ctx context.Context, in *PageRequestV2, opts ...grpc.CallOption) (*RequestPage, error)
+	WatchV2(ctx context.Context, in *PageRequestV2, opts ...grpc.CallOption) (*WatchPage, error)
 }
 
 type ownerOperationsClient struct {
@@ -191,6 +195,26 @@ func (c *ownerOperationsClient) Watch(ctx context.Context, in *PageRequest, opts
 	return out, nil
 }
 
+func (c *ownerOperationsClient) ListRequestsV2(ctx context.Context, in *PageRequestV2, opts ...grpc.CallOption) (*RequestPage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RequestPage)
+	err := c.cc.Invoke(ctx, OwnerOperations_ListRequestsV2_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ownerOperationsClient) WatchV2(ctx context.Context, in *PageRequestV2, opts ...grpc.CallOption) (*WatchPage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WatchPage)
+	err := c.cc.Invoke(ctx, OwnerOperations_WatchV2_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OwnerOperationsServer is the server API for OwnerOperations service.
 // All implementations must embed UnimplementedOwnerOperationsServer
 // for forward compatibility.
@@ -208,6 +232,8 @@ type OwnerOperationsServer interface {
 	ReadArtifact(context.Context, *ReadArtifactRequest) (*ArtifactRead, error)
 	ListRequests(context.Context, *PageRequest) (*RequestPage, error)
 	Watch(context.Context, *PageRequest) (*WatchPage, error)
+	ListRequestsV2(context.Context, *PageRequestV2) (*RequestPage, error)
+	WatchV2(context.Context, *PageRequestV2) (*WatchPage, error)
 	mustEmbedUnimplementedOwnerOperationsServer()
 }
 
@@ -256,6 +282,12 @@ func (UnimplementedOwnerOperationsServer) ListRequests(context.Context, *PageReq
 }
 func (UnimplementedOwnerOperationsServer) Watch(context.Context, *PageRequest) (*WatchPage, error) {
 	return nil, status.Error(codes.Unimplemented, "method Watch not implemented")
+}
+func (UnimplementedOwnerOperationsServer) ListRequestsV2(context.Context, *PageRequestV2) (*RequestPage, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListRequestsV2 not implemented")
+}
+func (UnimplementedOwnerOperationsServer) WatchV2(context.Context, *PageRequestV2) (*WatchPage, error) {
+	return nil, status.Error(codes.Unimplemented, "method WatchV2 not implemented")
 }
 func (UnimplementedOwnerOperationsServer) mustEmbedUnimplementedOwnerOperationsServer() {}
 func (UnimplementedOwnerOperationsServer) testEmbeddedByValue()                         {}
@@ -512,6 +544,42 @@ func _OwnerOperations_Watch_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OwnerOperations_ListRequestsV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PageRequestV2)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OwnerOperationsServer).ListRequestsV2(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OwnerOperations_ListRequestsV2_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OwnerOperationsServer).ListRequestsV2(ctx, req.(*PageRequestV2))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OwnerOperations_WatchV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PageRequestV2)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OwnerOperationsServer).WatchV2(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OwnerOperations_WatchV2_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OwnerOperationsServer).WatchV2(ctx, req.(*PageRequestV2))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OwnerOperations_ServiceDesc is the grpc.ServiceDesc for OwnerOperations service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -570,6 +638,14 @@ var OwnerOperations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Watch",
 			Handler:    _OwnerOperations_Watch_Handler,
+		},
+		{
+			MethodName: "ListRequestsV2",
+			Handler:    _OwnerOperations_ListRequestsV2_Handler,
+		},
+		{
+			MethodName: "WatchV2",
+			Handler:    _OwnerOperations_WatchV2_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

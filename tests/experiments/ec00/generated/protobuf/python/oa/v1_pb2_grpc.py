@@ -99,6 +99,16 @@ class OwnerOperationsStub:
                 request_serializer=oa_dot_v1__pb2.PageRequest.SerializeToString,
                 response_deserializer=oa_dot_v1__pb2.WatchPage.FromString,
                 _registered_method=True)
+        self.ListRequestsV2 = channel.unary_unary(
+                '/ec00.oa.v1.OwnerOperations/ListRequestsV2',
+                request_serializer=oa_dot_v1__pb2.PageRequestV2.SerializeToString,
+                response_deserializer=oa_dot_v1__pb2.RequestPage.FromString,
+                _registered_method=True)
+        self.WatchV2 = channel.unary_unary(
+                '/ec00.oa.v1.OwnerOperations/WatchV2',
+                request_serializer=oa_dot_v1__pb2.PageRequestV2.SerializeToString,
+                response_deserializer=oa_dot_v1__pb2.WatchPage.FromString,
+                _registered_method=True)
 
 
 class OwnerOperationsServicer:
@@ -182,6 +192,18 @@ class OwnerOperationsServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListRequestsV2(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def WatchV2(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_OwnerOperationsServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -248,6 +270,16 @@ def add_OwnerOperationsServicer_to_server(servicer, server):
             'Watch': grpc.unary_unary_rpc_method_handler(
                     servicer.Watch,
                     request_deserializer=oa_dot_v1__pb2.PageRequest.FromString,
+                    response_serializer=oa_dot_v1__pb2.WatchPage.SerializeToString,
+            ),
+            'ListRequestsV2': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListRequestsV2,
+                    request_deserializer=oa_dot_v1__pb2.PageRequestV2.FromString,
+                    response_serializer=oa_dot_v1__pb2.RequestPage.SerializeToString,
+            ),
+            'WatchV2': grpc.unary_unary_rpc_method_handler(
+                    servicer.WatchV2,
+                    request_deserializer=oa_dot_v1__pb2.PageRequestV2.FromString,
                     response_serializer=oa_dot_v1__pb2.WatchPage.SerializeToString,
             ),
     }
@@ -601,6 +633,60 @@ class OwnerOperations:
             target,
             '/ec00.oa.v1.OwnerOperations/Watch',
             oa_dot_v1__pb2.PageRequest.SerializeToString,
+            oa_dot_v1__pb2.WatchPage.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListRequestsV2(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ec00.oa.v1.OwnerOperations/ListRequestsV2',
+            oa_dot_v1__pb2.PageRequestV2.SerializeToString,
+            oa_dot_v1__pb2.RequestPage.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def WatchV2(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ec00.oa.v1.OwnerOperations/WatchV2',
+            oa_dot_v1__pb2.PageRequestV2.SerializeToString,
             oa_dot_v1__pb2.WatchPage.FromString,
             options,
             channel_credentials,

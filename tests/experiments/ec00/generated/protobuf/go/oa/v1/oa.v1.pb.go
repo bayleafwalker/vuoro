@@ -1595,6 +1595,59 @@ func (x *PageRequest) GetLimit() int32 {
 	return 0
 }
 
+// Experimental new read identity preserves explicit scalar defaults.
+type PageRequestV2 struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Cursor        *string                `protobuf:"bytes,1,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	Limit         *int32                 `protobuf:"varint,2,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PageRequestV2) Reset() {
+	*x = PageRequestV2{}
+	mi := &file_oa_v1_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PageRequestV2) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PageRequestV2) ProtoMessage() {}
+
+func (x *PageRequestV2) ProtoReflect() protoreflect.Message {
+	mi := &file_oa_v1_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PageRequestV2.ProtoReflect.Descriptor instead.
+func (*PageRequestV2) Descriptor() ([]byte, []int) {
+	return file_oa_v1_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *PageRequestV2) GetCursor() string {
+	if x != nil && x.Cursor != nil {
+		return *x.Cursor
+	}
+	return ""
+}
+
+func (x *PageRequestV2) GetLimit() int32 {
+	if x != nil && x.Limit != nil {
+		return *x.Limit
+	}
+	return 0
+}
+
 var File_oa_v1_proto protoreflect.FileDescriptor
 
 const file_oa_v1_proto_rawDesc = "" +
@@ -1746,11 +1799,16 @@ const file_oa_v1_proto_rawDesc = "" +
 	"\vPageRequest\x12\x1b\n" +
 	"\x06cursor\x18\x01 \x01(\tH\x00R\x06cursor\x88\x01\x01\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x05R\x05limitB\t\n" +
-	"\a_cursor*a\n" +
+	"\a_cursor\"\\\n" +
+	"\rPageRequestV2\x12\x1b\n" +
+	"\x06cursor\x18\x01 \x01(\tH\x00R\x06cursor\x88\x01\x01\x12\x19\n" +
+	"\x05limit\x18\x02 \x01(\x05H\x01R\x05limit\x88\x01\x01B\t\n" +
+	"\a_cursorB\b\n" +
+	"\x06_limit*a\n" +
 	"\fRequestState\x12\x1d\n" +
 	"\x19REQUEST_STATE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12REQUEST_STATE_OPEN\x10\x01\x12\x1a\n" +
-	"\x16REQUEST_STATE_RESOLVED\x10\x022\xc5\a\n" +
+	"\x16REQUEST_STATE_RESOLVED\x10\x022\xc8\b\n" +
 	"\x0fOwnerOperations\x12A\n" +
 	"\aPublish\x12\x1a.ec00.oa.v1.PublishRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12?\n" +
 	"\x06Revise\x12\x19.ec00.oa.v1.ReviseRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12U\n" +
@@ -1764,7 +1822,9 @@ const file_oa_v1_proto_rawDesc = "" +
 	"\x0eReadDependants\x12\x17.ec00.oa.v1.RequestById\x1a\x1a.ec00.oa.v1.DependantsRead\x12I\n" +
 	"\fReadArtifact\x12\x1f.ec00.oa.v1.ReadArtifactRequest\x1a\x18.ec00.oa.v1.ArtifactRead\x12@\n" +
 	"\fListRequests\x12\x17.ec00.oa.v1.PageRequest\x1a\x17.ec00.oa.v1.RequestPage\x127\n" +
-	"\x05Watch\x12\x17.ec00.oa.v1.PageRequest\x1a\x15.ec00.oa.v1.WatchPageB<Z:example.com/vuoro-ec00/ec00/generated/protobuf/go/oa/v1;v1b\x06proto3"
+	"\x05Watch\x12\x17.ec00.oa.v1.PageRequest\x1a\x15.ec00.oa.v1.WatchPage\x12D\n" +
+	"\x0eListRequestsV2\x12\x19.ec00.oa.v1.PageRequestV2\x1a\x17.ec00.oa.v1.RequestPage\x12;\n" +
+	"\aWatchV2\x12\x19.ec00.oa.v1.PageRequestV2\x1a\x15.ec00.oa.v1.WatchPageB<Z:example.com/vuoro-ec00/ec00/generated/protobuf/go/oa/v1;v1b\x06proto3"
 
 var (
 	file_oa_v1_proto_rawDescOnce sync.Once
@@ -1779,7 +1839,7 @@ func file_oa_v1_proto_rawDescGZIP() []byte {
 }
 
 var file_oa_v1_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_oa_v1_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
+var file_oa_v1_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_oa_v1_proto_goTypes = []any{
 	(RequestState)(0),                      // 0: ec00.oa.v1.RequestState
 	(*PublishRequest)(nil),                 // 1: ec00.oa.v1.PublishRequest
@@ -1803,16 +1863,17 @@ var file_oa_v1_proto_goTypes = []any{
 	(*RequestById)(nil),                    // 19: ec00.oa.v1.RequestById
 	(*ReadArtifactRequest)(nil),            // 20: ec00.oa.v1.ReadArtifactRequest
 	(*PageRequest)(nil),                    // 21: ec00.oa.v1.PageRequest
-	(structpb.NullValue)(0),                // 22: google.protobuf.NullValue
+	(*PageRequestV2)(nil),                  // 22: ec00.oa.v1.PageRequestV2
+	(structpb.NullValue)(0),                // 23: google.protobuf.NullValue
 }
 var file_oa_v1_proto_depIdxs = []int32{
-	22, // 0: ec00.oa.v1.PublishRequest.note_null:type_name -> google.protobuf.NullValue
-	22, // 1: ec00.oa.v1.ReviseRequest.note_null:type_name -> google.protobuf.NullValue
-	22, // 2: ec00.oa.v1.RequestBody.note_null:type_name -> google.protobuf.NullValue
+	23, // 0: ec00.oa.v1.PublishRequest.note_null:type_name -> google.protobuf.NullValue
+	23, // 1: ec00.oa.v1.ReviseRequest.note_null:type_name -> google.protobuf.NullValue
+	23, // 2: ec00.oa.v1.RequestBody.note_null:type_name -> google.protobuf.NullValue
 	0,  // 3: ec00.oa.v1.RequestRead.state:type_name -> ec00.oa.v1.RequestState
 	10, // 4: ec00.oa.v1.RequestRead.body:type_name -> ec00.oa.v1.RequestBody
-	22, // 5: ec00.oa.v1.RequestRead.evidence_ref_null:type_name -> google.protobuf.NullValue
-	22, // 6: ec00.oa.v1.RequestRead.artifact_decision_digest_null:type_name -> google.protobuf.NullValue
+	23, // 5: ec00.oa.v1.RequestRead.evidence_ref_null:type_name -> google.protobuf.NullValue
+	23, // 6: ec00.oa.v1.RequestRead.artifact_decision_digest_null:type_name -> google.protobuf.NullValue
 	12, // 7: ec00.oa.v1.DependantsRead.items:type_name -> ec00.oa.v1.DependentRead
 	0,  // 8: ec00.oa.v1.RequestSummary.state:type_name -> ec00.oa.v1.RequestState
 	15, // 9: ec00.oa.v1.RequestPage.items:type_name -> ec00.oa.v1.RequestSummary
@@ -1830,21 +1891,25 @@ var file_oa_v1_proto_depIdxs = []int32{
 	20, // 21: ec00.oa.v1.OwnerOperations.ReadArtifact:input_type -> ec00.oa.v1.ReadArtifactRequest
 	21, // 22: ec00.oa.v1.OwnerOperations.ListRequests:input_type -> ec00.oa.v1.PageRequest
 	21, // 23: ec00.oa.v1.OwnerOperations.Watch:input_type -> ec00.oa.v1.PageRequest
-	3,  // 24: ec00.oa.v1.OwnerOperations.Publish:output_type -> ec00.oa.v1.MutationResult
-	3,  // 25: ec00.oa.v1.OwnerOperations.Revise:output_type -> ec00.oa.v1.MutationResult
-	3,  // 26: ec00.oa.v1.OwnerOperations.WithdrawDependent:output_type -> ec00.oa.v1.MutationResult
-	3,  // 27: ec00.oa.v1.OwnerOperations.ReportPerformed:output_type -> ec00.oa.v1.MutationResult
-	3,  // 28: ec00.oa.v1.OwnerOperations.Verify:output_type -> ec00.oa.v1.MutationResult
-	3,  // 29: ec00.oa.v1.OwnerOperations.DecideArtifact:output_type -> ec00.oa.v1.MutationResult
-	3,  // 30: ec00.oa.v1.OwnerOperations.Resolve:output_type -> ec00.oa.v1.MutationResult
-	3,  // 31: ec00.oa.v1.OwnerOperations.AcknowledgeContinuation:output_type -> ec00.oa.v1.MutationResult
-	11, // 32: ec00.oa.v1.OwnerOperations.ReadRequest:output_type -> ec00.oa.v1.RequestRead
-	13, // 33: ec00.oa.v1.OwnerOperations.ReadDependants:output_type -> ec00.oa.v1.DependantsRead
-	14, // 34: ec00.oa.v1.OwnerOperations.ReadArtifact:output_type -> ec00.oa.v1.ArtifactRead
-	16, // 35: ec00.oa.v1.OwnerOperations.ListRequests:output_type -> ec00.oa.v1.RequestPage
-	18, // 36: ec00.oa.v1.OwnerOperations.Watch:output_type -> ec00.oa.v1.WatchPage
-	24, // [24:37] is the sub-list for method output_type
-	11, // [11:24] is the sub-list for method input_type
+	22, // 24: ec00.oa.v1.OwnerOperations.ListRequestsV2:input_type -> ec00.oa.v1.PageRequestV2
+	22, // 25: ec00.oa.v1.OwnerOperations.WatchV2:input_type -> ec00.oa.v1.PageRequestV2
+	3,  // 26: ec00.oa.v1.OwnerOperations.Publish:output_type -> ec00.oa.v1.MutationResult
+	3,  // 27: ec00.oa.v1.OwnerOperations.Revise:output_type -> ec00.oa.v1.MutationResult
+	3,  // 28: ec00.oa.v1.OwnerOperations.WithdrawDependent:output_type -> ec00.oa.v1.MutationResult
+	3,  // 29: ec00.oa.v1.OwnerOperations.ReportPerformed:output_type -> ec00.oa.v1.MutationResult
+	3,  // 30: ec00.oa.v1.OwnerOperations.Verify:output_type -> ec00.oa.v1.MutationResult
+	3,  // 31: ec00.oa.v1.OwnerOperations.DecideArtifact:output_type -> ec00.oa.v1.MutationResult
+	3,  // 32: ec00.oa.v1.OwnerOperations.Resolve:output_type -> ec00.oa.v1.MutationResult
+	3,  // 33: ec00.oa.v1.OwnerOperations.AcknowledgeContinuation:output_type -> ec00.oa.v1.MutationResult
+	11, // 34: ec00.oa.v1.OwnerOperations.ReadRequest:output_type -> ec00.oa.v1.RequestRead
+	13, // 35: ec00.oa.v1.OwnerOperations.ReadDependants:output_type -> ec00.oa.v1.DependantsRead
+	14, // 36: ec00.oa.v1.OwnerOperations.ReadArtifact:output_type -> ec00.oa.v1.ArtifactRead
+	16, // 37: ec00.oa.v1.OwnerOperations.ListRequests:output_type -> ec00.oa.v1.RequestPage
+	18, // 38: ec00.oa.v1.OwnerOperations.Watch:output_type -> ec00.oa.v1.WatchPage
+	16, // 39: ec00.oa.v1.OwnerOperations.ListRequestsV2:output_type -> ec00.oa.v1.RequestPage
+	18, // 40: ec00.oa.v1.OwnerOperations.WatchV2:output_type -> ec00.oa.v1.WatchPage
+	26, // [26:41] is the sub-list for method output_type
+	11, // [11:26] is the sub-list for method input_type
 	11, // [11:11] is the sub-list for extension type_name
 	11, // [11:11] is the sub-list for extension extendee
 	0,  // [0:11] is the sub-list for field type_name
@@ -1882,13 +1947,14 @@ func file_oa_v1_proto_init() {
 	file_oa_v1_proto_msgTypes[15].OneofWrappers = []any{}
 	file_oa_v1_proto_msgTypes[17].OneofWrappers = []any{}
 	file_oa_v1_proto_msgTypes[20].OneofWrappers = []any{}
+	file_oa_v1_proto_msgTypes[21].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_oa_v1_proto_rawDesc), len(file_oa_v1_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   21,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -655,3 +655,57 @@ the pinned Nix toolchain. This establishes a tested representation repair for
 one candidate. Protobuf zero/absent limit behavior, native browser/Connect/proxy
 paths, TLS/authentication and representative workload/performance comparison
 remain open before the final ADR and foundation implementation.
+
+## Explicit read presence (18 October 2026)
+
+The zero/absent discrepancy above is now addressed by separate experimental
+`PageRequestV2`, `ListRequestsV2` and `WatchV2` identities. Both cursor and limit
+have protobuf presence. An absent limit defaults to two; explicit zero,
+negative or oversized limits are owner refusals. An absent cursor starts at the
+beginning; an explicit empty cursor is refused. The existing `PageRequest`,
+`ListRequests` and `Watch` retain their original zero/default and empty/reset
+behavior. These names remain in the disposable experiment's service namespace;
+they do not decide estate API version policy or the final IDL.
+
+Seven primary checks compare generated Python native gRPC and OpenAPI `/v2`
+clients, plus TypeScript generated protobuf messages over binary HTTP and the
+generated OpenAPI `/v2` client. TypeScript binary HTTP is a test bridge, not
+Connect, browser-native gRPC or a proxy qualification. Both read operations
+exercise absent, explicit zero, empty, one, negative and oversized inputs with
+actual serialized presence. Python checks ordered complete request/event fields
+against SQLite, bounded reconnect and identical-cursor replay after reopening
+the file, MAC/kind/principal/workspace/retention refusals, revoked identity,
+response loss before/after owner reads and unchanged request/event/idempotency
+rows. Malformed protobuf is rejected before owner invocation. A deliberately
+broken new handler that restores legacy defaulting is detected for both
+operations and both zero/empty cases.
+
+A separate native Go/Rust check runs the same twelve input cases per language,
+checks generated request bytes/presence, native status codes, exact generated
+response messages against Python and unchanged owner rows. It does not extend
+the Python reconnect/loss histories to every language. These native builds run
+locally in the locked Nix toolchain; hosted CI runs the seven primary checks and
+TypeScript type checking.
+
+The frozen old server and Python client in `compat/read-server-5d13` use six
+source/binding files byte-identical to landed commit
+`5d13baf05b1d90348c57481cb1cfc35a620cf615`, with pinned source/runner hashes.
+They run in separate processes with isolated import paths. Old clients retain
+identical legacy response bytes against old and new servers, including explicit
+empty/zero requests. New RPC calls to the old server return `UNIMPLEMENTED`;
+there is no automatic downgrade. Both direct fixture drift and coordinated
+fixture/manifest rehashing are rejected by the fixed manifest pin. These are
+loopback experiment fixtures, not a production rolling-upgrade deployment.
+
+Inside the pinned toolchain:
+
+```bash
+uv run --project tests/experiments/ec00/candidates --locked \
+  python -m unittest discover -s tests/experiments/ec00 -p read_presence_checks.py -v
+uv run --project tests/experiments/ec00/candidates --locked \
+  python -m unittest discover -s tests/experiments/ec00 -p read_presence_native_checks.py -v
+```
+
+Legacy lifecycle and versioned counter checks remain required. Browser/Connect,
+proxy/TLS/authentication, representative workloads and operational/performance
+comparison remain open before an architecture decision or foundation rollout.

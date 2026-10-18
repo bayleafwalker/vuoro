@@ -238,6 +238,20 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         try:
+            if self.path in {"/proto/v2/list-requests", "/proto/v2/watch"}:
+                from google.protobuf.message import DecodeError
+                try:
+                    request = v1_pb2.PageRequestV2.FromString(self._read())
+                except DecodeError:
+                    self._reply(400, b"", "application/protobuf")
+                    return
+                cursor = request.cursor if request.HasField("cursor") else None
+                limit = request.limit if request.HasField("limit") else 2
+                operation = "watch" if self.path.endswith("/watch") else "list_requests"
+                value = self._call_owner(operation, cursor, limit=limit)
+                result = self._proto_watch_page(value) if operation == "watch" else self._proto_request_page(value)
+                self._reply(200, result.SerializeToString(), "application/protobuf")
+                return
             operation_match = re.fullmatch(r"/v1/requests/([^/]+)/(withdraw|report|verify|artifact-decision|resolve|acknowledge)", self.path)
             if operation_match:
                 request_id, action = unquote(operation_match.group(1)), operation_match.group(2)
@@ -629,6 +643,22 @@ class _GrpcOwner(v1_pb2_grpc.OwnerOperationsServicer):
         try:
             return _Handler._proto_watch_page(self._call("watch", request.cursor or None,
                                         limit=request.limit or 2))
+        except Conflict as exc:
+            context.abort(grpc.StatusCode.ABORTED, str(exc))
+        except ResponseLost:
+            context.abort(grpc.StatusCode.UNAVAILABLE, "test harness response unavailable")
+
+    def ListRequestsV2(self, request: object, context: grpc.ServicerContext) -> object:
+        return _Handler._proto_request_page(self._read_v2("list_requests", request, context))
+
+    def WatchV2(self, request: object, context: grpc.ServicerContext) -> object:
+        return _Handler._proto_watch_page(self._read_v2("watch", request, context))
+
+    def _read_v2(self, operation: str, request: object, context: grpc.ServicerContext) -> dict[str, Any]:
+        cursor = request.cursor if request.HasField("cursor") else None
+        limit = request.limit if request.HasField("limit") else 2
+        try:
+            return self._call(operation, cursor, limit=limit)
         except Conflict as exc:
             context.abort(grpc.StatusCode.ABORTED, str(exc))
         except ResponseLost:

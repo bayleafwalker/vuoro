@@ -254,3 +254,11 @@ class PageRequest(_message.Message):
     cursor: str
     limit: int
     def __init__(self, cursor: _Optional[str] = ..., limit: _Optional[int] = ...) -> None: ...
+
+class PageRequestV2(_message.Message):
+    __slots__ = ("cursor", "limit")
+    CURSOR_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    cursor: str
+    limit: int
+    def __init__(self, cursor: _Optional[str] = ..., limit: _Optional[int] = ...) -> None: ...
