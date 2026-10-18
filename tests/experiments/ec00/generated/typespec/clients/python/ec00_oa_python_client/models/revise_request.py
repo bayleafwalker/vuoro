@@ -1,31 +1,44 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Self, TypeVar, cast
+from typing import Any, TypeVar, BinaryIO, TextIO, TYPE_CHECKING, Generator
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
+from ..types import UNSET, Unset
+from typing import cast
+
+
+
+
+
+
 T = TypeVar("T", bound="ReviseRequest")
+
 
 
 @_attrs_define
 class ReviseRequest:
     """
-    Attributes:
-        request_id (str): Decimal string identifier; preserved above JavaScript's safe integer range.
-        objective (str):
-        expected_revision (int | None | Unset):
-        note (None | str | Unset):
-    """
+        Attributes:
+            request_id (str): Decimal string identifier; preserved above JavaScript's safe integer range.
+            objective (str):
+            expected_revision (int | None | Unset):
+            note (None | str | Unset):
+     """
 
     request_id: str
     objective: str
     expected_revision: int | None | Unset = UNSET
     note: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+
+
+
+
 
     def to_dict(self) -> dict[str, Any]:
         request_id = self.request_id
@@ -44,14 +57,13 @@ class ReviseRequest:
         else:
             note = self.note
 
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update(
-            {
-                "requestId": request_id,
-                "objective": objective,
-            }
-        )
+        field_dict.update({
+            "requestId": request_id,
+            "objective": objective,
+        })
         if expected_revision is not UNSET:
             field_dict["expectedRevision"] = expected_revision
         if note is not UNSET:
@@ -59,8 +71,10 @@ class ReviseRequest:
 
         return field_dict
 
+
+
     @classmethod
-    def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
         request_id = d.pop("requestId")
 
@@ -75,6 +89,7 @@ class ReviseRequest:
 
         expected_revision = _parse_expected_revision(d.pop("expectedRevision", UNSET))
 
+
         def _parse_note(data: object) -> None | str | Unset:
             if data is None:
                 return data
@@ -84,12 +99,14 @@ class ReviseRequest:
 
         note = _parse_note(d.pop("note", UNSET))
 
+
         revise_request = cls(
             request_id=request_id,
             objective=objective,
             expected_revision=expected_revision,
             note=note,
         )
+
 
         revise_request.additional_properties = d
         return revise_request

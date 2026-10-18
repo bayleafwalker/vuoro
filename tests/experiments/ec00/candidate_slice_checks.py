@@ -17,6 +17,8 @@ sys.path.insert(0, str(ROOT / "tests/experiments/ec00/generated/protobuf/python"
 sys.path.insert(0, str(ROOT / "tests/experiments/ec00/generated/typespec/clients/python"))
 
 from oa import v1_pb2
+from oa import v1_pb2_grpc
+import grpc
 from ec00_oa_python_client.api.default import publish, revise
 from ec00_oa_python_client.client import Client
 from ec00_oa_python_client.models import PublishRequest, ReviseRequest
@@ -194,6 +196,44 @@ class CandidateSliceTests(unittest.TestCase):
                          json.loads(persisted_request(self.db_path, output["protoId"])[1]))
         self.assertEqual({"objective": "TypeSpec TypeScript revision", "note": None},
                          json.loads(persisted_request(self.db_path, output["httpId"])[1]))
+
+    def test_generated_python_grpc_client_uses_native_grpc_and_same_oracle(self) -> None:
+        channel = grpc.insecure_channel(self.server.grpc_target)
+        try:
+            stub = v1_pb2_grpc.OwnerOperationsStub(channel)
+            request_id = "9007199254741001"
+            result = stub.Publish(
+                v1_pb2.PublishRequest(request_id=request_id, objective="native gRPC publish",
+                                      note_null=0),
+                metadata=(("idempotency-key", "py-grpc-publish-large"),), timeout=5,
+            )
+            self.assertEqual((request_id, 1), (result.request_id, result.revision))
+            self.assertEqual({"objective": "native gRPC publish", "note": None},
+                             json.loads(persisted_request(self.db_path, request_id)[1]))
+
+            for expected, code, label in (
+                (None, grpc.StatusCode.INVALID_ARGUMENT, "absent"),
+                (0, grpc.StatusCode.ABORTED, "zero"),
+            ):
+                request = v1_pb2.ReviseRequest(request_id=request_id,
+                                               objective=f"native gRPC {label}")
+                if expected is not None:
+                    request.expected_revision = expected
+                with self.assertRaises(grpc.RpcError) as raised:
+                    stub.Revise(request, metadata=(("idempotency-key", f"py-grpc-revise-{label}"),),
+                                timeout=5)
+                self.assertEqual(code, raised.exception.code())
+
+            revised = stub.Revise(
+                v1_pb2.ReviseRequest(request_id=request_id, expected_revision=1,
+                                     objective="native gRPC revision", note=""),
+                metadata=(("idempotency-key", "py-grpc-revise-valid"),), timeout=5,
+            )
+            self.assertEqual(2, revised.revision)
+            self.assertEqual({"objective": "native gRPC revision", "note": ""},
+                             json.loads(persisted_request(self.db_path, request_id)[1]))
+        finally:
+            channel.close()
 
 
 if __name__ == "__main__":

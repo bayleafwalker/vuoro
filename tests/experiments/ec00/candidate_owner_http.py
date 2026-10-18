@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from concurrent import futures
 import json
 from pathlib import Path
 import re
@@ -12,6 +13,8 @@ from urllib.parse import unquote
 
 from owner_oracle import Conflict, OwnerOracle
 from oa import v1_pb2
+from oa import v1_pb2_grpc
+import grpc
 
 
 class _Server(ThreadingHTTPServer):
@@ -153,20 +156,84 @@ class CandidateOwnerServer:
         self.db_path = db_path
         self.httpd = _Server(db_path)
         self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+        self.grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
+        v1_pb2_grpc.add_OwnerOperationsServicer_to_server(_GrpcOwner(self), self.grpc_server)
+        self.grpc_port = self.grpc_server.add_insecure_port("127.0.0.1:0")
+        if not self.grpc_port:
+            raise RuntimeError("could not bind disposable gRPC loopback listener")
 
     @property
     def base_url(self) -> str:
         host, port = self.httpd.server_address
         return f"http://{host}:{port}"
 
+    @property
+    def grpc_target(self) -> str:
+        return f"127.0.0.1:{self.grpc_port}"
+
     def __enter__(self) -> "CandidateOwnerServer":
         self.thread.start()
+        self.grpc_server.start()
         return self
 
     def __exit__(self, *_: object) -> None:
+        self.grpc_server.stop(grace=0).wait(timeout=5)
         self.httpd.shutdown()
         self.httpd.server_close()
         self.thread.join(timeout=5)
+
+
+class _GrpcOwner(v1_pb2_grpc.OwnerOperationsServicer):
+    """Native gRPC test transport delegating to the same SQLite OwnerOracle."""
+
+    def __init__(self, harness: CandidateOwnerServer):
+        self.harness = harness
+
+    @staticmethod
+    def _body(message: object) -> dict[str, Any]:
+        body: dict[str, Any] = {"objective": message.objective}
+        note_kind = message.WhichOneof("note_value")
+        if note_kind == "note":
+            body["note"] = message.note
+        elif note_kind == "note_null":
+            body["note"] = None
+        return body
+
+    @staticmethod
+    def _idempotency_key(context: grpc.ServicerContext) -> str:
+        for key, value in context.invocation_metadata():
+            if key.lower() == "idempotency-key":
+                return value
+        return ""
+
+    def Publish(self, request: object, context: grpc.ServicerContext) -> object:
+        if not _valid_id(request.request_id) or not request.HasField("objective"):
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "request_id and objective are required")
+        try:
+            result = self._call("publish", request.request_id, self._body(request), ["work-a"],
+                                self._idempotency_key(context))
+        except Conflict as exc:
+            context.abort(grpc.StatusCode.ABORTED, str(exc))
+        return v1_pb2.MutationResult(request_id=result["request_id"], revision=result["revision"])
+
+    def Revise(self, request: object, context: grpc.ServicerContext) -> object:
+        if (not _valid_id(request.request_id) or not request.HasField("objective")
+                or not request.HasField("expected_revision")):
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT,
+                          "request_id, objective and expected_revision are required")
+        try:
+            result = self._call("revise", request.request_id, request.expected_revision,
+                                self._body(request), self._idempotency_key(context))
+        except Conflict as exc:
+            context.abort(grpc.StatusCode.ABORTED, str(exc))
+        return v1_pb2.MutationResult(request_id=result["request_id"], revision=result["revision"])
+
+    def _call(self, operation: str, *args: Any) -> dict[str, Any]:
+        owner = OwnerOracle.connect_as(self.harness.db_path, "requester-a")
+        try:
+            return getattr(owner, operation)(*args)
+        finally:
+            owner.close()
 
 
 def initialize_fixture(path: Path) -> None:
