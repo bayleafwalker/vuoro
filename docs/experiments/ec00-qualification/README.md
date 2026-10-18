@@ -136,8 +136,15 @@ The predeclared cases in this slice are:
 - TypeSpec/OpenAPI optional and nullable `expectedRevision`: absent and `null`
   are refused before the owner call, zero reaches the owner's stale-revision
   refusal, and revision 1 succeeds; and
-- optional note presence: protobuf absent versus empty string, and OpenAPI
-  absent versus explicit `null` are carried into the persisted request body.
+- optional nullable note semantics through both representations: absent,
+  present empty string and explicit `null` reach the same persisted JSON
+  shapes. The protobuf candidate uses a oneof with a `NullValue` arm to encode
+  `null`; OpenAPI uses its optional nullable string field.
+
+The `expectedRevision: null` case is exercised only in the OpenAPI arm because
+the protobuf candidate models `expected_revision` as an optional `int64`, which
+has absence and integer values but no scalar `null`. Both arms exercise absent,
+zero and valid expected revisions.
 
 The Python and TypeScript clients both exercise both candidate representations
 against one actual SQLite oracle per test. This proves only the shown

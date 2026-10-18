@@ -4,13 +4,15 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { NullValue } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_struct } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file oa.v1.proto.
  */
 export const file_oa_v1: GenFile = /*@__PURE__*/
-  fileDesc("CgtvYS52MS5wcm90bxIKZWMwMC5vYS52MSJmCg5QdWJsaXNoUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEhYKCW9iamVjdGl2ZRgCIAEoCUgAiAEBEhEKBG5vdGUYAyABKAlIAYgBAUIMCgpfb2JqZWN0aXZlQgcKBV9ub3RlIpsBCg1SZXZpc2VSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSHgoRZXhwZWN0ZWRfcmV2aXNpb24YAiABKANIAIgBARIWCglvYmplY3RpdmUYAyABKAlIAYgBARIRCgRub3RlGAQgASgJSAKIAQFCFAoSX2V4cGVjdGVkX3JldmlzaW9uQgwKCl9vYmplY3RpdmVCBwoFX25vdGUiNgoOTXV0YXRpb25SZXN1bHQSEgoKcmVxdWVzdF9pZBgBIAEoCRIQCghyZXZpc2lvbhgCIAEoAzKVAQoPT3duZXJPcGVyYXRpb25zEkEKB1B1Ymxpc2gSGi5lYzAwLm9hLnYxLlB1Ymxpc2hSZXF1ZXN0GhouZWMwMC5vYS52MS5NdXRhdGlvblJlc3VsdBI/CgZSZXZpc2USGS5lYzAwLm9hLnYxLlJldmlzZVJlcXVlc3QaGi5lYzAwLm9hLnYxLk11dGF0aW9uUmVzdWx0YgZwcm90bzM");
+  fileDesc("CgtvYS52MS5wcm90bxIKZWMwMC5vYS52MSKZAQoOUHVibGlzaFJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIWCglvYmplY3RpdmUYAiABKAlIAYgBARIOCgRub3RlGAMgASgJSAASLwoJbm90ZV9udWxsGAQgASgOMhouZ29vZ2xlLnByb3RvYnVmLk51bGxWYWx1ZUgAQgwKCm5vdGVfdmFsdWVCDAoKX29iamVjdGl2ZSLOAQoNUmV2aXNlUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEh4KEWV4cGVjdGVkX3JldmlzaW9uGAIgASgDSAGIAQESFgoJb2JqZWN0aXZlGAMgASgJSAKIAQESDgoEbm90ZRgEIAEoCUgAEi8KCW5vdGVfbnVsbBgFIAEoDjIaLmdvb2dsZS5wcm90b2J1Zi5OdWxsVmFsdWVIAEIMCgpub3RlX3ZhbHVlQhQKEl9leHBlY3RlZF9yZXZpc2lvbkIMCgpfb2JqZWN0aXZlIjYKDk11dGF0aW9uUmVzdWx0EhIKCnJlcXVlc3RfaWQYASABKAkSEAoIcmV2aXNpb24YAiABKAMylQEKD093bmVyT3BlcmF0aW9ucxJBCgdQdWJsaXNoEhouZWMwMC5vYS52MS5QdWJsaXNoUmVxdWVzdBoaLmVjMDAub2EudjEuTXV0YXRpb25SZXN1bHQSPwoGUmV2aXNlEhkuZWMwMC5vYS52MS5SZXZpc2VSZXF1ZXN0GhouZWMwMC5vYS52MS5NdXRhdGlvblJlc3VsdGIGcHJvdG8z", [file_google_protobuf_struct]);
 
 /**
  * @generated from message ec00.oa.v1.PublishRequest
@@ -30,9 +32,21 @@ export type PublishRequest = Message<"ec00.oa.v1.PublishRequest"> & {
   objective?: string | undefined;
 
   /**
-   * @generated from field: optional string note = 3;
+   * @generated from oneof ec00.oa.v1.PublishRequest.note_value
    */
-  note?: string | undefined;
+  noteValue: {
+    /**
+     * @generated from field: string note = 3;
+     */
+    value: string;
+    case: "note";
+  } | {
+    /**
+     * @generated from field: google.protobuf.NullValue note_null = 4;
+     */
+    value: NullValue;
+    case: "noteNull";
+  } | { case: undefined; value?: undefined };
 };
 
 /**
@@ -62,9 +76,21 @@ export type ReviseRequest = Message<"ec00.oa.v1.ReviseRequest"> & {
   objective?: string | undefined;
 
   /**
-   * @generated from field: optional string note = 4;
+   * @generated from oneof ec00.oa.v1.ReviseRequest.note_value
    */
-  note?: string | undefined;
+  noteValue: {
+    /**
+     * @generated from field: string note = 4;
+     */
+    value: string;
+    case: "note";
+  } | {
+    /**
+     * @generated from field: google.protobuf.NullValue note_null = 5;
+     */
+    value: NullValue;
+    case: "noteNull";
+  } | { case: undefined; value?: undefined };
 };
 
 /**

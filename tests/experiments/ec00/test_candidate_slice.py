@@ -65,6 +65,17 @@ class CandidateSliceTests(unittest.TestCase):
         self.assertEqual(200, status)
         self.assertEqual({"objective": ""}, json.loads(persisted_request(self.db_path, empty_objective_id)[1]))
 
+        proto_null_note_id = "9007199254740998"
+        status, _ = _protobuf_call(
+            self.server.base_url + "/proto/v1/requests", "POST",
+            v1_pb2.PublishRequest(request_id=proto_null_note_id, objective="protobuf null note",
+                                  note_null=0),
+            "py-proto-publish-null-note",
+        )
+        self.assertEqual(200, status)
+        self.assertEqual({"objective": "protobuf null note", "note": None},
+                         json.loads(persisted_request(self.db_path, proto_null_note_id)[1]))
+
         proto_id = "9007199254740993"
         status, raw = _protobuf_call(
             self.server.base_url + "/proto/v1/requests", "POST",
@@ -111,6 +122,16 @@ class CandidateSliceTests(unittest.TestCase):
         self.assertEqual(http_id, response.parsed.request_id)
         self.assertEqual({"objective": "OpenAPI Python publish", "note": None},
                          json.loads(persisted_request(self.db_path, http_id)[1]))
+        http_empty_note_id = "9007199254740999"
+        empty_note = publish.sync_detailed(
+            client=Client(base_url=self.server.base_url,
+                          headers={"Idempotency-Key": "py-http-publish-note-empty"},
+                          raise_on_unexpected_status=False),
+            body=PublishRequest(request_id=http_empty_note_id, objective="OpenAPI Python empty note", note=""),
+        )
+        self.assertEqual(200, empty_note.status_code)
+        self.assertEqual({"objective": "OpenAPI Python empty note", "note": ""},
+                         json.loads(persisted_request(self.db_path, http_empty_note_id)[1]))
         http_absent_note_id = "9007199254740997"
         absent_note_client = Client(base_url=self.server.base_url,
                                     headers={"Idempotency-Key": "py-http-publish-note-unset"},
@@ -160,10 +181,15 @@ class CandidateSliceTests(unittest.TestCase):
             output["protoAbsentStatus"], output["protoZeroStatus"],
             output["httpAbsentStatus"], output["httpNullStatus"], output["httpZeroStatus"],
         ))
-        for request_id in (output["protoId"], output["httpId"]):
+        for request_id in (output["protoId"], output["httpId"], output["protoNullNoteId"],
+                           output["httpEmptyNoteId"]):
             self.assertIsNotNone(persisted_request(self.db_path, request_id))
+        self.assertEqual({"objective": "protobuf TypeScript null note", "note": None},
+                         json.loads(persisted_request(self.db_path, output["protoNullNoteId"])[1]))
         self.assertEqual({"objective": "TypeSpec TypeScript absent note"},
                          json.loads(persisted_request(self.db_path, output["httpAbsentNoteId"])[1]))
+        self.assertEqual({"objective": "TypeSpec TypeScript empty note", "note": ""},
+                         json.loads(persisted_request(self.db_path, output["httpEmptyNoteId"])[1]))
         self.assertEqual({"objective": "protobuf TypeScript revision", "note": ""},
                          json.loads(persisted_request(self.db_path, output["protoId"])[1]))
         self.assertEqual({"objective": "TypeSpec TypeScript revision", "note": None},

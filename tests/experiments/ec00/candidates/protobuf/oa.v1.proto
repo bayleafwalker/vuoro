@@ -2,19 +2,27 @@ syntax = "proto3";
 
 package ec00.oa.v1;
 
+import "google/protobuf/struct.proto";
+
 message PublishRequest {
   // OA item identifiers are decimal strings so JavaScript clients do not round
   // values above Number.MAX_SAFE_INTEGER.
   string request_id = 1;
   optional string objective = 2;
-  optional string note = 3;
+  oneof note_value {
+    string note = 3;
+    google.protobuf.NullValue note_null = 4;
+  }
 }
 
 message ReviseRequest {
   string request_id = 1;
   optional int64 expected_revision = 2;
   optional string objective = 3;
-  optional string note = 4;
+  oneof note_value {
+    string note = 4;
+    google.protobuf.NullValue note_null = 5;
+  }
 }
 
 message MutationResult {

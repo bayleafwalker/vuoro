@@ -86,8 +86,6 @@ def main() -> int:
         if installed != expected or locked != expected:
             raise SystemExit(f"npm package version mismatch: {package}: installed={installed}, locked={locked}")
     env = dict(os.environ, PATH=f"{node.parent}:{npm_bin}:{os.environ['PATH']}")
-    run([str(npm_bin / "tsc"), "--project", str(CANDIDATES / "tsconfig.json")],
-        cwd=CANDIDATES, env=env)
     with tempfile.TemporaryDirectory(prefix="ec00-generation-") as tmp:
         out = Path(tmp)
         openapi_dir = out / "openapi"
@@ -110,7 +108,8 @@ def main() -> int:
              "--path", str(openapi), "--output-path", str(tsp_py),
              "--config", str(CANDIDATES / "openapi-python-client.yaml"), "--overwrite"],
             cwd=CANDIDATES, env=env)
-        run([str(protoc), f"-I{CANDIDATES / 'protobuf'}", f"--python_out={proto_py}",
+        run([str(protoc), f"-I{CANDIDATES / 'protobuf'}",
+             f"-I{protoc.parent.parent / 'include'}", f"--python_out={proto_py}",
              f"--pyi_out={proto_py}", f"--plugin=protoc-gen-es={npm_bin / 'protoc-gen-es'}",
              f"--es_out={proto_ts}", "--es_opt=target=ts", str(CANDIDATES / "protobuf/oa.v1.proto")],
             cwd=CANDIDATES, env=env)
@@ -132,6 +131,8 @@ def main() -> int:
                 shutil.rmtree(destination, ignore_errors=True)
                 shutil.copytree(source, destination,
                                 ignore=shutil.ignore_patterns(".ruff_cache", "__pycache__"))
+            run([str(npm_bin / "tsc"), "--project", str(CANDIDATES / "tsconfig.json")],
+                cwd=CANDIDATES, env=env)
             print("generated outputs updated")
             return 0
 
@@ -144,6 +145,8 @@ def main() -> int:
                 drift.append(relative)
         if drift:
             raise SystemExit("generated output drift: " + ", ".join(drift) + "; rerun with --write")
+        run([str(npm_bin / "tsc"), "--project", str(CANDIDATES / "tsconfig.json")],
+            cwd=CANDIDATES, env=env)
     print("all generated outputs match pinned inputs and toolchains")
     return 0
 

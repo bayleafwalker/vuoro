@@ -39,6 +39,17 @@ const emptyObjective = await protoRequest(
   "proto-publish-empty-objective",
 );
 await assertStatus(emptyObjective, 200, "protobuf present empty objective");
+const protoNullNoteId = "9007199254740998";
+const protoNullNote = await protoRequest(
+  "/proto/v1/requests",
+  toBinary(PublishRequestSchema, create(PublishRequestSchema, {
+    requestId: protoNullNoteId,
+    objective: "protobuf TypeScript null note",
+    noteValue: { case: "noteNull", value: 0 },
+  })),
+  `proto-publish-null-note-${protoNullNoteId}`,
+);
+await assertStatus(protoNullNote, 200, "protobuf explicit null note");
 const protoPublished = await protoRequest(
   "/proto/v1/requests",
   toBinary(PublishRequestSchema, create(PublishRequestSchema, {
@@ -80,7 +91,7 @@ const protoRevised = await protoRequest(
     requestId: protoId,
     expectedRevision: 1n,
     objective: "protobuf TypeScript revision",
-    note: "",
+    noteValue: { case: "note", value: "" },
   })),
   `proto-revise-one-${protoId}`,
   "PATCH",
@@ -91,6 +102,7 @@ if (protoRevisedResult.revision !== 2n) throw new Error("protobuf revise result 
 
 const httpId = "9007199254740995";
 const httpAbsentNoteId = "9007199254740997";
+const httpEmptyNoteId = "9007199254740999";
 const httpPub = await publish({
   client: createClient({ baseUrl, headers: { "Idempotency-Key": `http-publish-${httpId}` } }),
   body: { requestId: httpId, objective: "TypeSpec TypeScript publish", note: null },
@@ -104,6 +116,13 @@ const httpAbsentNote = await publish({
 });
 if (httpAbsentNote.error || httpAbsentNote.data?.requestId !== httpAbsentNoteId) {
   throw new Error(`OpenAPI TypeScript absent-note publish mismatch: ${JSON.stringify(httpAbsentNote)}`);
+}
+const httpEmptyNote = await publish({
+  client: createClient({ baseUrl, headers: { "Idempotency-Key": `http-publish-note-empty-${httpEmptyNoteId}` } }),
+  body: { requestId: httpEmptyNoteId, objective: "TypeSpec TypeScript empty note", note: "" },
+});
+if (httpEmptyNote.error || httpEmptyNote.data?.requestId !== httpEmptyNoteId) {
+  throw new Error(`OpenAPI TypeScript empty-note publish mismatch: ${JSON.stringify(httpEmptyNote)}`);
 }
 
 async function httpRevise(expectedRevision: number | null | undefined, key: string) {
@@ -135,6 +154,7 @@ if (httpGood.error || httpGood.data?.revision !== 2) {
   throw new Error(`OpenAPI TypeScript revise mismatch: ${JSON.stringify(httpGood)}`);
 }
 
-console.log(JSON.stringify({ protoId, protoRevision: Number(protoRevisedResult.revision), httpId, httpAbsentNoteId,
+console.log(JSON.stringify({ protoId, protoRevision: Number(protoRevisedResult.revision), protoNullNoteId,
+  httpId, httpAbsentNoteId, httpEmptyNoteId,
   httpRevision: httpGood.data.revision, protoAbsentStatus: protoAbsent.status,
   protoZeroStatus: protoZero.status, httpAbsentStatus: 422, httpNullStatus: 422, httpZeroStatus: 409 }));

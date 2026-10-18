@@ -75,8 +75,10 @@ class _Handler(BaseHTTPRequestHandler):
                     self._reply(422, b"", "application/protobuf")
                     return
                 owner_body = {"objective": message.objective}
-                if message.HasField("note"):
+                if message.WhichOneof("note_value") == "note":
                     owner_body["note"] = message.note
+                elif message.WhichOneof("note_value") == "note_null":
+                    owner_body["note"] = None
                 result = self._call_owner("publish", message.request_id, owner_body, ["work-a"],
                                           self.headers.get("Idempotency-Key", ""))
                 self._reply(200, v1_pb2.MutationResult(
@@ -123,8 +125,10 @@ class _Handler(BaseHTTPRequestHandler):
                     self._reply(422, b"", "application/protobuf")
                     return
                 owner_body = {"objective": message.objective}
-                if message.HasField("note"):
+                if message.WhichOneof("note_value") == "note":
                     owner_body["note"] = message.note
+                elif message.WhichOneof("note_value") == "note_null":
+                    owner_body["note"] = None
                 result = self._call_owner("revise", request_id, message.expected_revision, owner_body,
                                           self.headers.get("Idempotency-Key", ""))
                 self._reply(200, v1_pb2.MutationResult(
