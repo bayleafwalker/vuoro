@@ -427,6 +427,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(404, {"error": "not found"})
         except Conflict as exc:
             self._json(409, {"error": str(exc)})
+        except ResponseLost:
+            self.close_connection = True
         except (ValueError, TypeError, KeyError) as exc:
             self._json(400, {"error": str(exc)})
 
@@ -624,8 +626,13 @@ class _GrpcOwner(v1_pb2_grpc.OwnerOperationsServicer):
                                     limit=request.limit or 2))
 
     def Watch(self, request: object, context: grpc.ServicerContext) -> object:
-        return _Handler._proto_watch_page(self._call("watch", request.cursor or None,
-                                    limit=request.limit or 2))
+        try:
+            return _Handler._proto_watch_page(self._call("watch", request.cursor or None,
+                                        limit=request.limit or 2))
+        except Conflict as exc:
+            context.abort(grpc.StatusCode.ABORTED, str(exc))
+        except ResponseLost:
+            context.abort(grpc.StatusCode.UNAVAILABLE, "test harness response unavailable")
 
     def _call(self, operation: str, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return self.harness.httpd.owner_call(operation, *args, **kwargs)

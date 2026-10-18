@@ -22,6 +22,11 @@ jobs:
           uv run --project tests/experiments/ec00/candidates --locked
           python -m unittest discover -s tests/experiments/ec00
           -p transport_failure_checks.py -v
+      - name: Compare unary watch replay, reconnect and refusal semantics
+        run: >-
+          uv run --project tests/experiments/ec00/candidates --locked
+          python -m unittest discover -s tests/experiments/ec00
+          -p watch_replay_checks.py -v
 
   native-settlement-demo:
     # Optional consumer against released immutable owners, outside workspace/image.
