@@ -76,3 +76,118 @@ and costs of unsuccessful work. Capture is case-level only; it does not
 establish coverage by individual source. Tests use synthetic records. No real accepted
 outcome sample, cross-provider superiority, accepted threshold policy, sustained
 commitment product, automatic re-evaluation, or authority expansion is qualified.
+
+## Supplied Sprintctl owner-record intake
+
+`vuoro_evidence.owner_outcome_intake.intake_owner_outcome(case)` adds a pure
+structural mapping into the existing `OutcomeObservation`. It performs no
+network or storage access, accepts no provider credentials, and cannot accept
+work. This is a supplied-record projection contract, not a Sprintctl export
+format or a claim that a production export has been qualified. Callers extract
+these fields from independently obtained records; the package has no Sprintctl
+runtime dependency.
+
+The envelope uses `schema_version: vuoro-owner-outcome-intake/v1`. Required
+fields are `case_id`, unique nonempty `run_ids`, `owner_record_ref`, unique
+nonempty `evidence_refs`, `evidence_class`, explicit `captured` (true, false or
+null), nonempty text `repository_id`, positive integer `item_id`, and `item`. Optional
+`decision`, `release` and `measurements` fields may be omitted. Unknown fields
+and malformed values fail validation rather than silently removing a case.
+References are nonempty opaque text without control characters. Their
+immutability, resolution and authenticity remain the caller's responsibility.
+
+The supplied projections contain these exact fields:
+
+| Projection | Fields |
+| --- | --- |
+| `item` | `repository_id`, `id`, `status`, `resolution`, `terminal_decision_id` |
+| `decision` | `repository_id`, `id`, `work_item_id`, `kind`, `release_digest` |
+| `release` | `repository_id`, `work_item_id`, `release_digest` |
+
+Repository scopes (native Sprintctl `repo_id` text) and item IDs must match the envelope. Item status uses Sprintctl's
+`pending`, `active`, `blocked` and `done` vocabulary. A Decision ID must match
+the item's terminal pointer. Release digests are compared as supplied 64-character
+lowercase hexadecimal strings: the adapter does not recompute or certify the
+owner's canonical digest. The optional Decision is the terminal Decision, not
+an arbitrary latest `revise` record.
+
+| Supplied owner facts | Observation disposition |
+| --- | --- |
+| Done/accepted item, matching terminal `accept` Decision and matching Release | `accepted` |
+| Done/rejected item, matching terminal `reject` Decision and any required Release join | `rejected` |
+| Open item with no terminal pointer, resolution or supplied terminal Decision | `pending` |
+| Missing or contradictory terminal joins, legacy done, withdrawn or superseded | `unknown` |
+
+Rejection may omit a Release when its Decision has no Release digest; acceptance
+requires one. Provider completion, an accepted effect intent, an applied attempt,
+or a matching receipt alone cannot supply this terminal work join. An effect
+acceptance snapshot is insufficient input for this adapter.
+
+The result retains `observation`, `join_status` (`consistent`, `incomplete` or
+`conflicting`), stable `reason_codes`, a detached `supplied_records` copy,
+`measurement_provenance` and `limitations`. Every result explicitly states
+`source_verification: not_performed_by_this_package`. Even a consistent accepted
+join means **structural mapping of supplied owner records**, under the existing
+learning package's external-source trust contract. It is not authenticated
+acceptance. Missing records produce an incomplete join, contradictory supplied
+facts a conflicting join; both map to unknown. Known independent measurements
+remain usable for population burden. Measurement exclusions do not change the
+owner join status.
+
+Reasons include `terminal-decision-missing`, `terminal-decision-id-mismatch`,
+`decision-item-mismatch`, `decision-kind-resolution-mismatch`,
+`release-record-missing`, `release-item-mismatch`, `release-digest-mismatch`,
+`legacy-terminal-unqualified`, `terminal-disposition-unmapped`,
+`measurement-provenance-missing` and `measurement-coverage-incomplete`.
+Caller-supplied capture is preserved independently of join status; it is a
+case-level capture observation, not source verification.
+
+### Supplied measurements and retained sidecar
+
+`measurements` maps any of `acceptance_seconds`, `review_seconds`,
+`rework_seconds`, `recovery_seconds` and `known_cost` to:
+
+```json
+{
+  "value": 60,
+  "unit": "seconds",
+  "coverage": "complete",
+  "source_ref": "owner:measurement@immutable-revision",
+  "window": {
+    "start": "2026-10-17T12:00:00Z",
+    "end": "2026-10-17T12:05:00Z"
+  }
+}
+```
+
+Effort values are nonnegative integer seconds; cost uses an exact nonnegative
+**decimal string** and an uppercase three-letter currency unit, such as
+`"value": "0.10", "unit": "EUR"`. One case has at most one supplied cost.
+No conversion, rate inference or combination of currencies occurs in intake.
+Measurements remain caller reports even with complete provenance. The window
+must contain supplied UTC timestamps in nondecreasing order; no duration is
+inferred from those timestamps or provider completion.
+
+Only complete coverage with both a source reference and a window maps to a
+scalar. Partial or unknown coverage, absent provenance, and unqualified
+acceptance time map to `None`, with the original supplied measurement and
+exclusion reasons retained in `measurement_provenance`. Unknown is never zero.
+`acceptance_seconds` additionally requires the structurally mapped accepted
+disposition. Qualified review, rework, recovery and cost remain attached to
+rejected, pending and unknown cases.
+
+Pass **all** intake observations into the existing `ExperimentRecord`, preserve
+its original `expected_case_ids`, and carry intake limitations into the record's
+`limitations`. Retain intake results alongside the summary: the existing summary
+does not propagate measurement windows, supplied projections or exclusion
+sidecars. The adapter cannot choose a smaller population, authenticate a
+registration, set a review threshold or rank workflows.
+
+The synthetic `test_owner_outcome_intake.py` fixtures check identity/digest
+mismatches, absent joins, unsupported terminal states, independent capture,
+measurement exclusions, exact cost and integration with the existing summary.
+The mixed-population example preserves one unknown conflicting case and one
+missing case while separating accepted, captured and expected counts. This
+qualifies the supplied-input software contract only. Real source authentication,
+representative outcome samples, recovery-effort comparisons and causal workflow
+claims still require independent evidence.
