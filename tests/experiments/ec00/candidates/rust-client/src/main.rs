@@ -106,7 +106,7 @@ async fn big_read(eps:&HashMap<String,Endpoint>,a:&Artifact)->Result<(),Box<dyn 
     if r.revision!=a.revision||r.material_revision!=a.material_revision||r.created_seq!=a.sequence||art.artifact_digest!=a.artifact_digest||art.key_id!=a.key_id||!art.original_bytes.is_empty()||art.envelope_bytes!=STANDARD.decode(&a.envelope_bytes)?||art.signature!=STANDARD.decode(&a.signature)?{return Err(format!("Rust HTTP exact int64 read mismatch {r:?} {art:?}").into())}
     let mut c=grpc_connect(&eps["verifier-a"].grpc).await?;
     let pr=c.read_request(grpc_request(oa::RequestById{request_id:a.request_id.clone()},"rust-big-read-proto")?).await?.into_inner();
-    let pa=c.read_artifact(grpc_request(oa::ReadArtifactRequest{request_id:a.request_id.clone(),material_revision:9007199254740995},"rust-big-artifact-proto")?).await?.into_inner();
+    let pa=c.read_artifact(grpc_request(oa::ReadArtifactRequest{request_id:a.request_id.clone(),material_revision:a.material_revision.parse::<i64>()?},"rust-big-artifact-proto")?).await?.into_inner();
     if pr.revision.to_string()!=a.revision||pr.material_revision.to_string()!=a.material_revision||pr.created_seq.to_string()!=a.sequence||pa.artifact_digest!=a.artifact_digest||pa.key_id!=a.key_id||!pa.original_bytes.is_empty()||pa.envelope_bytes!=STANDARD.decode(&a.envelope_bytes)?||pa.signature!=STANDARD.decode(&a.signature)?{return Err(format!("Rust protobuf exact int64 read mismatch {pr:?}").into())}
     Ok(())
 }

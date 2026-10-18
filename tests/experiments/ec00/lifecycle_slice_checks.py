@@ -464,6 +464,7 @@ class LifecycleSliceTests(unittest.TestCase):
         material_revision = fixture["material_revision"]
         sequence = fixture["sequence"]
         signed = fixture["signed"]
+        self.assertGreaterEqual(revision, material_revision)
         with CandidateOwnerServer(self.db_path, principal_id="requester-a") as server:
             request_doc = self.parsed(read_request.sync_detailed(
                 request_id, client=self.http_client(server.base_url)))

@@ -241,8 +241,8 @@ if (artifactWire) {
       artifact_digest: string; key_id: string; original_bytes: string;
       envelope_bytes: string; signature: string;
     };
-    const largeRevision = "9007199254740993";
-    const largeMaterialRevision = "9007199254740995";
+    const largeRevision = "9007199254740995";
+    const largeMaterialRevision = "9007199254740993";
     const largeSequence = "9007199254740997";
     const client = createClient({ baseUrl });
     const request = await readRequest({ client, path: { requestId: bigReadId } });

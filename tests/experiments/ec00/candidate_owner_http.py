@@ -650,9 +650,11 @@ def initialize_fixture(path: Path) -> None:
 def seed_typed_read_fixture(path: Path) -> dict[str, Any]:
     """Seed exact int64 and empty-original-bytes read values for generated clients."""
     request_id = "9007199254741199"
-    revision = 9007199254740993
-    material_revision = 9007199254740995
+    revision = 9007199254740995
+    material_revision = 9007199254740993
     sequence = 9007199254740997
+    if revision < material_revision:
+        raise ValueError("aggregate revision cannot precede the material revision")
     body = {"objective": "typed int64 read fixture"}
     signed = make_signed_artifact(workspace_id="workspace-a", request_id=request_id,
         material_revision=material_revision, material_digest=material_digest(body), original_bytes=b"")

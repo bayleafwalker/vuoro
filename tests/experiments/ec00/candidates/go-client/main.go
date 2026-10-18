@@ -179,7 +179,11 @@ func runBigRead(eps map[string]endpoint, a artifactFixture) error {
 		if x != nil {
 			return x
 		}
-		pa, x := client.ReadArtifact(ctx, &pb.ReadArtifactRequest{RequestId: a.RequestID, MaterialRevision: 9007199254740995})
+		materialRevision, parseErr := strconv.ParseInt(a.MaterialRevision, 10, 64)
+		if parseErr != nil {
+			return parseErr
+		}
+		pa, x := client.ReadArtifact(ctx, &pb.ReadArtifactRequest{RequestId: a.RequestID, MaterialRevision: materialRevision})
 		if x != nil {
 			return x
 		}
