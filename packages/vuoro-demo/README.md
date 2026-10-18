@@ -6,6 +6,42 @@ client transport behavior. Install the wheel in a fresh Python 3.12 environment;
 its metadata binds released client 0.1.2, service 0.1.92 and Sprintctl 0.18.0
 artifacts by URL and SHA256. PostgreSQL 16 tools and Git must be installed.
 
+Run as a **non-root Unix user**. From this checkout, install the optional
+consumer into its own environment (it is intentionally outside the development
+workspace and production image):
+
+```sh
+uv venv /tmp/vuoro-demo-env
+uv pip install --no-config --python /tmp/vuoro-demo-env/bin/python ./packages/vuoro-demo
+/tmp/vuoro-demo-env/bin/vuoro doctor --pg-bin /path/to/postgresql16/bin
+/tmp/vuoro-demo-env/bin/vuoro demo --pg-bin /path/to/postgresql16/bin --receipt proof.json
+```
+
+`vuoro doctor --json` emits `vuoro-demo-preflight/v1` and exits 0 when its
+prerequisite checks pass, otherwise 1. An explicit `--pg-bin` never falls back
+to PostgreSQL on PATH. Both `initdb` and `pg_ctl` must report major version 16.
+The check runs only tool version probes and reads installed package metadata;
+it starts no database or service and creates no fixture state. A ready report
+does not prove settlement, available disk space, or a working live deployment.
+Only the demo's receipt records its executed scenario and cleanup outcome.
+
+For a checkoutless run of the **existing source-pinned demo**, use the public
+revision below. This historical revision exposes `demo`, not the new `doctor`
+command. `uvx` builds the optional consumer from that exact Git revision and
+installs its hash-pinned released owner/client dependencies; this is a source
+install, not a published `vuoro-demo` release wheel.
+
+```sh
+uvx --from 'vuoro-demo @ git+https://github.com/bayleafwalker/vuoro.git@56248feb9c0ce155cc3337ef5f7e90e1c9e4d79b#subdirectory=packages/vuoro-demo' \
+  vuoro demo --pg-bin /path/to/postgresql16/bin --receipt proof.json
+```
+
+Use a fresh receipt filename. After a successful run, retain `proof.json` as
+the bounded evidence and remove the optional environment when finished. No
+account is required. Source: [bayleafwalker/vuoro](https://github.com/bayleafwalker/vuoro);
+work authority: [bayleafwalker/sprintctl](https://github.com/bayleafwalker/sprintctl).
+The unrelated CloudSprints project is not this work authority.
+
 ```sh
 vuoro demo --pg-bin /path/to/postgresql16/bin --receipt proof.json
 ```

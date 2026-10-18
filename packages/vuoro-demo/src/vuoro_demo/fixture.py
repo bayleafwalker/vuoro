@@ -4,11 +4,12 @@ from contextlib import contextmanager
 import os
 from pathlib import Path
 import secrets
-import shutil
 import socket
 import subprocess
 import threading
 import time
+
+from .preflight import postgres_tools
 
 
 def command(arguments: list[str], root: Path):
@@ -19,6 +20,8 @@ def command(arguments: list[str], root: Path):
 
 @contextmanager
 def fixture(root: Path, pg_bin: Path | None, *, state: dict):
+    state["cleanup"] = "not-started"
+    tools = postgres_tools(pg_bin)
     from sprintctl import pg
     from sprintctl.application import WorkApplication
     from sprintctl.vuoro_adapter import register_work_catalog
@@ -29,16 +32,6 @@ def fixture(root: Path, pg_bin: Path | None, *, state: dict):
     import uvicorn
     from .scenario import ENVIRONMENT, REPO
 
-    state["cleanup"] = "not-started"
-    tools = {}
-    for name in ("initdb", "pg_ctl"):
-        path = str(pg_bin / name) if pg_bin else shutil.which(name)
-        if not path or not Path(path).is_file():
-            raise ValueError("PostgreSQL 16 tools required; use --pg-bin; external DSNs are unsupported")
-        tools[name] = path
-    version = command([tools["initdb"], "--version"], root).stdout
-    if " 16." not in version:
-        raise ValueError("This qualified demo requires PostgreSQL 16")
     data, sock = root / "postgres", root / "socket"
     sock.mkdir(mode=0o700)
     command([tools["initdb"], "-D", str(data), "-U", "demo_migration",
