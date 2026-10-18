@@ -960,7 +960,7 @@ def test_direct_caller_cancellation_reaps_actual_group_before_loop_closes(tmp_pa
     def alive(pid):
         try:
             return Path(f"/proc/{pid}/stat").read_text().split()[2] != "Z"
-        except FileNotFoundError:
+        except (FileNotFoundError, ProcessLookupError):
             return False
 
     async def workflow():
