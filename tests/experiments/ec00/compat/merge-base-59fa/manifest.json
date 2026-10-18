@@ -1,0 +1,142 @@
+{
+  "purpose": "Frozen exact 59fa native-gRPC service, owner oracle, and generated Python protobuf stubs used only by the EC-00 common Publish/Revise compatibility check.",
+  "source_commit": "59fa6194baae21f15558b09522eaf98879989134",
+  "source_files": [
+    {
+      "path": "candidate_owner_http.py",
+      "sha256": "6b76c01eca9da39321044db7916ad716f7ec97e547dc3adde6319796bf5ed696"
+    },
+    {
+      "path": "owner_oracle.py",
+      "sha256": "752d3824e1b6be0ec6bcdcd672382f13705646f94ace1fa33a13e0c54338dc9f"
+    },
+    {
+      "path": "generated/protobuf/python/oa/v1_pb2.py",
+      "sha256": "0ad776f4dfb708808b440f73e136cdddcad95efaa9f138ee3c215dc0721c0c24"
+    },
+    {
+      "path": "generated/protobuf/python/oa/v1_pb2_grpc.py",
+      "sha256": "955b1da4125b80fb01346ea3895a82101feb2a4df6b634e612bb738c9152cfb8"
+    }
+  ],
+  "test_harness_files": [
+    "grpc_common_client.py",
+    "serve_old_grpc.py",
+    "ec00/candidates/go-client-compat/main.go",
+    "ec00/candidates/rust-client/src/bin/current_common_compat.rs"
+  ],
+  "go_rust_source_files": [
+    {
+      "path": "ec00/go.mod",
+      "sha256": "80a9a66b25a9b0a58a1824a006a8c71f6bff7c974d37eae8237aae606ba8d9f9"
+    },
+    {
+      "path": "ec00/go.sum",
+      "sha256": "b68e8b28a47210af1e5b0e2f59c9c48ca735a377ade2db5d4c2477398faa0440"
+    },
+    {
+      "path": "ec00/candidates/go-client/main.go",
+      "sha256": "ee803ee1fa9b3382094e95c82473c39307d36996d61423582c036cc706d37a08"
+    },
+    {
+      "path": "ec00/generated/protobuf/go/oa/v1/oa.v1.pb.go",
+      "sha256": "4c941af7388713d2591690f7a009682724e85a1acdbd1f895ce69ee3c395ded3"
+    },
+    {
+      "path": "ec00/generated/protobuf/go/oa/v1/oa.v1_grpc.pb.go",
+      "sha256": "dbd6039a9769b0f5073de238f3db24636e1c6b2b61a61fbd8112422ce79b2119"
+    },
+    {
+      "path": "ec00/generated/typespec/clients/go/api_default.go",
+      "sha256": "631c30a5cdb8ef4e5f08578fb49bfb307acbdc4140426ec247207b3f0ebb9da6"
+    },
+    {
+      "path": "ec00/generated/typespec/clients/go/client.go",
+      "sha256": "c9900be722d63d2ce9bedc30dea45b85884756773f742a4716ea06a847cc471a"
+    },
+    {
+      "path": "ec00/generated/typespec/clients/go/configuration.go",
+      "sha256": "283325194b8be7c43b3e81a2ff16031b325feb56fe1fc9f18f493122d18dcc84"
+    },
+    {
+      "path": "ec00/generated/typespec/clients/go/go.mod",
+      "sha256": "a6f48f40d8fa4b0b70f09ccaf433400a856e7bb82c976dcd086e234698c53546"
+    },
+    {
+      "path": "ec00/generated/typespec/clients/go/model_mutation_result.go",
+      "sha256": "efe7e06f1410acf4edea189322109c97c695eea21269393fafd29c361ad3c65f"
+    },
+    {
+      "path": "ec00/generated/typespec/clients/go/model_publish_request.go",
+      "sha256": "a8cf7c344bfa99f03b35df7acd47feeff0f1d9bcb0ac0260eb1237e3d17faa06"
+    },
+    {
+      "path": "ec00/generated/typespec/clients/go/model_revise_request.go",
+      "sha256": "eccbeb81bd727b0c62453cfcd1a691da625a23ba9e441e766ecefd4ed9c7f3ac"
+    },
+    {
+      "path": "ec00/generated/typespec/clients/go/response.go",
+      "sha256": "3018354425b5b941f3c4bd48600a155f0657165323a21e703e7643c93cf652fa"
+    },
+    {
+      "path": "ec00/generated/typespec/clients/go/utils.go",
+      "sha256": "a6b2438f2f61c1b6d1a98be53dd4c0b0f0f9ea97f279727206746d7fe52b53c8"
+    },
+    {
+      "path": "ec00/candidates/rust-client/Cargo.toml",
+      "sha256": "0b88900df7d23cf1073186efd2afb41d791913b8c0a1df430fe27a7abc8b026a"
+    },
+    {
+      "path": "ec00/candidates/rust-client/Cargo.lock",
+      "sha256": "eced3ab7123b42d54ddcab3651209c4d3b783935f85ddaf387dab9902fd69c8e"
+    },
+    {
+      "path": "ec00/candidates/rust-client/build.rs",
+      "sha256": "95b7b9edabc7abab02426a6887e915d57b6ccf55d9b1069c99ac9f69fbf6a7bf"
+    },
+    {
+      "path": "ec00/candidates/rust-client/src/main.rs",
+      "sha256": "15d0c71d38a187ce2874afb8833c4fa45e29cd2248ead03956a43f9864576161"
+    },
+    {
+      "path": "ec00/candidates/protobuf/oa.v1.proto",
+      "sha256": "501cf73bb6731facfcbe1a07c803e7e3343a1945e278ce1095966f32f89744f7"
+    },
+    {
+      "path": "ec00/generated/typespec/clients/rust/Cargo.toml",
+      "sha256": "749be7b4d109447d6754420ed7522e501f3b7984141db1d3205169abf8f1c93c"
+    },
+    {
+      "path": "ec00/generated/typespec/clients/rust/src/lib.rs",
+      "sha256": "590ed4d065b9647efa83aa34b02460309b71bdd141da66af9ebf75600e1e2a71"
+    },
+    {
+      "path": "ec00/generated/typespec/clients/rust/src/apis/mod.rs",
+      "sha256": "2832c038ad5e1e1a95e9dedb2d40a0a9a45ead36c1d7f25b6dbd0484530d3448"
+    },
+    {
+      "path": "ec00/generated/typespec/clients/rust/src/apis/configuration.rs",
+      "sha256": "f13940ac1741691c7a20faf527827ba3d48b51511d286e14a67d3c36d512696f"
+    },
+    {
+      "path": "ec00/generated/typespec/clients/rust/src/apis/default_api.rs",
+      "sha256": "d758e13225c5148d06fec80cd6f62e3bb2d85de7bf2afd15cc8aa93430555c72"
+    },
+    {
+      "path": "ec00/generated/typespec/clients/rust/src/models/mod.rs",
+      "sha256": "d5afdd6f97a2f7d55a859cda038d504ca311a7bb50fca992e7969563722e8018"
+    },
+    {
+      "path": "ec00/generated/typespec/clients/rust/src/models/mutation_result.rs",
+      "sha256": "719067a628a90acff50dc9f0e11e1d9aaee91c9442e04b6f6c9e34d15a8cc8d5"
+    },
+    {
+      "path": "ec00/generated/typespec/clients/rust/src/models/publish_request.rs",
+      "sha256": "06e0043e82b6bd944f68ec23ce2db3d6f16841e012a4fb6010d7c4e3e09057ec"
+    },
+    {
+      "path": "ec00/generated/typespec/clients/rust/src/models/revise_request.rs",
+      "sha256": "a92c0bc5a465d8c80af0187e65ea4b257bf3f400af7ea80a367e4cc39164a3b1"
+    }
+  ]
+}

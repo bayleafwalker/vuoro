@@ -164,7 +164,8 @@ class GeneratedGoRustClientTests(unittest.TestCase):
 
     def test_generated_rust_grpc_and_openapi_clients(self) -> None:
         manifest = HERE / "candidates/rust-client/Cargo.toml"
-        output = self.run_client(["cargo", "run", "--manifest-path", str(manifest), "--locked", "--quiet"], ROOT)
+        output = self.run_client(["cargo", "run", "--manifest-path", str(manifest), "--locked", "--quiet",
+                                  "--bin", "ec00-rust-client-check"], ROOT)
         self.assert_shared_results(output, "rust", "9007199254741021", "9007199254741023")
 
 

@@ -357,8 +357,10 @@ The LC07 slice accepts unknown JSON/protobuf fields without adding them to the
 owner projection and rejects an unrecognized protobuf `NullValue` enum number
 rather than collapsing it into null. LC08 here covers frozen Python and
 TypeScript clients for common OpenAPI/protobuf-over-HTTP publish/revise
-operations; native gRPC old/new compatibility remains untested because the
-frozen baseline did not provide a native gRPC server/client boundary.
+operations. The separate 59fa compatibility fixture below now tests the
+generated Python, Go and Rust protobuf clients in both directions over native
+gRPC. The matrix is limited to common Publish/Revise; it does not cover newly
+added RPCs.
 
 ## Typed-read and Go/Rust lifecycle slice (18 October 2026)
 
@@ -384,8 +386,18 @@ and a verified Ed25519 signature; an absent bundle, a partial bundle, or a
 bundle with empty digest/key/envelope/signature metadata is invalid. JSON body
 unknown fields are not preserved by the owner projection and
 are not claimed as a typed-read capability. Existing HTTP frozen-client LC08
-coverage remains; native gRPC old/new compatibility against the frozen
-`59fa6194baae21f15558b09522eaf98879989134` baseline is still open.
+coverage remains. A separate focused test runs the generated 59fa Python gRPC
+stub and frozen 59fa Go/Rust clients against the current service, then runs
+current generated Python, Go and Rust clients against the frozen 59fa service.
+The Go client, owner and protobuf bindings are source files copied byte-for-byte
+from 59fa and hash checked. The baseline did not check in generated Rust gRPC
+bindings; its frozen Rust client and `build.rs` compile the frozen
+`ec00/candidates/protobuf/oa.v1.proto` using the frozen Cargo manifest and lockfile,
+not the current proto or a checked-in binary. The compatibility test pins the fixture
+manifest digest independently of its per-file hashes, so coordinated fixture
+and manifest edits are rejected. These checks cover only common Publish/Revise.
+The test also confirms that current `ReadRequest` receives `UNIMPLEMENTED`
+from the old service; newly added RPCs are not otherwise tested here.
 
 This typed-read replacement intentionally changes the payload on existing v1
 HTTP and RPC read methods from `JsonResult { json: string }` (the a94cf67
@@ -401,26 +413,32 @@ integer evidence covers read projections only: mutation `expectedRevision`
 remains a JSON number in this candidate and is not qualified above that range.
 
 These generated-client cases remain test-only correctness evidence. They do
-not qualify native gRPC compatibility across revisions, the complete EC-00
+not qualify the complete native gRPC compatibility matrix or the complete EC-00
 matrix, browser/proxy behavior, production authentication or performance, and
 do not select an architecture.
 
-Run the lifecycle tests explicitly with the pinned toolchain and a loopback-
-permitting test environment:
+Run the lifecycle tests explicitly inside the pinned EC-00 toolchain shell and
+a loopback-permitting test environment. The shell exports Node, Go, Cargo,
+protoc and the protobuf include path:
 
 ```bash
 uv run --project tests/experiments/ec00/candidates --locked \
   python tests/experiments/ec00/test_owner_oracle.py
-EC00_NODE=/path/to/node-24.21.0/bin/node uv run \
-  --project tests/experiments/ec00/candidates --locked \
-  python tests/experiments/ec00/lifecycle_slice_checks.py
+nix develop ./tests/experiments/ec00/candidates/toolchain --command \
+  uv run --project tests/experiments/ec00/candidates --locked \
+  python tests/experiments/ec00/lifecycle_slice_checks.py \
+  LifecycleSliceTests.test_frozen_59fa_and_current_generated_grpc_clients_interoperate
+nix develop ./tests/experiments/ec00/candidates/toolchain --command \
+  uv run --project tests/experiments/ec00/candidates --locked \
+  python tests/experiments/ec00/lifecycle_slice_checks.py \
+  LifecycleSliceTests.test_frozen_59fa_go_rust_clients_against_current_grpc_service
 ```
 
 This slice is still a correctness experiment, not an architecture decision.
-The full old/new compatibility matrix, Go/Rust lifecycle coverage, RPC
-cancellation/deadline behavior, browser/proxy and offline restore cases,
-representative workload/performance comparison, and EC-01 producer/consumer
-evidence remain open gates before the ADR.
+Old/new native gRPC compatibility beyond the common Python/Go/Rust
+Publish/Revise surface, RPC cancellation/deadline behavior, browser/proxy and
+offline restore cases, representative workload/performance comparison, and EC-01
+producer/consumer evidence remain open gates before the ADR.
 
 ## Offline check
 
