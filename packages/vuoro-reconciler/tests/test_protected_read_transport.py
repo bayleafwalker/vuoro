@@ -271,6 +271,10 @@ def test_exact_requests_fresh_credentials_numeric_tls_and_proxy_ignored(
                 assert len(server.requests) == 2 and all(
                     row[2] for row in server.requests
                 )
+                assert all(
+                    b"X-Vuoro-Client-Protocol:" not in row[0]
+                    for row in server.requests
+                )
                 head, body, _ = server.requests[0]
                 assert head.startswith(
                     b"POST /v1/protected-effects/list-accepted HTTP/1.1\r\n"
