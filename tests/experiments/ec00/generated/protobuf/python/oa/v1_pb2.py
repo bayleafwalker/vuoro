@@ -25,13 +25,14 @@ _sym_db = _symbol_database.Default()
 from google.protobuf import struct_pb2 as google_dot_protobuf_dot_struct__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0boa.v1.proto\x12\nec00.oa.v1\x1a\x1cgoogle/protobuf/struct.proto\"\x99\x01\n\x0ePublishRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x16\n\tobjective\x18\x02 \x01(\tH\x01\x88\x01\x01\x12\x0e\n\x04note\x18\x03 \x01(\tH\x00\x12/\n\tnote_null\x18\x04 \x01(\x0e\x32\x1a.google.protobuf.NullValueH\x00\x42\x0c\n\nnote_valueB\x0c\n\n_objective\"\xce\x01\n\rReviseRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x1e\n\x11\x65xpected_revision\x18\x02 \x01(\x03H\x01\x88\x01\x01\x12\x16\n\tobjective\x18\x03 \x01(\tH\x02\x88\x01\x01\x12\x0e\n\x04note\x18\x04 \x01(\tH\x00\x12/\n\tnote_null\x18\x05 \x01(\x0e\x32\x1a.google.protobuf.NullValueH\x00\x42\x0c\n\nnote_valueB\x14\n\x12_expected_revisionB\x0c\n\n_objective\"6\n\x0eMutationResult\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x10\n\x08revision\x18\x02 \x01(\x03\x32\x95\x01\n\x0fOwnerOperations\x12\x41\n\x07Publish\x12\x1a.ec00.oa.v1.PublishRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12?\n\x06Revise\x12\x19.ec00.oa.v1.ReviseRequest\x1a\x1a.ec00.oa.v1.MutationResultb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0boa.v1.proto\x12\nec00.oa.v1\x1a\x1cgoogle/protobuf/struct.proto\"\x99\x01\n\x0ePublishRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x16\n\tobjective\x18\x02 \x01(\tH\x01\x88\x01\x01\x12\x0e\n\x04note\x18\x03 \x01(\tH\x00\x12/\n\tnote_null\x18\x04 \x01(\x0e\x32\x1a.google.protobuf.NullValueH\x00\x42\x0c\n\nnote_valueB\x0c\n\n_objective\"\xce\x01\n\rReviseRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x1e\n\x11\x65xpected_revision\x18\x02 \x01(\x03H\x01\x88\x01\x01\x12\x16\n\tobjective\x18\x03 \x01(\tH\x02\x88\x01\x01\x12\x0e\n\x04note\x18\x04 \x01(\tH\x00\x12/\n\tnote_null\x18\x05 \x01(\x0e\x32\x1a.google.protobuf.NullValueH\x00\x42\x0c\n\nnote_valueB\x14\n\x12_expected_revisionB\x0c\n\n_objective\"6\n\x0eMutationResult\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x10\n\x08revision\x18\x02 \x01(\x03\x32\x95\x01\n\x0fOwnerOperations\x12\x41\n\x07Publish\x12\x1a.ec00.oa.v1.PublishRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12?\n\x06Revise\x12\x19.ec00.oa.v1.ReviseRequest\x1a\x1a.ec00.oa.v1.MutationResultB<Z:example.com/vuoro-ec00/ec00/generated/protobuf/go/oa/v1;v1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'oa.v1_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
-  DESCRIPTOR._loaded_options = None
+  _globals['DESCRIPTOR']._loaded_options = None
+  _globals['DESCRIPTOR']._serialized_options = b'Z:example.com/vuoro-ec00/ec00/generated/protobuf/go/oa/v1;v1'
   _globals['_PUBLISHREQUEST']._serialized_start=58
   _globals['_PUBLISHREQUEST']._serialized_end=211
   _globals['_REVISEREQUEST']._serialized_start=214

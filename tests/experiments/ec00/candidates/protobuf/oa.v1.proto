@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package ec00.oa.v1;
 
+option go_package = "example.com/vuoro-ec00/ec00/generated/protobuf/go/oa/v1;v1";
+
 import "google/protobuf/struct.proto";
 
 message PublishRequest {
