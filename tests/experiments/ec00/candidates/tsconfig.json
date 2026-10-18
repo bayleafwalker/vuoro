@@ -24,6 +24,8 @@
     "run_typescript_clients.ts",
     "run_large_cas_clients.ts",
     "run_versioned_counter_client.ts",
-    "run_read_presence_client.ts"
+    "run_read_presence_client.ts",
+    "connect_browser_client.ts",
+    "serve_connect_edge.ts"
   ]
 }

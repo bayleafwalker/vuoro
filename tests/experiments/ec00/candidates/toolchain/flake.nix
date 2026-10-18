@@ -17,10 +17,12 @@
           pkgs.openapi-generator-cli
           pkgs.protobuf
           pkgs.nodejs_24
+          pkgs.chromium
         ];
         shellHook = ''
           export EC00_GO=${pkgs.go_1_26}/bin/go
           export EC00_CARGO=${pkgs.cargo}/bin/cargo
+          export EC00_CHROMIUM=${pkgs.chromium}/bin/chromium
           export EC00_NODE=${pkgs.nodejs_24}/bin/node
           export EC00_PROTOC=${pkgs.protobuf}/bin/protoc
           export PROTOC=${pkgs.protobuf}/bin/protoc

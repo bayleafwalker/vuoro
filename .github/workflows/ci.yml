@@ -9,6 +9,29 @@ permissions:
   contents: read
 
 jobs:
+  ec00-browser-connect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v8.3.2
+        with:
+          python-version: "3.13.16"
+      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012 # v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: Qualify genuine Chromium clients and locally generated Connect paths
+        shell: bash
+        run: |
+          nix develop ./tests/experiments/ec00/candidates/toolchain --command bash -euc '
+            npm ci --prefix tests/experiments/ec00/candidates --ignore-scripts --no-audit --no-fund
+            tests/experiments/ec00/candidates/node_modules/.bin/tsc --project tests/experiments/ec00/candidates/tsconfig.json
+            uv run --project tests/experiments/ec00/candidates --locked python scripts/experiments/ec00/generate_connect.py
+            uv run --project tests/experiments/ec00/candidates --locked python -m unittest discover -s tests/experiments/ec00 -p connect_generation_checks.py -v
+            uv run --project tests/experiments/ec00/candidates --locked python -m unittest discover -s tests/experiments/ec00 -p connect_python_checks.py -v
+            uv run --project tests/experiments/ec00/candidates --locked python -m unittest discover -s tests/experiments/ec00 -p connect_browser_checks.py -v
+          '
   ec00-large-cas:
     runs-on: ubuntu-latest
     timeout-minutes: 5
