@@ -1,0 +1,26 @@
+{
+  "name": "vuoro-ec00-candidate-generators",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.21.0"
+  },
+  "dependencies": {
+    "@bufbuild/protoc-gen-es": "2.16.0",
+    "@bufbuild/protobuf": "2.16.0",
+    "@hey-api/openapi-ts": "0.99.0",
+    "tsx": "4.23.13",
+    "@typespec/compiler": "1.17.0",
+    "@typespec/events": "0.87.0",
+    "@typespec/http": "1.17.0",
+    "@typespec/openapi": "1.17.0",
+    "@typespec/openapi3": "1.17.0",
+    "@typespec/rest": "0.87.0",
+    "@typespec/sse": "0.87.0",
+    "@typespec/streams": "0.87.0",
+    "@typespec/versioning": "0.87.0"
+  },
+  "overrides": {
+    "typescript": "5.9.3"
+  }
+}

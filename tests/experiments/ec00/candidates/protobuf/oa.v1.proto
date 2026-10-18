@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package ec00.oa.v1;
+
+message PublishRequest {
+  // OA item identifiers are decimal strings so JavaScript clients do not round
+  // values above Number.MAX_SAFE_INTEGER.
+  string request_id = 1;
+  optional string objective = 2;
+  optional string note = 3;
+}
+
+message ReviseRequest {
+  string request_id = 1;
+  optional int64 expected_revision = 2;
+  optional string objective = 3;
+  optional string note = 4;
+}
+
+message MutationResult {
+  string request_id = 1;
+  int64 revision = 2;
+}
+
+service OwnerOperations {
+  rpc Publish(PublishRequest) returns (MutationResult);
+  rpc Revise(ReviseRequest) returns (MutationResult);
+}

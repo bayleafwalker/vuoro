@@ -1,0 +1,7 @@
+emit:
+  - "@typespec/openapi3"
+options:
+  "@typespec/openapi3":
+    emitter-output-dir: "{cwd}/../generated/typespec/openapi"
+    output-file: "ec00-oa-v1.openapi.json"
+    file-type: json
