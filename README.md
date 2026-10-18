@@ -157,3 +157,7 @@ handshake, catalog, and generic invocation contract.
 Adapter pinning, the required source evidence for a new Sprintctl work adapter,
 and the release/operator boundary are documented in
 [`docs/architecture/adapter-promotion.md`](docs/architecture/adapter-promotion.md).
+
+## Goal-derived delivery roadmap
+
+The [KAOS roadmap](docs/plans/2026-10-18-kaos-roadmap.md) traces ecosystem goals to this project's implementation, product onboarding, dependencies and acceptance work. It records planned scope, not deployed capability.
