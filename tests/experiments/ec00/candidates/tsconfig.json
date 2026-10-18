@@ -22,6 +22,7 @@
   },
   "files": [
     "run_typescript_clients.ts",
-    "run_large_cas_clients.ts"
+    "run_large_cas_clients.ts",
+    "run_versioned_counter_client.ts"
   ]
 }
