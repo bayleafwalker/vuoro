@@ -184,6 +184,8 @@ uv run --project tests/experiments/ec00/candidates --locked \
   python scripts/experiments/ec00/generate_candidates.py
 uv run --project tests/experiments/ec00/candidates --locked \
   python -m unittest discover -s tests/experiments/ec00 -p 'test_*.py' -v
+uv run --project tests/experiments/ec00/candidates --locked \
+  python -m unittest discover -s tests/experiments/ec00 -p 'candidate_slice_checks.py' -v
 ```
 
 The generator check also runs `tsc --project
@@ -208,7 +210,10 @@ describes the compiler's Python output.
 
 ## Offline check
 
-Run with standard library only:
+Run the dependency-free owner-oracle tests with standard library only. The
+generated-client integration test has a non-default pytest filename so regular
+workspace test collection does not import optional EC-00 generator runtimes;
+run it explicitly with the locked candidate project as shown above.
 
 ```bash
 python -m unittest discover -s tests/experiments/ec00 -p 'test_*.py' -v
