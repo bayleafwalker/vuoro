@@ -9,9 +9,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
-import sys
 import tarfile
-import tempfile
 
 ROOT = Path(__file__).resolve().parents[3]
 EC00 = ROOT / 'tests/experiments/ec00'
@@ -148,6 +146,16 @@ def prepare(destination):
     print(json.dumps(receipt))
 
 
+def run_bundle(archive, expected, report):
+    verify(archive, expected)
+    # The external archive pin authenticates the launcher before any of its code executes.
+    with tarfile.open(archive) as stream:
+        launcher = stream.extractfile('payload/offline_namespace.py').read()
+    namespace = {'__name__': 'ec00_offline_namespace'}
+    exec(compile(launcher, 'verified-bundle/offline_namespace.py', 'exec'), namespace)
+    namespace['restore_and_run'](archive, expected, report)
+
+
 def main():
     parser = argparse.ArgumentParser(); sub = parser.add_subparsers(dest='command', required=True)
     command = sub.add_parser('prepare'); command.add_argument('--destination', type=Path, required=True)
@@ -155,11 +163,7 @@ def main():
     command.add_argument('--sha256',required=True);command.add_argument('--report',type=Path,required=True)
     args = parser.parse_args()
     if args.command=='prepare':prepare(args.destination)
-    else:
-        sys.path.insert(0,str(EC00))
-        from offline_namespace import restore_and_run
-        verify(args.archive,args.sha256)
-        restore_and_run(args.archive,args.sha256,args.report)
+    else:run_bundle(args.archive,args.sha256,args.report)
 
 
 if __name__ == '__main__': main()

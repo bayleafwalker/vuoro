@@ -86,11 +86,12 @@ def restore_and_run(archive, expected, report):
             *[shlex.quote(runtime['EC00_MOUNT']) + ' --bind /dev/' + name + ' ' + shlex.quote(str(root / 'dev' / name)) for name in ('null','urandom','random')],
             'exec ' + shlex.join([runtime['EC00_CHROOT'], str(root), str(env_tool), '-i', *assignments,
                 '/opt/python/bin/python3.13', '-I', '/work/offline_inside.py'])])
-        result = subprocess.run([runtime['EC00_UNSHARE'],'--user','--map-root-user','--mount','--pid','--fork','--net',
-                                 str(bash),'-ec',script], text=True, capture_output=True, timeout=1200)
         report.parent.mkdir(parents=True, exist_ok=True)
-        report.with_suffix('.stdout.log').write_text(result.stdout)
-        report.with_suffix('.stderr.log').write_text(result.stderr)
+        # Stream diagnostics so timeouts and failed cold builds retain their evidence.
+        with report.with_suffix('.stdout.log').open('w') as stdout, report.with_suffix('.stderr.log').open('w') as stderr:
+            result = subprocess.run([runtime['EC00_UNSHARE'],'--user','--map-root-user','--mount',
+                                     '--pid','--fork','--kill-child=SIGKILL','--net',
+                                     str(bash),'-ec',script], stdout=stdout, stderr=stderr, timeout=1200)
         if result.returncode:
             raise RuntimeError('offline restore failed; see captured logs, returncode=' + str(result.returncode))
         shutil.copyfile(root / 'out/result.json', report)
