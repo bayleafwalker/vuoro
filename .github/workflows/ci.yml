@@ -37,6 +37,13 @@ jobs:
           uv run --project tests/experiments/ec00/candidates --locked \
             python -m unittest discover -s tests/experiments/ec00 -p versioned_counter_checks.py -v
 
+      - name: Qualify explicit read presence and frozen legacy compatibility
+        shell: bash
+        run: |
+          export EC00_NODE="$(command -v node)"
+          uv run --project tests/experiments/ec00/candidates --locked \
+            python -m unittest discover -s tests/experiments/ec00 -p read_presence_checks.py -v
+
   ec00-transport-failures:
     runs-on: ubuntu-latest
     timeout-minutes: 5

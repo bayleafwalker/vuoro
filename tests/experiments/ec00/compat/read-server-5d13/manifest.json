@@ -1,0 +1,45 @@
+{
+  "runner_files": [
+    {
+      "path": "serve_old_reads.py",
+      "sha256": "85098575224e991c26092e4cf91d6b15f14b23358854402d2f73dc850ad09180"
+    },
+    {
+      "path": "old_read_client.py",
+      "sha256": "bf329c83d6ff4c37d966797196356bd88dedef43c2e1cd198c936eecff0d9b68"
+    }
+  ],
+  "source_commit": "5d13baf05b1d90348c57481cb1cfc35a620cf615",
+  "source_files": [
+    {
+      "path": "source/candidate_owner_http.py",
+      "sha256": "2bc5da4c8036404f961755b3756d171e679bd4adc7b745546e6059a0cf0bb283",
+      "source_path": "tests/experiments/ec00/candidate_owner_http.py"
+    },
+    {
+      "path": "source/owner_oracle.py",
+      "sha256": "e75a5d957e630285636f8ef7d86baed0a4e4a625f26839e43717fe3460fdf310",
+      "source_path": "tests/experiments/ec00/owner_oracle.py"
+    },
+    {
+      "path": "source/artifact_semantics.py",
+      "sha256": "7473e9062752b83eb9517ea1acdff5ccf2b55a404dc11eeb088ff3fb03791670",
+      "source_path": "tests/experiments/ec00/artifact_semantics.py"
+    },
+    {
+      "path": "source/generated/protobuf/python/oa/v1_pb2.py",
+      "sha256": "c87349f1f7253eb58f241e48dfb4785ad685a3e64d97bb047b1bc74f24b565f0",
+      "source_path": "tests/experiments/ec00/generated/protobuf/python/oa/v1_pb2.py"
+    },
+    {
+      "path": "source/generated/protobuf/python/oa/v1_pb2.pyi",
+      "sha256": "d16e660e87f3f32c2960183372d7f5baa73bd5e57f57ffd8b82e373a939ea273",
+      "source_path": "tests/experiments/ec00/generated/protobuf/python/oa/v1_pb2.pyi"
+    },
+    {
+      "path": "source/generated/protobuf/python/oa/v1_pb2_grpc.py",
+      "sha256": "e5b419d6c606c72795ddf23bf0412fbcd73500fb7c3fd1697a14d3d8bd4d8e99",
+      "source_path": "tests/experiments/ec00/generated/protobuf/python/oa/v1_pb2_grpc.py"
+    }
+  ]
+}

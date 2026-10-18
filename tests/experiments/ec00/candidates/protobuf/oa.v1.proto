@@ -113,6 +113,8 @@ message WatchPage {
 message RequestById { string request_id = 1; }
 message ReadArtifactRequest { string request_id = 1; int64 material_revision = 2; }
 message PageRequest { optional string cursor = 1; int32 limit = 2; }
+// Experimental new read identity preserves explicit scalar defaults.
+message PageRequestV2 { optional string cursor = 1; optional int32 limit = 2; }
 
 service OwnerOperations {
   rpc Publish(PublishRequest) returns (MutationResult);
@@ -128,4 +130,6 @@ service OwnerOperations {
   rpc ReadArtifact(ReadArtifactRequest) returns (ArtifactRead);
   rpc ListRequests(PageRequest) returns (RequestPage);
   rpc Watch(PageRequest) returns (WatchPage);
+  rpc ListRequestsV2(PageRequestV2) returns (RequestPage);
+  rpc WatchV2(PageRequestV2) returns (WatchPage);
 }
