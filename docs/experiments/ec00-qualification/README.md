@@ -793,3 +793,64 @@ and native streaming/backpressure, other browser/runtime versions, offline
 package restore and representative workload/operational/performance comparison
 remain separate gates. No final ADR, foundation/OA implementation acceptance,
 production package, release, deployment or migration is selected by this slice.
+
+
+## Offline package restore on prepared Nix runtimes
+
+The offline experiment prepares a public dependency archive from one committed
+experiment revision. Preparation requires network access; the restore has a
+separate filesystem root, PID namespace, and network namespace. The existing
+read-only `/nix/store` supplies the explicitly recorded, locked native toolchain
+and Chromium. This is a client package restore/build experiment on those runtime
+prerequisites. It does not qualify a cold OS/Nix bootstrap, production database
+restore, deployment recovery, or a package release.
+
+Preparation refuses dirty or untracked experiment inputs. It archives the Git
+revision and uses that extracted source for Python requirements, npm installation,
+and Go/Rust vendoring. Python wheels retain the lockfile hashes; npm retains its
+content-addressed cache and lockfile integrity; Cargo vendor checksums and Go's
+locked module inputs are retained. The bundle contains Python 3.13.16 without
+global site packages, the hash-recorded uv 0.13.0 binary, public CA certificates,
+and FHS libraries resolved through the locked Nix loader/compiler runtime.
+The manifest hashes every payload file and records exact native tool paths.
+The preparation-only downloader is pip 26.2.1.
+
+The caller supplies the archive SHA256 from the separate preparation receipt.
+The bootstrap verifies that pin before executing the launcher contained in the
+bundle. The launcher verifies the internal file set and hashes before restoring
+anything into the new root. No host checkout, home, credential profile, ambient
+PATH, package registry cache, virtualenv, node_modules, or compiler output is
+mounted into that root. The child environment is cleared and populated explicitly;
+its passwd fixture refers to a fresh directory. Loopback is enabled for the
+real client/server checks, while an actual external IP connection must fail with
+`ENETUNREACH`. That failure is paired with a working loopback echo control.
+
+The runner deliberately removes a required Connect wheel and attempts an npm
+install from an empty cache; both must fail. It then creates a fresh Python venv,
+installs from the wheelhouse with hashes and no indexes, restores npm packages
+with `--offline`, and cold-builds Go/Rust clients from vendored sources with
+external registries disabled. TypeScript type checking, explicit read presence,
+frozen legacy read behavior, native presence/CAS, generated Python Connect, and
+the six actual Chromium/Connect/browser HTTP groups run from the restored source.
+No prior native build output is supplied. Command durations are diagnostics,
+not representative performance measurements.
+
+The separate integrity checks change an archive byte, alter a manifest-bound
+payload file, add an unlisted file, and modify a committed lockfile. Each must
+refuse at its boundary. A positive control also demonstrates that the launcher
+executed is the externally verified bundled copy. Run from a clean committed
+checkout after entering the pinned Nix toolchain:
+
+```bash
+uv run --project tests/experiments/ec00/candidates --locked python -m unittest discover -s tests/experiments/ec00 -p offline_integrity_checks.py -v
+uv run --project tests/experiments/ec00/candidates --locked python scripts/experiments/ec00/offline_packages.py prepare --destination /tmp/ec00-offline-bundle
+# Read receipt.json, then supply its SHA256 explicitly:
+uv run --project tests/experiments/ec00/candidates --locked python scripts/experiments/ec00/offline_packages.py run --archive /tmp/ec00-offline-bundle/offline-packages.tar --sha256 <receipt-sha256> --report /tmp/ec00-offline-result.json
+```
+
+The CI job enables unprivileged namespace support when the disposable Ubuntu
+runner's AppArmor setting prevents it, then performs the same unprivileged
+restore. It preserves receipts and diagnostics, including failures. It does
+not upload the large dependency bundle or publish packages. Experimental ingress,
+production authentication, streaming/backpressure, representative operations and
+performance, and the final architectural comparison remain separate gates.

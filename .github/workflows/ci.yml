@@ -9,6 +9,45 @@ permissions:
   contents: read
 
 jobs:
+  ec00-offline-packages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v8.3.2
+        with:
+          version: "0.13.0"
+          python-version: "3.13.16"
+      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012 # v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: Restore and rebuild clients without host source, caches, or external network
+        shell: bash
+        run: |
+          nix develop ./tests/experiments/ec00/candidates/toolchain --command bash -euc '
+            # Ubuntu hosted runners can restrict unprivileged namespaces with AppArmor.
+            # This changes only this disposable test VM; the actual restore still runs unprivileged.
+            if ! "$EC00_UNSHARE" --user --map-root-user true; then
+              test -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns
+              sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+              "$EC00_UNSHARE" --user --map-root-user true
+            fi
+            uv run --project tests/experiments/ec00/candidates --locked python -m unittest discover -s tests/experiments/ec00 -p offline_integrity_checks.py -v
+            uv run --project tests/experiments/ec00/candidates --locked python scripts/experiments/ec00/offline_packages.py prepare --destination "$RUNNER_TEMP/ec00-offline-bundle"
+            bundle_sha=$(uv run --project tests/experiments/ec00/candidates --locked python -c "import json,sys; print(json.load(open(sys.argv[1]))[\"sha256\"])" "$RUNNER_TEMP/ec00-offline-bundle/receipt.json")
+            uv run --project tests/experiments/ec00/candidates --locked python scripts/experiments/ec00/offline_packages.py run --archive "$RUNNER_TEMP/ec00-offline-bundle/offline-packages.tar" --sha256 "$bundle_sha" --report "$RUNNER_TEMP/ec00-offline-result.json"
+          '
+      - name: Preserve offline receipts and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ec00-offline-package-receipts
+          path: |
+            ${{ runner.temp }}/ec00-offline-bundle/receipt.json
+            ${{ runner.temp }}/ec00-offline-result.*
+          if-no-files-found: warn
+
   ec00-browser-connect:
     runs-on: ubuntu-latest
     timeout-minutes: 15
