@@ -2,8 +2,8 @@
 // @generated from file oa.v1.proto (package ec00.oa.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { NullValue } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_struct } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file oa.v1.proto.
  */
 export const file_oa_v1: GenFile = /*@__PURE__*/
-  fileDesc("CgtvYS52MS5wcm90bxIKZWMwMC5vYS52MSKxAgoOUHVibGlzaFJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIWCglvYmplY3RpdmUYAiABKAlIAYgBARIOCgRub3RlGAMgASgJSAASLwoJbm90ZV9udWxsGAQgASgOMhouZ29vZ2xlLnByb3RvYnVmLk51bGxWYWx1ZUgAEhUKDWRlcGVuZGVudF9pZHMYBSADKAkSFwoPYXJ0aWZhY3RfZGlnZXN0GAYgASgJEhcKD2FydGlmYWN0X2tleV9pZBgHIAEoCRIWCg5hcnRpZmFjdF9ieXRlcxgIIAEoDBIZChFhcnRpZmFjdF9lbnZlbG9wZRgJIAEoDBIaChJhcnRpZmFjdF9zaWduYXR1cmUYCiABKAxCDAoKbm90ZV92YWx1ZUIMCgpfb2JqZWN0aXZlIs4BCg1SZXZpc2VSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSHgoRZXhwZWN0ZWRfcmV2aXNpb24YAiABKANIAYgBARIWCglvYmplY3RpdmUYAyABKAlIAogBARIOCgRub3RlGAQgASgJSAASLwoJbm90ZV9udWxsGAUgASgOMhouZ29vZ2xlLnByb3RvYnVmLk51bGxWYWx1ZUgAQgwKCm5vdGVfdmFsdWVCFAoSX2V4cGVjdGVkX3JldmlzaW9uQgwKCl9vYmplY3RpdmUiNgoOTXV0YXRpb25SZXN1bHQSEgoKcmVxdWVzdF9pZBgBIAEoCRIQCghyZXZpc2lvbhgCIAEoAyJ6ChhXaXRoZHJhd0RlcGVuZGVudFJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIUCgxkZXBlbmRlbnRfaWQYAiABKAkSHgoRZXhwZWN0ZWRfcmV2aXNpb24YAyABKANIAIgBAUIUChJfZXhwZWN0ZWRfcmV2aXNpb24iYgoWUmVwb3J0UGVyZm9ybWVkUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEh4KEWV4cGVjdGVkX3JldmlzaW9uGAIgASgDSACIAQFCFAoSX2V4cGVjdGVkX3JldmlzaW9uIm8KDVZlcmlmeVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIeChFleHBlY3RlZF9yZXZpc2lvbhgCIAEoA0gAiAEBEhQKDGV2aWRlbmNlX3JlZhgDIAEoCUIUChJfZXhwZWN0ZWRfcmV2aXNpb24iegoVRGVjaWRlQXJ0aWZhY3RSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSHgoRZXhwZWN0ZWRfcmV2aXNpb24YAiABKANIAIgBARIXCg9hcnRpZmFjdF9kaWdlc3QYAyABKAlCFAoSX2V4cGVjdGVkX3JldmlzaW9uIloKDlJlc29sdmVSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSHgoRZXhwZWN0ZWRfcmV2aXNpb24YAiABKANIAIgBAUIUChJfZXhwZWN0ZWRfcmV2aXNpb24igAEKHkFja25vd2xlZGdlQ29udGludWF0aW9uUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEhQKDGRlcGVuZGVudF9pZBgCIAEoCRIeChFleHBlY3RlZF9yZXZpc2lvbhgDIAEoA0gAiAEBQhQKEl9leHBlY3RlZF9yZXZpc2lvbiIhCgtSZXF1ZXN0QnlJZBISCgpyZXF1ZXN0X2lkGAEgASgJIkQKE1JlYWRBcnRpZmFjdFJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIZChFtYXRlcmlhbF9yZXZpc2lvbhgCIAEoAyI8CgtQYWdlUmVxdWVzdBITCgZjdXJzb3IYASABKAlIAIgBARINCgVsaW1pdBgCIAEoBUIJCgdfY3Vyc29yIhoKCkpzb25SZXN1bHQSDAoEanNvbhgBIAEoCTK+BwoPT3duZXJPcGVyYXRpb25zEkEKB1B1Ymxpc2gSGi5lYzAwLm9hLnYxLlB1Ymxpc2hSZXF1ZXN0GhouZWMwMC5vYS52MS5NdXRhdGlvblJlc3VsdBI/CgZSZXZpc2USGS5lYzAwLm9hLnYxLlJldmlzZVJlcXVlc3QaGi5lYzAwLm9hLnYxLk11dGF0aW9uUmVzdWx0ElUKEVdpdGhkcmF3RGVwZW5kZW50EiQuZWMwMC5vYS52MS5XaXRoZHJhd0RlcGVuZGVudFJlcXVlc3QaGi5lYzAwLm9hLnYxLk11dGF0aW9uUmVzdWx0ElEKD1JlcG9ydFBlcmZvcm1lZBIiLmVjMDAub2EudjEuUmVwb3J0UGVyZm9ybWVkUmVxdWVzdBoaLmVjMDAub2EudjEuTXV0YXRpb25SZXN1bHQSPwoGVmVyaWZ5EhkuZWMwMC5vYS52MS5WZXJpZnlSZXF1ZXN0GhouZWMwMC5vYS52MS5NdXRhdGlvblJlc3VsdBJPCg5EZWNpZGVBcnRpZmFjdBIhLmVjMDAub2EudjEuRGVjaWRlQXJ0aWZhY3RSZXF1ZXN0GhouZWMwMC5vYS52MS5NdXRhdGlvblJlc3VsdBJBCgdSZXNvbHZlEhouZWMwMC5vYS52MS5SZXNvbHZlUmVxdWVzdBoaLmVjMDAub2EudjEuTXV0YXRpb25SZXN1bHQSYQoXQWNrbm93bGVkZ2VDb250aW51YXRpb24SKi5lYzAwLm9hLnYxLkFja25vd2xlZGdlQ29udGludWF0aW9uUmVxdWVzdBoaLmVjMDAub2EudjEuTXV0YXRpb25SZXN1bHQSPgoLUmVhZFJlcXVlc3QSFy5lYzAwLm9hLnYxLlJlcXVlc3RCeUlkGhYuZWMwMC5vYS52MS5Kc29uUmVzdWx0EkEKDlJlYWREZXBlbmRhbnRzEhcuZWMwMC5vYS52MS5SZXF1ZXN0QnlJZBoWLmVjMDAub2EudjEuSnNvblJlc3VsdBJHCgxSZWFkQXJ0aWZhY3QSHy5lYzAwLm9hLnYxLlJlYWRBcnRpZmFjdFJlcXVlc3QaFi5lYzAwLm9hLnYxLkpzb25SZXN1bHQSPwoMTGlzdFJlcXVlc3RzEhcuZWMwMC5vYS52MS5QYWdlUmVxdWVzdBoWLmVjMDAub2EudjEuSnNvblJlc3VsdBI4CgVXYXRjaBIXLmVjMDAub2EudjEuUGFnZVJlcXVlc3QaFi5lYzAwLm9hLnYxLkpzb25SZXN1bHRCPFo6ZXhhbXBsZS5jb20vdnVvcm8tZWMwMC9lYzAwL2dlbmVyYXRlZC9wcm90b2J1Zi9nby9vYS92MTt2MWIGcHJvdG8z", [file_google_protobuf_struct]);
+  fileDesc("CgtvYS52MS5wcm90bxIKZWMwMC5vYS52MSKyAwoOUHVibGlzaFJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIWCglvYmplY3RpdmUYAiABKAlIAYgBARIOCgRub3RlGAMgASgJSAASLwoJbm90ZV9udWxsGAQgASgOMhouZ29vZ2xlLnByb3RvYnVmLk51bGxWYWx1ZUgAEhUKDWRlcGVuZGVudF9pZHMYBSADKAkSHAoPYXJ0aWZhY3RfZGlnZXN0GAYgASgJSAKIAQESHAoPYXJ0aWZhY3Rfa2V5X2lkGAcgASgJSAOIAQESGwoOYXJ0aWZhY3RfYnl0ZXMYCCABKAxIBIgBARIeChFhcnRpZmFjdF9lbnZlbG9wZRgJIAEoDEgFiAEBEh8KEmFydGlmYWN0X3NpZ25hdHVyZRgKIAEoDEgGiAEBQgwKCm5vdGVfdmFsdWVCDAoKX29iamVjdGl2ZUISChBfYXJ0aWZhY3RfZGlnZXN0QhIKEF9hcnRpZmFjdF9rZXlfaWRCEQoPX2FydGlmYWN0X2J5dGVzQhQKEl9hcnRpZmFjdF9lbnZlbG9wZUIVChNfYXJ0aWZhY3Rfc2lnbmF0dXJlIs4BCg1SZXZpc2VSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSHgoRZXhwZWN0ZWRfcmV2aXNpb24YAiABKANIAYgBARIWCglvYmplY3RpdmUYAyABKAlIAogBARIOCgRub3RlGAQgASgJSAASLwoJbm90ZV9udWxsGAUgASgOMhouZ29vZ2xlLnByb3RvYnVmLk51bGxWYWx1ZUgAQgwKCm5vdGVfdmFsdWVCFAoSX2V4cGVjdGVkX3JldmlzaW9uQgwKCl9vYmplY3RpdmUiNgoOTXV0YXRpb25SZXN1bHQSEgoKcmVxdWVzdF9pZBgBIAEoCRIQCghyZXZpc2lvbhgCIAEoAyJ6ChhXaXRoZHJhd0RlcGVuZGVudFJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIUCgxkZXBlbmRlbnRfaWQYAiABKAkSHgoRZXhwZWN0ZWRfcmV2aXNpb24YAyABKANIAIgBAUIUChJfZXhwZWN0ZWRfcmV2aXNpb24iYgoWUmVwb3J0UGVyZm9ybWVkUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEh4KEWV4cGVjdGVkX3JldmlzaW9uGAIgASgDSACIAQFCFAoSX2V4cGVjdGVkX3JldmlzaW9uIm8KDVZlcmlmeVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIeChFleHBlY3RlZF9yZXZpc2lvbhgCIAEoA0gAiAEBEhQKDGV2aWRlbmNlX3JlZhgDIAEoCUIUChJfZXhwZWN0ZWRfcmV2aXNpb24iegoVRGVjaWRlQXJ0aWZhY3RSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSHgoRZXhwZWN0ZWRfcmV2aXNpb24YAiABKANIAIgBARIXCg9hcnRpZmFjdF9kaWdlc3QYAyABKAlCFAoSX2V4cGVjdGVkX3JldmlzaW9uIloKDlJlc29sdmVSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSHgoRZXhwZWN0ZWRfcmV2aXNpb24YAiABKANIAIgBAUIUChJfZXhwZWN0ZWRfcmV2aXNpb24igAEKHkFja25vd2xlZGdlQ29udGludWF0aW9uUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEhQKDGRlcGVuZGVudF9pZBgCIAEoCRIeChFleHBlY3RlZF9yZXZpc2lvbhgDIAEoA0gAiAEBQhQKEl9leHBlY3RlZF9yZXZpc2lvbiJvCgtSZXF1ZXN0Qm9keRIRCglvYmplY3RpdmUYASABKAkSDgoEbm90ZRgCIAEoCUgAEi8KCW5vdGVfbnVsbBgDIAEoDjIaLmdvb2dsZS5wcm90b2J1Zi5OdWxsVmFsdWVIAEIMCgpub3RlX3ZhbHVlIsIDCgtSZXF1ZXN0UmVhZBISCgpyZXF1ZXN0X2lkGAEgASgJEhAKCHJldmlzaW9uGAIgASgDEhkKEW1hdGVyaWFsX3JldmlzaW9uGAMgASgDEicKBXN0YXRlGAQgASgOMhguZWMwMC5vYS52MS5SZXF1ZXN0U3RhdGUSJQoEYm9keRgFIAEoCzIXLmVjMDAub2EudjEuUmVxdWVzdEJvZHkSEAoIcmVwb3J0ZWQYBiABKAgSEAoIdmVyaWZpZWQYByABKAgSFgoMZXZpZGVuY2VfcmVmGAggASgJSAASNwoRZXZpZGVuY2VfcmVmX251bGwYCSABKA4yGi5nb29nbGUucHJvdG9idWYuTnVsbFZhbHVlSAASIgoYYXJ0aWZhY3RfZGVjaXNpb25fZGlnZXN0GAogASgJSAESQwodYXJ0aWZhY3RfZGVjaXNpb25fZGlnZXN0X251bGwYCyABKA4yGi5nb29nbGUucHJvdG9idWYuTnVsbFZhbHVlSAESEwoLY3JlYXRlZF9zZXEYDCABKANCFAoSZXZpZGVuY2VfcmVmX3ZhbHVlQhkKF2FydGlmYWN0X2RlY2lzaW9uX3ZhbHVlIk8KDURlcGVuZGVudFJlYWQSFAoMZGVwZW5kZW50X2lkGAEgASgJEg4KBmFjdGl2ZRgCIAEoCBIYChBjb250aW51YXRpb25fYWNrGAMgASgIIjoKDkRlcGVuZGFudHNSZWFkEigKBWl0ZW1zGAEgAygLMhkuZWMwMC5vYS52MS5EZXBlbmRlbnRSZWFkIq4BCgxBcnRpZmFjdFJlYWQSGQoRbWF0ZXJpYWxfcmV2aXNpb24YASABKAMSFwoPbWF0ZXJpYWxfZGlnZXN0GAIgASgJEhcKD2FydGlmYWN0X2RpZ2VzdBgDIAEoCRIOCgZrZXlfaWQYBCABKAkSFgoOb3JpZ2luYWxfYnl0ZXMYBSABKAwSFgoOZW52ZWxvcGVfYnl0ZXMYBiABKAwSEQoJc2lnbmF0dXJlGAcgASgMInQKDlJlcXVlc3RTdW1tYXJ5EhIKCnJlcXVlc3RfaWQYASABKAkSEAoIcmV2aXNpb24YAiABKAMSJwoFc3RhdGUYAyABKA4yGC5lYzAwLm9hLnYxLlJlcXVlc3RTdGF0ZRITCgtjcmVhdGVkX3NlcRgEIAEoAyJiCgtSZXF1ZXN0UGFnZRIpCgVpdGVtcxgBIAMoCzIaLmVjMDAub2EudjEuUmVxdWVzdFN1bW1hcnkSGAoLbmV4dF9jdXJzb3IYAiABKAlIAIgBAUIOCgxfbmV4dF9jdXJzb3IiTwoKV2F0Y2hFdmVudBILCgNzZXEYASABKAMSEgoKcmVxdWVzdF9pZBgCIAEoCRIOCgZhY3Rpb24YAyABKAkSEAoIcmV2aXNpb24YBCABKAMiawoJV2F0Y2hQYWdlEiYKBmV2ZW50cxgBIAMoCzIWLmVjMDAub2EudjEuV2F0Y2hFdmVudBIYCgtuZXh0X2N1cnNvchgCIAEoCUgAiAEBEgwKBG1vcmUYAyABKAhCDgoMX25leHRfY3Vyc29yIiEKC1JlcXVlc3RCeUlkEhIKCnJlcXVlc3RfaWQYASABKAkiRAoTUmVhZEFydGlmYWN0UmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEhkKEW1hdGVyaWFsX3JldmlzaW9uGAIgASgDIjwKC1BhZ2VSZXF1ZXN0EhMKBmN1cnNvchgBIAEoCUgAiAEBEg0KBWxpbWl0GAIgASgFQgkKB19jdXJzb3IqYQoMUmVxdWVzdFN0YXRlEh0KGVJFUVVFU1RfU1RBVEVfVU5TUEVDSUZJRUQQABIWChJSRVFVRVNUX1NUQVRFX09QRU4QARIaChZSRVFVRVNUX1NUQVRFX1JFU09MVkVEEAIyxQcKD093bmVyT3BlcmF0aW9ucxJBCgdQdWJsaXNoEhouZWMwMC5vYS52MS5QdWJsaXNoUmVxdWVzdBoaLmVjMDAub2EudjEuTXV0YXRpb25SZXN1bHQSPwoGUmV2aXNlEhkuZWMwMC5vYS52MS5SZXZpc2VSZXF1ZXN0GhouZWMwMC5vYS52MS5NdXRhdGlvblJlc3VsdBJVChFXaXRoZHJhd0RlcGVuZGVudBIkLmVjMDAub2EudjEuV2l0aGRyYXdEZXBlbmRlbnRSZXF1ZXN0GhouZWMwMC5vYS52MS5NdXRhdGlvblJlc3VsdBJRCg9SZXBvcnRQZXJmb3JtZWQSIi5lYzAwLm9hLnYxLlJlcG9ydFBlcmZvcm1lZFJlcXVlc3QaGi5lYzAwLm9hLnYxLk11dGF0aW9uUmVzdWx0Ej8KBlZlcmlmeRIZLmVjMDAub2EudjEuVmVyaWZ5UmVxdWVzdBoaLmVjMDAub2EudjEuTXV0YXRpb25SZXN1bHQSTwoORGVjaWRlQXJ0aWZhY3QSIS5lYzAwLm9hLnYxLkRlY2lkZUFydGlmYWN0UmVxdWVzdBoaLmVjMDAub2EudjEuTXV0YXRpb25SZXN1bHQSQQoHUmVzb2x2ZRIaLmVjMDAub2EudjEuUmVzb2x2ZVJlcXVlc3QaGi5lYzAwLm9hLnYxLk11dGF0aW9uUmVzdWx0EmEKF0Fja25vd2xlZGdlQ29udGludWF0aW9uEiouZWMwMC5vYS52MS5BY2tub3dsZWRnZUNvbnRpbnVhdGlvblJlcXVlc3QaGi5lYzAwLm9hLnYxLk11dGF0aW9uUmVzdWx0Ej8KC1JlYWRSZXF1ZXN0EhcuZWMwMC5vYS52MS5SZXF1ZXN0QnlJZBoXLmVjMDAub2EudjEuUmVxdWVzdFJlYWQSRQoOUmVhZERlcGVuZGFudHMSFy5lYzAwLm9hLnYxLlJlcXVlc3RCeUlkGhouZWMwMC5vYS52MS5EZXBlbmRhbnRzUmVhZBJJCgxSZWFkQXJ0aWZhY3QSHy5lYzAwLm9hLnYxLlJlYWRBcnRpZmFjdFJlcXVlc3QaGC5lYzAwLm9hLnYxLkFydGlmYWN0UmVhZBJACgxMaXN0UmVxdWVzdHMSFy5lYzAwLm9hLnYxLlBhZ2VSZXF1ZXN0GhcuZWMwMC5vYS52MS5SZXF1ZXN0UGFnZRI3CgVXYXRjaBIXLmVjMDAub2EudjEuUGFnZVJlcXVlc3QaFS5lYzAwLm9hLnYxLldhdGNoUGFnZUI8WjpleGFtcGxlLmNvbS92dW9yby1lYzAwL2VjMDAvZ2VuZXJhdGVkL3Byb3RvYnVmL2dvL29hL3YxO3YxYgZwcm90bzM", [file_google_protobuf_struct]);
 
 /**
  * @generated from message ec00.oa.v1.PublishRequest
@@ -54,29 +54,29 @@ export type PublishRequest = Message<"ec00.oa.v1.PublishRequest"> & {
   dependentIds: string[];
 
   /**
-   * @generated from field: string artifact_digest = 6;
+   * @generated from field: optional string artifact_digest = 6;
    */
-  artifactDigest: string;
+  artifactDigest?: string | undefined;
 
   /**
-   * @generated from field: string artifact_key_id = 7;
+   * @generated from field: optional string artifact_key_id = 7;
    */
-  artifactKeyId: string;
+  artifactKeyId?: string | undefined;
 
   /**
-   * @generated from field: bytes artifact_bytes = 8;
+   * @generated from field: optional bytes artifact_bytes = 8;
    */
-  artifactBytes: Uint8Array;
+  artifactBytes?: Uint8Array | undefined;
 
   /**
-   * @generated from field: bytes artifact_envelope = 9;
+   * @generated from field: optional bytes artifact_envelope = 9;
    */
-  artifactEnvelope: Uint8Array;
+  artifactEnvelope?: Uint8Array | undefined;
 
   /**
-   * @generated from field: bytes artifact_signature = 10;
+   * @generated from field: optional bytes artifact_signature = 10;
    */
-  artifactSignature: Uint8Array;
+  artifactSignature?: Uint8Array | undefined;
 };
 
 /**
@@ -305,6 +305,330 @@ export const AcknowledgeContinuationRequestSchema: GenMessage<AcknowledgeContinu
   messageDesc(file_oa_v1, 8);
 
 /**
+ * @generated from message ec00.oa.v1.RequestBody
+ */
+export type RequestBody = Message<"ec00.oa.v1.RequestBody"> & {
+  /**
+   * @generated from field: string objective = 1;
+   */
+  objective: string;
+
+  /**
+   * @generated from oneof ec00.oa.v1.RequestBody.note_value
+   */
+  noteValue: {
+    /**
+     * @generated from field: string note = 2;
+     */
+    value: string;
+    case: "note";
+  } | {
+    /**
+     * @generated from field: google.protobuf.NullValue note_null = 3;
+     */
+    value: NullValue;
+    case: "noteNull";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message ec00.oa.v1.RequestBody.
+ * Use `create(RequestBodySchema)` to create a new message.
+ */
+export const RequestBodySchema: GenMessage<RequestBody> = /*@__PURE__*/
+  messageDesc(file_oa_v1, 9);
+
+/**
+ * @generated from message ec00.oa.v1.RequestRead
+ */
+export type RequestRead = Message<"ec00.oa.v1.RequestRead"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: int64 revision = 2;
+   */
+  revision: bigint;
+
+  /**
+   * @generated from field: int64 material_revision = 3;
+   */
+  materialRevision: bigint;
+
+  /**
+   * @generated from field: ec00.oa.v1.RequestState state = 4;
+   */
+  state: RequestState;
+
+  /**
+   * @generated from field: ec00.oa.v1.RequestBody body = 5;
+   */
+  body?: RequestBody | undefined;
+
+  /**
+   * @generated from field: bool reported = 6;
+   */
+  reported: boolean;
+
+  /**
+   * @generated from field: bool verified = 7;
+   */
+  verified: boolean;
+
+  /**
+   * @generated from oneof ec00.oa.v1.RequestRead.evidence_ref_value
+   */
+  evidenceRefValue: {
+    /**
+     * @generated from field: string evidence_ref = 8;
+     */
+    value: string;
+    case: "evidenceRef";
+  } | {
+    /**
+     * @generated from field: google.protobuf.NullValue evidence_ref_null = 9;
+     */
+    value: NullValue;
+    case: "evidenceRefNull";
+  } | { case: undefined; value?: undefined };
+
+  /**
+   * @generated from oneof ec00.oa.v1.RequestRead.artifact_decision_value
+   */
+  artifactDecisionValue: {
+    /**
+     * @generated from field: string artifact_decision_digest = 10;
+     */
+    value: string;
+    case: "artifactDecisionDigest";
+  } | {
+    /**
+     * @generated from field: google.protobuf.NullValue artifact_decision_digest_null = 11;
+     */
+    value: NullValue;
+    case: "artifactDecisionDigestNull";
+  } | { case: undefined; value?: undefined };
+
+  /**
+   * @generated from field: int64 created_seq = 12;
+   */
+  createdSeq: bigint;
+};
+
+/**
+ * Describes the message ec00.oa.v1.RequestRead.
+ * Use `create(RequestReadSchema)` to create a new message.
+ */
+export const RequestReadSchema: GenMessage<RequestRead> = /*@__PURE__*/
+  messageDesc(file_oa_v1, 10);
+
+/**
+ * @generated from message ec00.oa.v1.DependentRead
+ */
+export type DependentRead = Message<"ec00.oa.v1.DependentRead"> & {
+  /**
+   * @generated from field: string dependent_id = 1;
+   */
+  dependentId: string;
+
+  /**
+   * @generated from field: bool active = 2;
+   */
+  active: boolean;
+
+  /**
+   * @generated from field: bool continuation_ack = 3;
+   */
+  continuationAck: boolean;
+};
+
+/**
+ * Describes the message ec00.oa.v1.DependentRead.
+ * Use `create(DependentReadSchema)` to create a new message.
+ */
+export const DependentReadSchema: GenMessage<DependentRead> = /*@__PURE__*/
+  messageDesc(file_oa_v1, 11);
+
+/**
+ * @generated from message ec00.oa.v1.DependantsRead
+ */
+export type DependantsRead = Message<"ec00.oa.v1.DependantsRead"> & {
+  /**
+   * @generated from field: repeated ec00.oa.v1.DependentRead items = 1;
+   */
+  items: DependentRead[];
+};
+
+/**
+ * Describes the message ec00.oa.v1.DependantsRead.
+ * Use `create(DependantsReadSchema)` to create a new message.
+ */
+export const DependantsReadSchema: GenMessage<DependantsRead> = /*@__PURE__*/
+  messageDesc(file_oa_v1, 12);
+
+/**
+ * @generated from message ec00.oa.v1.ArtifactRead
+ */
+export type ArtifactRead = Message<"ec00.oa.v1.ArtifactRead"> & {
+  /**
+   * @generated from field: int64 material_revision = 1;
+   */
+  materialRevision: bigint;
+
+  /**
+   * @generated from field: string material_digest = 2;
+   */
+  materialDigest: string;
+
+  /**
+   * @generated from field: string artifact_digest = 3;
+   */
+  artifactDigest: string;
+
+  /**
+   * @generated from field: string key_id = 4;
+   */
+  keyId: string;
+
+  /**
+   * @generated from field: bytes original_bytes = 5;
+   */
+  originalBytes: Uint8Array;
+
+  /**
+   * @generated from field: bytes envelope_bytes = 6;
+   */
+  envelopeBytes: Uint8Array;
+
+  /**
+   * @generated from field: bytes signature = 7;
+   */
+  signature: Uint8Array;
+};
+
+/**
+ * Describes the message ec00.oa.v1.ArtifactRead.
+ * Use `create(ArtifactReadSchema)` to create a new message.
+ */
+export const ArtifactReadSchema: GenMessage<ArtifactRead> = /*@__PURE__*/
+  messageDesc(file_oa_v1, 13);
+
+/**
+ * @generated from message ec00.oa.v1.RequestSummary
+ */
+export type RequestSummary = Message<"ec00.oa.v1.RequestSummary"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: int64 revision = 2;
+   */
+  revision: bigint;
+
+  /**
+   * @generated from field: ec00.oa.v1.RequestState state = 3;
+   */
+  state: RequestState;
+
+  /**
+   * @generated from field: int64 created_seq = 4;
+   */
+  createdSeq: bigint;
+};
+
+/**
+ * Describes the message ec00.oa.v1.RequestSummary.
+ * Use `create(RequestSummarySchema)` to create a new message.
+ */
+export const RequestSummarySchema: GenMessage<RequestSummary> = /*@__PURE__*/
+  messageDesc(file_oa_v1, 14);
+
+/**
+ * @generated from message ec00.oa.v1.RequestPage
+ */
+export type RequestPage = Message<"ec00.oa.v1.RequestPage"> & {
+  /**
+   * @generated from field: repeated ec00.oa.v1.RequestSummary items = 1;
+   */
+  items: RequestSummary[];
+
+  /**
+   * @generated from field: optional string next_cursor = 2;
+   */
+  nextCursor?: string | undefined;
+};
+
+/**
+ * Describes the message ec00.oa.v1.RequestPage.
+ * Use `create(RequestPageSchema)` to create a new message.
+ */
+export const RequestPageSchema: GenMessage<RequestPage> = /*@__PURE__*/
+  messageDesc(file_oa_v1, 15);
+
+/**
+ * @generated from message ec00.oa.v1.WatchEvent
+ */
+export type WatchEvent = Message<"ec00.oa.v1.WatchEvent"> & {
+  /**
+   * @generated from field: int64 seq = 1;
+   */
+  seq: bigint;
+
+  /**
+   * @generated from field: string request_id = 2;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string action = 3;
+   */
+  action: string;
+
+  /**
+   * @generated from field: int64 revision = 4;
+   */
+  revision: bigint;
+};
+
+/**
+ * Describes the message ec00.oa.v1.WatchEvent.
+ * Use `create(WatchEventSchema)` to create a new message.
+ */
+export const WatchEventSchema: GenMessage<WatchEvent> = /*@__PURE__*/
+  messageDesc(file_oa_v1, 16);
+
+/**
+ * @generated from message ec00.oa.v1.WatchPage
+ */
+export type WatchPage = Message<"ec00.oa.v1.WatchPage"> & {
+  /**
+   * @generated from field: repeated ec00.oa.v1.WatchEvent events = 1;
+   */
+  events: WatchEvent[];
+
+  /**
+   * @generated from field: optional string next_cursor = 2;
+   */
+  nextCursor?: string | undefined;
+
+  /**
+   * @generated from field: bool more = 3;
+   */
+  more: boolean;
+};
+
+/**
+ * Describes the message ec00.oa.v1.WatchPage.
+ * Use `create(WatchPageSchema)` to create a new message.
+ */
+export const WatchPageSchema: GenMessage<WatchPage> = /*@__PURE__*/
+  messageDesc(file_oa_v1, 17);
+
+/**
  * @generated from message ec00.oa.v1.RequestById
  */
 export type RequestById = Message<"ec00.oa.v1.RequestById"> & {
@@ -319,7 +643,7 @@ export type RequestById = Message<"ec00.oa.v1.RequestById"> & {
  * Use `create(RequestByIdSchema)` to create a new message.
  */
 export const RequestByIdSchema: GenMessage<RequestById> = /*@__PURE__*/
-  messageDesc(file_oa_v1, 9);
+  messageDesc(file_oa_v1, 18);
 
 /**
  * @generated from message ec00.oa.v1.ReadArtifactRequest
@@ -341,7 +665,7 @@ export type ReadArtifactRequest = Message<"ec00.oa.v1.ReadArtifactRequest"> & {
  * Use `create(ReadArtifactRequestSchema)` to create a new message.
  */
 export const ReadArtifactRequestSchema: GenMessage<ReadArtifactRequest> = /*@__PURE__*/
-  messageDesc(file_oa_v1, 10);
+  messageDesc(file_oa_v1, 19);
 
 /**
  * @generated from message ec00.oa.v1.PageRequest
@@ -363,24 +687,33 @@ export type PageRequest = Message<"ec00.oa.v1.PageRequest"> & {
  * Use `create(PageRequestSchema)` to create a new message.
  */
 export const PageRequestSchema: GenMessage<PageRequest> = /*@__PURE__*/
-  messageDesc(file_oa_v1, 11);
+  messageDesc(file_oa_v1, 20);
 
 /**
- * @generated from message ec00.oa.v1.JsonResult
+ * @generated from enum ec00.oa.v1.RequestState
  */
-export type JsonResult = Message<"ec00.oa.v1.JsonResult"> & {
+export enum RequestState {
   /**
-   * @generated from field: string json = 1;
+   * @generated from enum value: REQUEST_STATE_UNSPECIFIED = 0;
    */
-  json: string;
-};
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: REQUEST_STATE_OPEN = 1;
+   */
+  OPEN = 1,
+
+  /**
+   * @generated from enum value: REQUEST_STATE_RESOLVED = 2;
+   */
+  RESOLVED = 2,
+}
 
 /**
- * Describes the message ec00.oa.v1.JsonResult.
- * Use `create(JsonResultSchema)` to create a new message.
+ * Describes the enum ec00.oa.v1.RequestState.
  */
-export const JsonResultSchema: GenMessage<JsonResult> = /*@__PURE__*/
-  messageDesc(file_oa_v1, 12);
+export const RequestStateSchema: GenEnum<RequestState> = /*@__PURE__*/
+  enumDesc(file_oa_v1, 0);
 
 /**
  * @generated from service ec00.oa.v1.OwnerOperations
@@ -456,7 +789,7 @@ export const OwnerOperations: GenService<{
   readRequest: {
     methodKind: "unary";
     input: typeof RequestByIdSchema;
-    output: typeof JsonResultSchema;
+    output: typeof RequestReadSchema;
   },
   /**
    * @generated from rpc ec00.oa.v1.OwnerOperations.ReadDependants
@@ -464,7 +797,7 @@ export const OwnerOperations: GenService<{
   readDependants: {
     methodKind: "unary";
     input: typeof RequestByIdSchema;
-    output: typeof JsonResultSchema;
+    output: typeof DependantsReadSchema;
   },
   /**
    * @generated from rpc ec00.oa.v1.OwnerOperations.ReadArtifact
@@ -472,7 +805,7 @@ export const OwnerOperations: GenService<{
   readArtifact: {
     methodKind: "unary";
     input: typeof ReadArtifactRequestSchema;
-    output: typeof JsonResultSchema;
+    output: typeof ArtifactReadSchema;
   },
   /**
    * @generated from rpc ec00.oa.v1.OwnerOperations.ListRequests
@@ -480,7 +813,7 @@ export const OwnerOperations: GenService<{
   listRequests: {
     methodKind: "unary";
     input: typeof PageRequestSchema;
-    output: typeof JsonResultSchema;
+    output: typeof RequestPageSchema;
   },
   /**
    * @generated from rpc ec00.oa.v1.OwnerOperations.Watch
@@ -488,7 +821,7 @@ export const OwnerOperations: GenService<{
   watch: {
     methodKind: "unary";
     input: typeof PageRequestSchema;
-    output: typeof JsonResultSchema;
+    output: typeof WatchPageSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_oa_v1, 0);

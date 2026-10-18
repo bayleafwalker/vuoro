@@ -46,11 +46,11 @@ type OwnerOperationsClient interface {
 	DecideArtifact(ctx context.Context, in *DecideArtifactRequest, opts ...grpc.CallOption) (*MutationResult, error)
 	Resolve(ctx context.Context, in *ResolveRequest, opts ...grpc.CallOption) (*MutationResult, error)
 	AcknowledgeContinuation(ctx context.Context, in *AcknowledgeContinuationRequest, opts ...grpc.CallOption) (*MutationResult, error)
-	ReadRequest(ctx context.Context, in *RequestById, opts ...grpc.CallOption) (*JsonResult, error)
-	ReadDependants(ctx context.Context, in *RequestById, opts ...grpc.CallOption) (*JsonResult, error)
-	ReadArtifact(ctx context.Context, in *ReadArtifactRequest, opts ...grpc.CallOption) (*JsonResult, error)
-	ListRequests(ctx context.Context, in *PageRequest, opts ...grpc.CallOption) (*JsonResult, error)
-	Watch(ctx context.Context, in *PageRequest, opts ...grpc.CallOption) (*JsonResult, error)
+	ReadRequest(ctx context.Context, in *RequestById, opts ...grpc.CallOption) (*RequestRead, error)
+	ReadDependants(ctx context.Context, in *RequestById, opts ...grpc.CallOption) (*DependantsRead, error)
+	ReadArtifact(ctx context.Context, in *ReadArtifactRequest, opts ...grpc.CallOption) (*ArtifactRead, error)
+	ListRequests(ctx context.Context, in *PageRequest, opts ...grpc.CallOption) (*RequestPage, error)
+	Watch(ctx context.Context, in *PageRequest, opts ...grpc.CallOption) (*WatchPage, error)
 }
 
 type ownerOperationsClient struct {
@@ -141,9 +141,9 @@ func (c *ownerOperationsClient) AcknowledgeContinuation(ctx context.Context, in 
 	return out, nil
 }
 
-func (c *ownerOperationsClient) ReadRequest(ctx context.Context, in *RequestById, opts ...grpc.CallOption) (*JsonResult, error) {
+func (c *ownerOperationsClient) ReadRequest(ctx context.Context, in *RequestById, opts ...grpc.CallOption) (*RequestRead, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(JsonResult)
+	out := new(RequestRead)
 	err := c.cc.Invoke(ctx, OwnerOperations_ReadRequest_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -151,9 +151,9 @@ func (c *ownerOperationsClient) ReadRequest(ctx context.Context, in *RequestById
 	return out, nil
 }
 
-func (c *ownerOperationsClient) ReadDependants(ctx context.Context, in *RequestById, opts ...grpc.CallOption) (*JsonResult, error) {
+func (c *ownerOperationsClient) ReadDependants(ctx context.Context, in *RequestById, opts ...grpc.CallOption) (*DependantsRead, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(JsonResult)
+	out := new(DependantsRead)
 	err := c.cc.Invoke(ctx, OwnerOperations_ReadDependants_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -161,9 +161,9 @@ func (c *ownerOperationsClient) ReadDependants(ctx context.Context, in *RequestB
 	return out, nil
 }
 
-func (c *ownerOperationsClient) ReadArtifact(ctx context.Context, in *ReadArtifactRequest, opts ...grpc.CallOption) (*JsonResult, error) {
+func (c *ownerOperationsClient) ReadArtifact(ctx context.Context, in *ReadArtifactRequest, opts ...grpc.CallOption) (*ArtifactRead, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(JsonResult)
+	out := new(ArtifactRead)
 	err := c.cc.Invoke(ctx, OwnerOperations_ReadArtifact_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -171,9 +171,9 @@ func (c *ownerOperationsClient) ReadArtifact(ctx context.Context, in *ReadArtifa
 	return out, nil
 }
 
-func (c *ownerOperationsClient) ListRequests(ctx context.Context, in *PageRequest, opts ...grpc.CallOption) (*JsonResult, error) {
+func (c *ownerOperationsClient) ListRequests(ctx context.Context, in *PageRequest, opts ...grpc.CallOption) (*RequestPage, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(JsonResult)
+	out := new(RequestPage)
 	err := c.cc.Invoke(ctx, OwnerOperations_ListRequests_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -181,9 +181,9 @@ func (c *ownerOperationsClient) ListRequests(ctx context.Context, in *PageReques
 	return out, nil
 }
 
-func (c *ownerOperationsClient) Watch(ctx context.Context, in *PageRequest, opts ...grpc.CallOption) (*JsonResult, error) {
+func (c *ownerOperationsClient) Watch(ctx context.Context, in *PageRequest, opts ...grpc.CallOption) (*WatchPage, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(JsonResult)
+	out := new(WatchPage)
 	err := c.cc.Invoke(ctx, OwnerOperations_Watch_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -203,11 +203,11 @@ type OwnerOperationsServer interface {
 	DecideArtifact(context.Context, *DecideArtifactRequest) (*MutationResult, error)
 	Resolve(context.Context, *ResolveRequest) (*MutationResult, error)
 	AcknowledgeContinuation(context.Context, *AcknowledgeContinuationRequest) (*MutationResult, error)
-	ReadRequest(context.Context, *RequestById) (*JsonResult, error)
-	ReadDependants(context.Context, *RequestById) (*JsonResult, error)
-	ReadArtifact(context.Context, *ReadArtifactRequest) (*JsonResult, error)
-	ListRequests(context.Context, *PageRequest) (*JsonResult, error)
-	Watch(context.Context, *PageRequest) (*JsonResult, error)
+	ReadRequest(context.Context, *RequestById) (*RequestRead, error)
+	ReadDependants(context.Context, *RequestById) (*DependantsRead, error)
+	ReadArtifact(context.Context, *ReadArtifactRequest) (*ArtifactRead, error)
+	ListRequests(context.Context, *PageRequest) (*RequestPage, error)
+	Watch(context.Context, *PageRequest) (*WatchPage, error)
 	mustEmbedUnimplementedOwnerOperationsServer()
 }
 
@@ -242,19 +242,19 @@ func (UnimplementedOwnerOperationsServer) Resolve(context.Context, *ResolveReque
 func (UnimplementedOwnerOperationsServer) AcknowledgeContinuation(context.Context, *AcknowledgeContinuationRequest) (*MutationResult, error) {
 	return nil, status.Error(codes.Unimplemented, "method AcknowledgeContinuation not implemented")
 }
-func (UnimplementedOwnerOperationsServer) ReadRequest(context.Context, *RequestById) (*JsonResult, error) {
+func (UnimplementedOwnerOperationsServer) ReadRequest(context.Context, *RequestById) (*RequestRead, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReadRequest not implemented")
 }
-func (UnimplementedOwnerOperationsServer) ReadDependants(context.Context, *RequestById) (*JsonResult, error) {
+func (UnimplementedOwnerOperationsServer) ReadDependants(context.Context, *RequestById) (*DependantsRead, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReadDependants not implemented")
 }
-func (UnimplementedOwnerOperationsServer) ReadArtifact(context.Context, *ReadArtifactRequest) (*JsonResult, error) {
+func (UnimplementedOwnerOperationsServer) ReadArtifact(context.Context, *ReadArtifactRequest) (*ArtifactRead, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReadArtifact not implemented")
 }
-func (UnimplementedOwnerOperationsServer) ListRequests(context.Context, *PageRequest) (*JsonResult, error) {
+func (UnimplementedOwnerOperationsServer) ListRequests(context.Context, *PageRequest) (*RequestPage, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListRequests not implemented")
 }
-func (UnimplementedOwnerOperationsServer) Watch(context.Context, *PageRequest) (*JsonResult, error) {
+func (UnimplementedOwnerOperationsServer) Watch(context.Context, *PageRequest) (*WatchPage, error) {
 	return nil, status.Error(codes.Unimplemented, "method Watch not implemented")
 }
 func (UnimplementedOwnerOperationsServer) mustEmbedUnimplementedOwnerOperationsServer() {}

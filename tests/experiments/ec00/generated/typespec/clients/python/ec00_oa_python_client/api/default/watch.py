@@ -5,7 +5,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.read_result import ReadResult
+from ...models.watch_page import WatchPage
 from ...types import UNSET, Response, Unset
 
 
@@ -34,9 +34,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ReadResult | None:
+) -> WatchPage | None:
     if response.status_code == 200:
-        response_200 = ReadResult.from_dict(response.json())
+        response_200 = WatchPage.from_dict(response.json())
 
         return response_200
 
@@ -48,7 +48,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ReadResult]:
+) -> Response[WatchPage]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -62,7 +62,7 @@ def sync_detailed(
     client: AuthenticatedClient | Client,
     cursor: str | Unset = UNSET,
     limit: int | Unset = UNSET,
-) -> Response[ReadResult]:
+) -> Response[WatchPage]:
     """
     Args:
         cursor (str | Unset):
@@ -73,7 +73,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ReadResult]
+        Response[WatchPage]
     """
 
     kwargs = _get_kwargs(
@@ -93,7 +93,7 @@ def sync(
     client: AuthenticatedClient | Client,
     cursor: str | Unset = UNSET,
     limit: int | Unset = UNSET,
-) -> ReadResult | None:
+) -> WatchPage | None:
     """
     Args:
         cursor (str | Unset):
@@ -104,7 +104,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ReadResult
+        WatchPage
     """
 
     return sync_detailed(
@@ -119,7 +119,7 @@ async def asyncio_detailed(
     client: AuthenticatedClient | Client,
     cursor: str | Unset = UNSET,
     limit: int | Unset = UNSET,
-) -> Response[ReadResult]:
+) -> Response[WatchPage]:
     """
     Args:
         cursor (str | Unset):
@@ -130,7 +130,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ReadResult]
+        Response[WatchPage]
     """
 
     kwargs = _get_kwargs(
@@ -148,7 +148,7 @@ async def asyncio(
     client: AuthenticatedClient | Client,
     cursor: str | Unset = UNSET,
     limit: int | Unset = UNSET,
-) -> ReadResult | None:
+) -> WatchPage | None:
     """
     Args:
         cursor (str | Unset):
@@ -159,7 +159,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ReadResult
+        WatchPage
     """
 
     return (

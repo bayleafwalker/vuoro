@@ -183,7 +183,7 @@ pub async fn decide_artifact(configuration: &configuration::Configuration, reque
     }
 }
 
-pub async fn list_requests(configuration: &configuration::Configuration, cursor: Option<&str>, limit: Option<i32>) -> Result<models::ReadResult, Error<ListRequestsError>> {
+pub async fn list_requests(configuration: &configuration::Configuration, cursor: Option<&str>, limit: Option<i32>) -> Result<models::RequestPage, Error<ListRequestsError>> {
     // add a prefix to parameters to efficiently prevent name collisions
     let p_query_cursor = cursor;
     let p_query_limit = limit;
@@ -216,8 +216,8 @@ pub async fn list_requests(configuration: &configuration::Configuration, cursor:
         let content = resp.text().await?;
         match content_type {
             ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
-            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::ReadResult`"))),
-            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::ReadResult`")))),
+            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::RequestPage`"))),
+            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::RequestPage`")))),
         }
     } else {
         let content = resp.text().await?;
@@ -263,12 +263,12 @@ pub async fn publish(configuration: &configuration::Configuration, publish_reque
     }
 }
 
-pub async fn read_artifact(configuration: &configuration::Configuration, request_id: &str, material_revision: i64) -> Result<models::ReadResult, Error<ReadArtifactError>> {
+pub async fn read_artifact(configuration: &configuration::Configuration, request_id: &str, material_revision: &str) -> Result<models::ArtifactRead, Error<ReadArtifactError>> {
     // add a prefix to parameters to efficiently prevent name collisions
     let p_path_request_id = request_id;
     let p_path_material_revision = material_revision;
 
-    let uri_str = format!("{}/v1/requests/{requestId}/artifact/{materialRevision}", configuration.base_path, requestId=crate::apis::urlencode(p_path_request_id), materialRevision=p_path_material_revision);
+    let uri_str = format!("{}/v1/requests/{requestId}/artifact/{materialRevision}", configuration.base_path, requestId=crate::apis::urlencode(p_path_request_id), materialRevision=crate::apis::urlencode(p_path_material_revision));
     let mut req_builder = configuration.client.request(reqwest::Method::GET, &uri_str);
 
     if let Some(ref user_agent) = configuration.user_agent {
@@ -290,8 +290,8 @@ pub async fn read_artifact(configuration: &configuration::Configuration, request
         let content = resp.text().await?;
         match content_type {
             ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
-            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::ReadResult`"))),
-            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::ReadResult`")))),
+            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::ArtifactRead`"))),
+            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::ArtifactRead`")))),
         }
     } else {
         let content = resp.text().await?;
@@ -300,7 +300,7 @@ pub async fn read_artifact(configuration: &configuration::Configuration, request
     }
 }
 
-pub async fn read_dependants(configuration: &configuration::Configuration, request_id: &str) -> Result<models::ReadResult, Error<ReadDependantsError>> {
+pub async fn read_dependants(configuration: &configuration::Configuration, request_id: &str) -> Result<models::DependantsRead, Error<ReadDependantsError>> {
     // add a prefix to parameters to efficiently prevent name collisions
     let p_path_request_id = request_id;
 
@@ -326,8 +326,8 @@ pub async fn read_dependants(configuration: &configuration::Configuration, reque
         let content = resp.text().await?;
         match content_type {
             ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
-            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::ReadResult`"))),
-            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::ReadResult`")))),
+            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::DependantsRead`"))),
+            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::DependantsRead`")))),
         }
     } else {
         let content = resp.text().await?;
@@ -336,7 +336,7 @@ pub async fn read_dependants(configuration: &configuration::Configuration, reque
     }
 }
 
-pub async fn read_request(configuration: &configuration::Configuration, request_id: &str) -> Result<models::ReadResult, Error<ReadRequestError>> {
+pub async fn read_request(configuration: &configuration::Configuration, request_id: &str) -> Result<models::RequestRead, Error<ReadRequestError>> {
     // add a prefix to parameters to efficiently prevent name collisions
     let p_path_request_id = request_id;
 
@@ -362,8 +362,8 @@ pub async fn read_request(configuration: &configuration::Configuration, request_
         let content = resp.text().await?;
         match content_type {
             ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
-            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::ReadResult`"))),
-            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::ReadResult`")))),
+            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::RequestRead`"))),
+            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::RequestRead`")))),
         }
     } else {
         let content = resp.text().await?;
@@ -524,7 +524,7 @@ pub async fn verify(configuration: &configuration::Configuration, request_id: &s
     }
 }
 
-pub async fn watch(configuration: &configuration::Configuration, cursor: Option<&str>, limit: Option<i32>) -> Result<models::ReadResult, Error<WatchError>> {
+pub async fn watch(configuration: &configuration::Configuration, cursor: Option<&str>, limit: Option<i32>) -> Result<models::WatchPage, Error<WatchError>> {
     // add a prefix to parameters to efficiently prevent name collisions
     let p_query_cursor = cursor;
     let p_query_limit = limit;
@@ -557,8 +557,8 @@ pub async fn watch(configuration: &configuration::Configuration, cursor: Option<
         let content = resp.text().await?;
         match content_type {
             ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
-            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::ReadResult`"))),
-            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::ReadResult`")))),
+            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::WatchPage`"))),
+            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::WatchPage`")))),
         }
     } else {
         let content = resp.text().await?;

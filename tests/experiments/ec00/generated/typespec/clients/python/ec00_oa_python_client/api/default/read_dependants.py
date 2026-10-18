@@ -6,7 +6,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.read_result import ReadResult
+from ...models.dependants_read import DependantsRead
 from ...types import Response
 
 
@@ -26,9 +26,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ReadResult | None:
+) -> DependantsRead | None:
     if response.status_code == 200:
-        response_200 = ReadResult.from_dict(response.json())
+        response_200 = DependantsRead.from_dict(response.json())
 
         return response_200
 
@@ -40,7 +40,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ReadResult]:
+) -> Response[DependantsRead]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -53,7 +53,7 @@ def sync_detailed(
     request_id: str,
     *,
     client: AuthenticatedClient | Client,
-) -> Response[ReadResult]:
+) -> Response[DependantsRead]:
     """
     Args:
         request_id (str):
@@ -63,7 +63,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ReadResult]
+        Response[DependantsRead]
     """
 
     kwargs = _get_kwargs(
@@ -81,7 +81,7 @@ def sync(
     request_id: str,
     *,
     client: AuthenticatedClient | Client,
-) -> ReadResult | None:
+) -> DependantsRead | None:
     """
     Args:
         request_id (str):
@@ -91,7 +91,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ReadResult
+        DependantsRead
     """
 
     return sync_detailed(
@@ -104,7 +104,7 @@ async def asyncio_detailed(
     request_id: str,
     *,
     client: AuthenticatedClient | Client,
-) -> Response[ReadResult]:
+) -> Response[DependantsRead]:
     """
     Args:
         request_id (str):
@@ -114,7 +114,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ReadResult]
+        Response[DependantsRead]
     """
 
     kwargs = _get_kwargs(
@@ -130,7 +130,7 @@ async def asyncio(
     request_id: str,
     *,
     client: AuthenticatedClient | Client,
-) -> ReadResult | None:
+) -> DependantsRead | None:
     """
     Args:
         request_id (str):
@@ -140,7 +140,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ReadResult
+        DependantsRead
     """
 
     return (

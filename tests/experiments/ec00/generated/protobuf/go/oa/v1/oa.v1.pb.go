@@ -22,6 +22,55 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type RequestState int32
+
+const (
+	RequestState_REQUEST_STATE_UNSPECIFIED RequestState = 0
+	RequestState_REQUEST_STATE_OPEN        RequestState = 1
+	RequestState_REQUEST_STATE_RESOLVED    RequestState = 2
+)
+
+// Enum value maps for RequestState.
+var (
+	RequestState_name = map[int32]string{
+		0: "REQUEST_STATE_UNSPECIFIED",
+		1: "REQUEST_STATE_OPEN",
+		2: "REQUEST_STATE_RESOLVED",
+	}
+	RequestState_value = map[string]int32{
+		"REQUEST_STATE_UNSPECIFIED": 0,
+		"REQUEST_STATE_OPEN":        1,
+		"REQUEST_STATE_RESOLVED":    2,
+	}
+)
+
+func (x RequestState) Enum() *RequestState {
+	p := new(RequestState)
+	*p = x
+	return p
+}
+
+func (x RequestState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (RequestState) Descriptor() protoreflect.EnumDescriptor {
+	return file_oa_v1_proto_enumTypes[0].Descriptor()
+}
+
+func (RequestState) Type() protoreflect.EnumType {
+	return &file_oa_v1_proto_enumTypes[0]
+}
+
+func (x RequestState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use RequestState.Descriptor instead.
+func (RequestState) EnumDescriptor() ([]byte, []int) {
+	return file_oa_v1_proto_rawDescGZIP(), []int{0}
+}
+
 type PublishRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// OA item identifiers are decimal strings so JavaScript clients do not round
@@ -34,11 +83,11 @@ type PublishRequest struct {
 	//	*PublishRequest_NoteNull
 	NoteValue         isPublishRequest_NoteValue `protobuf_oneof:"note_value"`
 	DependentIds      []string                   `protobuf:"bytes,5,rep,name=dependent_ids,json=dependentIds,proto3" json:"dependent_ids,omitempty"`
-	ArtifactDigest    string                     `protobuf:"bytes,6,opt,name=artifact_digest,json=artifactDigest,proto3" json:"artifact_digest,omitempty"`
-	ArtifactKeyId     string                     `protobuf:"bytes,7,opt,name=artifact_key_id,json=artifactKeyId,proto3" json:"artifact_key_id,omitempty"`
-	ArtifactBytes     []byte                     `protobuf:"bytes,8,opt,name=artifact_bytes,json=artifactBytes,proto3" json:"artifact_bytes,omitempty"`
-	ArtifactEnvelope  []byte                     `protobuf:"bytes,9,opt,name=artifact_envelope,json=artifactEnvelope,proto3" json:"artifact_envelope,omitempty"`
-	ArtifactSignature []byte                     `protobuf:"bytes,10,opt,name=artifact_signature,json=artifactSignature,proto3" json:"artifact_signature,omitempty"`
+	ArtifactDigest    *string                    `protobuf:"bytes,6,opt,name=artifact_digest,json=artifactDigest,proto3,oneof" json:"artifact_digest,omitempty"`
+	ArtifactKeyId     *string                    `protobuf:"bytes,7,opt,name=artifact_key_id,json=artifactKeyId,proto3,oneof" json:"artifact_key_id,omitempty"`
+	ArtifactBytes     []byte                     `protobuf:"bytes,8,opt,name=artifact_bytes,json=artifactBytes,proto3,oneof" json:"artifact_bytes,omitempty"`
+	ArtifactEnvelope  []byte                     `protobuf:"bytes,9,opt,name=artifact_envelope,json=artifactEnvelope,proto3,oneof" json:"artifact_envelope,omitempty"`
+	ArtifactSignature []byte                     `protobuf:"bytes,10,opt,name=artifact_signature,json=artifactSignature,proto3,oneof" json:"artifact_signature,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -120,15 +169,15 @@ func (x *PublishRequest) GetDependentIds() []string {
 }
 
 func (x *PublishRequest) GetArtifactDigest() string {
-	if x != nil {
-		return x.ArtifactDigest
+	if x != nil && x.ArtifactDigest != nil {
+		return *x.ArtifactDigest
 	}
 	return ""
 }
 
 func (x *PublishRequest) GetArtifactKeyId() string {
-	if x != nil {
-		return x.ArtifactKeyId
+	if x != nil && x.ArtifactKeyId != nil {
+		return *x.ArtifactKeyId
 	}
 	return ""
 }
@@ -672,6 +721,732 @@ func (x *AcknowledgeContinuationRequest) GetExpectedRevision() int64 {
 	return 0
 }
 
+type RequestBody struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Objective string                 `protobuf:"bytes,1,opt,name=objective,proto3" json:"objective,omitempty"`
+	// Types that are valid to be assigned to NoteValue:
+	//
+	//	*RequestBody_Note
+	//	*RequestBody_NoteNull
+	NoteValue     isRequestBody_NoteValue `protobuf_oneof:"note_value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RequestBody) Reset() {
+	*x = RequestBody{}
+	mi := &file_oa_v1_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestBody) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestBody) ProtoMessage() {}
+
+func (x *RequestBody) ProtoReflect() protoreflect.Message {
+	mi := &file_oa_v1_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestBody.ProtoReflect.Descriptor instead.
+func (*RequestBody) Descriptor() ([]byte, []int) {
+	return file_oa_v1_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *RequestBody) GetObjective() string {
+	if x != nil {
+		return x.Objective
+	}
+	return ""
+}
+
+func (x *RequestBody) GetNoteValue() isRequestBody_NoteValue {
+	if x != nil {
+		return x.NoteValue
+	}
+	return nil
+}
+
+func (x *RequestBody) GetNote() string {
+	if x != nil {
+		if x, ok := x.NoteValue.(*RequestBody_Note); ok {
+			return x.Note
+		}
+	}
+	return ""
+}
+
+func (x *RequestBody) GetNoteNull() structpb.NullValue {
+	if x != nil {
+		if x, ok := x.NoteValue.(*RequestBody_NoteNull); ok {
+			return x.NoteNull
+		}
+	}
+	return structpb.NullValue(0)
+}
+
+type isRequestBody_NoteValue interface {
+	isRequestBody_NoteValue()
+}
+
+type RequestBody_Note struct {
+	Note string `protobuf:"bytes,2,opt,name=note,proto3,oneof"`
+}
+
+type RequestBody_NoteNull struct {
+	NoteNull structpb.NullValue `protobuf:"varint,3,opt,name=note_null,json=noteNull,proto3,enum=google.protobuf.NullValue,oneof"`
+}
+
+func (*RequestBody_Note) isRequestBody_NoteValue() {}
+
+func (*RequestBody_NoteNull) isRequestBody_NoteValue() {}
+
+type RequestRead struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	RequestId        string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Revision         int64                  `protobuf:"varint,2,opt,name=revision,proto3" json:"revision,omitempty"`
+	MaterialRevision int64                  `protobuf:"varint,3,opt,name=material_revision,json=materialRevision,proto3" json:"material_revision,omitempty"`
+	State            RequestState           `protobuf:"varint,4,opt,name=state,proto3,enum=ec00.oa.v1.RequestState" json:"state,omitempty"`
+	Body             *RequestBody           `protobuf:"bytes,5,opt,name=body,proto3" json:"body,omitempty"`
+	Reported         bool                   `protobuf:"varint,6,opt,name=reported,proto3" json:"reported,omitempty"`
+	Verified         bool                   `protobuf:"varint,7,opt,name=verified,proto3" json:"verified,omitempty"`
+	// Types that are valid to be assigned to EvidenceRefValue:
+	//
+	//	*RequestRead_EvidenceRef
+	//	*RequestRead_EvidenceRefNull
+	EvidenceRefValue isRequestRead_EvidenceRefValue `protobuf_oneof:"evidence_ref_value"`
+	// Types that are valid to be assigned to ArtifactDecisionValue:
+	//
+	//	*RequestRead_ArtifactDecisionDigest
+	//	*RequestRead_ArtifactDecisionDigestNull
+	ArtifactDecisionValue isRequestRead_ArtifactDecisionValue `protobuf_oneof:"artifact_decision_value"`
+	CreatedSeq            int64                               `protobuf:"varint,12,opt,name=created_seq,json=createdSeq,proto3" json:"created_seq,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *RequestRead) Reset() {
+	*x = RequestRead{}
+	mi := &file_oa_v1_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestRead) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestRead) ProtoMessage() {}
+
+func (x *RequestRead) ProtoReflect() protoreflect.Message {
+	mi := &file_oa_v1_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestRead.ProtoReflect.Descriptor instead.
+func (*RequestRead) Descriptor() ([]byte, []int) {
+	return file_oa_v1_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *RequestRead) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *RequestRead) GetRevision() int64 {
+	if x != nil {
+		return x.Revision
+	}
+	return 0
+}
+
+func (x *RequestRead) GetMaterialRevision() int64 {
+	if x != nil {
+		return x.MaterialRevision
+	}
+	return 0
+}
+
+func (x *RequestRead) GetState() RequestState {
+	if x != nil {
+		return x.State
+	}
+	return RequestState_REQUEST_STATE_UNSPECIFIED
+}
+
+func (x *RequestRead) GetBody() *RequestBody {
+	if x != nil {
+		return x.Body
+	}
+	return nil
+}
+
+func (x *RequestRead) GetReported() bool {
+	if x != nil {
+		return x.Reported
+	}
+	return false
+}
+
+func (x *RequestRead) GetVerified() bool {
+	if x != nil {
+		return x.Verified
+	}
+	return false
+}
+
+func (x *RequestRead) GetEvidenceRefValue() isRequestRead_EvidenceRefValue {
+	if x != nil {
+		return x.EvidenceRefValue
+	}
+	return nil
+}
+
+func (x *RequestRead) GetEvidenceRef() string {
+	if x != nil {
+		if x, ok := x.EvidenceRefValue.(*RequestRead_EvidenceRef); ok {
+			return x.EvidenceRef
+		}
+	}
+	return ""
+}
+
+func (x *RequestRead) GetEvidenceRefNull() structpb.NullValue {
+	if x != nil {
+		if x, ok := x.EvidenceRefValue.(*RequestRead_EvidenceRefNull); ok {
+			return x.EvidenceRefNull
+		}
+	}
+	return structpb.NullValue(0)
+}
+
+func (x *RequestRead) GetArtifactDecisionValue() isRequestRead_ArtifactDecisionValue {
+	if x != nil {
+		return x.ArtifactDecisionValue
+	}
+	return nil
+}
+
+func (x *RequestRead) GetArtifactDecisionDigest() string {
+	if x != nil {
+		if x, ok := x.ArtifactDecisionValue.(*RequestRead_ArtifactDecisionDigest); ok {
+			return x.ArtifactDecisionDigest
+		}
+	}
+	return ""
+}
+
+func (x *RequestRead) GetArtifactDecisionDigestNull() structpb.NullValue {
+	if x != nil {
+		if x, ok := x.ArtifactDecisionValue.(*RequestRead_ArtifactDecisionDigestNull); ok {
+			return x.ArtifactDecisionDigestNull
+		}
+	}
+	return structpb.NullValue(0)
+}
+
+func (x *RequestRead) GetCreatedSeq() int64 {
+	if x != nil {
+		return x.CreatedSeq
+	}
+	return 0
+}
+
+type isRequestRead_EvidenceRefValue interface {
+	isRequestRead_EvidenceRefValue()
+}
+
+type RequestRead_EvidenceRef struct {
+	EvidenceRef string `protobuf:"bytes,8,opt,name=evidence_ref,json=evidenceRef,proto3,oneof"`
+}
+
+type RequestRead_EvidenceRefNull struct {
+	EvidenceRefNull structpb.NullValue `protobuf:"varint,9,opt,name=evidence_ref_null,json=evidenceRefNull,proto3,enum=google.protobuf.NullValue,oneof"`
+}
+
+func (*RequestRead_EvidenceRef) isRequestRead_EvidenceRefValue() {}
+
+func (*RequestRead_EvidenceRefNull) isRequestRead_EvidenceRefValue() {}
+
+type isRequestRead_ArtifactDecisionValue interface {
+	isRequestRead_ArtifactDecisionValue()
+}
+
+type RequestRead_ArtifactDecisionDigest struct {
+	ArtifactDecisionDigest string `protobuf:"bytes,10,opt,name=artifact_decision_digest,json=artifactDecisionDigest,proto3,oneof"`
+}
+
+type RequestRead_ArtifactDecisionDigestNull struct {
+	ArtifactDecisionDigestNull structpb.NullValue `protobuf:"varint,11,opt,name=artifact_decision_digest_null,json=artifactDecisionDigestNull,proto3,enum=google.protobuf.NullValue,oneof"`
+}
+
+func (*RequestRead_ArtifactDecisionDigest) isRequestRead_ArtifactDecisionValue() {}
+
+func (*RequestRead_ArtifactDecisionDigestNull) isRequestRead_ArtifactDecisionValue() {}
+
+type DependentRead struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	DependentId     string                 `protobuf:"bytes,1,opt,name=dependent_id,json=dependentId,proto3" json:"dependent_id,omitempty"`
+	Active          bool                   `protobuf:"varint,2,opt,name=active,proto3" json:"active,omitempty"`
+	ContinuationAck bool                   `protobuf:"varint,3,opt,name=continuation_ack,json=continuationAck,proto3" json:"continuation_ack,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *DependentRead) Reset() {
+	*x = DependentRead{}
+	mi := &file_oa_v1_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DependentRead) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DependentRead) ProtoMessage() {}
+
+func (x *DependentRead) ProtoReflect() protoreflect.Message {
+	mi := &file_oa_v1_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DependentRead.ProtoReflect.Descriptor instead.
+func (*DependentRead) Descriptor() ([]byte, []int) {
+	return file_oa_v1_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *DependentRead) GetDependentId() string {
+	if x != nil {
+		return x.DependentId
+	}
+	return ""
+}
+
+func (x *DependentRead) GetActive() bool {
+	if x != nil {
+		return x.Active
+	}
+	return false
+}
+
+func (x *DependentRead) GetContinuationAck() bool {
+	if x != nil {
+		return x.ContinuationAck
+	}
+	return false
+}
+
+type DependantsRead struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*DependentRead       `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DependantsRead) Reset() {
+	*x = DependantsRead{}
+	mi := &file_oa_v1_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DependantsRead) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DependantsRead) ProtoMessage() {}
+
+func (x *DependantsRead) ProtoReflect() protoreflect.Message {
+	mi := &file_oa_v1_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DependantsRead.ProtoReflect.Descriptor instead.
+func (*DependantsRead) Descriptor() ([]byte, []int) {
+	return file_oa_v1_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *DependantsRead) GetItems() []*DependentRead {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+type ArtifactRead struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	MaterialRevision int64                  `protobuf:"varint,1,opt,name=material_revision,json=materialRevision,proto3" json:"material_revision,omitempty"`
+	MaterialDigest   string                 `protobuf:"bytes,2,opt,name=material_digest,json=materialDigest,proto3" json:"material_digest,omitempty"`
+	ArtifactDigest   string                 `protobuf:"bytes,3,opt,name=artifact_digest,json=artifactDigest,proto3" json:"artifact_digest,omitempty"`
+	KeyId            string                 `protobuf:"bytes,4,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
+	OriginalBytes    []byte                 `protobuf:"bytes,5,opt,name=original_bytes,json=originalBytes,proto3" json:"original_bytes,omitempty"`
+	EnvelopeBytes    []byte                 `protobuf:"bytes,6,opt,name=envelope_bytes,json=envelopeBytes,proto3" json:"envelope_bytes,omitempty"`
+	Signature        []byte                 `protobuf:"bytes,7,opt,name=signature,proto3" json:"signature,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ArtifactRead) Reset() {
+	*x = ArtifactRead{}
+	mi := &file_oa_v1_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ArtifactRead) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ArtifactRead) ProtoMessage() {}
+
+func (x *ArtifactRead) ProtoReflect() protoreflect.Message {
+	mi := &file_oa_v1_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ArtifactRead.ProtoReflect.Descriptor instead.
+func (*ArtifactRead) Descriptor() ([]byte, []int) {
+	return file_oa_v1_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ArtifactRead) GetMaterialRevision() int64 {
+	if x != nil {
+		return x.MaterialRevision
+	}
+	return 0
+}
+
+func (x *ArtifactRead) GetMaterialDigest() string {
+	if x != nil {
+		return x.MaterialDigest
+	}
+	return ""
+}
+
+func (x *ArtifactRead) GetArtifactDigest() string {
+	if x != nil {
+		return x.ArtifactDigest
+	}
+	return ""
+}
+
+func (x *ArtifactRead) GetKeyId() string {
+	if x != nil {
+		return x.KeyId
+	}
+	return ""
+}
+
+func (x *ArtifactRead) GetOriginalBytes() []byte {
+	if x != nil {
+		return x.OriginalBytes
+	}
+	return nil
+}
+
+func (x *ArtifactRead) GetEnvelopeBytes() []byte {
+	if x != nil {
+		return x.EnvelopeBytes
+	}
+	return nil
+}
+
+func (x *ArtifactRead) GetSignature() []byte {
+	if x != nil {
+		return x.Signature
+	}
+	return nil
+}
+
+type RequestSummary struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Revision      int64                  `protobuf:"varint,2,opt,name=revision,proto3" json:"revision,omitempty"`
+	State         RequestState           `protobuf:"varint,3,opt,name=state,proto3,enum=ec00.oa.v1.RequestState" json:"state,omitempty"`
+	CreatedSeq    int64                  `protobuf:"varint,4,opt,name=created_seq,json=createdSeq,proto3" json:"created_seq,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RequestSummary) Reset() {
+	*x = RequestSummary{}
+	mi := &file_oa_v1_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestSummary) ProtoMessage() {}
+
+func (x *RequestSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_oa_v1_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestSummary.ProtoReflect.Descriptor instead.
+func (*RequestSummary) Descriptor() ([]byte, []int) {
+	return file_oa_v1_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *RequestSummary) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *RequestSummary) GetRevision() int64 {
+	if x != nil {
+		return x.Revision
+	}
+	return 0
+}
+
+func (x *RequestSummary) GetState() RequestState {
+	if x != nil {
+		return x.State
+	}
+	return RequestState_REQUEST_STATE_UNSPECIFIED
+}
+
+func (x *RequestSummary) GetCreatedSeq() int64 {
+	if x != nil {
+		return x.CreatedSeq
+	}
+	return 0
+}
+
+type RequestPage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*RequestSummary      `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	NextCursor    *string                `protobuf:"bytes,2,opt,name=next_cursor,json=nextCursor,proto3,oneof" json:"next_cursor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RequestPage) Reset() {
+	*x = RequestPage{}
+	mi := &file_oa_v1_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestPage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestPage) ProtoMessage() {}
+
+func (x *RequestPage) ProtoReflect() protoreflect.Message {
+	mi := &file_oa_v1_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestPage.ProtoReflect.Descriptor instead.
+func (*RequestPage) Descriptor() ([]byte, []int) {
+	return file_oa_v1_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *RequestPage) GetItems() []*RequestSummary {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *RequestPage) GetNextCursor() string {
+	if x != nil && x.NextCursor != nil {
+		return *x.NextCursor
+	}
+	return ""
+}
+
+type WatchEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Seq           int64                  `protobuf:"varint,1,opt,name=seq,proto3" json:"seq,omitempty"`
+	RequestId     string                 `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Action        string                 `protobuf:"bytes,3,opt,name=action,proto3" json:"action,omitempty"`
+	Revision      int64                  `protobuf:"varint,4,opt,name=revision,proto3" json:"revision,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WatchEvent) Reset() {
+	*x = WatchEvent{}
+	mi := &file_oa_v1_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WatchEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WatchEvent) ProtoMessage() {}
+
+func (x *WatchEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_oa_v1_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WatchEvent.ProtoReflect.Descriptor instead.
+func (*WatchEvent) Descriptor() ([]byte, []int) {
+	return file_oa_v1_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *WatchEvent) GetSeq() int64 {
+	if x != nil {
+		return x.Seq
+	}
+	return 0
+}
+
+func (x *WatchEvent) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *WatchEvent) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *WatchEvent) GetRevision() int64 {
+	if x != nil {
+		return x.Revision
+	}
+	return 0
+}
+
+type WatchPage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Events        []*WatchEvent          `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
+	NextCursor    *string                `protobuf:"bytes,2,opt,name=next_cursor,json=nextCursor,proto3,oneof" json:"next_cursor,omitempty"`
+	More          bool                   `protobuf:"varint,3,opt,name=more,proto3" json:"more,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WatchPage) Reset() {
+	*x = WatchPage{}
+	mi := &file_oa_v1_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WatchPage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WatchPage) ProtoMessage() {}
+
+func (x *WatchPage) ProtoReflect() protoreflect.Message {
+	mi := &file_oa_v1_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WatchPage.ProtoReflect.Descriptor instead.
+func (*WatchPage) Descriptor() ([]byte, []int) {
+	return file_oa_v1_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *WatchPage) GetEvents() []*WatchEvent {
+	if x != nil {
+		return x.Events
+	}
+	return nil
+}
+
+func (x *WatchPage) GetNextCursor() string {
+	if x != nil && x.NextCursor != nil {
+		return *x.NextCursor
+	}
+	return ""
+}
+
+func (x *WatchPage) GetMore() bool {
+	if x != nil {
+		return x.More
+	}
+	return false
+}
+
 type RequestById struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
@@ -681,7 +1456,7 @@ type RequestById struct {
 
 func (x *RequestById) Reset() {
 	*x = RequestById{}
-	mi := &file_oa_v1_proto_msgTypes[9]
+	mi := &file_oa_v1_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -693,7 +1468,7 @@ func (x *RequestById) String() string {
 func (*RequestById) ProtoMessage() {}
 
 func (x *RequestById) ProtoReflect() protoreflect.Message {
-	mi := &file_oa_v1_proto_msgTypes[9]
+	mi := &file_oa_v1_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -706,7 +1481,7 @@ func (x *RequestById) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestById.ProtoReflect.Descriptor instead.
 func (*RequestById) Descriptor() ([]byte, []int) {
-	return file_oa_v1_proto_rawDescGZIP(), []int{9}
+	return file_oa_v1_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *RequestById) GetRequestId() string {
@@ -726,7 +1501,7 @@ type ReadArtifactRequest struct {
 
 func (x *ReadArtifactRequest) Reset() {
 	*x = ReadArtifactRequest{}
-	mi := &file_oa_v1_proto_msgTypes[10]
+	mi := &file_oa_v1_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -738,7 +1513,7 @@ func (x *ReadArtifactRequest) String() string {
 func (*ReadArtifactRequest) ProtoMessage() {}
 
 func (x *ReadArtifactRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_oa_v1_proto_msgTypes[10]
+	mi := &file_oa_v1_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -751,7 +1526,7 @@ func (x *ReadArtifactRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadArtifactRequest.ProtoReflect.Descriptor instead.
 func (*ReadArtifactRequest) Descriptor() ([]byte, []int) {
-	return file_oa_v1_proto_rawDescGZIP(), []int{10}
+	return file_oa_v1_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ReadArtifactRequest) GetRequestId() string {
@@ -778,7 +1553,7 @@ type PageRequest struct {
 
 func (x *PageRequest) Reset() {
 	*x = PageRequest{}
-	mi := &file_oa_v1_proto_msgTypes[11]
+	mi := &file_oa_v1_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -790,7 +1565,7 @@ func (x *PageRequest) String() string {
 func (*PageRequest) ProtoMessage() {}
 
 func (x *PageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_oa_v1_proto_msgTypes[11]
+	mi := &file_oa_v1_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -803,7 +1578,7 @@ func (x *PageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PageRequest.ProtoReflect.Descriptor instead.
 func (*PageRequest) Descriptor() ([]byte, []int) {
-	return file_oa_v1_proto_rawDescGZIP(), []int{11}
+	return file_oa_v1_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *PageRequest) GetCursor() string {
@@ -820,73 +1595,34 @@ func (x *PageRequest) GetLimit() int32 {
 	return 0
 }
 
-type JsonResult struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Json          string                 `protobuf:"bytes,1,opt,name=json,proto3" json:"json,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *JsonResult) Reset() {
-	*x = JsonResult{}
-	mi := &file_oa_v1_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *JsonResult) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*JsonResult) ProtoMessage() {}
-
-func (x *JsonResult) ProtoReflect() protoreflect.Message {
-	mi := &file_oa_v1_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use JsonResult.ProtoReflect.Descriptor instead.
-func (*JsonResult) Descriptor() ([]byte, []int) {
-	return file_oa_v1_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *JsonResult) GetJson() string {
-	if x != nil {
-		return x.Json
-	}
-	return ""
-}
-
 var File_oa_v1_proto protoreflect.FileDescriptor
 
 const file_oa_v1_proto_rawDesc = "" +
 	"\n" +
 	"\voa.v1.proto\x12\n" +
-	"ec00.oa.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xb8\x03\n" +
+	"ec00.oa.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xb9\x04\n" +
 	"\x0ePublishRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12!\n" +
 	"\tobjective\x18\x02 \x01(\tH\x01R\tobjective\x88\x01\x01\x12\x14\n" +
 	"\x04note\x18\x03 \x01(\tH\x00R\x04note\x129\n" +
 	"\tnote_null\x18\x04 \x01(\x0e2\x1a.google.protobuf.NullValueH\x00R\bnoteNull\x12#\n" +
-	"\rdependent_ids\x18\x05 \x03(\tR\fdependentIds\x12'\n" +
-	"\x0fartifact_digest\x18\x06 \x01(\tR\x0eartifactDigest\x12&\n" +
-	"\x0fartifact_key_id\x18\a \x01(\tR\rartifactKeyId\x12%\n" +
-	"\x0eartifact_bytes\x18\b \x01(\fR\rartifactBytes\x12+\n" +
-	"\x11artifact_envelope\x18\t \x01(\fR\x10artifactEnvelope\x12-\n" +
+	"\rdependent_ids\x18\x05 \x03(\tR\fdependentIds\x12,\n" +
+	"\x0fartifact_digest\x18\x06 \x01(\tH\x02R\x0eartifactDigest\x88\x01\x01\x12+\n" +
+	"\x0fartifact_key_id\x18\a \x01(\tH\x03R\rartifactKeyId\x88\x01\x01\x12*\n" +
+	"\x0eartifact_bytes\x18\b \x01(\fH\x04R\rartifactBytes\x88\x01\x01\x120\n" +
+	"\x11artifact_envelope\x18\t \x01(\fH\x05R\x10artifactEnvelope\x88\x01\x01\x122\n" +
 	"\x12artifact_signature\x18\n" +
-	" \x01(\fR\x11artifactSignatureB\f\n" +
+	" \x01(\fH\x06R\x11artifactSignature\x88\x01\x01B\f\n" +
 	"\n" +
 	"note_valueB\f\n" +
 	"\n" +
-	"_objective\"\x86\x02\n" +
+	"_objectiveB\x12\n" +
+	"\x10_artifact_digestB\x12\n" +
+	"\x10_artifact_key_idB\x11\n" +
+	"\x0f_artifact_bytesB\x14\n" +
+	"\x12_artifact_envelopeB\x15\n" +
+	"\x13_artifact_signature\"\x86\x02\n" +
 	"\rReviseRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x120\n" +
@@ -936,7 +1672,70 @@ const file_oa_v1_proto_rawDesc = "" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12!\n" +
 	"\fdependent_id\x18\x02 \x01(\tR\vdependentId\x120\n" +
 	"\x11expected_revision\x18\x03 \x01(\x03H\x00R\x10expectedRevision\x88\x01\x01B\x14\n" +
-	"\x12_expected_revision\",\n" +
+	"\x12_expected_revision\"\x8a\x01\n" +
+	"\vRequestBody\x12\x1c\n" +
+	"\tobjective\x18\x01 \x01(\tR\tobjective\x12\x14\n" +
+	"\x04note\x18\x02 \x01(\tH\x00R\x04note\x129\n" +
+	"\tnote_null\x18\x03 \x01(\x0e2\x1a.google.protobuf.NullValueH\x00R\bnoteNullB\f\n" +
+	"\n" +
+	"note_value\"\xe8\x04\n" +
+	"\vRequestRead\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1a\n" +
+	"\brevision\x18\x02 \x01(\x03R\brevision\x12+\n" +
+	"\x11material_revision\x18\x03 \x01(\x03R\x10materialRevision\x12.\n" +
+	"\x05state\x18\x04 \x01(\x0e2\x18.ec00.oa.v1.RequestStateR\x05state\x12+\n" +
+	"\x04body\x18\x05 \x01(\v2\x17.ec00.oa.v1.RequestBodyR\x04body\x12\x1a\n" +
+	"\breported\x18\x06 \x01(\bR\breported\x12\x1a\n" +
+	"\bverified\x18\a \x01(\bR\bverified\x12#\n" +
+	"\fevidence_ref\x18\b \x01(\tH\x00R\vevidenceRef\x12H\n" +
+	"\x11evidence_ref_null\x18\t \x01(\x0e2\x1a.google.protobuf.NullValueH\x00R\x0fevidenceRefNull\x12:\n" +
+	"\x18artifact_decision_digest\x18\n" +
+	" \x01(\tH\x01R\x16artifactDecisionDigest\x12_\n" +
+	"\x1dartifact_decision_digest_null\x18\v \x01(\x0e2\x1a.google.protobuf.NullValueH\x01R\x1aartifactDecisionDigestNull\x12\x1f\n" +
+	"\vcreated_seq\x18\f \x01(\x03R\n" +
+	"createdSeqB\x14\n" +
+	"\x12evidence_ref_valueB\x19\n" +
+	"\x17artifact_decision_value\"u\n" +
+	"\rDependentRead\x12!\n" +
+	"\fdependent_id\x18\x01 \x01(\tR\vdependentId\x12\x16\n" +
+	"\x06active\x18\x02 \x01(\bR\x06active\x12)\n" +
+	"\x10continuation_ack\x18\x03 \x01(\bR\x0fcontinuationAck\"A\n" +
+	"\x0eDependantsRead\x12/\n" +
+	"\x05items\x18\x01 \x03(\v2\x19.ec00.oa.v1.DependentReadR\x05items\"\x90\x02\n" +
+	"\fArtifactRead\x12+\n" +
+	"\x11material_revision\x18\x01 \x01(\x03R\x10materialRevision\x12'\n" +
+	"\x0fmaterial_digest\x18\x02 \x01(\tR\x0ematerialDigest\x12'\n" +
+	"\x0fartifact_digest\x18\x03 \x01(\tR\x0eartifactDigest\x12\x15\n" +
+	"\x06key_id\x18\x04 \x01(\tR\x05keyId\x12%\n" +
+	"\x0eoriginal_bytes\x18\x05 \x01(\fR\roriginalBytes\x12%\n" +
+	"\x0eenvelope_bytes\x18\x06 \x01(\fR\renvelopeBytes\x12\x1c\n" +
+	"\tsignature\x18\a \x01(\fR\tsignature\"\x9c\x01\n" +
+	"\x0eRequestSummary\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1a\n" +
+	"\brevision\x18\x02 \x01(\x03R\brevision\x12.\n" +
+	"\x05state\x18\x03 \x01(\x0e2\x18.ec00.oa.v1.RequestStateR\x05state\x12\x1f\n" +
+	"\vcreated_seq\x18\x04 \x01(\x03R\n" +
+	"createdSeq\"u\n" +
+	"\vRequestPage\x120\n" +
+	"\x05items\x18\x01 \x03(\v2\x1a.ec00.oa.v1.RequestSummaryR\x05items\x12$\n" +
+	"\vnext_cursor\x18\x02 \x01(\tH\x00R\n" +
+	"nextCursor\x88\x01\x01B\x0e\n" +
+	"\f_next_cursor\"q\n" +
+	"\n" +
+	"WatchEvent\x12\x10\n" +
+	"\x03seq\x18\x01 \x01(\x03R\x03seq\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x02 \x01(\tR\trequestId\x12\x16\n" +
+	"\x06action\x18\x03 \x01(\tR\x06action\x12\x1a\n" +
+	"\brevision\x18\x04 \x01(\x03R\brevision\"\x85\x01\n" +
+	"\tWatchPage\x12.\n" +
+	"\x06events\x18\x01 \x03(\v2\x16.ec00.oa.v1.WatchEventR\x06events\x12$\n" +
+	"\vnext_cursor\x18\x02 \x01(\tH\x00R\n" +
+	"nextCursor\x88\x01\x01\x12\x12\n" +
+	"\x04more\x18\x03 \x01(\bR\x04moreB\x0e\n" +
+	"\f_next_cursor\",\n" +
 	"\vRequestById\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\"a\n" +
@@ -947,10 +1746,11 @@ const file_oa_v1_proto_rawDesc = "" +
 	"\vPageRequest\x12\x1b\n" +
 	"\x06cursor\x18\x01 \x01(\tH\x00R\x06cursor\x88\x01\x01\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x05R\x05limitB\t\n" +
-	"\a_cursor\" \n" +
-	"\n" +
-	"JsonResult\x12\x12\n" +
-	"\x04json\x18\x01 \x01(\tR\x04json2\xbe\a\n" +
+	"\a_cursor*a\n" +
+	"\fRequestState\x12\x1d\n" +
+	"\x19REQUEST_STATE_UNSPECIFIED\x10\x00\x12\x16\n" +
+	"\x12REQUEST_STATE_OPEN\x10\x01\x12\x1a\n" +
+	"\x16REQUEST_STATE_RESOLVED\x10\x022\xc5\a\n" +
 	"\x0fOwnerOperations\x12A\n" +
 	"\aPublish\x12\x1a.ec00.oa.v1.PublishRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12?\n" +
 	"\x06Revise\x12\x19.ec00.oa.v1.ReviseRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12U\n" +
@@ -959,12 +1759,12 @@ const file_oa_v1_proto_rawDesc = "" +
 	"\x06Verify\x12\x19.ec00.oa.v1.VerifyRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12O\n" +
 	"\x0eDecideArtifact\x12!.ec00.oa.v1.DecideArtifactRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12A\n" +
 	"\aResolve\x12\x1a.ec00.oa.v1.ResolveRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12a\n" +
-	"\x17AcknowledgeContinuation\x12*.ec00.oa.v1.AcknowledgeContinuationRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12>\n" +
-	"\vReadRequest\x12\x17.ec00.oa.v1.RequestById\x1a\x16.ec00.oa.v1.JsonResult\x12A\n" +
-	"\x0eReadDependants\x12\x17.ec00.oa.v1.RequestById\x1a\x16.ec00.oa.v1.JsonResult\x12G\n" +
-	"\fReadArtifact\x12\x1f.ec00.oa.v1.ReadArtifactRequest\x1a\x16.ec00.oa.v1.JsonResult\x12?\n" +
-	"\fListRequests\x12\x17.ec00.oa.v1.PageRequest\x1a\x16.ec00.oa.v1.JsonResult\x128\n" +
-	"\x05Watch\x12\x17.ec00.oa.v1.PageRequest\x1a\x16.ec00.oa.v1.JsonResultB<Z:example.com/vuoro-ec00/ec00/generated/protobuf/go/oa/v1;v1b\x06proto3"
+	"\x17AcknowledgeContinuation\x12*.ec00.oa.v1.AcknowledgeContinuationRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12?\n" +
+	"\vReadRequest\x12\x17.ec00.oa.v1.RequestById\x1a\x17.ec00.oa.v1.RequestRead\x12E\n" +
+	"\x0eReadDependants\x12\x17.ec00.oa.v1.RequestById\x1a\x1a.ec00.oa.v1.DependantsRead\x12I\n" +
+	"\fReadArtifact\x12\x1f.ec00.oa.v1.ReadArtifactRequest\x1a\x18.ec00.oa.v1.ArtifactRead\x12@\n" +
+	"\fListRequests\x12\x17.ec00.oa.v1.PageRequest\x1a\x17.ec00.oa.v1.RequestPage\x127\n" +
+	"\x05Watch\x12\x17.ec00.oa.v1.PageRequest\x1a\x15.ec00.oa.v1.WatchPageB<Z:example.com/vuoro-ec00/ec00/generated/protobuf/go/oa/v1;v1b\x06proto3"
 
 var (
 	file_oa_v1_proto_rawDescOnce sync.Once
@@ -978,57 +1778,76 @@ func file_oa_v1_proto_rawDescGZIP() []byte {
 	return file_oa_v1_proto_rawDescData
 }
 
-var file_oa_v1_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_oa_v1_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_oa_v1_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_oa_v1_proto_goTypes = []any{
-	(*PublishRequest)(nil),                 // 0: ec00.oa.v1.PublishRequest
-	(*ReviseRequest)(nil),                  // 1: ec00.oa.v1.ReviseRequest
-	(*MutationResult)(nil),                 // 2: ec00.oa.v1.MutationResult
-	(*WithdrawDependentRequest)(nil),       // 3: ec00.oa.v1.WithdrawDependentRequest
-	(*ReportPerformedRequest)(nil),         // 4: ec00.oa.v1.ReportPerformedRequest
-	(*VerifyRequest)(nil),                  // 5: ec00.oa.v1.VerifyRequest
-	(*DecideArtifactRequest)(nil),          // 6: ec00.oa.v1.DecideArtifactRequest
-	(*ResolveRequest)(nil),                 // 7: ec00.oa.v1.ResolveRequest
-	(*AcknowledgeContinuationRequest)(nil), // 8: ec00.oa.v1.AcknowledgeContinuationRequest
-	(*RequestById)(nil),                    // 9: ec00.oa.v1.RequestById
-	(*ReadArtifactRequest)(nil),            // 10: ec00.oa.v1.ReadArtifactRequest
-	(*PageRequest)(nil),                    // 11: ec00.oa.v1.PageRequest
-	(*JsonResult)(nil),                     // 12: ec00.oa.v1.JsonResult
-	(structpb.NullValue)(0),                // 13: google.protobuf.NullValue
+	(RequestState)(0),                      // 0: ec00.oa.v1.RequestState
+	(*PublishRequest)(nil),                 // 1: ec00.oa.v1.PublishRequest
+	(*ReviseRequest)(nil),                  // 2: ec00.oa.v1.ReviseRequest
+	(*MutationResult)(nil),                 // 3: ec00.oa.v1.MutationResult
+	(*WithdrawDependentRequest)(nil),       // 4: ec00.oa.v1.WithdrawDependentRequest
+	(*ReportPerformedRequest)(nil),         // 5: ec00.oa.v1.ReportPerformedRequest
+	(*VerifyRequest)(nil),                  // 6: ec00.oa.v1.VerifyRequest
+	(*DecideArtifactRequest)(nil),          // 7: ec00.oa.v1.DecideArtifactRequest
+	(*ResolveRequest)(nil),                 // 8: ec00.oa.v1.ResolveRequest
+	(*AcknowledgeContinuationRequest)(nil), // 9: ec00.oa.v1.AcknowledgeContinuationRequest
+	(*RequestBody)(nil),                    // 10: ec00.oa.v1.RequestBody
+	(*RequestRead)(nil),                    // 11: ec00.oa.v1.RequestRead
+	(*DependentRead)(nil),                  // 12: ec00.oa.v1.DependentRead
+	(*DependantsRead)(nil),                 // 13: ec00.oa.v1.DependantsRead
+	(*ArtifactRead)(nil),                   // 14: ec00.oa.v1.ArtifactRead
+	(*RequestSummary)(nil),                 // 15: ec00.oa.v1.RequestSummary
+	(*RequestPage)(nil),                    // 16: ec00.oa.v1.RequestPage
+	(*WatchEvent)(nil),                     // 17: ec00.oa.v1.WatchEvent
+	(*WatchPage)(nil),                      // 18: ec00.oa.v1.WatchPage
+	(*RequestById)(nil),                    // 19: ec00.oa.v1.RequestById
+	(*ReadArtifactRequest)(nil),            // 20: ec00.oa.v1.ReadArtifactRequest
+	(*PageRequest)(nil),                    // 21: ec00.oa.v1.PageRequest
+	(structpb.NullValue)(0),                // 22: google.protobuf.NullValue
 }
 var file_oa_v1_proto_depIdxs = []int32{
-	13, // 0: ec00.oa.v1.PublishRequest.note_null:type_name -> google.protobuf.NullValue
-	13, // 1: ec00.oa.v1.ReviseRequest.note_null:type_name -> google.protobuf.NullValue
-	0,  // 2: ec00.oa.v1.OwnerOperations.Publish:input_type -> ec00.oa.v1.PublishRequest
-	1,  // 3: ec00.oa.v1.OwnerOperations.Revise:input_type -> ec00.oa.v1.ReviseRequest
-	3,  // 4: ec00.oa.v1.OwnerOperations.WithdrawDependent:input_type -> ec00.oa.v1.WithdrawDependentRequest
-	4,  // 5: ec00.oa.v1.OwnerOperations.ReportPerformed:input_type -> ec00.oa.v1.ReportPerformedRequest
-	5,  // 6: ec00.oa.v1.OwnerOperations.Verify:input_type -> ec00.oa.v1.VerifyRequest
-	6,  // 7: ec00.oa.v1.OwnerOperations.DecideArtifact:input_type -> ec00.oa.v1.DecideArtifactRequest
-	7,  // 8: ec00.oa.v1.OwnerOperations.Resolve:input_type -> ec00.oa.v1.ResolveRequest
-	8,  // 9: ec00.oa.v1.OwnerOperations.AcknowledgeContinuation:input_type -> ec00.oa.v1.AcknowledgeContinuationRequest
-	9,  // 10: ec00.oa.v1.OwnerOperations.ReadRequest:input_type -> ec00.oa.v1.RequestById
-	9,  // 11: ec00.oa.v1.OwnerOperations.ReadDependants:input_type -> ec00.oa.v1.RequestById
-	10, // 12: ec00.oa.v1.OwnerOperations.ReadArtifact:input_type -> ec00.oa.v1.ReadArtifactRequest
-	11, // 13: ec00.oa.v1.OwnerOperations.ListRequests:input_type -> ec00.oa.v1.PageRequest
-	11, // 14: ec00.oa.v1.OwnerOperations.Watch:input_type -> ec00.oa.v1.PageRequest
-	2,  // 15: ec00.oa.v1.OwnerOperations.Publish:output_type -> ec00.oa.v1.MutationResult
-	2,  // 16: ec00.oa.v1.OwnerOperations.Revise:output_type -> ec00.oa.v1.MutationResult
-	2,  // 17: ec00.oa.v1.OwnerOperations.WithdrawDependent:output_type -> ec00.oa.v1.MutationResult
-	2,  // 18: ec00.oa.v1.OwnerOperations.ReportPerformed:output_type -> ec00.oa.v1.MutationResult
-	2,  // 19: ec00.oa.v1.OwnerOperations.Verify:output_type -> ec00.oa.v1.MutationResult
-	2,  // 20: ec00.oa.v1.OwnerOperations.DecideArtifact:output_type -> ec00.oa.v1.MutationResult
-	2,  // 21: ec00.oa.v1.OwnerOperations.Resolve:output_type -> ec00.oa.v1.MutationResult
-	2,  // 22: ec00.oa.v1.OwnerOperations.AcknowledgeContinuation:output_type -> ec00.oa.v1.MutationResult
-	12, // 23: ec00.oa.v1.OwnerOperations.ReadRequest:output_type -> ec00.oa.v1.JsonResult
-	12, // 24: ec00.oa.v1.OwnerOperations.ReadDependants:output_type -> ec00.oa.v1.JsonResult
-	12, // 25: ec00.oa.v1.OwnerOperations.ReadArtifact:output_type -> ec00.oa.v1.JsonResult
-	12, // 26: ec00.oa.v1.OwnerOperations.ListRequests:output_type -> ec00.oa.v1.JsonResult
-	12, // 27: ec00.oa.v1.OwnerOperations.Watch:output_type -> ec00.oa.v1.JsonResult
-	15, // [15:28] is the sub-list for method output_type
-	2,  // [2:15] is the sub-list for method input_type
-	2,  // [2:2] is the sub-list for extension type_name
-	2,  // [2:2] is the sub-list for extension extendee
-	0,  // [0:2] is the sub-list for field type_name
+	22, // 0: ec00.oa.v1.PublishRequest.note_null:type_name -> google.protobuf.NullValue
+	22, // 1: ec00.oa.v1.ReviseRequest.note_null:type_name -> google.protobuf.NullValue
+	22, // 2: ec00.oa.v1.RequestBody.note_null:type_name -> google.protobuf.NullValue
+	0,  // 3: ec00.oa.v1.RequestRead.state:type_name -> ec00.oa.v1.RequestState
+	10, // 4: ec00.oa.v1.RequestRead.body:type_name -> ec00.oa.v1.RequestBody
+	22, // 5: ec00.oa.v1.RequestRead.evidence_ref_null:type_name -> google.protobuf.NullValue
+	22, // 6: ec00.oa.v1.RequestRead.artifact_decision_digest_null:type_name -> google.protobuf.NullValue
+	12, // 7: ec00.oa.v1.DependantsRead.items:type_name -> ec00.oa.v1.DependentRead
+	0,  // 8: ec00.oa.v1.RequestSummary.state:type_name -> ec00.oa.v1.RequestState
+	15, // 9: ec00.oa.v1.RequestPage.items:type_name -> ec00.oa.v1.RequestSummary
+	17, // 10: ec00.oa.v1.WatchPage.events:type_name -> ec00.oa.v1.WatchEvent
+	1,  // 11: ec00.oa.v1.OwnerOperations.Publish:input_type -> ec00.oa.v1.PublishRequest
+	2,  // 12: ec00.oa.v1.OwnerOperations.Revise:input_type -> ec00.oa.v1.ReviseRequest
+	4,  // 13: ec00.oa.v1.OwnerOperations.WithdrawDependent:input_type -> ec00.oa.v1.WithdrawDependentRequest
+	5,  // 14: ec00.oa.v1.OwnerOperations.ReportPerformed:input_type -> ec00.oa.v1.ReportPerformedRequest
+	6,  // 15: ec00.oa.v1.OwnerOperations.Verify:input_type -> ec00.oa.v1.VerifyRequest
+	7,  // 16: ec00.oa.v1.OwnerOperations.DecideArtifact:input_type -> ec00.oa.v1.DecideArtifactRequest
+	8,  // 17: ec00.oa.v1.OwnerOperations.Resolve:input_type -> ec00.oa.v1.ResolveRequest
+	9,  // 18: ec00.oa.v1.OwnerOperations.AcknowledgeContinuation:input_type -> ec00.oa.v1.AcknowledgeContinuationRequest
+	19, // 19: ec00.oa.v1.OwnerOperations.ReadRequest:input_type -> ec00.oa.v1.RequestById
+	19, // 20: ec00.oa.v1.OwnerOperations.ReadDependants:input_type -> ec00.oa.v1.RequestById
+	20, // 21: ec00.oa.v1.OwnerOperations.ReadArtifact:input_type -> ec00.oa.v1.ReadArtifactRequest
+	21, // 22: ec00.oa.v1.OwnerOperations.ListRequests:input_type -> ec00.oa.v1.PageRequest
+	21, // 23: ec00.oa.v1.OwnerOperations.Watch:input_type -> ec00.oa.v1.PageRequest
+	3,  // 24: ec00.oa.v1.OwnerOperations.Publish:output_type -> ec00.oa.v1.MutationResult
+	3,  // 25: ec00.oa.v1.OwnerOperations.Revise:output_type -> ec00.oa.v1.MutationResult
+	3,  // 26: ec00.oa.v1.OwnerOperations.WithdrawDependent:output_type -> ec00.oa.v1.MutationResult
+	3,  // 27: ec00.oa.v1.OwnerOperations.ReportPerformed:output_type -> ec00.oa.v1.MutationResult
+	3,  // 28: ec00.oa.v1.OwnerOperations.Verify:output_type -> ec00.oa.v1.MutationResult
+	3,  // 29: ec00.oa.v1.OwnerOperations.DecideArtifact:output_type -> ec00.oa.v1.MutationResult
+	3,  // 30: ec00.oa.v1.OwnerOperations.Resolve:output_type -> ec00.oa.v1.MutationResult
+	3,  // 31: ec00.oa.v1.OwnerOperations.AcknowledgeContinuation:output_type -> ec00.oa.v1.MutationResult
+	11, // 32: ec00.oa.v1.OwnerOperations.ReadRequest:output_type -> ec00.oa.v1.RequestRead
+	13, // 33: ec00.oa.v1.OwnerOperations.ReadDependants:output_type -> ec00.oa.v1.DependantsRead
+	14, // 34: ec00.oa.v1.OwnerOperations.ReadArtifact:output_type -> ec00.oa.v1.ArtifactRead
+	16, // 35: ec00.oa.v1.OwnerOperations.ListRequests:output_type -> ec00.oa.v1.RequestPage
+	18, // 36: ec00.oa.v1.OwnerOperations.Watch:output_type -> ec00.oa.v1.WatchPage
+	24, // [24:37] is the sub-list for method output_type
+	11, // [11:24] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_oa_v1_proto_init() }
@@ -1050,19 +1869,32 @@ func file_oa_v1_proto_init() {
 	file_oa_v1_proto_msgTypes[6].OneofWrappers = []any{}
 	file_oa_v1_proto_msgTypes[7].OneofWrappers = []any{}
 	file_oa_v1_proto_msgTypes[8].OneofWrappers = []any{}
-	file_oa_v1_proto_msgTypes[11].OneofWrappers = []any{}
+	file_oa_v1_proto_msgTypes[9].OneofWrappers = []any{
+		(*RequestBody_Note)(nil),
+		(*RequestBody_NoteNull)(nil),
+	}
+	file_oa_v1_proto_msgTypes[10].OneofWrappers = []any{
+		(*RequestRead_EvidenceRef)(nil),
+		(*RequestRead_EvidenceRefNull)(nil),
+		(*RequestRead_ArtifactDecisionDigest)(nil),
+		(*RequestRead_ArtifactDecisionDigestNull)(nil),
+	}
+	file_oa_v1_proto_msgTypes[15].OneofWrappers = []any{}
+	file_oa_v1_proto_msgTypes[17].OneofWrappers = []any{}
+	file_oa_v1_proto_msgTypes[20].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_oa_v1_proto_rawDesc), len(file_oa_v1_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   13,
+			NumEnums:      1,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_oa_v1_proto_goTypes,
 		DependencyIndexes: file_oa_v1_proto_depIdxs,
+		EnumInfos:         file_oa_v1_proto_enumTypes,
 		MessageInfos:      file_oa_v1_proto_msgTypes,
 	}.Build()
 	File_oa_v1_proto = out.File

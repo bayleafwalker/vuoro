@@ -16,11 +16,11 @@ message PublishRequest {
     google.protobuf.NullValue note_null = 4;
   }
   repeated string dependent_ids = 5;
-  string artifact_digest = 6;
-  string artifact_key_id = 7;
-  bytes artifact_bytes = 8;
-  bytes artifact_envelope = 9;
-  bytes artifact_signature = 10;
+  optional string artifact_digest = 6;
+  optional string artifact_key_id = 7;
+  optional bytes artifact_bytes = 8;
+  optional bytes artifact_envelope = 9;
+  optional bytes artifact_signature = 10;
 }
 
 message ReviseRequest {
@@ -44,10 +44,75 @@ message VerifyRequest { string request_id = 1; optional int64 expected_revision 
 message DecideArtifactRequest { string request_id = 1; optional int64 expected_revision = 2; string artifact_digest = 3; }
 message ResolveRequest { string request_id = 1; optional int64 expected_revision = 2; }
 message AcknowledgeContinuationRequest { string request_id = 1; string dependent_id = 2; optional int64 expected_revision = 3; }
+enum RequestState {
+  REQUEST_STATE_UNSPECIFIED = 0;
+  REQUEST_STATE_OPEN = 1;
+  REQUEST_STATE_RESOLVED = 2;
+}
+message RequestBody {
+  string objective = 1;
+  oneof note_value {
+    string note = 2;
+    google.protobuf.NullValue note_null = 3;
+  }
+}
+message RequestRead {
+  string request_id = 1;
+  int64 revision = 2;
+  int64 material_revision = 3;
+  RequestState state = 4;
+  RequestBody body = 5;
+  bool reported = 6;
+  bool verified = 7;
+  oneof evidence_ref_value {
+    string evidence_ref = 8;
+    google.protobuf.NullValue evidence_ref_null = 9;
+  }
+  oneof artifact_decision_value {
+    string artifact_decision_digest = 10;
+    google.protobuf.NullValue artifact_decision_digest_null = 11;
+  }
+  int64 created_seq = 12;
+}
+message DependentRead {
+  string dependent_id = 1;
+  bool active = 2;
+  bool continuation_ack = 3;
+}
+message DependantsRead { repeated DependentRead items = 1; }
+message ArtifactRead {
+  int64 material_revision = 1;
+  string material_digest = 2;
+  string artifact_digest = 3;
+  string key_id = 4;
+  bytes original_bytes = 5;
+  bytes envelope_bytes = 6;
+  bytes signature = 7;
+}
+message RequestSummary {
+  string request_id = 1;
+  int64 revision = 2;
+  RequestState state = 3;
+  int64 created_seq = 4;
+}
+message RequestPage {
+  repeated RequestSummary items = 1;
+  optional string next_cursor = 2;
+}
+message WatchEvent {
+  int64 seq = 1;
+  string request_id = 2;
+  string action = 3;
+  int64 revision = 4;
+}
+message WatchPage {
+  repeated WatchEvent events = 1;
+  optional string next_cursor = 2;
+  bool more = 3;
+}
 message RequestById { string request_id = 1; }
 message ReadArtifactRequest { string request_id = 1; int64 material_revision = 2; }
 message PageRequest { optional string cursor = 1; int32 limit = 2; }
-message JsonResult { string json = 1; }
 
 service OwnerOperations {
   rpc Publish(PublishRequest) returns (MutationResult);
@@ -58,9 +123,9 @@ service OwnerOperations {
   rpc DecideArtifact(DecideArtifactRequest) returns (MutationResult);
   rpc Resolve(ResolveRequest) returns (MutationResult);
   rpc AcknowledgeContinuation(AcknowledgeContinuationRequest) returns (MutationResult);
-  rpc ReadRequest(RequestById) returns (JsonResult);
-  rpc ReadDependants(RequestById) returns (JsonResult);
-  rpc ReadArtifact(ReadArtifactRequest) returns (JsonResult);
-  rpc ListRequests(PageRequest) returns (JsonResult);
-  rpc Watch(PageRequest) returns (JsonResult);
+  rpc ReadRequest(RequestById) returns (RequestRead);
+  rpc ReadDependants(RequestById) returns (DependantsRead);
+  rpc ReadArtifact(ReadArtifactRequest) returns (ArtifactRead);
+  rpc ListRequests(PageRequest) returns (RequestPage);
+  rpc Watch(PageRequest) returns (WatchPage);
 }
