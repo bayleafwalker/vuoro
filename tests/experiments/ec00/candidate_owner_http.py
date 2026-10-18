@@ -60,7 +60,11 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            # A departed client does not reverse an already committed owner call.
+            self.close_connection = True
 
     def _json(self, status: int, body: dict[str, Any]) -> None:
         self._reply(status, json.dumps(body, separators=(",", ":")).encode(), "application/json")
@@ -549,7 +553,7 @@ class _GrpcOwner(v1_pb2_grpc.OwnerOperationsServicer):
         except ValueError as exc:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
         except ResponseLost:
-            context.abort(grpc.StatusCode.UNAVAILABLE, "test harness dropped response after commit")
+            context.abort(grpc.StatusCode.UNAVAILABLE, "test harness response unavailable")
         return v1_pb2.MutationResult(request_id=result["request_id"], revision=result["revision"])
 
     def Revise(self, request: object, context: grpc.ServicerContext) -> object:
@@ -565,7 +569,7 @@ class _GrpcOwner(v1_pb2_grpc.OwnerOperationsServicer):
         except ValueError as exc:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
         except ResponseLost:
-            context.abort(grpc.StatusCode.UNAVAILABLE, "test harness dropped response after commit")
+            context.abort(grpc.StatusCode.UNAVAILABLE, "test harness response unavailable")
         return v1_pb2.MutationResult(request_id=result["request_id"], revision=result["revision"])
 
     def WithdrawDependent(self, request: object, context: grpc.ServicerContext) -> object:
@@ -601,7 +605,7 @@ class _GrpcOwner(v1_pb2_grpc.OwnerOperationsServicer):
         except Conflict as exc:
             context.abort(grpc.StatusCode.ABORTED, str(exc))
         except ResponseLost:
-            context.abort(grpc.StatusCode.UNAVAILABLE, "test harness dropped response after commit")
+            context.abort(grpc.StatusCode.UNAVAILABLE, "test harness response unavailable")
         return v1_pb2.MutationResult(request_id=result["request_id"], revision=result["revision"])
 
     def ReadRequest(self, request: object, context: grpc.ServicerContext) -> object:

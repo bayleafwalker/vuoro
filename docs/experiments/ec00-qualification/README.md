@@ -453,3 +453,49 @@ shown above.
 uv run --project tests/experiments/ec00/candidates --locked \
   python -m unittest discover -s tests/experiments/ec00 -p 'test_owner_oracle.py' -v
 ```
+
+
+## Generated Python transport-failure slice (18 October 2026)
+
+`transport_failure_checks.py` runs twelve cases: generated Python native gRPC
+and generated TypeSpec/OpenAPI HTTP clients, each with deadline, explicit
+client cancellation, and injected response unavailability before owner
+invocation or after the actual SQLite commit. Each case has its own file-backed
+database. A test-local event gate waits at the owner-call boundary; independent
+SQLite connections inspect request, event and idempotency rows while the call
+is paused and again after it finishes. No owner implementation or public
+contract gains a cancellation operation.
+
+The gRPC deadline surfaces `DEADLINE_EXCEEDED`, cancellation raises
+`FutureCancelledError`, and injected response loss surfaces `UNAVAILABLE`.
+The HTTP equivalents are a configured read timeout (`ReadTimeout`), cancelled
+async generated-client task (`CancelledError`), and a connection closed without
+an HTTP response (`RemoteProtocolError`). The unavailability fault is a harness
+injection, not a demonstrated packet loss, proxy failure or server crash.
+
+Both current test adapters allow an already dispatched handler to finish when
+its client times out or cancels. The before-invocation gate first proves zero
+owner rows; after cancellation/deadline and gate release, the handler commits
+exactly one request, event and idempotency result. The after-commit gate proves
+those three rows already exist before the client failure. Cancellation therefore
+does **not** qualify a no-effect outcome, owner cancellation or rollback. A
+pre-invocation unavailability injection prevents the owner call entirely; the
+same-key retry then creates the one logical result. For every case, two same-key
+replays return revision 1 and a changed-body replay refuses without altering the
+single persisted result. The request ID above JavaScript's safe integer limit
+and exact original objective remain intact.
+
+Run with the locked candidate Python environment:
+
+```bash
+uv run --project tests/experiments/ec00/candidates --locked \
+  python -m unittest discover -s tests/experiments/ec00 -p transport_failure_checks.py -v
+```
+
+The dedicated `ec00-transport-failures` CI job executes these cases. This is a
+Python/loopback/publish comparison only. Go/Rust/TypeScript cancellation,
+server-enforced deadlines, admission refusal after disconnect, commit-time
+cancellation, real authentication, TLS/proxy/browser behavior and production
+retry policy remain unqualified. It supplies no architecture or performance
+conclusion. Existing lifecycle and frozen old/new compatibility results retain
+their separate scope.
