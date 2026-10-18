@@ -499,3 +499,39 @@ cancellation, real authentication, TLS/proxy/browser behavior and production
 retry policy remain unqualified. It supplies no architecture or performance
 conclusion. Existing lifecycle and frozen old/new compatibility results retain
 their separate scope.
+
+
+## Generated Python unary watch replay slice (18 October 2026)
+
+`watch_replay_checks.py` compares native gRPC `Watch` and the generated OpenAPI
+GET `/v1/events` client against the same temporary file-backed owner and seeded
+principal. These are bounded unary pages, not streams or subscriptions. The
+checks compare complete semantic pages, cursor bytes, sequence order and owner
+request/event/idempotency rows using independent SQLite connections.
+
+Both clients replay identical cursors after reconnect and four injected lost
+responses (before/after the owner read in each transport). Eight additional
+cases time out or explicitly cancel generated-client calls at those read
+boundaries; retrying the same cursor returns the same page and leaves owner
+rows unchanged. Delayed polling with a writer appending between polls drains
+all six persisted events in order, at most two per call, then returns an empty
+page retaining its cursor. This tests a consumer that pauses between polls;
+it supplies no evidence about streaming queues or network backpressure.
+
+The refusal comparison covers oversized limits, tampered cursors, a list cursor
+used as a watch cursor, other principal/workspace, retention expiry and revoked
+principal. Each refusal preserves complete request/event/idempotency rows.
+HTTP refusals return 409 and the gRPC test adapter now explicitly maps owner
+`Conflict` to `ABORTED`; read-response loss maps to `UNAVAILABLE` or a closed
+HTTP response. The original adapter failed these comparisons with gRPC
+`UNKNOWN`; no production service or owner contract changed. Fixture identity
+seeding is not authentication qualification. A separate negative comparison records a limit semantic difference: omitted
+limits return two events in both arms; explicit gRPC scalar zero also defaults
+to 2, while explicit HTTP zero reaches the owner's refusal. This is an observed
+candidate mismatch, not a parity pass or a selected defaulting contract.
+
+Run the locked candidate environment with unittest discovery pattern
+`watch_replay_checks.py`; the dedicated EC00 CI job executes it beside the
+transport-failure slice. Real network/proxy/browser/TLS/authentication paths,
+other language watch clients, streaming and subscriber backpressure remain
+unqualified. These results do not select an architecture or report performance.
