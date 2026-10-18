@@ -8,6 +8,7 @@ import hashlib
 import sqlite3
 import sys
 import subprocess
+import shutil
 import tempfile
 import time
 import unittest
@@ -21,6 +22,8 @@ from google.protobuf import descriptor_pb2, descriptor_pool, message_factory
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
+FROZEN_59FA_MANIFEST_SHA256 = "4b90d609c530555e82954c0c94e3ccf69cc2d5274d568e6119e60e48ebc3b6b2"
+FROZEN_59FA_SOURCE_COMMIT = "59fa6194baae21f15558b09522eaf98879989134"
 sys.path.insert(0, str(ROOT / "tests/experiments/ec00/generated/protobuf/python"))
 sys.path.insert(0, str(ROOT / "tests/experiments/ec00/generated/typespec/clients/python"))
 
@@ -40,6 +43,24 @@ from artifact_semantics import make_signed_artifact, transport_fields
 from candidate_owner_http import (CandidateOwnerServer, initialize_fixture, persisted_artifact,
                                   persisted_request, seed_evidence, seed_typed_read_fixture)
 from owner_oracle import OwnerOracle, material_digest
+
+
+def load_verified_frozen_59fa_manifest(frozen: Path) -> dict[str, object]:
+    manifest_bytes = (frozen / "manifest.json").read_bytes()
+    actual_manifest_sha256 = hashlib.sha256(manifest_bytes).hexdigest()
+    if actual_manifest_sha256 != FROZEN_59FA_MANIFEST_SHA256:
+        raise AssertionError(
+            "frozen 59fa manifest differs from the reviewed source pin: "
+            f"{actual_manifest_sha256}"
+        )
+    manifest = json.loads(manifest_bytes)
+    if manifest.get("source_commit") != FROZEN_59FA_SOURCE_COMMIT:
+        raise AssertionError("frozen 59fa source commit does not match the reviewed pin")
+    for entry in manifest["source_files"] + manifest["go_rust_source_files"]:
+        actual = hashlib.sha256((frozen / entry["path"]).read_bytes()).hexdigest()
+        if actual != entry["sha256"]:
+            raise AssertionError(f"frozen 59fa source hash mismatch: {entry['path']}")
+    return manifest
 
 
 class LifecycleSliceTests(unittest.TestCase):
@@ -759,6 +780,243 @@ class LifecycleSliceTests(unittest.TestCase):
             if old_server.stderr:
                 old_server.stderr.close()
 
+    def test_frozen_59fa_and_current_generated_grpc_clients_interoperate(self) -> None:
+        frozen = HERE / "compat/merge-base-59fa"
+        load_verified_frozen_59fa_manifest(frozen)
+
+        client_script = frozen / "grpc_common_client.py"
+        old_pythonpath = str(frozen / "generated/protobuf/python")
+        current_pythonpath = str(HERE / "generated/protobuf/python")
+
+        def run_client(target: str, request_id: str, pythonpath: str) -> dict[str, object]:
+            result = subprocess.run([sys.executable, str(client_script), target, request_id],
+                cwd=frozen, env=dict(os.environ, PYTHONPATH=pythonpath),
+                capture_output=True, text=True, timeout=20)
+            self.assertEqual(0, result.returncode, result.stdout + "\n" + result.stderr)
+            return json.loads(result.stdout.strip().splitlines()[-1])
+
+        # Frozen 59fa generated stubs call the current service and its owner DB.
+        current_db = Path(self.temp.name) / "native-current.sqlite"
+        initialize_fixture(current_db)
+        with CandidateOwnerServer(current_db, principal_id="requester-a") as current_server:
+            old_result = run_client(current_server.grpc_target, "9007199254741301", old_pythonpath)
+        self.assertEqual("9007199254741301", old_result["request_id"])
+        self.assertEqual("9007199254741303", old_result["absent_note_id"])
+        self.assertEqual("9007199254741305", old_result["empty_note_id"])
+        db = sqlite3.connect(current_db)
+        try:
+            row = db.execute("SELECT revision,state,body_json FROM request WHERE request_id=?",
+                             ("9007199254741301",)).fetchone()
+            self.assertEqual((2, "open", '{"note":null,"objective":"second objective"}'), row)
+            self.assertEqual((1, "open", '{"objective":"absent note"}'), db.execute(
+                "SELECT revision,state,body_json FROM request WHERE request_id=?",
+                ("9007199254741303",)).fetchone())
+            self.assertEqual((1, "open", '{"note":"","objective":"present empty note"}'), db.execute(
+                "SELECT revision,state,body_json FROM request WHERE request_id=?",
+                ("9007199254741305",)).fetchone())
+            self.assertEqual(2, db.execute("SELECT count(*) FROM event WHERE request_id=?",
+                                           ("9007199254741301",)).fetchone()[0])
+        finally:
+            db.close()
+
+        # Current generated stubs call the exact frozen 59fa service and owner DB.
+        old_db = Path(self.temp.name) / "native-59fa.sqlite"
+        old_server = subprocess.Popen([sys.executable, str(frozen / "serve_old_grpc.py"), str(old_db)],
+            cwd=frozen, env=dict(os.environ, PYTHONPATH=old_pythonpath),
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            ready, _, _ = select.select([old_server.stdout], [], [], 10)
+            self.assertTrue(ready, "frozen 59fa gRPC server did not become ready")
+            target = json.loads(old_server.stdout.readline())["grpc"]
+            new_result = run_client(target, "9007199254741303", current_pythonpath)
+            self.assertEqual("9007199254741303", new_result["request_id"])
+            self.assertEqual("9007199254741307", new_result["empty_note_id"])
+
+            # The current schema has ReadRequest; the frozen service does not.
+            channel = grpc.insecure_channel(target)
+            try:
+                with self.assertRaises(grpc.RpcError) as missing_method:
+                    v1_pb2_grpc.OwnerOperationsStub(channel).ReadRequest(
+                        v1_pb2.RequestById(request_id="9007199254741303"), timeout=5)
+                self.assertEqual(grpc.StatusCode.UNIMPLEMENTED, missing_method.exception.code())
+            finally:
+                channel.close()
+
+            db = sqlite3.connect(old_db)
+            try:
+                row = db.execute("SELECT revision,state,body_json FROM request WHERE request_id=?",
+                                 ("9007199254741303",)).fetchone()
+                self.assertEqual((2, "open", '{"note":null,"objective":"second objective"}'), row)
+                self.assertEqual((1, "open", '{"objective":"absent note"}'), db.execute(
+                    "SELECT revision,state,body_json FROM request WHERE request_id=?",
+                    ("9007199254741305",)).fetchone())
+                self.assertEqual((1, "open", '{"note":"","objective":"present empty note"}'), db.execute(
+                    "SELECT revision,state,body_json FROM request WHERE request_id=?",
+                    ("9007199254741307",)).fetchone())
+                self.assertEqual(2, db.execute("SELECT count(*) FROM event WHERE request_id=?",
+                                               ("9007199254741303",)).fetchone()[0])
+            finally:
+                db.close()
+        finally:
+            if old_server.stdin:
+                old_server.stdin.close()
+            old_server.wait(timeout=10)
+            if old_server.returncode not in (0, None):
+                error = old_server.stderr.read() if old_server.stderr else ""
+                self.fail(f"frozen 59fa server exited {old_server.returncode}: {error}")
+            if old_server.stdout:
+                old_server.stdout.close()
+            if old_server.stderr:
+                old_server.stderr.close()
+
+    def test_frozen_59fa_go_rust_clients_against_current_grpc_service(self) -> None:
+        frozen = HERE / "compat/merge-base-59fa"
+        manifest = load_verified_frozen_59fa_manifest(frozen)
+        go = os.environ.get("EC00_GO") or shutil.which("go")
+        cargo = os.environ.get("EC00_CARGO") or shutil.which("cargo")
+        protoc_include = os.environ.get("PROTOC_INCLUDE")
+        self.assertTrue(go, "run inside the pinned EC-00 Go/Rust toolchain or set EC00_GO")
+        self.assertTrue(cargo, "run inside the pinned EC-00 Go/Rust toolchain or set EC00_CARGO")
+        self.assertTrue(protoc_include, "PROTOC_INCLUDE must identify the pinned protobuf include directory")
+        current_db = Path(self.temp.name) / "old-go-rust-clients-current-server.sqlite"
+        initialize_fixture(current_db)
+        with CandidateOwnerServer(current_db, principal_id="requester-a") as server:
+            old_root = frozen / "ec00"
+            old_env = dict(os.environ, EC00_GRPC_TARGET=server.grpc_target,
+                           EC00_BASE_URL=server.base_url, CGO_ENABLED="0")
+            old_go = subprocess.run([go, "run", "./candidates/go-client"], cwd=old_root,
+                env=old_env,
+                capture_output=True, text=True, timeout=240)
+            self.assertEqual(0, old_go.returncode, old_go.stdout + "\n" + old_go.stderr)
+            go_result = json.loads(old_go.stdout.strip().splitlines()[-1])
+            old_go_driver = subprocess.run([go, "run", "./candidates/go-client-compat"], cwd=old_root,
+                env=dict(old_env, EC00_COMPAT_ID_BASE="9007199254742401", EC00_COMPAT_LANGUAGE="go"),
+                capture_output=True, text=True, timeout=240)
+            self.assertEqual(0, old_go_driver.returncode,
+                             old_go_driver.stdout + "\n" + old_go_driver.stderr)
+            old_go_compat_result = json.loads(old_go_driver.stdout.strip().splitlines()[-1])
+
+            old_manifest = old_root / "candidates/rust-client/Cargo.toml"
+            old_rust_env = dict(os.environ, EC00_GRPC_TARGET=server.grpc_target,
+                EC00_BASE_URL=server.base_url, PROTOC_INCLUDE=protoc_include,
+                CARGO_TARGET_DIR=str(Path(self.temp.name) / "rust-old-client-target"))
+            old_rust = subprocess.run([cargo, "run", "--manifest-path", str(old_manifest), "--locked", "--quiet",
+                "--bin", "ec00-rust-client-check"],
+                cwd=old_root, env=old_rust_env,
+                capture_output=True, text=True, timeout=240)
+            self.assertEqual(0, old_rust.returncode, old_rust.stdout + "\n" + old_rust.stderr)
+            rust_result = json.loads(old_rust.stdout.strip().splitlines()[-1])
+            old_rust_driver = subprocess.run([cargo, "run", "--manifest-path", str(old_manifest),
+                "--locked", "--quiet", "--bin", "current_common_compat"], cwd=old_root,
+                env=dict(old_rust_env, EC00_COMPAT_ID_BASE="9007199254742501",
+                         EC00_COMPAT_LANGUAGE="rust"),
+                capture_output=True, text=True, timeout=240)
+            self.assertEqual(0, old_rust_driver.returncode,
+                             old_rust_driver.stdout + "\n" + old_rust_driver.stderr)
+            old_rust_compat_result = json.loads(old_rust_driver.stdout.strip().splitlines()[-1])
+
+        self.assertEqual("go", go_result["language"])
+        self.assertEqual("rust", rust_result["language"])
+        self.assertEqual("go", old_go_compat_result["language"])
+        self.assertEqual("rust", old_rust_compat_result["language"])
+        for row in (old_go_compat_result, old_rust_compat_result):
+            request_id = row["request_ids"][0]
+            self.assertGreater(int(request_id), 2**53)
+            db = sqlite3.connect(current_db)
+            try:
+                state = db.execute("SELECT revision,state,body_json FROM request WHERE request_id=?",
+                                   (request_id,)).fetchone()
+                self.assertEqual((2, "open", json.dumps({"note": "", "objective":
+                    f"{row['language'].title()} current common revise"}, separators=(",", ":"))), state)
+                self.assertEqual(2, db.execute("SELECT count(*) FROM event WHERE request_id=?",
+                                               (request_id,)).fetchone()[0])
+                expected_presence = (
+                    '{"objective":"note presence absent"}',
+                    '{"note":"","objective":"note presence empty"}',
+                    '{"note":null,"objective":"note presence null"}',
+                )
+                for presence_id, expected_body in zip(row["request_ids"][1:], expected_presence, strict=True):
+                    self.assertEqual((1, "open", expected_body), db.execute(
+                        "SELECT revision,state,body_json FROM request WHERE request_id=?",
+                        (presence_id,)).fetchone())
+            finally:
+                db.close()
+        for row in (go_result, rust_result):
+            request_id = row["protoId"]
+            self.assertGreater(int(request_id), 2**53)
+            db = sqlite3.connect(current_db)
+            try:
+                state = db.execute("SELECT revision,state,body_json FROM request WHERE request_id=?",
+                                   (request_id,)).fetchone()
+                self.assertEqual((2, "open", '{"note":"","objective":"Go native gRPC revision"}'
+                    if row["language"] == "go" else
+                    '{"note":"","objective":"Rust native gRPC revision"}'), state)
+                self.assertEqual(2, db.execute("SELECT count(*) FROM event WHERE request_id=?",
+                                               (request_id,)).fetchone()[0])
+            finally:
+                db.close()
+
+        # Current Go/Rust generated bindings exercise only the shared methods
+        # against the old service; use one independent frozen-owner database.
+        old_db = Path(self.temp.name) / "old-server-current-go-rust.sqlite"
+        old_server = subprocess.Popen([sys.executable, str(frozen / "serve_old_grpc.py"), str(old_db)],
+            cwd=frozen, env=dict(os.environ, PYTHONPATH=str(frozen / "generated/protobuf/python")),
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            ready, _, _ = select.select([old_server.stdout], [], [], 10)
+            self.assertTrue(ready, "frozen 59fa gRPC service did not become ready")
+            target = json.loads(old_server.stdout.readline())["grpc"]
+            current_root = HERE
+            for language, base in (("go", "9007199254742201"), ("rust", "9007199254742301")):
+                env = dict(os.environ, EC00_GRPC_TARGET=target, EC00_COMPAT_ID_BASE=base,
+                           EC00_COMPAT_LANGUAGE=language, CGO_ENABLED="0")
+                if language == "go":
+                    command = [go, "run", "./compat/current-go-grpc-client"]
+                    cwd = current_root
+                else:
+                    command = [cargo, "run", "--manifest-path",
+                        str(current_root / "candidates/rust-client/Cargo.toml"), "--locked", "--quiet",
+                        "--bin", "common_grpc_compat"]
+                    cwd = ROOT
+                current = subprocess.run(command, cwd=cwd, env=env,
+                    capture_output=True, text=True, timeout=240)
+                self.assertEqual(0, current.returncode, current.stdout + "\n" + current.stderr)
+                result = json.loads(current.stdout.strip().splitlines()[-1])
+                self.assertEqual(language, result["language"])
+                ids = result["request_ids"]
+                self.assertGreater(int(ids[0]), 2**53)
+                db = sqlite3.connect(old_db)
+                try:
+                    state = db.execute("SELECT revision,state,body_json FROM request WHERE request_id=?",
+                                       (ids[0],)).fetchone()
+                    objective = f"{language.title()} current common revise"
+                    self.assertEqual((2, "open", json.dumps({"note": "", "objective": objective},
+                        separators=(",", ":"))), state)
+                    self.assertEqual(2, db.execute("SELECT count(*) FROM event WHERE request_id=?",
+                                                   (ids[0],)).fetchone()[0])
+                    expected_presence = [
+                        {"objective": "note presence absent"},
+                        {"note": "", "objective": "note presence empty"},
+                        {"note": None, "objective": "note presence null"},
+                    ]
+                    for request_id, body in zip(ids[1:], expected_presence, strict=True):
+                        stored = db.execute("SELECT revision,state,body_json FROM request WHERE request_id=?",
+                                             (request_id,)).fetchone()
+                        self.assertEqual((1, "open", json.dumps(body, separators=(",", ":"))), stored)
+                finally:
+                    db.close()
+        finally:
+            if old_server.stdin:
+                old_server.stdin.close()
+            old_server.wait(timeout=10)
+            if old_server.returncode not in (0, None):
+                error = old_server.stderr.read() if old_server.stderr else ""
+                self.fail(f"frozen 59fa server exited {old_server.returncode}: {error}")
+            if old_server.stdout:
+                old_server.stdout.close()
+            if old_server.stderr:
+                old_server.stderr.close()
+
     def request_state(self, request_id: str) -> tuple[int, str]:
         db = sqlite3.connect(self.db_path)
         try:
@@ -766,6 +1024,23 @@ class LifecycleSliceTests(unittest.TestCase):
             return row
         finally:
             db.close()
+
+    def test_frozen_59fa_manifest_pin_rejects_coordinated_fixture_drift(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ec00-drifted-59fa-") as temp_dir:
+            frozen = Path(temp_dir)
+            fixture = frozen / "old_source.py"
+            fixture.write_text("# modified fixture\n")
+            fixture_sha256 = hashlib.sha256(fixture.read_bytes()).hexdigest()
+            manifest = {
+                "source_commit": FROZEN_59FA_SOURCE_COMMIT,
+                "source_files": [{"path": fixture.name, "sha256": fixture_sha256}],
+                "go_rust_source_files": [],
+            }
+            # The adjacent manifest agrees with the modified file, so only the
+            # independently reviewed manifest pin can reject this coordinated drift.
+            (frozen / "manifest.json").write_text(json.dumps(manifest, sort_keys=True))
+            with self.assertRaisesRegex(AssertionError, "manifest differs from the reviewed source pin"):
+                load_verified_frozen_59fa_manifest(frozen)
 
 
 if __name__ == "__main__":
