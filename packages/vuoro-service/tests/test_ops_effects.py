@@ -57,6 +57,7 @@ def make_journal(directory: Path, effects: list[dict]) -> Path:
         for operation in effect.get("spent", []):
             connection.execute("INSERT INTO publication_spent VALUES (?,?,?,?)", (key, operation, b"{}", _sha(b"{}")))
     connection.close()
+    (directory / "journal.sqlite3").chmod(0o600)
     return directory
 
 
@@ -102,6 +103,45 @@ def test_journal_is_read_without_modification(journal):
     effects = read_journal(journal)
     assert {effect.status for effect in effects.values()} == {"UNSETTLED"}
     assert {path.name: path.read_bytes() for path in journal.iterdir()} == before
+
+
+def test_rebound_empty_v2_journal_is_read_without_modification(tmp_path):
+    journal = make_journal(tmp_path / "journal-v1", [])
+    updated = _canonical({"schema": "vuoro-test-registry/v1", "revision": 2})
+    journal_module.rebind_empty_journal(
+        journal,
+        host_id="host",
+        profile_id="fixture-profile",
+        expected_old_registry_sha256=_sha(b"{}"),
+        new_registry_utf8=updated,
+        operation_id="a" * 32,
+    )
+    before = {path.name: path.read_bytes() for path in journal.iterdir()}
+
+    assert read_journal(journal) == {}
+    assert {path.name: path.read_bytes() for path in journal.iterdir()} == before
+
+
+def test_v2_journal_with_corrupt_registry_history_is_unreadable(tmp_path):
+    journal = make_journal(tmp_path / "journal-v1", [])
+    journal_module.rebind_empty_journal(
+        journal,
+        host_id="host",
+        profile_id="fixture-profile",
+        expected_old_registry_sha256=_sha(b"{}"),
+        new_registry_utf8=_canonical({"schema": "vuoro-test-registry/v1", "revision": 2}),
+        operation_id="b" * 32,
+    )
+    with sqlite3.connect(journal / "journal.sqlite3") as connection:
+        connection.execute("DROP TRIGGER registry_rebinds_no_update")
+        connection.execute(
+            "UPDATE registry_rebinds SET new_registry_sha256=? WHERE operation_id=?",
+            ("sha256:" + "0" * 64, "b" * 32),
+        )
+        connection.execute(journal_module._TRIGGER_SQL["registry_rebinds_no_update"])
+
+    with pytest.raises(ValueError, match="history digest is invalid"):
+        read_journal(journal)
 
 
 def test_tampered_journal_is_an_unknown(journal):
