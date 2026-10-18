@@ -11,11 +11,13 @@ import subprocess
 import tempfile
 import time
 import unittest
+import urllib.request
 from pathlib import Path
 import select
 
 import httpx
 import grpc
+from google.protobuf import descriptor_pb2, descriptor_pool, message_factory
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -35,7 +37,8 @@ from ec00_oa_python_client.models import (
 )
 from ec00_oa_python_client.types import UNSET
 from artifact_semantics import make_signed_artifact, transport_fields
-from candidate_owner_http import CandidateOwnerServer, initialize_fixture, persisted_artifact, persisted_request, seed_evidence
+from candidate_owner_http import (CandidateOwnerServer, initialize_fixture, persisted_artifact,
+                                  persisted_request, seed_evidence, seed_typed_read_fixture)
 from owner_oracle import OwnerOracle, material_digest
 
 
@@ -79,7 +82,7 @@ class LifecycleSliceTests(unittest.TestCase):
 
     @staticmethod
     def parsed(result):
-        return json.loads(result.parsed.json)
+        return result.parsed.to_dict()
 
     def publish_extras_openapi(self, base: str) -> None:
         for suffix in ("41", "43"):
@@ -110,13 +113,17 @@ class LifecycleSliceTests(unittest.TestCase):
             self.assertEqual(1, again.parsed.revision)
             request_doc = self.parsed(read_request.sync_detailed(request_id, client=self.http_client(server.base_url)))
             deps = self.parsed(read_dependants.sync_detailed(request_id, client=self.http_client(server.base_url)))
-            saved_artifact = self.parsed(read_artifact.sync_detailed(request_id, 1, client=self.http_client(server.base_url)))
-            self.assertEqual(1, request_doc["revision"])
-            self.assertEqual(1, request_doc["material_revision"])
-            self.assertEqual({"work-a": {"active": 1, "continuation_ack": 0},
-                              "work-b": {"active": 1, "continuation_ack": 0}}, deps)
+            saved_artifact = self.parsed(read_artifact.sync_detailed(request_id, "1", client=self.http_client(server.base_url)))
+            self.assertEqual("1", request_doc["revision"])
+            self.assertEqual("1", request_doc["materialRevision"])
+            self.assertEqual("open", request_doc["state"])
+            self.assertEqual({"objective": body["objective"], "note": body["note"]}, request_doc["body"])
+            self.assertEqual([{"dependentId": "work-a", "active": True, "continuationAck": False},
+                              {"dependentId": "work-b", "active": True, "continuationAck": False}], deps["items"])
             self.assertEqual(base64.b64encode(signed["original_bytes"]).decode(), saved_artifact["originalBytes"])
-            self.assertEqual(1, saved_artifact["materialRevision"])
+            self.assertEqual("1", saved_artifact["materialRevision"])
+            self.assertEqual(material_digest(body), saved_artifact["materialDigest"])
+            self.assertEqual(signed["key_id"], saved_artifact["keyId"])
             self.assertEqual((signed["original_bytes"], signed["envelope_bytes"], signed["signature"], signed["artifact_digest"]),
                              persisted_artifact(self.db_path, request_id, 1))
 
@@ -215,8 +222,8 @@ class LifecycleSliceTests(unittest.TestCase):
             self.assertEqual(409, stale.status_code)
         with CandidateOwnerServer(self.db_path, principal_id="requester-a") as server:
             deps = self.parsed(read_dependants.sync_detailed(withdraw_id, client=self.http_client(server.base_url)))
-            self.assertEqual({"work-a": {"active": 0, "continuation_ack": 0},
-                              "work-b": {"active": 1, "continuation_ack": 0}}, deps)
+            self.assertEqual([{"dependentId": "work-a", "active": False, "continuationAck": False},
+                              {"dependentId": "work-b", "active": True, "continuationAck": False}], deps["items"])
 
         # Material revise clears the derived state and the previous revision's signed decision.
         with CandidateOwnerServer(self.db_path, principal_id="coordinator-a") as server:
@@ -254,8 +261,8 @@ class LifecycleSliceTests(unittest.TestCase):
             self.assertEqual(5, revised.parsed.revision)
             self.assertIn(("revise", "invalidation-revise"), server.fault_consumed)
             after = self.parsed(read_request.sync_detailed(invalidation_id, client=self.http_client(server.base_url)))
-            self.assertEqual((0, 0, None, None), (after["reported"], after["verified"], after["evidence_ref"],
-                                                   after["artifact_decision_digest"]))
+            self.assertEqual((False, False, None, None), (after["reported"], after["verified"], after["evidenceRef"],
+                                                          after["artifactDecisionDigest"]))
             stale_decision = decide_artifact.sync_detailed(invalidation_id, client=self.http_client(server.base_url, "old-artifact-after-revise"),
                 body=DecideArtifactRequest(expected_revision=5, artifact_digest=invalidation_signed["artifact_digest"]))
             self.assertEqual(409, stale_decision.status_code)
@@ -266,14 +273,14 @@ class LifecycleSliceTests(unittest.TestCase):
         with CandidateOwnerServer(self.db_path, principal_id="requester-a") as server:
             first = self.parsed(list_requests.sync_detailed(client=self.http_client(server.base_url), limit=2))
             self.assertEqual(2, len(first["items"]))
-            self.assertIsNotNone(first["next_cursor"])
+            self.assertIsNotNone(first["nextCursor"])
             oversized = list_requests.sync_detailed(client=self.http_client(server.base_url), limit=3)
             self.assertEqual(409, oversized.status_code)
-            page_cursor = first["next_cursor"]
+            page_cursor = first["nextCursor"]
             watch_first = self.parsed(watch.sync_detailed(client=self.http_client(server.base_url), limit=1))
             self.assertEqual(1, len(watch_first["events"]))
             self.assertTrue(watch_first["more"])
-            watch_cursor = watch_first["next_cursor"]
+            watch_cursor = watch_first["nextCursor"]
         with CandidateOwnerServer(self.db_path, principal_id="requester-a2") as peer:
             self.assertEqual(409, list_requests.sync_detailed(client=self.http_client(peer.base_url), cursor=page_cursor, limit=2).status_code)
             self.assertEqual(409, watch.sync_detailed(client=self.http_client(peer.base_url), cursor=watch_cursor, limit=1).status_code)
@@ -340,12 +347,25 @@ class LifecycleSliceTests(unittest.TestCase):
                 artifact_signature=base64.b64decode(fields["artifactSignature"]),
             ), metadata=(("idempotency-key", "grpc-lifecycle-publish"),), timeout=5)
             self.assertEqual((request_id, 1), (result.request_id, result.revision))
+            request_read = stub.ReadRequest(v1_pb2.RequestById(request_id=request_id), timeout=5)
+            self.assertEqual((request_id, 1, 1, v1_pb2.REQUEST_STATE_OPEN),
+                             (request_read.request_id, request_read.revision,
+                              request_read.material_revision, request_read.state))
+            self.assertEqual(body["objective"], request_read.body.objective)
+            self.assertEqual("note", request_read.body.WhichOneof("note_value"))
+            self.assertEqual(body["note"], request_read.body.note)
+            self.assertEqual("evidence_ref_null", request_read.WhichOneof("evidence_ref_value"))
+            dependants = stub.ReadDependants(v1_pb2.RequestById(request_id=request_id), timeout=5)
+            self.assertEqual([("work-a", True, False), ("work-b", True, False), ("work-c", True, False)],
+                             [(item.dependent_id, item.active, item.continuation_ack) for item in dependants.items])
             stored = stub.ReadArtifact(v1_pb2.ReadArtifactRequest(request_id=request_id, material_revision=1), timeout=5)
-            wire = json.loads(stored.json)
-            self.assertEqual(1, wire["materialRevision"])
-            self.assertEqual(signed["original_bytes"], base64.b64decode(wire["originalBytes"]))
-            self.assertEqual(signed["envelope_bytes"], base64.b64decode(wire["envelopeBytes"]))
-            self.assertEqual(signed["signature"], base64.b64decode(wire["signature"]))
+            self.assertEqual(1, stored.material_revision)
+            self.assertEqual(material_digest(body), stored.material_digest)
+            self.assertEqual(signed["artifact_digest"], stored.artifact_digest)
+            self.assertEqual(signed["key_id"], stored.key_id)
+            self.assertEqual(signed["original_bytes"], stored.original_bytes)
+            self.assertEqual(signed["envelope_bytes"], stored.envelope_bytes)
+            self.assertEqual(signed["signature"], stored.signature)
         finally:
             channel.close()
             coordinator.__exit__(None, None, None)
@@ -420,10 +440,123 @@ class LifecycleSliceTests(unittest.TestCase):
                           "continuation-acknowledged"],
                          [event[1] for event in self.events(request_id)])
         self.assertEqual(8, self.events(request_id)[-1][2])
+        reader, channel, stub = stub_for("requester-a")
+        try:
+            request_read = stub.ReadRequest(v1_pb2.RequestById(request_id=request_id), timeout=5)
+            self.assertEqual((8, v1_pb2.REQUEST_STATE_RESOLVED), (request_read.revision, request_read.state))
+            self.assertTrue(request_read.verified)
+            self.assertEqual(f"evidence:source:{request_id}", request_read.evidence_ref)
+            page = stub.ListRequests(v1_pb2.PageRequest(limit=1), timeout=5)
+            self.assertEqual(request_id, page.items[0].request_id)
+            self.assertEqual(8, page.items[0].revision)
+            events = stub.Watch(v1_pb2.PageRequest(limit=2), timeout=5)
+            self.assertEqual(2, len(events.events))
+            self.assertEqual(1, events.events[0].seq)
+            self.assertTrue(events.more)
+        finally:
+            channel.close()
+            reader.__exit__(None, None, None)
+
+    def test_typed_reads_preserve_large_int64_and_empty_artifact_bytes(self) -> None:
+        fixture = seed_typed_read_fixture(self.db_path)
+        request_id = fixture["request_id"]
+        revision = fixture["revision"]
+        material_revision = fixture["material_revision"]
+        sequence = fixture["sequence"]
+        signed = fixture["signed"]
+        with CandidateOwnerServer(self.db_path, principal_id="requester-a") as server:
+            request_doc = self.parsed(read_request.sync_detailed(
+                request_id, client=self.http_client(server.base_url)))
+            self.assertEqual((str(revision), str(material_revision), str(sequence)),
+                             (request_doc["revision"], request_doc["materialRevision"],
+                              request_doc["createdSeq"]))
+            self.assertEqual((request_id, "open", fixture["body"]["objective"]),
+                             (request_doc["requestId"], request_doc["state"],
+                              request_doc["body"]["objective"]))
+            self.assertIsNone(request_doc["evidenceRef"])
+            deps = self.parsed(read_dependants.sync_detailed(
+                request_id, client=self.http_client(server.base_url)))
+            self.assertEqual([{"dependentId": "work-a", "active": True, "continuationAck": False}],
+                             deps["items"])
+            artifact = self.parsed(read_artifact.sync_detailed(
+                request_id, str(material_revision), client=self.http_client(server.base_url)))
+            self.assertEqual(str(material_revision), artifact["materialRevision"])
+            self.assertEqual("", artifact["originalBytes"])
+            self.assertEqual(base64.b64encode(signed["envelope_bytes"]).decode(), artifact["envelopeBytes"])
+            self.assertEqual(base64.b64encode(signed["signature"]).decode(), artifact["signature"])
+            page = self.parsed(list_requests.sync_detailed(client=self.http_client(server.base_url), limit=2))
+            self.assertEqual(str(revision), next(item["revision"] for item in page["items"]
+                                                  if item["requestId"] == request_id))
+            watch_page = self.parsed(watch.sync_detailed(client=self.http_client(server.base_url), limit=2))
+            event = next(item for item in watch_page["events"] if item["requestId"] == request_id)
+            self.assertEqual((str(sequence), str(revision)), (event["seq"], event["revision"]))
+
+            channel = grpc.insecure_channel(server.grpc_target)
+            stub = v1_pb2_grpc.OwnerOperationsStub(channel)
+            try:
+                proto_request = stub.ReadRequest(v1_pb2.RequestById(request_id=request_id), timeout=5)
+                self.assertEqual((revision, material_revision, sequence),
+                                 (proto_request.revision, proto_request.material_revision,
+                                  proto_request.created_seq))
+                self.assertEqual(v1_pb2.REQUEST_STATE_OPEN, proto_request.state)
+                self.assertEqual("evidence_ref_null", proto_request.WhichOneof("evidence_ref_value"))
+                proto_deps = stub.ReadDependants(v1_pb2.RequestById(request_id=request_id), timeout=5)
+                self.assertEqual([("work-a", True, False)],
+                                 [(row.dependent_id, row.active, row.continuation_ack) for row in proto_deps.items])
+                proto_artifact = stub.ReadArtifact(v1_pb2.ReadArtifactRequest(
+                    request_id=request_id, material_revision=material_revision), timeout=5)
+                self.assertEqual(b"", proto_artifact.original_bytes)
+                self.assertEqual(signed["envelope_bytes"], proto_artifact.envelope_bytes)
+                self.assertEqual(signed["signature"], proto_artifact.signature)
+                proto_page = stub.ListRequests(v1_pb2.PageRequest(limit=2), timeout=5)
+                self.assertEqual(revision, next(item.revision for item in proto_page.items
+                                                 if item.request_id == request_id))
+                proto_watch = stub.Watch(v1_pb2.PageRequest(limit=2), timeout=5)
+                proto_event = next(item for item in proto_watch.events if item.request_id == request_id)
+                self.assertEqual((sequence, revision), (proto_event.seq, proto_event.revision))
+            finally:
+                channel.close()
+
+    def test_typed_read_shape_is_known_break_from_a94_jsonresult(self) -> None:
+        """The candidate replaces the old v1 JsonResult shape without negotiation."""
+        fixture = seed_typed_read_fixture(self.db_path)
+        request_id = fixture["request_id"]
+        with CandidateOwnerServer(self.db_path, principal_id="requester-a") as server:
+            with urllib.request.urlopen(f"{server.base_url}/v1/requests/{request_id}", timeout=5) as response:
+                http_body = json.load(response)
+            self.assertNotIn("json", http_body)
+            self.assertEqual(request_id, http_body["requestId"])
+            channel = grpc.insecure_channel(server.grpc_target)
+            try:
+                current = v1_pb2_grpc.OwnerOperationsStub(channel).ReadRequest(
+                    v1_pb2.RequestById(request_id=request_id), timeout=5)
+            finally:
+                channel.close()
+
+        # In a94cf67, JsonResult's only field was string json = 1. The new
+        # RequestRead uses field 1 for request_id; an old decoder sees a
+        # syntactically valid protobuf value with different semantics.
+        legacy_file = descriptor_pb2.FileDescriptorProto(
+            name="frozen-a94-json-result.proto", package="ec00.oa.v1", syntax="proto3")
+        legacy = legacy_file.message_type.add(name="JsonResult")
+        legacy_field = legacy.field.add(name="json", number=1,
+            label=descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+            type=descriptor_pb2.FieldDescriptorProto.TYPE_STRING)
+        pool = descriptor_pool.DescriptorPool()
+        pool.Add(legacy_file)
+        legacy_type = message_factory.GetMessageClass(pool.FindMessageTypeByName("ec00.oa.v1.JsonResult"))
+        old_client_view = legacy_type.FromString(current.SerializeToString())
+        self.assertEqual(request_id, old_client_view.json)
+        # This particular string is valid JSON as a number, which makes the
+        # incompatibility a silent semantic change rather than a parse error.
+        decoded_old_payload = json.loads(old_client_view.json)
+        self.assertEqual(int(request_id), decoded_old_payload)
+        self.assertIsInstance(decoded_old_payload, int)
 
     def test_generated_typescript_openapi_and_protobuf_lifecycle_clients(self) -> None:
         node = os.environ.get("EC00_NODE")
         self.assertTrue(node, "EC00_NODE must point to the pinned Node 24.21.0 toolchain")
+        big_read = seed_typed_read_fixture(self.db_path)
         http_id, proto_id = "9007199254741123", "9007199254741125"
         http_artifact = make_signed_artifact(workspace_id="workspace-a", request_id=http_id, material_revision=1,
             material_digest=material_digest({"objective": "generated TypeSpec lifecycle"}),
@@ -440,7 +573,12 @@ class LifecycleSliceTests(unittest.TestCase):
             bundle[name] = {key: (base64.b64encode(value).decode("ascii") if isinstance(value, bytes) else value)
                             for key, value in artifact.items()}
         candidates = HERE / "candidates"
+        big_signed = big_read["signed"]
+        big_artifact = {key: base64.b64encode(big_signed[key]).decode("ascii")
+                        for key in ("original_bytes", "envelope_bytes", "signature")}
+        big_artifact.update({"artifact_digest": big_signed["artifact_digest"], "key_id": big_signed["key_id"]})
         env = dict(os.environ, EC00_BASE_URL="", EC00_SIGNED_ARTIFACT=json.dumps(bundle),
+                   EC00_BIG_READ_ID=big_read["request_id"], EC00_BIG_READ_ARTIFACT=json.dumps(big_artifact),
                    NODE_PATH=str(candidates / "node_modules"),
                    PATH=f"{Path(node).resolve().parent}:{candidates / 'node_modules/.bin'}:{os.environ['PATH']}")
         with CandidateOwnerServer(self.db_path, principal_id="requester-a") as server:

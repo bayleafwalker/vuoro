@@ -264,7 +264,7 @@ func (r ApiListRequestsRequest) Limit(limit int32) ApiListRequestsRequest {
 	return r
 }
 
-func (r ApiListRequestsRequest) Execute() (*ReadResult, *http.Response, error) {
+func (r ApiListRequestsRequest) Execute() (*RequestPage, *http.Response, error) {
 	return r.ApiService.ListRequestsExecute(r)
 }
 
@@ -282,13 +282,13 @@ func (a *DefaultAPIService) ListRequests(ctx context.Context) ApiListRequestsReq
 }
 
 // Execute executes the request
-//  @return ReadResult
-func (a *DefaultAPIService) ListRequestsExecute(r ApiListRequestsRequest) (*ReadResult, *http.Response, error) {
+//  @return RequestPage
+func (a *DefaultAPIService) ListRequestsExecute(r ApiListRequestsRequest) (*RequestPage, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *ReadResult
+		localVarReturnValue  *RequestPage
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "DefaultAPIService.ListRequests")
@@ -474,10 +474,10 @@ type ApiReadArtifactRequest struct {
 	ctx context.Context
 	ApiService *DefaultAPIService
 	requestId string
-	materialRevision int64
+	materialRevision string
 }
 
-func (r ApiReadArtifactRequest) Execute() (*ReadResult, *http.Response, error) {
+func (r ApiReadArtifactRequest) Execute() (*ArtifactRead, *http.Response, error) {
 	return r.ApiService.ReadArtifactExecute(r)
 }
 
@@ -489,7 +489,7 @@ ReadArtifact Method for ReadArtifact
  @param materialRevision
  @return ApiReadArtifactRequest
 */
-func (a *DefaultAPIService) ReadArtifact(ctx context.Context, requestId string, materialRevision int64) ApiReadArtifactRequest {
+func (a *DefaultAPIService) ReadArtifact(ctx context.Context, requestId string, materialRevision string) ApiReadArtifactRequest {
 	return ApiReadArtifactRequest{
 		ApiService: a,
 		ctx: ctx,
@@ -499,13 +499,13 @@ func (a *DefaultAPIService) ReadArtifact(ctx context.Context, requestId string, 
 }
 
 // Execute executes the request
-//  @return ReadResult
-func (a *DefaultAPIService) ReadArtifactExecute(r ApiReadArtifactRequest) (*ReadResult, *http.Response, error) {
+//  @return ArtifactRead
+func (a *DefaultAPIService) ReadArtifactExecute(r ApiReadArtifactRequest) (*ArtifactRead, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *ReadResult
+		localVarReturnValue  *ArtifactRead
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "DefaultAPIService.ReadArtifact")
@@ -581,7 +581,7 @@ type ApiReadDependantsRequest struct {
 	requestId string
 }
 
-func (r ApiReadDependantsRequest) Execute() (*ReadResult, *http.Response, error) {
+func (r ApiReadDependantsRequest) Execute() (*DependantsRead, *http.Response, error) {
 	return r.ApiService.ReadDependantsExecute(r)
 }
 
@@ -601,13 +601,13 @@ func (a *DefaultAPIService) ReadDependants(ctx context.Context, requestId string
 }
 
 // Execute executes the request
-//  @return ReadResult
-func (a *DefaultAPIService) ReadDependantsExecute(r ApiReadDependantsRequest) (*ReadResult, *http.Response, error) {
+//  @return DependantsRead
+func (a *DefaultAPIService) ReadDependantsExecute(r ApiReadDependantsRequest) (*DependantsRead, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *ReadResult
+		localVarReturnValue  *DependantsRead
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "DefaultAPIService.ReadDependants")
@@ -682,7 +682,7 @@ type ApiReadRequestRequest struct {
 	requestId string
 }
 
-func (r ApiReadRequestRequest) Execute() (*ReadResult, *http.Response, error) {
+func (r ApiReadRequestRequest) Execute() (*RequestRead, *http.Response, error) {
 	return r.ApiService.ReadRequestExecute(r)
 }
 
@@ -702,13 +702,13 @@ func (a *DefaultAPIService) ReadRequest(ctx context.Context, requestId string) A
 }
 
 // Execute executes the request
-//  @return ReadResult
-func (a *DefaultAPIService) ReadRequestExecute(r ApiReadRequestRequest) (*ReadResult, *http.Response, error) {
+//  @return RequestRead
+func (a *DefaultAPIService) ReadRequestExecute(r ApiReadRequestRequest) (*RequestRead, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *ReadResult
+		localVarReturnValue  *RequestRead
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "DefaultAPIService.ReadRequest")
@@ -1242,7 +1242,7 @@ func (r ApiWatchRequest) Limit(limit int32) ApiWatchRequest {
 	return r
 }
 
-func (r ApiWatchRequest) Execute() (*ReadResult, *http.Response, error) {
+func (r ApiWatchRequest) Execute() (*WatchPage, *http.Response, error) {
 	return r.ApiService.WatchExecute(r)
 }
 
@@ -1260,13 +1260,13 @@ func (a *DefaultAPIService) Watch(ctx context.Context) ApiWatchRequest {
 }
 
 // Execute executes the request
-//  @return ReadResult
-func (a *DefaultAPIService) WatchExecute(r ApiWatchRequest) (*ReadResult, *http.Response, error) {
+//  @return WatchPage
+func (a *DefaultAPIService) WatchExecute(r ApiWatchRequest) (*WatchPage, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *ReadResult
+		localVarReturnValue  *WatchPage
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "DefaultAPIService.Watch")

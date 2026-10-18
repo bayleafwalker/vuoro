@@ -1,48 +1,70 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Self, TypeVar
+from typing import Any, Self, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="ReadResult")
+from ..types import UNSET, Unset
+
+T = TypeVar("T", bound="RequestBody")
 
 
 @_attrs_define
-class ReadResult:
+class RequestBody:
     """
     Attributes:
-        json (str):
+        objective (str):
+        note (None | str | Unset):
     """
 
-    json: str
+    objective: str
+    note: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        json = self.json
+        objective = self.objective
+
+        note: None | str | Unset
+        if isinstance(self.note, Unset):
+            note = UNSET
+        else:
+            note = self.note
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "json": json,
+                "objective": objective,
             }
         )
+        if note is not UNSET:
+            field_dict["note"] = note
 
         return field_dict
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         d = dict(src_dict)
-        json = d.pop("json")
+        objective = d.pop("objective")
 
-        read_result = cls(
-            json=json,
+        def _parse_note(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        note = _parse_note(d.pop("note", UNSET))
+
+        request_body = cls(
+            objective=objective,
+            note=note,
         )
 
-        read_result.additional_properties = d
-        return read_result
+        request_body.additional_properties = d
+        return request_body
 
     @property
     def additional_keys(self) -> list[str]:

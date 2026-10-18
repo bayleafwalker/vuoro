@@ -13,6 +13,7 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from owner_oracle import Conflict, OwnerOracle, ResponseLost, material_digest
+from artifact_semantics import make_signed_artifact
 from oa import v1_pb2
 from oa import v1_pb2_grpc
 import grpc
@@ -92,18 +93,136 @@ class _Handler(BaseHTTPRequestHandler):
         }
 
     def _artifact_from_proto(self, message: object) -> dict[str, Any] | None:
-        names = (message.artifact_digest, message.artifact_key_id, message.artifact_bytes,
-                 message.artifact_envelope, message.artifact_signature)
-        if not any(names):
+        names = ("artifact_digest", "artifact_key_id", "artifact_bytes",
+                 "artifact_envelope", "artifact_signature")
+        present = [message.HasField(name) for name in names]
+        if not any(present):
             return None
-        if not all(names):
+        if not all(present):
             raise ValueError("signed artifact fields must be supplied together")
         return {"artifact_digest": message.artifact_digest, "key_id": message.artifact_key_id,
                 "original_bytes": message.artifact_bytes, "envelope_bytes": message.artifact_envelope,
                 "signature": message.artifact_signature}
 
     def _json_read(self, value: Any) -> None:
-        self._json(200, {"json": json.dumps(value, separators=(",", ":"))})
+        self._json(200, value)
+
+    @staticmethod
+    def _request_read(value: dict[str, Any]) -> dict[str, Any]:
+        body = json.loads(value.pop("body_json"))
+        return {
+            "requestId": value["request_id"],
+            "revision": str(value["revision"]),
+            "materialRevision": str(value["material_revision"]),
+            "state": value["state"],
+            "body": {"objective": body["objective"], **({"note": body["note"]} if "note" in body else {})},
+            "reported": bool(value["reported"]),
+            "verified": bool(value["verified"]),
+            "evidenceRef": value["evidence_ref"],
+            "artifactDecisionDigest": value["artifact_decision_digest"],
+            "createdSeq": str(value["created_seq"]),
+        }
+
+    @staticmethod
+    def _dependants_read(value: dict[str, dict[str, int]]) -> dict[str, Any]:
+        return {"items": [
+            {"dependentId": dep_id, "active": bool(row["active"]),
+             "continuationAck": bool(row["continuation_ack"])}
+            for dep_id, row in sorted(value.items())
+        ]}
+
+    @staticmethod
+    def _artifact_read(value: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "materialRevision": str(value["material_revision"]),
+            "materialDigest": value["material_digest"],
+            "artifactDigest": value["artifact_digest"],
+            "keyId": value["key_id"],
+            "originalBytes": base64.b64encode(value["original_bytes"]).decode("ascii"),
+            "envelopeBytes": base64.b64encode(value["envelope_bytes"]).decode("ascii"),
+            "signature": base64.b64encode(value["signature"]).decode("ascii"),
+        }
+
+    @staticmethod
+    def _request_page(value: dict[str, Any]) -> dict[str, Any]:
+        return {"items": [
+            {"requestId": row["request_id"], "revision": str(row["revision"]),
+             "state": row["state"], "createdSeq": str(row["created_seq"])}
+            for row in value["items"]
+        ], "nextCursor": value["next_cursor"]}
+
+    @staticmethod
+    def _watch_page(value: dict[str, Any]) -> dict[str, Any]:
+        return {"events": [
+            {"seq": str(row["seq"]), "requestId": row["request_id"],
+             "action": row["action"], "revision": str(row["revision"])}
+            for row in value["events"]
+        ], "nextCursor": value["next_cursor"], "more": value["more"]}
+
+    @staticmethod
+    def _request_state(value: str) -> int:
+        try:
+            return {"open": v1_pb2.REQUEST_STATE_OPEN,
+                    "resolved": v1_pb2.REQUEST_STATE_RESOLVED}[value]
+        except KeyError as exc:
+            raise ValueError("owner returned an unknown request state") from exc
+
+    @classmethod
+    def _proto_request_read(cls, value: dict[str, Any]) -> Any:
+        body = json.loads(value["body_json"])
+        result = v1_pb2.RequestRead(
+            request_id=value["request_id"], revision=value["revision"],
+            material_revision=value["material_revision"], state=cls._request_state(value["state"]),
+            body=v1_pb2.RequestBody(objective=body["objective"]), reported=bool(value["reported"]),
+            verified=bool(value["verified"]), created_seq=value["created_seq"])
+        if "note" in body:
+            if body["note"] is None:
+                result.body.note_null = 0
+            else:
+                result.body.note = body["note"]
+        if value["evidence_ref"] is None:
+            result.evidence_ref_null = 0
+        else:
+            result.evidence_ref = value["evidence_ref"]
+        if value["artifact_decision_digest"] is None:
+            result.artifact_decision_digest_null = 0
+        else:
+            result.artifact_decision_digest = value["artifact_decision_digest"]
+        return result
+
+    @staticmethod
+    def _proto_dependants_read(value: dict[str, dict[str, int]]) -> Any:
+        return v1_pb2.DependantsRead(items=[
+            v1_pb2.DependentRead(dependent_id=dep_id, active=bool(row["active"]),
+                                 continuation_ack=bool(row["continuation_ack"]))
+            for dep_id, row in sorted(value.items())])
+
+    @staticmethod
+    def _proto_artifact_read(value: dict[str, Any]) -> Any:
+        return v1_pb2.ArtifactRead(material_revision=value["material_revision"],
+            material_digest=value["material_digest"], artifact_digest=value["artifact_digest"],
+            key_id=value["key_id"], original_bytes=value["original_bytes"],
+            envelope_bytes=value["envelope_bytes"], signature=value["signature"])
+
+    @classmethod
+    def _proto_request_page(cls, value: dict[str, Any]) -> Any:
+        result = v1_pb2.RequestPage(items=[
+            v1_pb2.RequestSummary(request_id=row["request_id"], revision=row["revision"],
+                state=cls._request_state(row["state"]), created_seq=row["created_seq"])
+            for row in value["items"]])
+        if value["next_cursor"] is not None:
+            result.next_cursor = value["next_cursor"]
+        return result
+
+    @staticmethod
+    def _proto_watch_page(value: dict[str, Any]) -> Any:
+        result = v1_pb2.WatchPage(events=[
+            v1_pb2.WatchEvent(seq=row["seq"], request_id=row["request_id"],
+                              action=row["action"], revision=row["revision"])
+            for row in value["events"]], more=value["more"])
+        if value["next_cursor"] is not None:
+            result.next_cursor = value["next_cursor"]
+        return result
 
     @staticmethod
     def _wire_artifact(value: dict[str, Any]) -> dict[str, Any]:
@@ -274,27 +393,29 @@ class _Handler(BaseHTTPRequestHandler):
             path = parsed.path
             match = re.fullmatch(r"/v1/requests/([^/]+)/dependants", path)
             if match:
-                self._json_read(self._call_owner("dependants", unquote(match.group(1))))
+                value = self._call_owner("dependants", unquote(match.group(1)))
+                self._json_read(self._dependants_read(value))
                 return
             match = re.fullmatch(r"/v1/requests/([^/]+)/artifact/(\d+)", path)
             if match:
                 value = self._call_owner("signed_artifact", unquote(match.group(1)), int(match.group(2)))
-                self._json_read(self._wire_artifact(value))
+                self._json_read(self._artifact_read(value))
                 return
             match = re.fullmatch(r"/v1/requests/([^/]+)", path)
             if match:
                 value = self._call_owner("request", unquote(match.group(1)))
-                value["body"] = json.loads(value.pop("body_json"))
-                self._json_read(value)
+                self._json_read(self._request_read(value))
                 return
             query = parse_qs(parsed.query, keep_blank_values=True)
             cursor = query.get("cursor", [None])[0]
             limit = int(query.get("limit", ["2"])[0])
             if path == "/v1/requests":
-                self._json_read(self._call_owner("list_requests", cursor, limit=limit))
+                value = self._call_owner("list_requests", cursor, limit=limit)
+                self._json_read(self._request_page(value))
                 return
             if path == "/v1/events":
-                self._json_read(self._call_owner("watch", cursor, limit=limit))
+                value = self._call_owner("watch", cursor, limit=limit)
+                self._json_read(self._watch_page(value))
                 return
             if path.startswith("/proto/v1/"):
                 self._get_proto(path, query)
@@ -308,27 +429,30 @@ class _Handler(BaseHTTPRequestHandler):
     def _get_proto(self, path: str, query: dict[str, list[str]]) -> None:
         match = re.fullmatch(r"/proto/v1/requests/([^/]+)/dependants", path)
         if match:
-            value = self._call_owner("dependants", unquote(match.group(1)))
+            value = self._proto_dependants_read(
+                self._call_owner("dependants", unquote(match.group(1))))
         else:
             match = re.fullmatch(r"/proto/v1/requests/([^/]+)/artifact/(\d+)", path)
             if match:
-                value = self._wire_artifact(self._call_owner("signed_artifact", unquote(match.group(1)), int(match.group(2))))
+                value = self._proto_artifact_read(self._call_owner(
+                    "signed_artifact", unquote(match.group(1)), int(match.group(2))))
             else:
                 match = re.fullmatch(r"/proto/v1/requests/([^/]+)", path)
                 if match:
-                    value = self._call_owner("request", unquote(match.group(1)))
-                    value["body"] = json.loads(value.pop("body_json"))
+                    value = self._proto_request_read(
+                        self._call_owner("request", unquote(match.group(1))))
                 elif path == "/proto/v1/requests":
-                    value = self._call_owner("list_requests", query.get("cursor", [None])[0],
-                                              limit=int(query.get("limit", ["2"])[0]))
+                    value = self._proto_request_page(self._call_owner(
+                        "list_requests", query.get("cursor", [None])[0],
+                        limit=int(query.get("limit", ["2"])[0])))
                 elif path == "/proto/v1/events":
-                    value = self._call_owner("watch", query.get("cursor", [None])[0],
-                                              limit=int(query.get("limit", ["2"])[0]))
+                    value = self._proto_watch_page(self._call_owner(
+                        "watch", query.get("cursor", [None])[0],
+                        limit=int(query.get("limit", ["2"])[0])))
                 else:
                     self._reply(404, b"", "application/protobuf")
                     return
-        self._reply(200, v1_pb2.JsonResult(json=json.dumps(value, separators=(",", ":"))).SerializeToString(),
-                    "application/protobuf")
+        self._reply(200, value.SerializeToString(), "application/protobuf")
 
 
 def _valid_id(value: Any) -> bool:
@@ -395,11 +519,12 @@ class _GrpcOwner(v1_pb2_grpc.OwnerOperationsServicer):
 
     @staticmethod
     def _artifact(message: object) -> dict[str, Any] | None:
-        fields = (message.artifact_digest, message.artifact_key_id, message.artifact_bytes,
-                  message.artifact_envelope, message.artifact_signature)
-        if not any(fields):
+        names = ("artifact_digest", "artifact_key_id", "artifact_bytes",
+                 "artifact_envelope", "artifact_signature")
+        present = [message.HasField(name) for name in names]
+        if not any(present):
             return None
-        if not all(fields):
+        if not all(present):
             raise ValueError("signed artifact fields must be supplied together")
         return {"artifact_digest": message.artifact_digest, "key_id": message.artifact_key_id,
                 "original_bytes": message.artifact_bytes, "envelope_bytes": message.artifact_envelope,
@@ -481,24 +606,22 @@ class _GrpcOwner(v1_pb2_grpc.OwnerOperationsServicer):
 
     def ReadRequest(self, request: object, context: grpc.ServicerContext) -> object:
         value = self._call("request", request.request_id)
-        value["body"] = json.loads(value.pop("body_json"))
-        return v1_pb2.JsonResult(json=json.dumps(value, separators=(",", ":")))
+        return _Handler._proto_request_read(value)
 
     def ReadDependants(self, request: object, context: grpc.ServicerContext) -> object:
-        return v1_pb2.JsonResult(json=json.dumps(self._call("dependants", request.request_id), separators=(",", ":")))
+        return _Handler._proto_dependants_read(self._call("dependants", request.request_id))
 
     def ReadArtifact(self, request: object, context: grpc.ServicerContext) -> object:
         value = self._call("signed_artifact", request.request_id, request.material_revision)
-        wire = _Handler._wire_artifact(value)
-        return v1_pb2.JsonResult(json=json.dumps(wire, separators=(",", ":")))
+        return _Handler._proto_artifact_read(value)
 
     def ListRequests(self, request: object, context: grpc.ServicerContext) -> object:
-        return v1_pb2.JsonResult(json=json.dumps(self._call("list_requests", request.cursor or None,
-                                    limit=request.limit or 2), separators=(",", ":")))
+        return _Handler._proto_request_page(self._call("list_requests", request.cursor or None,
+                                    limit=request.limit or 2))
 
     def Watch(self, request: object, context: grpc.ServicerContext) -> object:
-        return v1_pb2.JsonResult(json=json.dumps(self._call("watch", request.cursor or None,
-                                    limit=request.limit or 2), separators=(",", ":")))
+        return _Handler._proto_watch_page(self._call("watch", request.cursor or None,
+                                    limit=request.limit or 2))
 
     def _call(self, operation: str, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return self.harness.httpd.owner_call(operation, *args, **kwargs)
@@ -522,6 +645,37 @@ def initialize_fixture(path: Path) -> None:
         {"link_id": "work-z", "workspace_id": "workspace-b", "owner_principal": "requester-b",
          "repo_id": "foreign-repo", "run_ref": "foreign-run"},
     ])
+
+
+def seed_typed_read_fixture(path: Path) -> dict[str, Any]:
+    """Seed exact int64 and empty-original-bytes read values for generated clients."""
+    request_id = "9007199254741199"
+    revision = 9007199254740993
+    material_revision = 9007199254740995
+    sequence = 9007199254740997
+    body = {"objective": "typed int64 read fixture"}
+    signed = make_signed_artifact(workspace_id="workspace-a", request_id=request_id,
+        material_revision=material_revision, material_digest=material_digest(body), original_bytes=b"")
+    db = sqlite3.connect(path)
+    try:
+        db.execute("INSERT INTO request(request_id,workspace_id,revision,material_revision,state,body_json,created_seq) VALUES(?,?,?,?,?,?,?)",
+                   (request_id, "workspace-a", revision, material_revision, "open",
+                    json.dumps(body, sort_keys=True, separators=(",", ":")), sequence))
+        db.execute("INSERT INTO dependent(request_id,dependent_id) VALUES(?,?)", (request_id, "work-a"))
+        db.execute("INSERT INTO signed_artifact(workspace_id,request_id,material_revision,material_digest,artifact_digest,key_id,original_bytes,envelope_bytes,signature) VALUES(?,?,?,?,?,?,?,?,?)",
+                   ("workspace-a", request_id, material_revision, material_digest(body),
+                    signed["artifact_digest"], signed["key_id"], sqlite3.Binary(signed["original_bytes"]),
+                    sqlite3.Binary(signed["envelope_bytes"]), sqlite3.Binary(signed["signature"])))
+        event = {"request_id": request_id, "action": "published", "revision": revision}
+        db.execute("INSERT INTO event(seq,workspace_id,request_id,action,revision,event_json) VALUES(?,?,?,?,?,?)",
+                   (sequence, "workspace-a", request_id, "published", revision,
+                    json.dumps(event, sort_keys=True, separators=(",", ":"))))
+        db.commit()
+    finally:
+        db.close()
+    return {"request_id": request_id, "revision": revision,
+            "material_revision": material_revision, "sequence": sequence,
+            "body": body, "signed": signed}
 
 
 def seed_evidence(path: Path, *, evidence_ref: str, request_id: str, body: dict[str, Any],

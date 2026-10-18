@@ -16,59 +16,59 @@ import (
 	"fmt"
 )
 
-// checks if the ReadResult type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &ReadResult{}
+// checks if the DependantsRead type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &DependantsRead{}
 
-// ReadResult struct for ReadResult
-type ReadResult struct {
-	Json string `json:"json"`
+// DependantsRead struct for DependantsRead
+type DependantsRead struct {
+	Items []DependentRead `json:"items"`
 }
 
-type _ReadResult ReadResult
+type _DependantsRead DependantsRead
 
-// NewReadResult instantiates a new ReadResult object
+// NewDependantsRead instantiates a new DependantsRead object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewReadResult(json string) *ReadResult {
-	this := ReadResult{}
-	this.Json = json
+func NewDependantsRead(items []DependentRead) *DependantsRead {
+	this := DependantsRead{}
+	this.Items = items
 	return &this
 }
 
-// NewReadResultWithDefaults instantiates a new ReadResult object
+// NewDependantsReadWithDefaults instantiates a new DependantsRead object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewReadResultWithDefaults() *ReadResult {
-	this := ReadResult{}
+func NewDependantsReadWithDefaults() *DependantsRead {
+	this := DependantsRead{}
 	return &this
 }
 
-// GetJson returns the Json field value
-func (o *ReadResult) GetJson() string {
+// GetItems returns the Items field value
+func (o *DependantsRead) GetItems() []DependentRead {
 	if o == nil {
-		var ret string
+		var ret []DependentRead
 		return ret
 	}
 
-	return o.Json
+	return o.Items
 }
 
-// GetJsonOk returns a tuple with the Json field value
+// GetItemsOk returns a tuple with the Items field value
 // and a boolean to check if the value has been set.
-func (o *ReadResult) GetJsonOk() (*string, bool) {
+func (o *DependantsRead) GetItemsOk() ([]DependentRead, bool) {
 	if o == nil {
 		return nil, false
 	}
-	return &o.Json, true
+	return o.Items, true
 }
 
-// SetJson sets field value
-func (o *ReadResult) SetJson(v string) {
-	o.Json = v
+// SetItems sets field value
+func (o *DependantsRead) SetItems(v []DependentRead) {
+	o.Items = v
 }
 
-func (o ReadResult) MarshalJSON() ([]byte, error) {
+func (o DependantsRead) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -76,18 +76,18 @@ func (o ReadResult) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o ReadResult) ToMap() (map[string]interface{}, error) {
+func (o DependantsRead) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	toSerialize["json"] = o.Json
+	toSerialize["items"] = o.Items
 	return toSerialize, nil
 }
 
-func (o *ReadResult) UnmarshalJSON(data []byte) (err error) {
+func (o *DependantsRead) UnmarshalJSON(data []byte) (err error) {
 	// This validates that all required properties are included in the JSON object
 	// by unmarshalling the object into a generic map with string keys and checking
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
-		"json",
+		"items",
 	}
 
 	allProperties := make(map[string]interface{})
@@ -104,53 +104,53 @@ func (o *ReadResult) UnmarshalJSON(data []byte) (err error) {
 		}
 	}
 
-	varReadResult := _ReadResult{}
+	varDependantsRead := _DependantsRead{}
 
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varReadResult)
+	err = decoder.Decode(&varDependantsRead)
 
 	if err != nil {
 		return err
 	}
 
-	*o = ReadResult(varReadResult)
+	*o = DependantsRead(varDependantsRead)
 
 	return err
 }
 
-type NullableReadResult struct {
-	value *ReadResult
+type NullableDependantsRead struct {
+	value *DependantsRead
 	isSet bool
 }
 
-func (v NullableReadResult) Get() *ReadResult {
+func (v NullableDependantsRead) Get() *DependantsRead {
 	return v.value
 }
 
-func (v *NullableReadResult) Set(val *ReadResult) {
+func (v *NullableDependantsRead) Set(val *DependantsRead) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableReadResult) IsSet() bool {
+func (v NullableDependantsRead) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableReadResult) Unset() {
+func (v *NullableDependantsRead) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableReadResult(val *ReadResult) *NullableReadResult {
-	return &NullableReadResult{value: val, isSet: true}
+func NewNullableDependantsRead(val *DependantsRead) *NullableDependantsRead {
+	return &NullableDependantsRead{value: val, isSet: true}
 }
 
-func (v NullableReadResult) MarshalJSON() ([]byte, error) {
+func (v NullableDependantsRead) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableReadResult) UnmarshalJSON(src []byte) error {
+func (v *NullableDependantsRead) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

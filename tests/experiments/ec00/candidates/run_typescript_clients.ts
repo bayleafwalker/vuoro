@@ -1,10 +1,13 @@
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import { createClient } from "../generated/typespec/clients/typescript/client";
-import { publish, readArtifact, reportPerformed, revise, withdrawDependent } from "../generated/typespec/clients/typescript/sdk.gen";
+import { listRequests, publish, readArtifact, readDependants, readRequest, reportPerformed, revise, watch, withdrawDependent } from "../generated/typespec/clients/typescript/sdk.gen";
 import {
   MutationResultSchema,
-  ReadArtifactRequestSchema,
-  JsonResultSchema,
+  ArtifactReadSchema,
+  RequestReadSchema,
+  DependantsReadSchema,
+  RequestPageSchema,
+  WatchPageSchema,
   PublishRequestSchema,
   ReportPerformedRequestSchema,
   ReviseRequestSchema,
@@ -185,11 +188,10 @@ if (artifactWire) {
       artifactSignature: signed.signature,
     } as never });
     if (pub.error || pub.data?.revision !== 1) throw new Error(`TypeSpec lifecycle publish failed: ${JSON.stringify(pub)}`);
-    const read = await readArtifact({ client, path: { requestId: id, materialRevision: 1 } });
-    if (read.error || !read.data?.json) throw new Error("TypeSpec signed-artifact read failed");
-    const stored = JSON.parse(read.data.json);
-    if (stored.artifactDigest !== signed.artifact_digest || stored.originalBytes !== signed.original_bytes ||
-        stored.envelopeBytes !== signed.envelope_bytes || stored.signature !== signed.signature) {
+    const read = await readArtifact({ client, path: { requestId: id, materialRevision: "1" } });
+    if (read.error || !read.data) throw new Error("TypeSpec signed-artifact read failed");
+    if (read.data.artifactDigest !== signed.artifact_digest || read.data.originalBytes !== signed.original_bytes ||
+        read.data.envelopeBytes !== signed.envelope_bytes || read.data.signature !== signed.signature) {
       throw new Error("TypeSpec signed-artifact read did not preserve exact bytes");
     }
     const withdrawn = await withdrawDependent({ client, path: { requestId: id },
@@ -215,10 +217,9 @@ if (artifactWire) {
     await assertStatus(pub, 200, "protobuf lifecycle publish");
     const read = await fetch(`${baseUrl}/proto/v1/requests/${id}/artifact/1`);
     await assertStatus(read, 200, "protobuf lifecycle artifact read");
-    const wire = fromBinary(JsonResultSchema, new Uint8Array(await read.arrayBuffer()));
-    const stored = JSON.parse(wire.json);
-    if (stored.artifactDigest !== signed.artifact_digest || stored.originalBytes !== signed.original_bytes ||
-        stored.envelopeBytes !== signed.envelope_bytes || stored.signature !== signed.signature) {
+    const stored = fromBinary(ArtifactReadSchema, new Uint8Array(await read.arrayBuffer()));
+    if (stored.artifactDigest !== signed.artifact_digest || encode(stored.originalBytes) !== signed.original_bytes ||
+        encode(stored.envelopeBytes) !== signed.envelope_bytes || encode(stored.signature) !== signed.signature) {
       throw new Error("protobuf signed-artifact read did not preserve exact bytes");
     }
     const withdrawn = await protoRequest(`/proto/v1/requests/${id}/withdraw`,
@@ -234,5 +235,97 @@ if (artifactWire) {
     return id;
   };
   const [httpLifecycleId, protoLifecycleId] = await Promise.all([runHttpLifecycle(), runProtoLifecycle()]);
+  const bigReadId = process.env.EC00_BIG_READ_ID;
+  if (bigReadId) {
+    const bigSigned = JSON.parse(process.env.EC00_BIG_READ_ARTIFACT ?? "{}") as {
+      artifact_digest: string; key_id: string; original_bytes: string;
+      envelope_bytes: string; signature: string;
+    };
+    const largeRevision = "9007199254740993";
+    const largeMaterialRevision = "9007199254740995";
+    const largeSequence = "9007199254740997";
+    const client = createClient({ baseUrl });
+    const request = await readRequest({ client, path: { requestId: bigReadId } });
+    if (request.error || request.data?.revision !== largeRevision ||
+        request.data.materialRevision !== largeMaterialRevision || request.data.createdSeq !== largeSequence ||
+        request.data.state !== "open" || request.data.body.objective !== "typed int64 read fixture") {
+      throw new Error(`TypeSpec typed large-int64 request read mismatch: ${JSON.stringify(request)}`);
+    }
+    const deps = await readDependants({ client, path: { requestId: bigReadId } });
+    if (deps.error || deps.data?.items.length !== 1 || deps.data.items[0].dependentId !== "work-a") {
+      throw new Error("TypeSpec typed dependant read mismatch");
+    }
+    const artifact = await readArtifact({ client, path: { requestId: bigReadId, materialRevision: largeMaterialRevision } });
+    if (artifact.error || artifact.data?.materialRevision !== largeMaterialRevision ||
+        artifact.data.originalBytes !== "" || artifact.data.artifactDigest !== bigSigned.artifact_digest ||
+        artifact.data.envelopeBytes !== bigSigned.envelope_bytes || artifact.data.signature !== bigSigned.signature) {
+      throw new Error("TypeSpec large material revision or empty artifact bytes were not preserved");
+    }
+    let cursor: string | undefined;
+    let foundSummary = false;
+    do {
+      const page = await listRequests({ client, query: { cursor, limit: 2 } });
+      if (page.error || !page.data) throw new Error("TypeSpec typed request page read failed");
+      foundSummary ||= page.data.items.some((item) => item.requestId === bigReadId &&
+        item.revision === largeRevision && item.createdSeq === largeSequence);
+      cursor = page.data.nextCursor ?? undefined;
+    } while (cursor && !foundSummary);
+    if (!foundSummary) throw new Error("TypeSpec typed page lost a large int64 summary value");
+    cursor = undefined;
+    let foundEvent = false;
+    do {
+      const page = await watch({ client, query: { cursor, limit: 2 } });
+      if (page.error || !page.data) throw new Error("TypeSpec typed watch page read failed");
+      foundEvent ||= page.data.events.some((event) => event.requestId === bigReadId &&
+        event.revision === largeRevision && event.seq === largeSequence);
+      cursor = page.data.nextCursor ?? undefined;
+    } while (cursor && !foundEvent);
+    if (!foundEvent) throw new Error("TypeSpec typed watch lost a large int64 event value");
+
+    const protoRequest = await fetch(`${baseUrl}/proto/v1/requests/${bigReadId}`);
+    const protoRequestValue = fromBinary(RequestReadSchema, new Uint8Array(await protoRequest.arrayBuffer()));
+    if (protoRequestValue.revision !== BigInt(largeRevision) ||
+        protoRequestValue.materialRevision !== BigInt(largeMaterialRevision) ||
+        protoRequestValue.createdSeq !== BigInt(largeSequence) || protoRequestValue.state !== 1) {
+      throw new Error("protobuf TypeScript typed large-int64 request read mismatch");
+    }
+    const protoDepsResponse = await fetch(`${baseUrl}/proto/v1/requests/${bigReadId}/dependants`);
+    const protoDeps = fromBinary(DependantsReadSchema, new Uint8Array(await protoDepsResponse.arrayBuffer()));
+    if (protoDeps.items.length !== 1 || protoDeps.items[0].dependentId !== "work-a") {
+      throw new Error("protobuf TypeScript typed dependant read mismatch");
+    }
+    const protoArtifactResponse = await fetch(`${baseUrl}/proto/v1/requests/${bigReadId}/artifact/${largeMaterialRevision}`);
+    const protoArtifact = fromBinary(ArtifactReadSchema, new Uint8Array(await protoArtifactResponse.arrayBuffer()));
+    if (protoArtifact.materialRevision !== BigInt(largeMaterialRevision) || protoArtifact.originalBytes.length !== 0 ||
+        protoArtifact.artifactDigest !== bigSigned.artifact_digest ||
+        encode(protoArtifact.envelopeBytes) !== bigSigned.envelope_bytes ||
+        encode(protoArtifact.signature) !== bigSigned.signature) {
+      throw new Error("protobuf large material revision or empty bytes mismatch");
+    }
+    let protoCursor: string | undefined;
+    let protoSummaryFound = false;
+    do {
+      const query = new URLSearchParams({ limit: "2" });
+      if (protoCursor) query.set("cursor", protoCursor);
+      const response = await fetch(`${baseUrl}/proto/v1/requests?${query}`);
+      const page = fromBinary(RequestPageSchema, new Uint8Array(await response.arrayBuffer()));
+      protoSummaryFound ||= page.items.some((item) => item.requestId === bigReadId &&
+        item.revision === BigInt(largeRevision) && item.createdSeq === BigInt(largeSequence));
+      protoCursor = page.nextCursor || undefined;
+    } while (protoCursor && !protoSummaryFound);
+    if (!protoSummaryFound) throw new Error("protobuf typed request page lost large int64 summary values");
+    protoCursor = undefined;
+    let protoEventFound = false;
+    do {
+      const query = new URLSearchParams({ limit: "2" });
+      if (protoCursor) query.set("cursor", protoCursor);
+      const response = await fetch(`${baseUrl}/proto/v1/events?${query}`);
+      const page = fromBinary(WatchPageSchema, new Uint8Array(await response.arrayBuffer()));
+      protoEventFound ||= page.events.some((event) => event.requestId === bigReadId &&
+        event.revision === BigInt(largeRevision) && event.seq === BigInt(largeSequence));
+      protoCursor = page.nextCursor || undefined;
+    } while (protoCursor && !protoEventFound);
+    if (!protoEventFound) throw new Error("protobuf typed watch lost large int64 event values");
+  }
   console.log(JSON.stringify({ httpLifecycleId, protoLifecycleId }));
 }

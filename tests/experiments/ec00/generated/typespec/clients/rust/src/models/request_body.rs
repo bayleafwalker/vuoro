@@ -12,15 +12,18 @@ use crate::models;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ReadResult {
-    #[serde(rename = "json")]
-    pub json: String,
+pub struct RequestBody {
+    #[serde(rename = "objective")]
+    pub objective: String,
+    #[serde(rename = "note", default, with = "::serde_with::rust::double_option", skip_serializing_if = "Option::is_none")]
+    pub note: Option<Option<String>>,
 }
 
-impl ReadResult {
-    pub fn new(json: String) -> ReadResult {
-        ReadResult {
-            json,
+impl RequestBody {
+    pub fn new(objective: String) -> RequestBody {
+        RequestBody {
+            objective,
+            note: None,
         }
     }
 }

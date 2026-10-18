@@ -322,8 +322,9 @@ TypeSpec/OpenAPI and native protobuf/gRPC clients run the complete lifecycle;
 generated TypeScript clients exercise artifact publication/readback and initial
 withdraw/report transitions through both representations. TypeScript protobuf
 messages use binary protobuf over the test-only HTTP bridge; the native gRPC
-qualification is the Python generated protobuf client. Existing Go/Rust slices
-remain publish/revise only. The clients never supply role or workspace claims:
+qualification is the Python generated protobuf client (at this slice's landing,
+the Go/Rust clients were publish/revise-only; see the follow-up below). The
+clients never supply role or workspace claims:
 the disposable server binds one seeded principal for the whole client process.
 
 Signed artifacts retain the exact binary artifact, canonical signed-envelope
@@ -358,6 +359,51 @@ rather than collapsing it into null. LC08 here covers frozen Python and
 TypeScript clients for common OpenAPI/protobuf-over-HTTP publish/revise
 operations; native gRPC old/new compatibility remains untested because the
 frozen baseline did not provide a native gRPC server/client boundary.
+
+## Typed-read and Go/Rust lifecycle slice (18 October 2026)
+
+This follow-up replaces opaque JSON-string read results with typed request,
+dependent, artifact, list and watch projections in both candidate schemas.
+Generated Go and Rust OpenAPI/HTTP clients and generated Go and Rust native
+protobuf/gRPC clients now exercise the same persisted publish → withdraw a
+separate third dependent → report → verify → decide artifact → resolve →
+acknowledge the two still-active dependents sequence. Each transport reads the
+persisted request, dependants, signed artifact and bounded list/watch pages.
+The shared event golden is identical across these four Go/Rust paths. The
+earlier Python lifecycle transcript remains its predeclared seven-mutation
+case with a separate withdrawal case; it is not represented as the same event
+sequence.
+
+Both Go and Rust also read a seeded request with `revision`,
+`material_revision`, and `created_seq` above JavaScript's exact integer range.
+OpenAPI/TypeSpec encodes these read-only `int64` values as decimal strings;
+native protobuf uses `int64`. The clients compare exact decimal values and
+exact stored binary artifact, envelope and signature bytes. The valid empty
+artifact payload case uses `original_bytes = b""` with nonempty signed context
+and a verified Ed25519 signature; an absent bundle, a partial bundle, or a
+bundle with empty digest/key/envelope/signature metadata is invalid. JSON body
+unknown fields are not preserved by the owner projection and
+are not claimed as a typed-read capability. Existing HTTP frozen-client LC08
+coverage remains; native gRPC old/new compatibility against the frozen
+`59fa6194baae21f15558b09522eaf98879989134` baseline is still open.
+
+This typed-read replacement intentionally changes the payload on existing v1
+HTTP and RPC read methods from `JsonResult { json: string }` (the a94cf67
+candidate contract) to typed response objects, without version negotiation.
+The negative fidelity test demonstrates the protobuf wire hazard: an old
+`JsonResult` decoder reads the new `RequestRead.request_id` field as its
+`json` field. This fixture's numeric identifier then parses as a JSON integer,
+not the prior read object, so the mismatch can be silent. Frozen publish/revise
+compatibility does not cover this read break. This is an experimental schema
+change only; safe production migration needs an explicit
+compatibility/versioning decision outside this slice. Also, the `>2^53` exact
+integer evidence covers read projections only: mutation `expectedRevision`
+remains a JSON number in this candidate and is not qualified above that range.
+
+These generated-client cases remain test-only correctness evidence. They do
+not qualify native gRPC compatibility across revisions, the complete EC-00
+matrix, browser/proxy behavior, production authentication or performance, and
+do not select an architecture.
 
 Run the lifecycle tests explicitly with the pinned toolchain and a loopback-
 permitting test environment:

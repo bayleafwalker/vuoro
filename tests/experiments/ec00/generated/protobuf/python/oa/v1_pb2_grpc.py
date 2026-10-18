@@ -77,27 +77,27 @@ class OwnerOperationsStub:
         self.ReadRequest = channel.unary_unary(
                 '/ec00.oa.v1.OwnerOperations/ReadRequest',
                 request_serializer=oa_dot_v1__pb2.RequestById.SerializeToString,
-                response_deserializer=oa_dot_v1__pb2.JsonResult.FromString,
+                response_deserializer=oa_dot_v1__pb2.RequestRead.FromString,
                 _registered_method=True)
         self.ReadDependants = channel.unary_unary(
                 '/ec00.oa.v1.OwnerOperations/ReadDependants',
                 request_serializer=oa_dot_v1__pb2.RequestById.SerializeToString,
-                response_deserializer=oa_dot_v1__pb2.JsonResult.FromString,
+                response_deserializer=oa_dot_v1__pb2.DependantsRead.FromString,
                 _registered_method=True)
         self.ReadArtifact = channel.unary_unary(
                 '/ec00.oa.v1.OwnerOperations/ReadArtifact',
                 request_serializer=oa_dot_v1__pb2.ReadArtifactRequest.SerializeToString,
-                response_deserializer=oa_dot_v1__pb2.JsonResult.FromString,
+                response_deserializer=oa_dot_v1__pb2.ArtifactRead.FromString,
                 _registered_method=True)
         self.ListRequests = channel.unary_unary(
                 '/ec00.oa.v1.OwnerOperations/ListRequests',
                 request_serializer=oa_dot_v1__pb2.PageRequest.SerializeToString,
-                response_deserializer=oa_dot_v1__pb2.JsonResult.FromString,
+                response_deserializer=oa_dot_v1__pb2.RequestPage.FromString,
                 _registered_method=True)
         self.Watch = channel.unary_unary(
                 '/ec00.oa.v1.OwnerOperations/Watch',
                 request_serializer=oa_dot_v1__pb2.PageRequest.SerializeToString,
-                response_deserializer=oa_dot_v1__pb2.JsonResult.FromString,
+                response_deserializer=oa_dot_v1__pb2.WatchPage.FromString,
                 _registered_method=True)
 
 
@@ -228,27 +228,27 @@ def add_OwnerOperationsServicer_to_server(servicer, server):
             'ReadRequest': grpc.unary_unary_rpc_method_handler(
                     servicer.ReadRequest,
                     request_deserializer=oa_dot_v1__pb2.RequestById.FromString,
-                    response_serializer=oa_dot_v1__pb2.JsonResult.SerializeToString,
+                    response_serializer=oa_dot_v1__pb2.RequestRead.SerializeToString,
             ),
             'ReadDependants': grpc.unary_unary_rpc_method_handler(
                     servicer.ReadDependants,
                     request_deserializer=oa_dot_v1__pb2.RequestById.FromString,
-                    response_serializer=oa_dot_v1__pb2.JsonResult.SerializeToString,
+                    response_serializer=oa_dot_v1__pb2.DependantsRead.SerializeToString,
             ),
             'ReadArtifact': grpc.unary_unary_rpc_method_handler(
                     servicer.ReadArtifact,
                     request_deserializer=oa_dot_v1__pb2.ReadArtifactRequest.FromString,
-                    response_serializer=oa_dot_v1__pb2.JsonResult.SerializeToString,
+                    response_serializer=oa_dot_v1__pb2.ArtifactRead.SerializeToString,
             ),
             'ListRequests': grpc.unary_unary_rpc_method_handler(
                     servicer.ListRequests,
                     request_deserializer=oa_dot_v1__pb2.PageRequest.FromString,
-                    response_serializer=oa_dot_v1__pb2.JsonResult.SerializeToString,
+                    response_serializer=oa_dot_v1__pb2.RequestPage.SerializeToString,
             ),
             'Watch': grpc.unary_unary_rpc_method_handler(
                     servicer.Watch,
                     request_deserializer=oa_dot_v1__pb2.PageRequest.FromString,
-                    response_serializer=oa_dot_v1__pb2.JsonResult.SerializeToString,
+                    response_serializer=oa_dot_v1__pb2.WatchPage.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -493,7 +493,7 @@ class OwnerOperations:
             target,
             '/ec00.oa.v1.OwnerOperations/ReadRequest',
             oa_dot_v1__pb2.RequestById.SerializeToString,
-            oa_dot_v1__pb2.JsonResult.FromString,
+            oa_dot_v1__pb2.RequestRead.FromString,
             options,
             channel_credentials,
             insecure,
@@ -520,7 +520,7 @@ class OwnerOperations:
             target,
             '/ec00.oa.v1.OwnerOperations/ReadDependants',
             oa_dot_v1__pb2.RequestById.SerializeToString,
-            oa_dot_v1__pb2.JsonResult.FromString,
+            oa_dot_v1__pb2.DependantsRead.FromString,
             options,
             channel_credentials,
             insecure,
@@ -547,7 +547,7 @@ class OwnerOperations:
             target,
             '/ec00.oa.v1.OwnerOperations/ReadArtifact',
             oa_dot_v1__pb2.ReadArtifactRequest.SerializeToString,
-            oa_dot_v1__pb2.JsonResult.FromString,
+            oa_dot_v1__pb2.ArtifactRead.FromString,
             options,
             channel_credentials,
             insecure,
@@ -574,7 +574,7 @@ class OwnerOperations:
             target,
             '/ec00.oa.v1.OwnerOperations/ListRequests',
             oa_dot_v1__pb2.PageRequest.SerializeToString,
-            oa_dot_v1__pb2.JsonResult.FromString,
+            oa_dot_v1__pb2.RequestPage.FromString,
             options,
             channel_credentials,
             insecure,
@@ -601,7 +601,7 @@ class OwnerOperations:
             target,
             '/ec00.oa.v1.OwnerOperations/Watch',
             oa_dot_v1__pb2.PageRequest.SerializeToString,
-            oa_dot_v1__pb2.JsonResult.FromString,
+            oa_dot_v1__pb2.WatchPage.FromString,
             options,
             channel_credentials,
             insecure,

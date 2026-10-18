@@ -36,7 +36,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ReadResult"
+                  "$ref": "#/components/schemas/WatchPage"
                 }
               }
             }
@@ -100,7 +100,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ReadResult"
+                  "$ref": "#/components/schemas/RequestPage"
                 }
               }
             }
@@ -162,7 +162,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ReadResult"
+                  "$ref": "#/components/schemas/RequestRead"
                 }
               }
             }
@@ -261,7 +261,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "format": "int64"
             }
           }
@@ -272,7 +272,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ReadResult"
+                  "$ref": "#/components/schemas/ArtifactRead"
                 }
               }
             }
@@ -299,7 +299,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ReadResult"
+                  "$ref": "#/components/schemas/DependantsRead"
                 }
               }
             }
@@ -474,6 +474,45 @@
           }
         }
       },
+      "ArtifactRead": {
+        "type": "object",
+        "required": [
+          "materialRevision",
+          "materialDigest",
+          "artifactDigest",
+          "keyId",
+          "originalBytes",
+          "envelopeBytes",
+          "signature"
+        ],
+        "properties": {
+          "materialRevision": {
+            "type": "string",
+            "format": "int64"
+          },
+          "materialDigest": {
+            "type": "string"
+          },
+          "artifactDigest": {
+            "type": "string"
+          },
+          "keyId": {
+            "type": "string"
+          },
+          "originalBytes": {
+            "type": "string",
+            "format": "byte"
+          },
+          "envelopeBytes": {
+            "type": "string",
+            "format": "byte"
+          },
+          "signature": {
+            "type": "string",
+            "format": "byte"
+          }
+        }
+      },
       "DecideArtifactRequest": {
         "type": "object",
         "required": [
@@ -487,6 +526,39 @@
           },
           "artifactDigest": {
             "type": "string"
+          }
+        }
+      },
+      "DependantsRead": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DependentRead"
+            }
+          }
+        }
+      },
+      "DependentRead": {
+        "type": "object",
+        "required": [
+          "dependentId",
+          "active",
+          "continuationAck"
+        ],
+        "properties": {
+          "dependentId": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "continuationAck": {
+            "type": "boolean"
           }
         }
       },
@@ -565,14 +637,118 @@
           }
         }
       },
-      "ReadResult": {
+      "RequestBody": {
         "type": "object",
         "required": [
-          "json"
+          "objective"
         ],
         "properties": {
-          "json": {
+          "objective": {
             "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "RequestPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RequestSummary"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "RequestRead": {
+        "type": "object",
+        "required": [
+          "requestId",
+          "revision",
+          "materialRevision",
+          "state",
+          "body",
+          "reported",
+          "verified",
+          "createdSeq"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string",
+            "format": "int64"
+          },
+          "materialRevision": {
+            "type": "string",
+            "format": "int64"
+          },
+          "state": {
+            "$ref": "#/components/schemas/RequestState"
+          },
+          "body": {
+            "$ref": "#/components/schemas/RequestBody"
+          },
+          "reported": {
+            "type": "boolean"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "evidenceRef": {
+            "type": "string",
+            "nullable": true
+          },
+          "artifactDecisionDigest": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdSeq": {
+            "type": "string",
+            "format": "int64"
+          }
+        }
+      },
+      "RequestState": {
+        "type": "string",
+        "enum": [
+          "open",
+          "resolved"
+        ]
+      },
+      "RequestSummary": {
+        "type": "object",
+        "required": [
+          "requestId",
+          "revision",
+          "state",
+          "createdSeq"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string",
+            "format": "int64"
+          },
+          "state": {
+            "$ref": "#/components/schemas/RequestState"
+          },
+          "createdSeq": {
+            "type": "string",
+            "format": "int64"
           }
         }
       },
@@ -626,6 +802,53 @@
           },
           "evidenceRef": {
             "type": "string"
+          }
+        }
+      },
+      "WatchEvent": {
+        "type": "object",
+        "required": [
+          "seq",
+          "requestId",
+          "action",
+          "revision"
+        ],
+        "properties": {
+          "seq": {
+            "type": "string",
+            "format": "int64"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string",
+            "format": "int64"
+          }
+        }
+      },
+      "WatchPage": {
+        "type": "object",
+        "required": [
+          "events",
+          "more"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WatchEvent"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "more": {
+            "type": "boolean"
           }
         }
       },

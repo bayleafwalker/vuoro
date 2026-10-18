@@ -5,6 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
+base64 = "=0.22.1"
 ec00_oa = { path = "../../generated/typespec/clients/rust", default-features = false, features = ["rustls"] }
 prost = "=0.14.3"
 prost-types = "=0.14.3"

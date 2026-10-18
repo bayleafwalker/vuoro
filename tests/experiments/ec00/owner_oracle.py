@@ -239,7 +239,12 @@ class OwnerOracle:
         if position<floor-1:raise Conflict("watch cursor expired; reset/reconcile required")
         rows=self.db.execute("SELECT seq,event_json FROM event WHERE workspace_id=? AND seq>? ORDER BY seq LIMIT ?",(self.workspace_id,position,limit+1)).fetchall(); selected=rows[:limit]
         nxt=self._encode_cursor("watch",selected[-1]["seq"]) if selected else cursor
-        return {"events":[json.loads(r["event_json"]) for r in selected],"next_cursor":nxt,"more":len(rows)>limit}
+        events=[]
+        for row in selected:
+            event=json.loads(row["event_json"])
+            event["seq"]=row["seq"]
+            events.append(event)
+        return {"events":events,"next_cursor":nxt,"more":len(rows)>limit}
     def compact_events_through(self,seq:int)->None:
         self.db.execute("BEGIN IMMEDIATE")
         try:

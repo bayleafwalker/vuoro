@@ -9,9 +9,29 @@ export type AcknowledgeRequest = {
     expectedRevision: number;
 };
 
+export type ArtifactRead = {
+    materialRevision: string;
+    materialDigest: string;
+    artifactDigest: string;
+    keyId: string;
+    originalBytes: string;
+    envelopeBytes: string;
+    signature: string;
+};
+
 export type DecideArtifactRequest = {
     expectedRevision: number;
     artifactDigest: string;
+};
+
+export type DependantsRead = {
+    items: Array<DependentRead>;
+};
+
+export type DependentRead = {
+    dependentId: string;
+    active: boolean;
+    continuationAck: boolean;
 };
 
 export type MutationResult = {
@@ -39,8 +59,36 @@ export type PublishRequest = {
     artifactSignature?: string;
 };
 
-export type ReadResult = {
-    json: string;
+export type RequestBody = {
+    objective: string;
+    note?: string | null;
+};
+
+export type RequestPage = {
+    items: Array<RequestSummary>;
+    nextCursor?: string | null;
+};
+
+export type RequestRead = {
+    requestId: string;
+    revision: string;
+    materialRevision: string;
+    state: RequestState;
+    body: RequestBody;
+    reported: boolean;
+    verified: boolean;
+    evidenceRef?: string | null;
+    artifactDecisionDigest?: string | null;
+    createdSeq: string;
+};
+
+export type RequestState = 'open' | 'resolved';
+
+export type RequestSummary = {
+    requestId: string;
+    revision: string;
+    state: RequestState;
+    createdSeq: string;
 };
 
 export type ReviseRequest = {
@@ -62,6 +110,19 @@ export type VerifyRequest = {
     evidenceRef: string;
 };
 
+export type WatchEvent = {
+    seq: string;
+    requestId: string;
+    action: string;
+    revision: string;
+};
+
+export type WatchPage = {
+    events: Array<WatchEvent>;
+    nextCursor?: string | null;
+    more: boolean;
+};
+
 export type WithdrawRequest = {
     dependentId: string;
     expectedRevision: number;
@@ -81,7 +142,7 @@ export type WatchResponses = {
     /**
      * The request has succeeded.
      */
-    200: ReadResult;
+    200: WatchPage;
 };
 
 export type WatchResponse = WatchResponses[keyof WatchResponses];
@@ -100,7 +161,7 @@ export type ListRequestsResponses = {
     /**
      * The request has succeeded.
      */
-    200: ReadResult;
+    200: RequestPage;
 };
 
 export type ListRequestsResponse = ListRequestsResponses[keyof ListRequestsResponses];
@@ -134,7 +195,7 @@ export type ReadRequestResponses = {
     /**
      * The request has succeeded.
      */
-    200: ReadResult;
+    200: RequestRead;
 };
 
 export type ReadRequestResponse = ReadRequestResponses[keyof ReadRequestResponses];
@@ -197,7 +258,7 @@ export type ReadArtifactData = {
     body?: never;
     path: {
         requestId: string;
-        materialRevision: number;
+        materialRevision: string;
     };
     query?: never;
     url: '/v1/requests/{requestId}/artifact/{materialRevision}';
@@ -207,7 +268,7 @@ export type ReadArtifactResponses = {
     /**
      * The request has succeeded.
      */
-    200: ReadResult;
+    200: ArtifactRead;
 };
 
 export type ReadArtifactResponse = ReadArtifactResponses[keyof ReadArtifactResponses];
@@ -225,7 +286,7 @@ export type ReadDependantsResponses = {
     /**
      * The request has succeeded.
      */
-    200: ReadResult;
+    200: DependantsRead;
 };
 
 export type ReadDependantsResponse = ReadDependantsResponses[keyof ReadDependantsResponses];
