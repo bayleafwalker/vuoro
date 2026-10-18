@@ -37,13 +37,14 @@ from .protected_copy_codec import (
 
 DB_NAME = "journal.sqlite3"
 LOCK_NAME = "journal.lock"
-VERSION = 1
+VERSION = 2
 _TABLE_SQL = {
     "journal_metadata": "CREATE TABLE journal_metadata (singleton INTEGER PRIMARY KEY NOT NULL CHECK(singleton=1), component_version INTEGER NOT NULL CHECK(component_version=1), host_id TEXT NOT NULL, registry_utf8 BLOB NOT NULL, registry_sha256 TEXT NOT NULL)",
     "effect_bindings": "CREATE TABLE effect_bindings (effect_key TEXT PRIMARY KEY NOT NULL, binding_utf8 BLOB NOT NULL, binding_sha256 TEXT NOT NULL, protected_copy_utf8 BLOB NOT NULL, protected_copy_sha256 TEXT NOT NULL)",
     "journal_events": "CREATE TABLE journal_events (effect_key TEXT NOT NULL REFERENCES effect_bindings(effect_key), seq INTEGER NOT NULL CHECK(seq>=0), event_type TEXT NOT NULL, payload_utf8 BLOB NOT NULL, payload_sha256 TEXT NOT NULL, PRIMARY KEY(effect_key,seq))",
     "publication_spent": "CREATE TABLE publication_spent (effect_key TEXT NOT NULL REFERENCES effect_bindings(effect_key), operation TEXT NOT NULL CHECK(operation IN ('branch-create','pr-create')), request_utf8 BLOB NOT NULL, request_sha256 TEXT NOT NULL, PRIMARY KEY(effect_key,operation))",
     "applied_outcomes": "CREATE TABLE applied_outcomes (effect_key TEXT PRIMARY KEY NOT NULL REFERENCES effect_bindings(effect_key), outcome_utf8 BLOB NOT NULL, outcome_sha256 TEXT NOT NULL)",
+    "registry_rebinds": "CREATE TABLE registry_rebinds (operation_id TEXT PRIMARY KEY NOT NULL, host_id TEXT NOT NULL, profile_id TEXT NOT NULL, old_registry_utf8 BLOB NOT NULL, old_registry_sha256 TEXT NOT NULL, new_registry_utf8 BLOB NOT NULL, new_registry_sha256 TEXT NOT NULL)",
 }
 _TRIGGER_SQL = {
     f"{table}_no_{verb.lower()}": (
@@ -64,6 +65,13 @@ _CATALOG = sorted(
         for name in _TABLE_SQL
         if name != "journal_metadata"
     ]
+)
+_V1_TABLE_SQL = {name: sql for name, sql in _TABLE_SQL.items() if name != "registry_rebinds"}
+_V1_TRIGGER_SQL = {name: sql for name, sql in _TRIGGER_SQL.items() if not name.startswith("registry_rebinds_")}
+_V1_CATALOG = sorted(
+    [("table", name, name, sql) for name, sql in _V1_TABLE_SQL.items()]
+    + [("trigger", name, name.rsplit("_no_", 1)[0], sql) for name, sql in _V1_TRIGGER_SQL.items()]
+    + [("index", f"sqlite_autoindex_{name}_1", name, None) for name in _V1_TABLE_SQL if name != "journal_metadata"]
 )
 _MUTEX_GUARD = threading.Lock()
 _MUTEXES = {}
@@ -206,13 +214,76 @@ def _settings(connection):
 
 
 def _catalog(connection):
-    _need(connection.execute("PRAGMA user_version").fetchone()[0] == VERSION)
+    version = connection.execute("PRAGMA user_version").fetchone()[0]
+    if version == 1:
+        _catalog_v1(connection)
+        return
+    _need(version == VERSION)
     found = connection.execute(
         "SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name"
     ).fetchall()
     _need(found == _CATALOG)
     _need(connection.execute("PRAGMA foreign_key_check").fetchall() == [])
     _need(connection.execute("PRAGMA integrity_check").fetchall() == [("ok",)])
+    _validate_rebind_history(connection)
+
+
+def _validate_rebind_history(connection):
+    records = connection.execute(
+        "SELECT operation_id,host_id,profile_id,old_registry_utf8,old_registry_sha256,new_registry_utf8,new_registry_sha256 FROM registry_rebinds ORDER BY rowid"
+    ).fetchall()
+    previous = None
+    for operation_id, host_id, profile_id, old_raw, old_hash, new_raw, new_hash in records:
+        _need(type(operation_id) is str and re.fullmatch(r"[0-9a-f]{32}", operation_id))
+        _text(host_id, 200)
+        _need(type(profile_id) is str and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", profile_id))
+        _read(old_raw, 65536)
+        _read(new_raw, 65536)
+        _need(old_hash == _hash(old_raw) and new_hash == _hash(new_raw) and old_hash != new_hash)
+        if previous is not None:
+            _need((host_id, profile_id, old_raw) == previous)
+        previous = (host_id, profile_id, new_raw)
+    if records:
+        meta = connection.execute(
+            "SELECT host_id,registry_utf8,registry_sha256 FROM journal_metadata WHERE singleton=1"
+        ).fetchone()
+        _need(
+            meta is not None
+            and meta[0] == previous[0]
+            and meta[1] == previous[2]
+            and meta[2] == _hash(meta[1])
+        )
+
+
+def _catalog_v1(connection):
+    _need(connection.execute("PRAGMA user_version").fetchone()[0] == 1)
+    found = connection.execute(
+        "SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name"
+    ).fetchall()
+    _need(found == _V1_CATALOG)
+    _need(connection.execute("PRAGMA foreign_key_check").fetchall() == [])
+    _need(connection.execute("PRAGMA integrity_check").fetchall() == [("ok",)])
+
+
+def _table_is_empty(connection, table):
+    return connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone() == (0,)
+
+
+def _rebind_files_check(directory, directory_fd, lock_fd, database_fd, identities):
+    _path(directory)
+    entries = (
+        os.lstat(directory),
+        os.stat(LOCK_NAME, dir_fd=directory_fd, follow_symlinks=False),
+        os.stat(DB_NAME, dir_fd=directory_fd, follow_symlinks=False),
+    )
+    descriptors = (os.fstat(directory_fd), os.fstat(lock_fd), os.fstat(database_fd))
+    modes = (0o700, 0o600, 0o600)
+    for entry, descriptor, identity, mode, is_directory in zip(
+        entries, descriptors, identities, modes, (True, False, False), strict=True
+    ):
+        _owned(entry, mode, is_directory)
+        _owned(descriptor, mode, is_directory)
+        _need(_identity(entry) == _identity(descriptor) == identity)
 
 
 def _fsync_files(directory_fd, database_fd):
@@ -292,6 +363,128 @@ def install_journal(directory, *, host_id, registry_utf8):
                 if fd is not None:
                     os.close(fd)
     # A failed installation is intentionally left for owner inspection; no repair.
+
+
+
+@_fixed
+def rebind_empty_journal(
+    directory,
+    *,
+    host_id,
+    profile_id,
+    expected_old_registry_sha256,
+    new_registry_utf8,
+    operation_id,
+    expected_physical_identities=None,
+    identity_check=None,
+):
+    """Append a registry binding only while the v1/v2 journal has no effects."""
+    _text(host_id, 200)
+    _need(type(profile_id) is str and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", profile_id))
+    _digest(expected_old_registry_sha256)
+    _read(new_registry_utf8, 65536)
+    _need(type(operation_id) is str and re.fullmatch(r"[0-9a-f]{32}", operation_id))
+    directory = _path(directory)
+    directory_fd = lock_fd = database_fd = None
+    connection = None
+    locked = False
+    try:
+        directory_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        _owned(os.fstat(directory_fd), 0o700, True)
+        for name in (LOCK_NAME, DB_NAME):
+            fd = os.open(name, os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=directory_fd)
+            _owned(os.fstat(fd), 0o600)
+            named = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+            _owned(named, 0o600)
+            _need(_identity(os.fstat(fd)) == _identity(named))
+            if name == LOCK_NAME:
+                lock_fd = fd
+            else:
+                database_fd = fd
+        identities = (
+            _identity(os.fstat(directory_fd)),
+            _identity(os.fstat(lock_fd)),
+            _identity(os.fstat(database_fd)),
+        )
+        if expected_physical_identities is not None:
+            _need(tuple(expected_physical_identities) == identities)
+        _rebind_files_check(directory, directory_fd, lock_fd, database_fd, identities)
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            locked = True
+        except BlockingIOError:
+            _need(False)
+        if identity_check is not None:
+            identity_check()
+        connection = sqlite3.connect(
+            f"file:/proc/self/fd/{database_fd}?mode=rw", uri=True, isolation_level=None
+        )
+        _settings(connection)
+        _need(connection.execute("PRAGMA journal_mode").fetchone()[0] == "delete")
+        connection.execute("BEGIN IMMEDIATE")
+        version = connection.execute("PRAGMA user_version").fetchone()[0]
+        _need(version in (1, VERSION))
+        _catalog(connection)
+        rows = connection.execute("SELECT * FROM journal_metadata").fetchall()
+        _need(len(rows) == 1)
+        singleton, component_version, stored_host, old_raw, old_hash = rows[0]
+        _need((singleton, component_version, stored_host) == (1, 1, host_id))
+        _read(old_raw, 65536)
+        _need(old_hash == _hash(old_raw) == expected_old_registry_sha256)
+        new_hash = _hash(new_registry_utf8)
+        _need(new_hash != old_hash)
+        effect_tables = ("effect_bindings", "journal_events", "publication_spent", "applied_outcomes")
+        _need(all(_table_is_empty(connection, table) for table in effect_tables))
+        if version == 1:
+            connection.execute(_TABLE_SQL["registry_rebinds"])
+            for name, sql in _TRIGGER_SQL.items():
+                if name.startswith("registry_rebinds_"):
+                    connection.execute(sql)
+        else:
+            history = connection.execute(
+                "SELECT operation_id,host_id,profile_id,old_registry_utf8,old_registry_sha256,new_registry_utf8,new_registry_sha256 FROM registry_rebinds ORDER BY rowid"
+            ).fetchall()
+            if history:
+                _need((history[-1][1], history[-1][2], history[-1][5]) == (host_id, profile_id, old_raw))
+        connection.execute(
+            "INSERT INTO registry_rebinds VALUES (?,?,?,?,?,?,?)",
+            (operation_id, host_id, profile_id, old_raw, old_hash, new_registry_utf8, new_hash),
+        )
+        connection.execute("DROP TRIGGER journal_metadata_no_update")
+        connection.execute(
+            "UPDATE journal_metadata SET registry_utf8=?, registry_sha256=? WHERE singleton=1",
+            (new_registry_utf8, new_hash),
+        )
+        connection.execute(_TRIGGER_SQL["journal_metadata_no_update"])
+        if version == 1:
+            connection.execute(f"PRAGMA user_version={VERSION}")
+        _catalog(connection)
+        _need(all(_table_is_empty(connection, table) for table in effect_tables))
+        _rebind_files_check(directory, directory_fd, lock_fd, database_fd, identities)
+        if identity_check is not None:
+            identity_check()
+        connection.commit()
+        _fsync_files(directory_fd, database_fd)
+        _catalog(connection)
+        _rebind_files_check(directory, directory_fd, lock_fd, database_fd, identities)
+        if identity_check is not None:
+            identity_check()
+        return {"operation_id": operation_id, "old_registry_sha256": old_hash, "new_registry_sha256": new_hash}
+    except BaseException:
+        if connection is not None and connection.in_transaction:
+            connection.rollback()
+        raise
+    finally:
+        try:
+            if connection is not None:
+                connection.close()
+        finally:
+            if locked:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            for fd in (database_fd, lock_fd, directory_fd):
+                if fd is not None:
+                    os.close(fd)
+
 
 
 def _branch(value):
@@ -697,7 +890,7 @@ class ExecutionJournal:
                 == [
                     (
                         1,
-                        VERSION,
+                        1,
                         self.host_id,
                         self.registry_utf8,
                         _hash(self.registry_utf8),
@@ -893,6 +1086,25 @@ class ExecutionJournal:
         _need(type(key) is str and _HEX.fullmatch(key))
         with self._transaction(write=False):
             return self._load(key)
+
+    @_fixed
+    def registry_rebind_receipt(self, operation_id):
+        _need(type(operation_id) is str and re.fullmatch(r"[0-9a-f]{32}", operation_id))
+        with self._transaction(write=False) as connection:
+            _need(connection.execute("PRAGMA user_version").fetchone()[0] == VERSION)
+            row = connection.execute(
+                "SELECT operation_id,host_id,profile_id,old_registry_sha256,new_registry_sha256 FROM registry_rebinds WHERE operation_id=?",
+                (operation_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            return {
+                "operation_id": row[0],
+                "host_id": row[1],
+                "profile_id": row[2],
+                "old_registry_sha256": row[3],
+                "new_registry_sha256": row[4],
+            }
 
     def _append(self, key, kind, raw, *, operation=None, outcome=False):
         with self._transaction() as connection:

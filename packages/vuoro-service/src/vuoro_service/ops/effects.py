@@ -35,6 +35,7 @@ from .runtime import open_without_redirects
 ATTEMPT_ID = re.compile(r"^attempt_[0-9A-HJKMNP-TV-Z]{26}$")
 JOURNAL_DB = "journal.sqlite3"
 JOURNAL_TABLES = {"journal_metadata", "effect_bindings", "journal_events", "publication_spent", "applied_outcomes"}
+JOURNAL_V2_TABLES = JOURNAL_TABLES | {"registry_rebinds"}
 JOURNAL_OPERATION = {"push_branch": "branch-create", "open_pull_request": "pr-create"}
 TERMINAL = {"APPLIED", "REFUSED", "CONFLICT"}
 
@@ -43,11 +44,73 @@ AttemptSource = Callable[[str], tuple[int, Any]]
 
 
 class JournalUnreadable(ValueError):
-    """The journal is absent, not v1, or fails its own row digests."""
+    """The journal is absent, unsupported, or fails its own row digests."""
 
 
 def _sha(raw: bytes) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def _validate_v2_registry_history(connection: sqlite3.Connection) -> None:
+    """Validate v2 registry transition history without changing journal state."""
+    catalog = {
+        (name, sql)
+        for name, sql in connection.execute(
+            "SELECT name,sql FROM sqlite_master WHERE type='table'"
+        )
+    }
+    if len(catalog) != len(JOURNAL_V2_TABLES) or {name for name, _ in catalog} != JOURNAL_V2_TABLES:
+        raise JournalUnreadable("journal catalog does not match version 2")
+    immutable_sql = {
+        name: sql
+        for name, sql in connection.execute(
+            "SELECT name,sql FROM sqlite_master WHERE type='trigger' AND tbl_name='registry_rebinds'"
+        )
+    }
+    expected_triggers = {
+        "registry_rebinds_no_update": "CREATE TRIGGER registry_rebinds_no_update BEFORE UPDATE ON registry_rebinds BEGIN SELECT RAISE(ABORT, 'immutable-journal'); END",
+        "registry_rebinds_no_delete": "CREATE TRIGGER registry_rebinds_no_delete BEFORE DELETE ON registry_rebinds BEGIN SELECT RAISE(ABORT, 'immutable-journal'); END",
+    }
+    if immutable_sql != expected_triggers:
+        raise JournalUnreadable("journal registry history is not immutable")
+    metadata = connection.execute(
+        "SELECT singleton,component_version,host_id,registry_utf8,registry_sha256 FROM journal_metadata"
+    ).fetchall()
+    if len(metadata) != 1:
+        raise JournalUnreadable("journal metadata is invalid")
+    singleton, component_version, current_host, current_raw, current_hash = metadata[0]
+    if (
+        singleton != 1
+        or component_version != 1
+        or not isinstance(current_host, str)
+        or not isinstance(current_raw, bytes)
+        or current_hash != _sha(current_raw)
+    ):
+        raise JournalUnreadable("journal metadata is invalid")
+    rows = connection.execute(
+        "SELECT operation_id,host_id,profile_id,old_registry_utf8,old_registry_sha256,new_registry_utf8,new_registry_sha256 FROM registry_rebinds ORDER BY rowid"
+    ).fetchall()
+    previous: tuple[str, str, bytes] | None = None
+    for operation_id, host_id, profile_id, old_raw, old_hash, new_raw, new_hash in rows:
+        if (
+            not isinstance(operation_id, str)
+            or re.fullmatch(r"[0-9a-f]{32}", operation_id) is None
+            or not isinstance(host_id, str)
+            or not host_id
+            or not isinstance(profile_id, str)
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", profile_id) is None
+            or not isinstance(old_raw, bytes)
+            or not isinstance(new_raw, bytes)
+            or old_hash != _sha(old_raw)
+            or new_hash != _sha(new_raw)
+            or old_hash == new_hash
+        ):
+            raise JournalUnreadable("journal registry history digest is invalid")
+        if previous is not None and (host_id, profile_id, old_raw) != previous:
+            raise JournalUnreadable("journal registry history is discontinuous")
+        previous = (host_id, profile_id, new_raw)
+    if previous is not None and (current_host, current_raw) != (previous[0], previous[2]):
+        raise JournalUnreadable("journal registry history does not match current metadata")
 
 
 @dataclass(frozen=True)
@@ -91,12 +154,16 @@ def read_journal(directory: Path) -> dict[str, JournalEffect]:
         raise JournalUnreadable("journal database cannot be opened read-only") from error
     try:
         connection.execute("PRAGMA query_only=ON")
-        if connection.execute("PRAGMA user_version").fetchone()[0] != 1:
-            raise JournalUnreadable("journal is not component version 1")
+        connection.execute("BEGIN")  # validate catalog, history and effects in one snapshot
+        version = connection.execute("PRAGMA user_version").fetchone()[0]
         tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        if tables != JOURNAL_TABLES:
-            raise JournalUnreadable("journal catalog does not match version 1")
-        connection.execute("BEGIN")  # one consistent snapshot under SQLite's shared lock
+        if version == 1:
+            if tables != JOURNAL_TABLES:
+                raise JournalUnreadable("journal catalog does not match version 1")
+        elif version == 2:
+            _validate_v2_registry_history(connection)
+        else:
+            raise JournalUnreadable("journal version is unsupported")
         bindings = connection.execute(
             "SELECT effect_key, binding_utf8, binding_sha256 FROM effect_bindings ORDER BY effect_key"
         ).fetchall()

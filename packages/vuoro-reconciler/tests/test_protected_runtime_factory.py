@@ -1,10 +1,12 @@
 """Composition ownership and refusal gates; no installed authority fixture."""
 
 from types import SimpleNamespace
+import os
 
 import pytest
 
 from vuoro_reconciler import protected_runtime_factory as module
+from vuoro_reconciler import protected_provider_registry
 from vuoro_reconciler.protected_runtime_registry import RuntimeRefused
 
 
@@ -165,6 +167,231 @@ def test_explicit_install_uses_exact_snapshot_and_is_not_runtime_open(monkeypatc
         )
     ]
     assert events == ["admit"]
+
+
+def rebind_composition(monkeypatch, tmp_path, *, active=False):
+    digest = "sha256:" + "a" * 64
+    host = "sha256:" + "b" * 64
+    old = "sha256:" + "c" * 64
+    registry = b'{"schema":"registry/v1"}'
+    profile = SimpleNamespace(
+        profile_sha256=digest,
+        registry_sha256=module._hash(registry),
+        data={"runtime_profile_sha256": "sha256:" + "d" * 64, "artifact_root": str(tmp_path / "artifacts")},
+    )
+    (tmp_path / "artifacts").mkdir()
+    snapshot = SimpleNamespace(
+        profile=profile, host_id=host, registry_utf8=registry
+    )
+    runtime = SimpleNamespace(profile_sha256=profile.data["runtime_profile_sha256"])
+    state_dir = tmp_path / "operation-state"
+    state_dir.mkdir()
+    state_dir.chmod(0o700)
+    lock_path = state_dir / "fixture.lock"
+    lock_path.touch(mode=0o600)
+    lock_path.chmod(0o600)
+    active_path = state_dir / "fixture.active"
+    if active:
+        active_path.write_text("active")
+    events = []
+    monkeypatch.setattr(module, "_snapshot", lambda profile_id: snapshot)
+    monkeypatch.setattr(module, "load_runtime_profile", lambda profile_id: runtime)
+    monkeypatch.setattr(module, "admit_installation", lambda value: events.append("admit"))
+    monkeypatch.setattr(
+        protected_provider_registry,
+        "_state_paths",
+        lambda profile_id: (state_dir, lock_path, "fixture.active"),
+    )
+
+    class Provider:
+        def __init__(self):
+            self._state = SimpleNamespace(
+                profile=profile,
+                directory=os.open(state_dir, os.O_RDONLY | os.O_DIRECTORY),
+                lock=os.open(lock_path, os.O_RDWR),
+            )
+
+        def close(self):
+            events.append("provider-close")
+            os.close(self._state.lock)
+            os.close(self._state.directory)
+
+    monkeypatch.setattr(module, "_provider", lambda profile_id: Provider())
+    location = SimpleNamespace(
+        directory=tmp_path / "journal",
+        check=lambda: events.append("location-check"),
+        journal_identities=lambda: (1, 2, 3),
+        check_journal_identities=lambda expected: events.append("journal-identities-check"),
+        close=lambda: events.append("location-close"),
+    )
+    monkeypatch.setattr(module, "_journal_directory", lambda profile_id: location)
+    monkeypatch.setattr(module, "_separate_storage", lambda *args: None)
+    return snapshot, runtime, location, events, old
+
+
+def test_empty_journal_rebind_factory_binds_current_profile_under_locks(monkeypatch, tmp_path):
+    snapshot, runtime, location, events, old = rebind_composition(monkeypatch, tmp_path)
+    calls = []
+    monkeypatch.setattr(
+        module,
+        "rebind_empty_journal",
+        lambda directory, **kwargs: calls.append((directory, kwargs))
+        or {"operation_id": kwargs["operation_id"], "old_registry_sha256": old, "new_registry_sha256": snapshot.profile.registry_sha256},
+    )
+    result = module.rebind_empty_profile_journal(
+        "fixture",
+        expected_old_registry_sha256=old,
+        expected_profile_sha256=snapshot.profile.profile_sha256,
+        expected_host_id=snapshot.host_id,
+        operation_id="a" * 32,
+    )
+    assert result["operation_id"] == "a" * 32
+    assert calls[0][0] == location.directory
+    assert {key: value for key, value in calls[0][1].items() if key != "identity_check"} == {
+        "host_id": snapshot.host_id,
+        "profile_id": "fixture",
+        "expected_old_registry_sha256": old,
+        "new_registry_utf8": snapshot.registry_utf8,
+        "operation_id": "a" * 32,
+        "expected_physical_identities": (1, 2, 3),
+    }
+    assert callable(calls[0][1]["identity_check"])
+    assert events.count("provider-close") == 1 and events.count("location-close") == 1
+
+
+@pytest.mark.parametrize("drift", ["profile", "host"])
+def test_empty_journal_rebind_factory_refuses_stale_profile_or_host_before_lock(
+    monkeypatch, tmp_path, drift
+):
+    snapshot, _, _, _, _ = rebind_composition(monkeypatch, tmp_path)
+    monkeypatch.setattr(module, "_provider", lambda *args: pytest.fail("lock opened"))
+    kwargs = {
+        "expected_old_registry_sha256": "sha256:" + "c" * 64,
+        "expected_profile_sha256": "sha256:" + "0" * 64 if drift == "profile" else snapshot.profile.profile_sha256,
+        "expected_host_id": "sha256:" + "0" * 64 if drift == "host" else snapshot.host_id,
+        "operation_id": "a" * 32,
+    }
+    with pytest.raises(RuntimeRefused):
+        module.rebind_empty_profile_journal("fixture", **kwargs)
+
+
+def test_empty_journal_rebind_factory_refuses_active_marker_before_mutation(
+    monkeypatch, tmp_path
+):
+    snapshot, _, _, _, _ = rebind_composition(monkeypatch, tmp_path, active=True)
+    monkeypatch.setattr(
+        module, "rebind_empty_journal", lambda *args, **kwargs: pytest.fail("journal changed")
+    )
+    with pytest.raises(RuntimeRefused):
+        module.rebind_empty_profile_journal(
+            "fixture",
+            expected_old_registry_sha256="sha256:" + "c" * 64,
+            expected_profile_sha256=snapshot.profile.profile_sha256,
+            expected_host_id=snapshot.host_id,
+            operation_id="a" * 32,
+        )
+
+
+def test_registry_rebind_receipt_factory_joins_current_admission_and_journal(
+    monkeypatch, tmp_path
+):
+    snapshot, _, location, events, _ = rebind_composition(monkeypatch, tmp_path)
+    receipt = {
+        "operation_id": "a" * 32,
+        "host_id": snapshot.host_id,
+        "profile_id": "fixture",
+        "old_registry_sha256": "sha256:" + "c" * 64,
+        "new_registry_sha256": snapshot.profile.registry_sha256,
+    }
+
+    class Journal:
+        def __init__(self, directory, *, host_id, registry_utf8):
+            assert directory == location.directory
+            assert host_id == snapshot.host_id
+            assert registry_utf8 == snapshot.registry_utf8
+
+        def registry_rebind_receipt(self, operation_id):
+            assert operation_id == "a" * 32
+            return receipt
+
+        def close(self):
+            events.append("journal-close")
+
+    monkeypatch.setattr(module, "ExecutionJournal", Journal)
+    observed = module.read_profile_journal_rebind_receipt(
+        "fixture",
+        operation_id="a" * 32,
+        expected_profile_sha256=snapshot.profile.profile_sha256,
+        expected_host_id=snapshot.host_id,
+    )
+    assert observed == receipt
+    assert events.count("journal-close") == 1 and events.count("provider-close") == 1
+
+
+def test_registry_rebind_receipt_factory_rechecks_journal_path_after_read(
+    monkeypatch, tmp_path
+):
+    snapshot, _, location, events, _ = rebind_composition(monkeypatch, tmp_path)
+    checks = 0
+
+    def changing_path():
+        nonlocal checks
+        checks += 1
+        events.append("location-check")
+        if checks == 2:
+            raise OSError("fixture path replaced")
+
+    location.check = changing_path
+
+    class Journal:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def registry_rebind_receipt(self, operation_id):
+            return {"operation_id": operation_id}
+
+        def close(self):
+            events.append("journal-close")
+
+    monkeypatch.setattr(module, "ExecutionJournal", Journal)
+    with pytest.raises(RuntimeRefused):
+        module.read_profile_journal_rebind_receipt(
+            "fixture",
+            operation_id="a" * 32,
+            expected_profile_sha256=snapshot.profile.profile_sha256,
+            expected_host_id=snapshot.host_id,
+        )
+    assert events.count("journal-close") == 1
+    assert events.count("provider-close") == 1
+
+
+def test_registry_rebind_receipt_factory_refuses_marker_created_during_read(
+    monkeypatch, tmp_path
+):
+    snapshot, _, location, events, _ = rebind_composition(monkeypatch, tmp_path)
+    active_path = tmp_path / "operation-state" / "fixture.active"
+
+    class Journal:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def registry_rebind_receipt(self, operation_id):
+            active_path.write_text("active")
+            return {"operation_id": operation_id}
+
+        def close(self):
+            events.append("journal-close")
+
+    monkeypatch.setattr(module, "ExecutionJournal", Journal)
+    with pytest.raises(RuntimeRefused):
+        module.read_profile_journal_rebind_receipt(
+            "fixture",
+            operation_id="a" * 32,
+            expected_profile_sha256=snapshot.profile.profile_sha256,
+            expected_host_id=snapshot.host_id,
+        )
+    assert events.count("journal-close") == 1
+    assert events.count("provider-close") == 1
 
 
 @pytest.mark.parametrize("active", ["journal", "state", "fork"])

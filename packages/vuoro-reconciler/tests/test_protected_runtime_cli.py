@@ -104,6 +104,95 @@ def test_explicit_install_never_opens_executor_or_selects_path(monkeypatch, caps
     assert json.loads(capsys.readouterr().out)["status"] == "INSTALLED"
 
 
+def test_empty_journal_rebind_is_explicit_and_does_not_open_runtime(monkeypatch, capsys):
+    calls = []
+    monkeypatch.setattr(
+        module,
+        "rebind_empty_profile_journal",
+        lambda profile, **kwargs: calls.append((profile, kwargs))
+        or {
+            "profile_id": profile,
+            "host_id": "sha256:" + "1" * 64,
+            "profile_sha256": "sha256:" + "2" * 64,
+            "operation_id": "a" * 32,
+            "old_registry_sha256": "sha256:" + "3" * 64,
+            "new_registry_sha256": "sha256:" + "4" * 64,
+        },
+    )
+    monkeypatch.setattr(
+        module, "open_installed_runtime", lambda *args: pytest.fail("runtime open")
+    )
+    assert module.main(
+        [
+            "rebind-empty-journal",
+            "fixture",
+            "--expected-old-registry-sha256",
+            "sha256:" + "3" * 64,
+            "--expected-profile-sha256",
+            "sha256:" + "2" * 64,
+            "--expected-host-id",
+            "sha256:" + "1" * 64,
+                "--operation-id",
+                "a" * 32,
+        ]
+    ) == 0
+    assert calls == [
+        (
+            "fixture",
+            {
+                "expected_old_registry_sha256": "sha256:" + "3" * 64,
+                "expected_profile_sha256": "sha256:" + "2" * 64,
+                "expected_host_id": "sha256:" + "1" * 64,
+                "operation_id": "a" * 32,
+            },
+        )
+    ]
+    assert json.loads(capsys.readouterr().out)["status"] == "REBOUND"
+
+
+def test_rebind_receipt_lookup_is_read_only_and_requires_exact_operation(monkeypatch, capsys):
+    calls = []
+    monkeypatch.setattr(
+        module,
+        "read_profile_journal_rebind_receipt",
+        lambda profile, **kwargs: calls.append((profile, kwargs))
+        or {
+            "operation_id": "a" * 32,
+            "host_id": "sha256:" + "1" * 64,
+            "profile_id": profile,
+            "old_registry_sha256": "sha256:" + "3" * 64,
+            "new_registry_sha256": "sha256:" + "4" * 64,
+        },
+    )
+    monkeypatch.setattr(
+        module,
+        "rebind_empty_profile_journal",
+        lambda *args, **kwargs: pytest.fail("receipt lookup must not mutate"),
+    )
+    assert module.main(
+        [
+            "journal-rebind-receipt",
+            "fixture",
+            "a" * 32,
+            "--expected-profile-sha256",
+            "sha256:" + "2" * 64,
+            "--expected-host-id",
+            "sha256:" + "1" * 64,
+        ]
+    ) == 0
+    assert calls == [
+        (
+            "fixture",
+            {
+                "operation_id": "a" * 32,
+                "expected_profile_sha256": "sha256:" + "2" * 64,
+                "expected_host_id": "sha256:" + "1" * 64,
+            },
+        )
+    ]
+    assert json.loads(capsys.readouterr().out)["status"] == "COMMITTED"
+
+
 @pytest.mark.parametrize(
     "flag",
     [
