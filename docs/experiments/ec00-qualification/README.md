@@ -577,3 +577,81 @@ comparison. Local execution uses the pinned Nix toolchain and the same locked
 packages. Run unittest discovery with pattern `large_cas_checks.py` after
 installing those tools and setting `EC00_NODE` to the pinned executable. There
 are no performance, proxy, browser or production qualification claims here.
+
+
+## Versioned decimal mutation counters (18 October 2026)
+
+The TypeSpec challenger now has an explicit experimental `/v2` projection. Its
+authored source imports the v1 models, clones them into the v2 namespace, and
+applies decimal-string encoding to every mutation expected revision and mutation
+result revision. It declares nonnegative counter bounds and canonical decimal
+meaning beside that encoding. V1 stays available with its original numeric wire
+contract, including the precision limitations measured in the previous slice.
+This remains a disposable comparison input; no estate API, selected IDL,
+production package, migration window or architecture ADR changes here.
+
+The test-only v2 codec accepts canonical nonnegative decimal text within signed
+int64 range and rejects numeric JSON, signs, whitespace, leading zeros, fractions,
+exponents and overflow before owner invocation. It converts the accepted value
+for the same existing `OwnerOracle`; that owner still performs CAS, authorization,
+idempotency, event transactions and signed-artifact validation. The codec adds
+an explicit wire version and keeps one authoritative owner/ledger. Generated
+client types carry strings; this is not a claim of complete generated runtime
+validation for arbitrary hostile responses.
+
+Executable checks cover:
+
+- Sixteen isolated generated-client cases: Python, TypeScript, Go and Rust,
+  each at counters 1, 9007199254740995, 9007199254740996 and
+  9223372036854775806. All preserve exact input/result text, replay one key to
+  the same result, and refuse a changed body. Independent SQLite reads verify
+  one transition/event/idempotency result. The last fixture increments to signed
+  int64 maximum. Counters are seeded directly; natural counter growth,
+  increment beyond maximum and additional concurrency qualification are outside
+  this slice.
+- Actual TypeScript request/response text carries decimal strings. The earlier
+  v1 numeric failure remains reproducible. Invalid v2 types, lexemes and overflow,
+  absent/null revisions and stale zero/maximum values leave owner rows unchanged.
+- A generated Python v2 lifecycle publishes an exact signed artifact, withdraws
+  one shared dependent, reports, verifies, records the artifact decision,
+  resolves and acknowledges separate remaining dependants. Seven induced
+  post-commit response losses reconcile through same-key replay. Partial
+  acknowledgement is observed before the second dependant continues. Original
+  artifact, envelope, signature, digest and material meaning remain intact.
+- V1 numeric and v2 decimal routes coexist. Generated Python commands replay
+  the same semantic command/key across versions in both directions at counters
+  1 and 9007199254740995, preserving one owner transition and rejecting changed
+  meaning. Frozen v1 Python/TypeScript clients
+  interoperate with the versioned server; the complete ten-case v1 lifecycle
+  regression also passes through it, including the frozen native Go/Rust cases.
+  A v2 client against a v1-only server gets 404 and does not downgrade or mutate.
+
+The generated OpenAPI and Python/TypeScript/Go/Rust clients live under
+`generated/typespec-v2`. `generate_versioned_counters.py` first verifies the
+existing v1 artifacts and pinned toolchain, compiles both services, requires the
+emitted v1 OpenAPI to remain byte-identical, then generates/checks only the v2
+subtree. Actual falsifiers reject altered v2 output and a versioned source that
+attempts to change v1 wire bytes. Generated files have no independently edited
+schema bodies. The Go module and Rust consumer lock retain the existing external
+dependency versions; Rust adds the generated local v2 crate.
+
+Use the locked Nix toolchain and installed locked npm/Python tools:
+
+```bash
+uv run --project tests/experiments/ec00/candidates --locked \
+  python scripts/experiments/ec00/generate_versioned_counters.py
+uv run --project tests/experiments/ec00/candidates --locked \
+  python -m unittest discover -s tests/experiments/ec00 -p versioned_counter_checks.py -v
+uv run --project tests/experiments/ec00/candidates --locked \
+  python -m unittest discover -s tests/experiments/ec00 -p versioned_native_checks.py -v
+uv run --project tests/experiments/ec00/candidates --locked \
+  python -m unittest discover -s tests/experiments/ec00 -p versioned_generation_checks.py -v
+```
+
+The generator's `--write` refreshes its isolated v2 targets. Hosted CI runs the
+Python/TypeScript checks and type checking beside the v1 counter comparison;
+Go/Rust execution and complete regeneration/falsifiers are verified locally with
+the pinned Nix toolchain. This establishes a tested representation repair for
+one candidate. Protobuf zero/absent limit behavior, native browser/Connect/proxy
+paths, TLS/authentication and representative workload/performance comparison
+remain open before the final ADR and foundation implementation.

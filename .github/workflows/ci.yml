@@ -30,6 +30,12 @@ jobs:
           export EC00_NODE="$(command -v node)"
           uv run --project tests/experiments/ec00/candidates --locked \
             python -m unittest discover -s tests/experiments/ec00 -p large_cas_checks.py -v
+      - name: Qualify versioned decimal counters and retained v1 clients
+        shell: bash
+        run: |
+          export EC00_NODE="$(command -v node)"
+          uv run --project tests/experiments/ec00/candidates --locked \
+            python -m unittest discover -s tests/experiments/ec00 -p versioned_counter_checks.py -v
 
   ec00-transport-failures:
     runs-on: ubuntu-latest
