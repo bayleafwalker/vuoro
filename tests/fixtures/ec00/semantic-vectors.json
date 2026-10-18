@@ -1,0 +1,76 @@
+{
+  "purpose": "transport-neutral EC-00 behavior vectors; not a serialized production contract",
+  "version": 1,
+  "cases": [
+    {
+      "id": "publish-idempotent",
+      "operations": ["publish", "publish-same-key-same-body"],
+      "must_hold": ["same logical request identity", "same result", "one durable request"]
+    },
+    {
+      "id": "idempotency-key-body-conflict",
+      "operations": ["publish", "publish-same-key-different-body"],
+      "must_refuse": "idempotency conflict; existing record unchanged"
+    },
+    {
+      "id": "commit-then-response-loss",
+      "operations": ["publish-commit", "drop-response", "retry-identical-operation"],
+      "must_hold": ["one durable request", "retry returns original logical result", "no second effect"]
+    },
+    {
+      "id": "revision-cas",
+      "operations": ["revise-current-revision", "revise-stale-revision"],
+      "must_refuse": "stale revision; no partial write"
+    },
+    {
+      "id": "shared-dependent-withdrawal",
+      "operations": ["publish-with-two-dependants", "withdraw-one-dependent"],
+      "must_hold": ["withdrawn dependent is removed from the need", "other dependent remains active"]
+    },
+    {
+      "id": "report-is-not-verification",
+      "operations": ["report-performed"],
+      "must_hold": ["report is observable", "verification remains unresolved"]
+    },
+    {
+      "id": "verification-is-distinct-transition",
+      "operations": ["report-performed", "verify-source-evidence"],
+      "must_hold": ["verifier transition is separate", "source/evidence basis remains identifiable"]
+    },
+    {
+      "id": "per-dependent-continuation-ack",
+      "operations": ["resolve", "ack-dependent-A"],
+      "must_hold": ["A acknowledgement recorded", "B remains unacknowledged", "no global resume"]
+    },
+    {
+      "id": "expired-procedure-freshness",
+      "operations": ["publish-procedure-at-source-revision-R", "observe-source-revision-R-plus-one"],
+      "must_hold": ["request identity survives", "procedure is not presented as current", "refresh outcome is explicit"]
+    },
+    {
+      "id": "dead-requester-is-uncertain",
+      "operations": ["publish", "requester-session-disappears"],
+      "must_hold": ["request persists", "freshness becomes uncertain", "silence does not resolve or withdraw"]
+    },
+    {
+      "id": "partial-or-uncertain-operation",
+      "operations": ["report-partial-or-unknown", "reconcile-target-before-retry"],
+      "must_hold": ["unknown is not success/failure/absence", "retry does not occur before reconciliation"]
+    },
+    {
+      "id": "request-content-is-not-authority",
+      "operations": ["publish-request-text-containing-command-or-approval-claim"],
+      "must_hold": ["request is untrusted content", "no protected authority is created"]
+    },
+    {
+      "id": "shared-withdrawal-does-not-erase-others",
+      "operations": ["publish-compatible-shared-request", "one-requester-withdraws"],
+      "must_hold": ["remaining dependants still have a current need"]
+    },
+    {
+      "id": "successor-continuation-ready",
+      "operations": ["resolve", "native-wake-unavailable", "successor-reads-current-packet"],
+      "must_hold": ["continuation-ready visible", "exact work/request/evidence revisions linked", "no scheduler introduced"]
+    }
+  ]
+}

@@ -26,7 +26,7 @@ and evidence.
 | **Bounded MI-1 proof** | Real hosted Claude → isolated native Codex continuation, protected exact-artifact publication, interruption/recovery and independent authorization reconstruction are accepted. P1–P4 include a bounded completeness baseline with explicit capture/attribution failures. See [proof and limits](https://github.com/bayleafwalker/agentops/blob/main/docs/evidence/2026-10-09-mi1-bindery/README.md). |
 | **Not yet established** | Whole-estate capture coverage, direct hosted owner registration, legacy Auditctl import (S4), hardware/ERH-006 repetition and unqualified resource-owner horizons. The original vendor comparison was retired by the operator; no comparative result is claimed. |
 | **Delivered milestone** | [Market integration milestone MI-1](docs/plans/2026-10-05-market-integration-milestone.md): an end-to-end proof across real harnesses, provider evidence ingestion, a reconstruction view, and an evidence-completeness measure. |
-| **Where current truth lives** | Product sourcing and learning scope: [2026-10-15 direction](docs/direction/2026-10-15-product-direction.md). Target state and its product amendment: agentops `docs/plans/2026-09-17-target-state.md`. Component status: [disposition register](docs/direction/disposition-register.yaml). Estate shape (a 2026-09-12 snapshot): [The agentic estate](docs/architecture/agentic-estate.md). Where older plans conflict, those win. |
+| **Where current truth lives** | Accepted product sourcing and learning scope: [2026-10-15 direction](docs/direction/2026-10-15-product-direction.md). Product delivery dependencies and acceptance: [2026-10-17 plan](docs/plans/2026-10-17-product-delivery-plan.md) (accepted planning scope; implementation and qualification pending). Target state and its product amendment: agentops `docs/plans/2026-09-17-target-state.md`. Component status: [disposition register](docs/direction/disposition-register.yaml). Estate shape (a 2026-09-12 snapshot): [The agentic estate](docs/architecture/agentic-estate.md). Where older plans conflict, those win. |
 | **Project overview** | [Vuoro on kotona.app](https://kotona.app/projects/vuoro/) |
 
 Vuoro is one product with three surfaces and unchanged internal owners: **work
@@ -173,3 +173,7 @@ handshake, catalog, and generic invocation contract.
 Adapter pinning, the required source evidence for a new Sprintctl work adapter,
 and the release/operator boundary are documented in
 [`docs/architecture/adapter-promotion.md`](docs/architecture/adapter-promotion.md).
+
+## Goal-derived delivery roadmap
+
+The [KAOS roadmap](docs/plans/2026-10-18-kaos-roadmap.md) traces ecosystem goals to this project's implementation, product onboarding, dependencies and acceptance work. It records planned scope, not deployed capability.

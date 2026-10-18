@@ -169,6 +169,11 @@ async def _command(argv, env, data=b"", maximum=65536, *, pack=False, pass_fds=(
                 else:
                     process.stdin.write(data)
                     await process.stdin.drain()
+            except (BrokenPipeError, ConnectionResetError):
+                # A command can reject its arguments before consuming stdin.
+                # Preserve its exit status so the caller sees the fixed refusal
+                # rather than a pipe race that masks the actual result.
+                pass
             finally:
                 process.stdin.close()
 

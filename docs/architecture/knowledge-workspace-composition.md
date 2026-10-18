@@ -44,9 +44,9 @@ records how the domain is bound, configured, migrated and released.
 
   The knowledge-only catalog revision is
   `e651dd978f73772e520f28f5ab9b6f46b77578ecc459d171d01eb4c204e75e49`. Together
-  with the pinned work (97) and audit (5) operations, the three-domain catalog
-  has 120 operations, revision
-  `270c8e6c34563b7abb8e7fad54bfd9be522a3a2cec2f256cd91784142066fb8b`
+  with the pinned work (103) and audit (5) operations, the three-domain catalog
+  has 126 operations, revision
+  `37292f51f8cbc643e34c57cd122dcb584e97bca3ca001adaa1fc430b14d02ebc`
   (`scripts/validate_released_catalog_composition.py`, run against the
   released wheels). This is the served catalog from vuoro-service 0.1.96.
 - **Authority.** The shell checks the coarse credential authority
@@ -177,6 +177,13 @@ vuoro-workspace check --dsn "$VUORO_KNOWLEDGE_RUNTIME_DSN" --schema knowledge \
 The runtime role needs `USAGE` on the schema and DML on its tables. P1c owns
 the grants.
 
+The physical schema is installation configuration. Before migration, inspect
+its ownership, tables and migration ledger. An existing knowledge service may
+already use the default `knowledge` namespace with an incompatible ledger.
+Preserve that namespace and choose a separate schema for Workspace; pass the
+same explicit name to the owner CLI, runtime configuration and grant scripts.
+Schema coexistence does not import or migrate the legacy service's data.
+
 ## Release and pin
 
 - `vuoro-workspace` is released like the other in-repo packages: tag
@@ -213,9 +220,25 @@ Before deploying it, appservice must provide:
 
 1. the knowledge migration Job, which runs `vuoro-workspace migrate` as the
    knowledge migration role and has completed;
-2. the knowledge runtime DSN (`VUORO_KNOWLEDGE_RUNTIME_DSN`), the object
-   store (`VUORO_KNOWLEDGE_OBJECT_STORE` plus a bucket-scoped credential) and
-   the runtime grants.
+2. the knowledge runtime DSN (`VUORO_KNOWLEDGE_RUNTIME_DSN`), the configured
+   object store (`VUORO_KNOWLEDGE_OBJECT_STORE`) and the runtime grants.
+
+The storage choice is installation-specific. S3 deployments need a
+bucket-scoped credential. The supported filesystem backend needs a persistent
+volume at the configured absolute path, writable by the service UID under its
+normal containment settings. Neither choice grants callers knowledge scopes
+or workspace membership.
+
+Recovery must cover both the database and object store. Establish a writer
+fence before creating a paired recovery point; record the exact database and
+object-store backup identities together, and qualify restoring both together
+before granting knowledge write access. Independent scheduled database dumps
+and volume snapshots do not establish a coherent pair. Preserve existing
+domain data and grants throughout the cutover.
+
+This storage requirement supersedes the earlier P1c assumption that every
+installation would use a bucket-scoped credential. Deployment-specific volume,
+backup and retention configuration belongs in appservice.
 
 Deploying the pinned image before both are in place fails startup closed. It
 does not degrade.

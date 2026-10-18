@@ -14,6 +14,7 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.responses import JSONResponse, Response
 
 from vuoro_service import __version__
+from vuoro_service.run_delegation import DelegatedIdentity
 from vuoro_service.body_limit import DEFAULT_INVOKE_BODY_LIMIT_BYTES, InvokeBodyLimitMiddleware
 from vuoro_service.catalog import (
     CatalogRegistry,
@@ -395,6 +396,13 @@ def create_app(
                 status="rejected",
                 error_code="environment-mismatch",
                 error_message="identity is not bound to this deployment environment",
+                http_status=403,
+            )
+        if isinstance(identity, DelegatedIdentity) and not identity.permits(operation_name, arguments):
+            return _invocation_response(
+                request_id=request_id, operation=operation_name, revision=revision,
+                status="rejected", error_code="delegation-operation-not-allowed",
+                error_message="run credential does not permit this operation and run",
                 http_status=403,
             )
         authority = operation.definition.required_authority

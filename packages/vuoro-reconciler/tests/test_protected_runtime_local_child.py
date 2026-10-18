@@ -3,9 +3,11 @@
 import asyncio
 import importlib
 import os
+from pathlib import Path
 import shutil
 import stat
 import subprocess
+import tempfile
 from types import SimpleNamespace
 import pytest
 from vuoro_reconciler import protected_runtime_local_child as child
@@ -402,13 +404,16 @@ def test_actual_frozen_git_callback_integration(
 
     class Local:
         async def acquire_base(self, profile, oid, target):
-            calls.append(("base", stat.S_IMODE(target.stat().st_mode)))
+            initial_mode = stat.S_IMODE(target.stat().st_mode)
             assert profile == value.profile
             fd = os.open(target, os.O_RDONLY | os.O_DIRECTORY)
             try:
                 await child._base(registered, runtime, oid, fd)
             finally:
                 os.close(fd)
+            calls.append(
+                ("base", initial_mode, stat.S_IMODE(target.stat().st_mode))
+            )
 
         async def sign(self, unsigned):
             calls.append(("sign", len(unsigned)))
@@ -460,7 +465,7 @@ def test_actual_frozen_git_callback_integration(
             )
             assert recovered.local_ready_utf8 == artifact.local_ready_utf8
         assert [call[0] for call in calls] == ["base", "sign"]
-        assert calls[0][1] == 0o755
+        assert calls[0][1] == calls[0][2]
     finally:
         value.journal.close()
 
@@ -634,13 +639,21 @@ def test_actual_ambient_git_helper_proxy_and_hook_never_execute(
     assert not marker.exists()
 
 
+@pytest.fixture
+def short_gnupg_home():
+    # GnuPG creates several UNIX sockets under GNUPGHOME. Keep the path short
+    # enough for S.gpg-agent.browser even when pytest's temp path is very long.
+    with tempfile.TemporaryDirectory(prefix="v-gpg-") as directory:
+        home = Path(directory)
+        yield home
+
+
 def test_actual_locked_fixture_signer_refuses_without_unlock_or_agent_creation(
-    tmp_path, lifecycle
+    short_gnupg_home, lifecycle
 ):
     from vuoro_reconciler.protected_runtime_credentials import _sealed
 
-    home = tmp_path / "locked-disposable-signer"
-    home.mkdir(mode=0o700)
+    home = short_gnupg_home
     env = {"PATH": os.defpath, "GNUPGHOME": str(home), "LANG": "C"}
     gpg, gpgconf, agent = (
         shutil.which(name) for name in ("gpg", "gpgconf", "gpg-agent")

@@ -1,0 +1,128 @@
+schema_version = "vuoro-reference-distribution/v1"
+distribution_id = "vuoro-self-hosted-reference"
+contract_status = "candidate"
+source_maturity = "source-composed"
+supported_distribution = false
+qualification_status = "pending"
+deployment_status = "unknown"
+composition_manifest = "packages/vuoro-service/composition/adapter-pins.json"
+service_package = "packages/vuoro-service/pyproject.toml"
+service_distribution = "vuoro-service"
+service_version = "0.1.96"
+image_policy = "immutable-digest-required"
+
+[support]
+status = "not-committed"
+response_sla = "none"
+service_release_owner = "Vuoro"
+hosted_tenant_lifecycle_owner = "vuoro-cloud"
+domain_schema_and_migration_owners = ["sprintctl", "auditctl", "vuoro-workspace"]
+installation_infrastructure_and_backup_owner = "installation operator"
+support_claim = "No public or customer support commitment is established by this source contract."
+
+[[capability]]
+domain = "work"
+lock_id = "work-adapter"
+distribution = "sprintctl"
+pinned_version = "0.20.0"
+api_version = "work-api/v1"
+schema_version = "work-schema/v1"
+capability_summary = "Sprintctl work operations composed through the released adapter."
+pin_maturity = "immutable-release-pinned"
+composition_maturity = "source-composed"
+deployment_maturity = "unknown"
+user_qualification = "not-qualified"
+
+[[capability]]
+domain = "audit"
+lock_id = "audit-adapter"
+distribution = "auditctl"
+pinned_version = "0.1.9"
+api_version = "audit/v1"
+schema_version = "audit-schema/v1"
+capability_summary = "Auditctl evidence operations composed through the released adapter."
+pin_maturity = "immutable-release-pinned"
+composition_maturity = "source-composed"
+deployment_maturity = "unknown"
+user_qualification = "not-qualified"
+
+[[capability]]
+domain = "knowledge"
+lock_id = "knowledge-adapter"
+distribution = "vuoro-workspace"
+pinned_version = "0.1.0"
+api_version = "vuoro-workspace/v1"
+schema_version = "knowledge-schema/v1"
+capability_summary = "Vuoro Workspace knowledge operations composed through its released adapter."
+pin_maturity = "immutable-release-pinned"
+composition_maturity = "source-composed"
+deployment_maturity = "unknown"
+user_qualification = "not-qualified"
+
+[[lifecycle]]
+operation = "install"
+source_status = "candidate-templates"
+procedure = ["deploy/compose/README.md", "deploy/kustomize/base/README.md"]
+qualification = "not-exercised-by-an-independent-user"
+boundary = "Compose is a disposable local evaluation stack; the neutral Kustomize base requires an overlay and immutable image digest."
+
+[[lifecycle]]
+operation = "upgrade-and-migrate"
+source_status = "explicit-owner-migrations"
+procedure = ["docs/architecture/packaging.md", "deploy/kustomize/base/README.md", "docs/architecture/diagnostic-operations.md"]
+qualification = "not-exercised-as-a-reference-distribution"
+boundary = "Startup checks compatibility but never migrates. Suspended owner jobs require explicit migration-role credentials and owner-specific evidence."
+
+[[lifecycle]]
+operation = "rollback"
+source_status = "compatibility-conditional"
+procedure = ["docs/architecture/diagnostic-operations.md#migration-preflight"]
+qualification = "not-exercised-as-a-reference-distribution"
+boundary = "Revert only while the previous image admits the committed schema; otherwise use a compatible forward fix or coordinated restore."
+
+[[lifecycle]]
+operation = "backup-and-restore"
+source_status = "owner-and-installation-specific"
+procedure = ["docs/architecture/diagnostic-operations.md#isolated-restore"]
+qualification = "requires-ee-03-and-ee-11"
+boundary = "The neutral distribution does not own database backup policy, object retention, recovery credentials, or a whole-application restore target."
+
+[[lifecycle]]
+operation = "export-and-import"
+source_status = "partial-owner-contracts"
+procedure = ["docs/architecture/knowledge-workspace-composition.md"]
+qualification = "requires-ee-10-and-ee-11"
+boundary = "Workspace export/import does not establish portability for every external owner record or the whole installed distribution."
+
+[[lifecycle]]
+operation = "diagnostics"
+source_status = "read-only-operations-available"
+procedure = ["docs/architecture/diagnostic-operations.md"]
+qualification = "source-contract-only"
+boundary = "Off-image diagnostics report a missing installed-composition attestation as unknown; they do not prove a live deployment."
+
+[[lifecycle]]
+operation = "removal"
+source_status = "candidate-owner-disposition-procedure"
+procedure = ["docs/operations/reference-distribution-removal.md"]
+qualification = "not-exercised-as-a-reference-distribution"
+boundary = "The procedure stops delivery and inventories neutral resources, but retains data by default; no owner has authorized purge and no independent removal/reconstruction has been qualified."
+
+[upgrade_policy]
+status = "candidate-compatibility-rules"
+composition_unit = "one immutable service release plus the exact adapter pins in its composition manifest"
+adapter_pin_changes = "review-and-qualify-as-a-composition"
+schema_migration_owner = "domain-owner"
+automatic_migration = false
+upgrade_grace_period = "not-committed"
+incompatible_upgrade_action = "freeze-delivery-until-owner-compatible-upgrade-or-coordinated-restore"
+rollback_rule = "previous-image-only-while-it-admits-the-current-schema"
+qualification = "not-exercised-as-a-reference-distribution"
+
+[qualification]
+required_evidence = ["EE-02", "EE-03", "EE-10", "EE-11"]
+independent_user_install = "not-run"
+reference_workflow = "not-qualified"
+restore_export = "not-qualified"
+support_response = "not-defined"
+cost_and_adoption = "not-measured"

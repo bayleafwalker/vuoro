@@ -931,7 +931,7 @@ class WorkspaceStore:
             if scope != "approved" and not working:
                 raise WorkspaceError(E.FORBIDDEN, f"{scope} scope needs knowledge:contribute")
             if scope == "approved":
-                rev_filter = "r.revision_id = i.approved_revision_id"
+                rev_filter = "r.revision_id = i.approved_revision_id AND r.state = 'approved'"
                 art_filter = "v.version_id = a.approved_version_id AND v.review_state = 'approved'"
             elif scope == "working":
                 rev_filter = "(r.revision_id = i.approved_revision_id OR r.state IN ('draft','proposed'))"

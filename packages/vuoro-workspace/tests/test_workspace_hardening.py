@@ -335,6 +335,44 @@ def test_import_refuses_path_traversal(env, bad):
     assert "unsafe path" in _import_problems(e, out)
 
 
+def test_import_cannot_publish_a_draft_through_the_approved_pointer(env):
+    out, manifest = _bundle(env)
+    item = next(item for item in manifest["items"] if item["approved_revision_id"] is None)
+    item["approved_revision_id"] = item["latest_revision_id"]
+    _rewrite(out, manifest)
+    assert "approved_revision_id" in _import_problems(env, out)
+
+
+def test_import_cannot_approve_an_unreviewed_artifact_through_its_pointer(env):
+    out, manifest = _bundle(env)
+    artifact = manifest["artifacts"][0]
+    artifact["approved_version_id"] = artifact["latest_version_id"]
+    _rewrite(out, manifest)
+    assert "approved_version_id" in _import_problems(env, out)
+
+
+def test_import_rejects_checksum_valid_non_utf8_revision_before_writing(env):
+    out, manifest = _bundle(env)
+    revision = manifest["items"][0]["revisions"][0]
+    body = b"\xff\xfeinvalid markdown"
+    (out / revision["path"]).write_bytes(body)
+    revision["content_sha256"] = sha(body)
+    _rewrite(out, manifest)
+    assert "UTF-8" in _import_problems(env, out)
+
+
+def test_approved_search_does_not_trust_a_legacy_inconsistent_pointer(env):
+    e = env
+    draft = e.store.item_create(e.p["contrib"], e.ws, "UnpublishedDraft", "privatephrase")
+    # Represent a legacy inconsistent import; ordinary owner operations cannot
+    # create this pointer. A reader must still never receive the draft hit.
+    with e.store.conn.cursor() as cur:
+        cur.execute("UPDATE knowledge_item SET approved_revision_id = %s WHERE item_id = %s",
+                    (draft["revision_id"], draft["item_id"]))
+    assert e.store.search(e.p["reader"], e.ws, "privatephrase")["total"] == 0
+    assert e.store.search(e.p["contrib"], e.ws, "privatephrase", scope="working")["total"] == 1
+
+
 def test_import_refuses_cross_item_and_unknown_proposals(env):
     e = env
     out, m = _bundle(e)

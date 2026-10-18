@@ -951,14 +951,16 @@ def test_direct_caller_cancellation_reaps_actual_group_before_loop_closes(tmp_pa
     shim.write_text(
         f"#!{sys.executable}\nimport os,time\npid=os.fork()\n"
         "if pid==0:\n time.sleep(30)\nelse:\n"
-        f" open({str(child_file)!r},'w').write(str(pid))\n time.sleep(30)\n"
+        f" tmp={str(child_file)!r}+'.tmp'\n"
+        " with open(tmp,'w') as handle: handle.write(str(pid))\n"
+        f" os.replace(tmp,{str(child_file)!r})\n time.sleep(30)\n"
     )
     shim.chmod(0o700)
 
     def alive(pid):
         try:
             return Path(f"/proc/{pid}/stat").read_text().split()[2] != "Z"
-        except FileNotFoundError:
+        except (FileNotFoundError, ProcessLookupError):
             return False
 
     async def workflow():

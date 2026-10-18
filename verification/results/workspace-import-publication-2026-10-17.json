@@ -1,0 +1,77 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.workspace-import-publication",
+  "contract_ref": {
+    "doc_id": "vuoro-knowledge-workspace-phase0",
+    "revision": "sha256:3628943d23346a398ff6437249bb08f6a1b8469f4e54c734ea908c09a172f102"
+  },
+  "implementation_sha": "e77e7de408d28f2a3cd8f176ef85ce7522c6536c",
+  "depth": 2,
+  "environment": {
+    "backend": "Disposable PostgreSQL 16.15 (Docker postgres:16) and local fixture object store",
+    "isolation": "Loopback-only test server; random schema per fixture; no production state",
+    "tool_versions": {
+      "python": "3.12",
+      "pytest": "8.4.2",
+      "postgresql": "16.15"
+    }
+  },
+  "execution": {
+    "histories": 4,
+    "bounds": {
+      "workspace_tests_passed": 100,
+      "distribution_wheels_built": 4,
+      "full_suite_passed": 2889,
+      "full_suite_failed": 0,
+      "full_suite_skipped": 140
+    },
+    "faults_exercised": [
+      "Draft approved_revision_id",
+      "Unreviewed approved_version_id",
+      "Checksum-valid non-UTF-8 revision",
+      "Legacy inconsistent database pointer"
+    ]
+  },
+  "claims": [
+    {
+      "property": "Approved pointers name approved revisions or ready approved artifact versions",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-workspace/tests/test_workspace_hardening.py"
+      ]
+    },
+    {
+      "property": "Invalid encoding fails before database or object-store mutation",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-workspace/tests/test_workspace_hardening.py"
+      ]
+    },
+    {
+      "property": "Approved search excludes legacy-pointer drafts",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-workspace/tests/test_workspace_hardening.py"
+      ]
+    },
+    {
+      "property": "Authorized working search preserves drafts",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-workspace/tests/test_workspace_hardening.py"
+      ]
+    }
+  ],
+  "counterexamples": [
+    {
+      "summary": "Three new malformed-bundle tests failed before repair: draft approval pointer, unreviewed artifact approval pointer and checksum-valid binary revision. All pass after preflight checks.",
+      "trace_ref": "packages/vuoro-workspace/tests/test_workspace_hardening.py"
+    }
+  ],
+  "notes": [
+    "Independent read-only review found no blocking defect; importer validation precedes _mutate/object writes.",
+    "Initial full suite had 12 preexisting runtime-child failures, reproduced on origin/main. Separate repair merged in PR244 (83ed516). Rebased full suite passed 2889 tests with 140 unconfigured owner/cgroup/install fixture skips; four wheel builds preceded checks.",
+    "Workspace suite itself passed all 100 tests without skips. Full hosted CI gates remain separately recorded in the PR; no runtime qualification, release or deployment.",
+    "No claim about hostile concurrent bundle-directory mutation, arbitrary object-store recovery, or physical power-loss durability."
+  ]
+}

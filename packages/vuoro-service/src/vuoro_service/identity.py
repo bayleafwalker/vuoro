@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Literal
 
 from fastapi import Request
@@ -79,8 +80,15 @@ class Identity:
     #: separate field from ``principal_id`` so downstream owner adapters can
     #: bind correlation metadata without parsing a display/binding string.
     principal_epoch: int | None = None
+    #: Verified parent credential expiry, when supplied by its authenticator.
+    #: Domain owners use this bound when minting narrower child credentials.
+    expires_at: datetime | None = None
 
     def __post_init__(self) -> None:
+        if self.expires_at is not None and (
+            not isinstance(self.expires_at, datetime) or self.expires_at.utcoffset() is None
+        ):
+            raise IdentityResolutionError("credential expiry must be an aware timestamp")
         if self.principal_id is not None and not (
             PRINCIPAL_ID.fullmatch(self.principal_id)
             or SYSTEM_PRINCIPAL_ID.fullmatch(self.principal_id)

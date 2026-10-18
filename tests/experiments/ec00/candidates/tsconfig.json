@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "skipLibCheck": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@bufbuild/protobuf": [
+        "node_modules/@bufbuild/protobuf/dist/esm/index.d.ts"
+      ],
+      "@bufbuild/protobuf/*": [
+        "node_modules/@bufbuild/protobuf/dist/esm/*/index.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "run_typescript_clients.ts",
+    "run_large_cas_clients.ts",
+    "run_versioned_counter_client.ts",
+    "run_read_presence_client.ts",
+    "connect_browser_client.ts",
+    "serve_connect_edge.ts"
+  ]
+}

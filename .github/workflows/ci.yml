@@ -9,6 +9,122 @@ permissions:
   contents: read
 
 jobs:
+  ec00-offline-packages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v8.3.2
+        with:
+          version: "0.13.0"
+          python-version: "3.13.16"
+      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012 # v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: Restore and rebuild clients without host source, caches, or external network
+        shell: bash
+        run: |
+          nix develop ./tests/experiments/ec00/candidates/toolchain --command bash -euc '
+            # Ubuntu hosted runners can restrict unprivileged namespaces with AppArmor.
+            # This changes only this disposable test VM; the actual restore still runs unprivileged.
+            if ! "$EC00_UNSHARE" --user --map-root-user true; then
+              test -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns
+              sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+              "$EC00_UNSHARE" --user --map-root-user true
+            fi
+            uv run --project tests/experiments/ec00/candidates --locked python -m unittest discover -s tests/experiments/ec00 -p offline_integrity_checks.py -v
+            uv run --project tests/experiments/ec00/candidates --locked python scripts/experiments/ec00/offline_packages.py prepare --destination "$RUNNER_TEMP/ec00-offline-bundle"
+            bundle_sha=$(uv run --project tests/experiments/ec00/candidates --locked python -c "import json,sys; print(json.load(open(sys.argv[1]))[\"sha256\"])" "$RUNNER_TEMP/ec00-offline-bundle/receipt.json")
+            uv run --project tests/experiments/ec00/candidates --locked python scripts/experiments/ec00/offline_packages.py run --archive "$RUNNER_TEMP/ec00-offline-bundle/offline-packages.tar" --sha256 "$bundle_sha" --report "$RUNNER_TEMP/ec00-offline-result.json"
+          '
+      - name: Preserve offline receipts and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ec00-offline-package-receipts
+          path: |
+            ${{ runner.temp }}/ec00-offline-bundle/receipt.json
+            ${{ runner.temp }}/ec00-offline-result.*
+          if-no-files-found: warn
+
+  ec00-browser-connect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v8.3.2
+        with:
+          python-version: "3.13.16"
+      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012 # v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: Qualify genuine Chromium clients and locally generated Connect paths
+        shell: bash
+        run: |
+          nix develop ./tests/experiments/ec00/candidates/toolchain --command bash -euc '
+            npm ci --prefix tests/experiments/ec00/candidates --ignore-scripts --no-audit --no-fund
+            tests/experiments/ec00/candidates/node_modules/.bin/tsc --project tests/experiments/ec00/candidates/tsconfig.json
+            uv run --project tests/experiments/ec00/candidates --locked python scripts/experiments/ec00/generate_connect.py
+            uv run --project tests/experiments/ec00/candidates --locked python -m unittest discover -s tests/experiments/ec00 -p connect_generation_checks.py -v
+            uv run --project tests/experiments/ec00/candidates --locked python -m unittest discover -s tests/experiments/ec00 -p connect_python_checks.py -v
+            uv run --project tests/experiments/ec00/candidates --locked python -m unittest discover -s tests/experiments/ec00 -p connect_browser_checks.py -v
+          '
+  ec00-large-cas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v8.3.2
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.21.0"
+      - name: Install locked generated-client tools
+        run: npm ci --prefix tests/experiments/ec00/candidates --ignore-scripts --no-audit --no-fund
+      - name: Type check generated-client runners
+        run: tests/experiments/ec00/candidates/node_modules/.bin/tsc --project tests/experiments/ec00/candidates/tsconfig.json
+      - name: Compare safe and unsafe mutation revision counters
+        shell: bash
+        run: |
+          export EC00_NODE="$(command -v node)"
+          uv run --project tests/experiments/ec00/candidates --locked \
+            python -m unittest discover -s tests/experiments/ec00 -p large_cas_checks.py -v
+      - name: Qualify versioned decimal counters and retained v1 clients
+        shell: bash
+        run: |
+          export EC00_NODE="$(command -v node)"
+          uv run --project tests/experiments/ec00/candidates --locked \
+            python -m unittest discover -s tests/experiments/ec00 -p versioned_counter_checks.py -v
+
+      - name: Qualify explicit read presence and frozen legacy compatibility
+        shell: bash
+        run: |
+          export EC00_NODE="$(command -v node)"
+          uv run --project tests/experiments/ec00/candidates --locked \
+            python -m unittest discover -s tests/experiments/ec00 -p read_presence_checks.py -v
+
+  ec00-transport-failures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v8.3.2
+        with:
+          python-version: "3.13"
+      - name: Compare generated-client deadline, cancellation and response loss
+        run: >-
+          uv run --project tests/experiments/ec00/candidates --locked
+          python -m unittest discover -s tests/experiments/ec00
+          -p transport_failure_checks.py -v
+      - name: Compare unary watch replay, reconnect and refusal semantics
+        run: >-
+          uv run --project tests/experiments/ec00/candidates --locked
+          python -m unittest discover -s tests/experiments/ec00
+          -p watch_replay_checks.py -v
+
   native-settlement-demo:
     # Optional consumer against released immutable owners, outside workspace/image.
     runs-on: ubuntu-latest
@@ -220,7 +336,8 @@ jobs:
             -m pytest --import-mode=importlib \
             packages/vuoro-service/tests/conformance/test_bound_proposal_http.py \
             packages/vuoro-service/tests/conformance/test_evidence_evaluation_http.py \
-            packages/vuoro-service/tests/conformance/test_effect_attempt_http.py -q \
+            packages/vuoro-service/tests/conformance/test_effect_attempt_http.py \
+            packages/vuoro-service/tests/conformance/test_released_run_delegation_http.py -q \
             --lease-pg-url postgresql://m14:m14-ci-only@127.0.0.1:5432/lease_conformance_ci
       - name: Provider-neutral lease contract (reference and pinned owner)
         run: >-
@@ -310,45 +427,45 @@ jobs:
           export VUORO_SCHEMA22_ATTESTATION=/tmp/vuoro-schema22-installed.json
           /tmp/vuoro-bound-released-composition/bin/python -m pytest --import-mode=importlib \
             packages/vuoro-service/tests/conformance/test_schema22_composition_migration.py -q
-      - name: Actual schema-22 closure (service 0.1.93) to explicit schema-25 CLI migration
+      - name: Actual schema-25 closure (service 0.1.95) to explicit schema-27 CLI migration
         shell: bash
         env:
           PGPASSWORD: m14-ci-only
           VUORO_BOUND_COMPOSITION_PROOF: "1"
-          VUORO_SCHEMA25_COMPOSITION_PROOF: "1"
-          VUORO_SCHEMA25_MIGRATION_PG_URL: postgresql://schema25_work_migration:schema25-ci-only@127.0.0.1:5432/lease_conformance_schema25_ci?options=-csearch_path%3Dwork%2Cpg_catalog
-          VUORO_SCHEMA25_RUNTIME_PG_URL: postgresql://schema25_work_runtime:schema25-ci-only@127.0.0.1:5432/lease_conformance_schema25_ci?options=-csearch_path%3Dwork%2Cpg_catalog
-          VUORO_SCHEMA25_AUDIT_MIGRATION_PG_URL: postgresql://schema25_audit_migration:schema25-ci-only@127.0.0.1:5432/lease_conformance_schema25_ci
-          VUORO_SCHEMA25_AUDIT_RUNTIME_PG_URL: postgresql://schema25_audit_runtime:schema25-ci-only@127.0.0.1:5432/lease_conformance_schema25_ci
-          VUORO_SCHEMA25_KNOWLEDGE_MIGRATION_PG_URL: postgresql://schema25_knowledge_migration:schema25-ci-only@127.0.0.1:5432/lease_conformance_schema25_ci
-          VUORO_SCHEMA25_KNOWLEDGE_RUNTIME_PG_URL: postgresql://schema25_knowledge_runtime:schema25-ci-only@127.0.0.1:5432/lease_conformance_schema25_ci
+          VUORO_SCHEMA27_COMPOSITION_PROOF: "1"
+          VUORO_SCHEMA27_MIGRATION_PG_URL: postgresql://schema27_work_migration:schema27-ci-only@127.0.0.1:5432/lease_conformance_schema27_ci?options=-csearch_path%3Dwork%2Cpg_catalog
+          VUORO_SCHEMA27_RUNTIME_PG_URL: postgresql://schema27_work_runtime:schema27-ci-only@127.0.0.1:5432/lease_conformance_schema27_ci?options=-csearch_path%3Dwork%2Cpg_catalog
+          VUORO_SCHEMA27_AUDIT_MIGRATION_PG_URL: postgresql://schema27_audit_migration:schema27-ci-only@127.0.0.1:5432/lease_conformance_schema27_ci
+          VUORO_SCHEMA27_AUDIT_RUNTIME_PG_URL: postgresql://schema27_audit_runtime:schema27-ci-only@127.0.0.1:5432/lease_conformance_schema27_ci
+          VUORO_SCHEMA27_KNOWLEDGE_MIGRATION_PG_URL: postgresql://schema27_knowledge_migration:schema27-ci-only@127.0.0.1:5432/lease_conformance_schema27_ci
+          VUORO_SCHEMA27_KNOWLEDGE_RUNTIME_PG_URL: postgresql://schema27_knowledge_runtime:schema27-ci-only@127.0.0.1:5432/lease_conformance_schema27_ci
         run: |
           set -euo pipefail
           # Separate roles and database; no production endpoint or inherited schema.
           psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U m14 -d m14_scenario <<'SQL'
-          CREATE ROLE schema25_work_migration LOGIN PASSWORD 'schema25-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
-          CREATE ROLE schema25_work_runtime LOGIN PASSWORD 'schema25-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
-          CREATE ROLE schema25_audit_migration LOGIN PASSWORD 'schema25-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
-          CREATE ROLE schema25_audit_runtime LOGIN PASSWORD 'schema25-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
-          CREATE ROLE schema25_knowledge_migration LOGIN PASSWORD 'schema25-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
-          CREATE ROLE schema25_knowledge_runtime LOGIN PASSWORD 'schema25-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
-          CREATE DATABASE lease_conformance_schema25_ci;
-          GRANT CONNECT,CREATE ON DATABASE lease_conformance_schema25_ci TO schema25_work_migration,schema25_audit_migration,schema25_knowledge_migration;
-          GRANT CONNECT ON DATABASE lease_conformance_schema25_ci TO schema25_work_runtime,schema25_audit_runtime,schema25_knowledge_runtime;
+          CREATE ROLE schema27_work_migration LOGIN PASSWORD 'schema27-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          CREATE ROLE schema27_work_runtime LOGIN PASSWORD 'schema27-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          CREATE ROLE schema27_audit_migration LOGIN PASSWORD 'schema27-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          CREATE ROLE schema27_audit_runtime LOGIN PASSWORD 'schema27-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          CREATE ROLE schema27_knowledge_migration LOGIN PASSWORD 'schema27-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          CREATE ROLE schema27_knowledge_runtime LOGIN PASSWORD 'schema27-ci-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          CREATE DATABASE lease_conformance_schema27_ci;
+          GRANT CONNECT,CREATE ON DATABASE lease_conformance_schema27_ci TO schema27_work_migration,schema27_audit_migration,schema27_knowledge_migration;
+          GRANT CONNECT ON DATABASE lease_conformance_schema27_ci TO schema27_work_runtime,schema27_audit_runtime,schema27_knowledge_runtime;
           SQL
-          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U m14 -d lease_conformance_schema25_ci \
-            -c 'CREATE SCHEMA work AUTHORIZATION schema25_work_migration'
-          python scripts/prepare_schema21_upgrade_fixture.py --closure schema22 /tmp/vuoro-schema22-upgrade
-          export VUORO_SCHEMA22_OWNER_PYTHON=/tmp/vuoro-schema22-upgrade/venv/bin/python
-          export VUORO_SCHEMA22_MANIFEST="$PWD/packages/vuoro-service/tests/fixtures/schema22-adapter-pins.json"
-          export VUORO_SCHEMA22_WHEEL_DIR=/tmp/vuoro-schema22-upgrade/wheels
-          export VUORO_SCHEMA22_ATTESTATION=/tmp/vuoro-schema22-upgrade/installed.json
-          export VUORO_SCHEMA25_MANIFEST="$PWD/packages/vuoro-service/composition/adapter-pins.json"
-          export VUORO_SCHEMA25_WHEEL_DIR="$PWD/dist/adapters"
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U m14 -d lease_conformance_schema27_ci \
+            -c 'CREATE SCHEMA work AUTHORIZATION schema27_work_migration'
+          python scripts/prepare_schema21_upgrade_fixture.py --closure schema25 /tmp/vuoro-schema25-upgrade
+          export VUORO_SCHEMA25_OWNER_PYTHON=/tmp/vuoro-schema25-upgrade/venv/bin/python
+          export VUORO_SCHEMA25_MANIFEST="$PWD/packages/vuoro-service/tests/fixtures/schema25-adapter-pins.json"
+          export VUORO_SCHEMA25_WHEEL_DIR=/tmp/vuoro-schema25-upgrade/wheels
+          export VUORO_SCHEMA25_ATTESTATION=/tmp/vuoro-schema25-upgrade/installed.json
+          export VUORO_SCHEMA27_MANIFEST="$PWD/packages/vuoro-service/composition/adapter-pins.json"
+          export VUORO_SCHEMA27_WHEEL_DIR="$PWD/dist/adapters"
           # Attested by the schema-21 step from the same released wheels.
-          export VUORO_SCHEMA25_ATTESTATION=/tmp/vuoro-schema22-installed.json
+          export VUORO_SCHEMA27_ATTESTATION=/tmp/vuoro-schema22-installed.json
           /tmp/vuoro-bound-released-composition/bin/python -m pytest --import-mode=importlib \
-            packages/vuoro-service/tests/conformance/test_schema25_composition_migration.py -q
+            packages/vuoro-service/tests/conformance/test_schema27_composition_migration.py -q
       - name: Protected effect binding on the released schema-21 owner
         env:
           PGPASSWORD: m14-ci-only

@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package ec00.oa.v1;
+
+option go_package = "example.com/vuoro-ec00/ec00/generated/protobuf/go/oa/v1;v1";
+
+import "google/protobuf/struct.proto";
+
+message PublishRequest {
+  // OA item identifiers are decimal strings so JavaScript clients do not round
+  // values above Number.MAX_SAFE_INTEGER.
+  string request_id = 1;
+  optional string objective = 2;
+  oneof note_value {
+    string note = 3;
+    google.protobuf.NullValue note_null = 4;
+  }
+}
+
+message ReviseRequest {
+  string request_id = 1;
+  optional int64 expected_revision = 2;
+  optional string objective = 3;
+  oneof note_value {
+    string note = 4;
+    google.protobuf.NullValue note_null = 5;
+  }
+}
+
+message MutationResult {
+  string request_id = 1;
+  int64 revision = 2;
+}
+
+service OwnerOperations {
+  rpc Publish(PublishRequest) returns (MutationResult);
+  rpc Revise(ReviseRequest) returns (MutationResult);
+}

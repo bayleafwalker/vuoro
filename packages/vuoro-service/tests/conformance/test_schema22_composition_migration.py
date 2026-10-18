@@ -22,7 +22,7 @@ from psycopg import sql
 from vuoro_service.composition import CompositionError, create_composed_app
 from .test_bound_proposal_http import assert_installed_composition
 from .knowledge_fixture import provision_knowledge, validate_knowledge_urls
-from .test_schema25_composition_migration import CATALOG_REVISION, CATALOG_TOTAL
+from .test_schema27_composition_migration import CATALOG_REVISION, CATALOG_TOTAL
 
 pytestmark = pytest.mark.essential_safety
 
@@ -32,7 +32,8 @@ pytestmark = pytest.mark.essential_safety
 POST21_TABLES = ('work_effect_attempt', 'work_effect_attempt_event',
                  'work_run_invocation_binding', 'work_run_invocation_attempt',
                  'agent_instance', 'agent_declaration_revision', 'agent_observation',
-                 'agent_inbox_counter', 'agent_message', 'agent_message_receipt')
+                 'agent_inbox_counter', 'agent_message', 'agent_message_receipt',
+                 'work_approval', 'work_run_delegation')
 
 
 def validate_fixture_urls(urls):
@@ -229,7 +230,7 @@ else:
     store=pg.get_connection(migration);store.repo_id='agentops'
     try:
         migrated=pg_migrations.migrate_schema(store)
-        assert migrated['from_version']==21 and migrated['to_version']==25 and migrated['applied_versions']==[22,23,24,25]
+        assert migrated['from_version']==21 and migrated['to_version']==27 and migrated['applied_versions']==[22,23,24,25,26,27]
         assert pg_migrations.migrate_schema(store)['applied_versions']==[]
     finally:store.conn.close()
     grants()
@@ -249,7 +250,7 @@ else:
         role=conn.execute('SELECT rolsuper,rolcreatedb,rolcreaterole,rolreplication,rolbypassrls FROM pg_roles WHERE rolname=current_user').fetchone()
         assert not any(role)
         assert not conn.execute("SELECT pg_has_role(current_user,%s,'MEMBER')",(migration_role,)).fetchone()[0]
-        assert conn.execute('SELECT version FROM schema_version').fetchone()[0]==25
+        assert conn.execute('SELECT version FROM schema_version').fetchone()[0]==27
         assert not conn.execute("SELECT has_schema_privilege(current_user,'work','CREATE')").fetchone()[0]
         for table in ('work_effect_attempt','work_effect_attempt_event'):
             assert conn.execute('SELECT has_table_privilege(current_user,%s,%s)',(table,'SELECT,INSERT,UPDATE,DELETE')).fetchone()[0]

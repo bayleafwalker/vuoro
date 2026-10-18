@@ -10,7 +10,12 @@ import sys
 from .protected_copy_codec import _need, _read
 from .protected_executor import ExecutionResult
 from .protected_effects import AcceptedPageData
-from .protected_runtime_factory import open_installed_runtime, install_profile_journal
+from .protected_runtime_factory import (
+    install_profile_journal,
+    open_installed_runtime,
+    rebind_empty_profile_journal,
+    read_profile_journal_rebind_receipt,
+)
 from .protected_runtime_registry import _ID
 
 
@@ -44,6 +49,18 @@ def _cursor(value):
     return value
 
 
+def _sha256(value):
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", value):
+        raise argparse.ArgumentTypeError("invalid SHA-256 digest")
+    return value
+
+
+def _operation_id(value):
+    if not re.fullmatch(r"[0-9a-f]{32}", value):
+        raise argparse.ArgumentTypeError("invalid operation ID")
+    return value
+
+
 def _parser():
     parser = argparse.ArgumentParser(prog="vuoro-protected")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -60,6 +77,22 @@ def _parser():
         "install-journal", help="exclusively install the bound journal"
     )
     install.add_argument("profile_id", type=_profile)
+    rebind = commands.add_parser(
+        "rebind-empty-journal",
+        help="explicitly bind a verified empty journal to the installed registry",
+    )
+    rebind.add_argument("profile_id", type=_profile)
+    rebind.add_argument("--expected-old-registry-sha256", required=True, type=_sha256)
+    rebind.add_argument("--expected-profile-sha256", required=True, type=_sha256)
+    rebind.add_argument("--expected-host-id", required=True, type=_sha256)
+    rebind.add_argument("--operation-id", required=True, type=_operation_id)
+    receipt = commands.add_parser(
+        "journal-rebind-receipt", help="read a committed empty-journal registry transition receipt"
+    )
+    receipt.add_argument("profile_id", type=_profile)
+    receipt.add_argument("operation_id", type=_operation_id)
+    receipt.add_argument("--expected-profile-sha256", required=True, type=_sha256)
+    receipt.add_argument("--expected-host-id", required=True, type=_sha256)
     return parser
 
 
@@ -117,6 +150,47 @@ def main(argv=None):
                     "schema": "vuoro-protected-journal-installation/v1",
                     "profile_id": arguments.profile_id,
                     "status": "INSTALLED",
+                }
+            )
+            return 0
+        if arguments.command == "rebind-empty-journal":
+            receipt = rebind_empty_profile_journal(
+                arguments.profile_id,
+                expected_old_registry_sha256=arguments.expected_old_registry_sha256,
+                expected_profile_sha256=arguments.expected_profile_sha256,
+                expected_host_id=arguments.expected_host_id,
+                operation_id=arguments.operation_id,
+            )
+            _emit(
+                {
+                    "schema": "vuoro-protected-journal-registry-rebind/v1",
+                    "status": "REBOUND",
+                    **receipt,
+                }
+            )
+            return 0
+        if arguments.command == "journal-rebind-receipt":
+            value = read_profile_journal_rebind_receipt(
+                arguments.profile_id,
+                operation_id=arguments.operation_id,
+                expected_profile_sha256=arguments.expected_profile_sha256,
+                expected_host_id=arguments.expected_host_id,
+            )
+            if value is None:
+                _emit(
+                    {
+                        "schema": "vuoro-protected-journal-registry-rebind-receipt/v1",
+                        "status": "NOT_FOUND",
+                        "profile_id": arguments.profile_id,
+                        "operation_id": arguments.operation_id,
+                    }
+                )
+                return 2
+            _emit(
+                {
+                    "schema": "vuoro-protected-journal-registry-rebind-receipt/v1",
+                    "status": "COMMITTED",
+                    **value,
                 }
             )
             return 0
