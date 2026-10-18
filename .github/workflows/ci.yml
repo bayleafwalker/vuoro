@@ -9,6 +9,28 @@ permissions:
   contents: read
 
 jobs:
+  ec00-large-cas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v8.3.2
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.21.0"
+      - name: Install locked generated-client tools
+        run: npm ci --prefix tests/experiments/ec00/candidates --ignore-scripts --no-audit --no-fund
+      - name: Type check generated-client runners
+        run: tests/experiments/ec00/candidates/node_modules/.bin/tsc --project tests/experiments/ec00/candidates/tsconfig.json
+      - name: Compare safe and unsafe mutation revision counters
+        shell: bash
+        run: |
+          export EC00_NODE="$(command -v node)"
+          uv run --project tests/experiments/ec00/candidates --locked \
+            python -m unittest discover -s tests/experiments/ec00 -p large_cas_checks.py -v
+
   ec00-transport-failures:
     runs-on: ubuntu-latest
     timeout-minutes: 5

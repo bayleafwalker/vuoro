@@ -535,3 +535,45 @@ Run the locked candidate environment with unittest discovery pattern
 transport-failure slice. Real network/proxy/browser/TLS/authentication paths,
 other language watch clients, streaming and subscriber backpressure remain
 unqualified. These results do not select an architecture or report performance.
+
+
+## Large mutation counters: positive and negative qualification (18 October 2026)
+
+`large_cas_checks.py` exercises actual owner CAS at synthetic counter 1,
+9007199254740995 and 9007199254740996, using independent file-backed SQLite
+databases for generated OpenAPI Python, native gRPC Python, OpenAPI TypeScript
+and protobuf TypeScript clients. TypeScript protobuf uses generated binary
+messages over the existing test-only HTTP bridge; it is not native gRPC.
+The fixture seeds counters directly and does not claim trillions of observed
+transitions, natural counter growth, or additional concurrency qualification.
+
+The twelve subcases check exact committed request/material revisions, objective,
+appended event fields, preserved prior events and the stored idempotency result.
+The OpenAPI TypeScript runner captures the actual HTTP request and response text;
+Python decodes that text without JavaScript numeric rounding. Its findings are:
+
+- With expected revision 9007199254740995, the generated TypeScript numeric
+  input serializes as 9007199254740996. The owner refuses stale CAS (409), and
+  all request/event/idempotency rows remain unchanged.
+- With the exact representable even input 9007199254740996, CAS succeeds and
+  the owner commits 9007199254740997. The HTTP response contains that exact
+  integer, but the generated TypeScript numeric result reports 9007199254740996.
+  A committed effect therefore cannot be inferred correctly from that parsed
+  revision alone.
+- Python OpenAPI and Python gRPC preserve both tested large expected revisions
+  and results; TypeScript protobuf preserves them through `bigint` and binary
+  encoding. All four arms pass the counter-1 control case.
+
+These are explicit negative findings for the current OpenAPI TypeScript numeric
+contract, not a full-int64 parity pass. The existing decimal-string typed reads
+do not repair mutation input or result precision. A future contract decision
+must resolve this limitation (for example with a consistently generated decimal
+representation) and qualify compatibility; this slice changes no schema,
+production contract, generator projection or selected architecture.
+
+The dedicated `ec00-large-cas` CI job installs Node 24.21.0, locked npm tools and
+the locked Python environment, type-checks both TypeScript runners and runs the
+comparison. Local execution uses the pinned Nix toolchain and the same locked
+packages. Run unittest discovery with pattern `large_cas_checks.py` after
+installing those tools and setting `EC00_NODE` to the pinned executable. There
+are no performance, proxy, browser or production qualification claims here.
