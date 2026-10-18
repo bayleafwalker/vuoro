@@ -146,6 +146,10 @@ def test_fresh_uuid_exact_invocation_schema_fixed_read_operation_and_profile(
                 row[0].startswith(b"POST /api/invoke/v1 HTTP/1.1\r\n")
                 for row in server.requests
             )
+            assert all(
+                b"X-Vuoro-Client-Protocol: 1\r\n" in row[0]
+                for row in server.requests
+            )
             assert credentials.calls == [chosen, chosen]
             with pytest.raises(AttributeError):
                 source.profile = chosen

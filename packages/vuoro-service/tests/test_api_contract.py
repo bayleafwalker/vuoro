@@ -247,6 +247,12 @@ async def test_invocation_derives_identity_and_enforces_contract() -> None:
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://test"
     ) as client:
+        missing_protocol = await client.post("/api/invoke/v1", json=request)
+        assert missing_protocol.status_code == 426
+        assert missing_protocol.json()["error"]["code"] == (
+            "client-protocol-incompatible"
+        )
+
         missing_identity = await client.post(
             "/api/invoke/v1", headers=protocol, json=request
         )

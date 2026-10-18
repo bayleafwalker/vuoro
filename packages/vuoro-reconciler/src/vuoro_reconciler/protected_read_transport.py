@@ -276,8 +276,11 @@ async def _read_wire(profile, credential_provider, path, request_utf8):
                 and tls.version() == "TLSv1.3"
                 and tls.selected_alpn_protocol() in (None, "http/1.1")
             )
+            client_protocol = (
+                "X-Vuoro-Client-Protocol: 1\r\n" if path == _NATIVE_PATH else ""
+            )
             head = (
-                f"POST {path} HTTP/1.1\r\nHost: {authority}\r\nAuthorization: Bearer {credential.bearer_ascii}\r\nContent-Type: application/json\r\nContent-Length: {len(request_utf8)}\r\nAccept: application/json\r\nConnection: close\r\n\r\n"
+                f"POST {path} HTTP/1.1\r\nHost: {authority}\r\nAuthorization: Bearer {credential.bearer_ascii}\r\nContent-Type: application/json\r\nContent-Length: {len(request_utf8)}\r\nAccept: application/json\r\n{client_protocol}Connection: close\r\n\r\n"
             ).encode("ascii")
             writer.write(head + request_utf8)
             await writer.drain()
