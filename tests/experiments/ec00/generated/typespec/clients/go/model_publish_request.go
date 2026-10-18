@@ -25,6 +25,12 @@ type PublishRequest struct {
 	RequestId string `json:"requestId"`
 	Objective string `json:"objective"`
 	Note NullableString `json:"note,omitempty"`
+	Dependants []string `json:"dependants,omitempty"`
+	ArtifactDigest *string `json:"artifactDigest,omitempty"`
+	ArtifactKeyId *string `json:"artifactKeyId,omitempty"`
+	ArtifactBytes *string `json:"artifactBytes,omitempty"`
+	ArtifactEnvelope *string `json:"artifactEnvelope,omitempty"`
+	ArtifactSignature *string `json:"artifactSignature,omitempty"`
 }
 
 type _PublishRequest PublishRequest
@@ -138,6 +144,198 @@ func (o *PublishRequest) UnsetNote() {
 	o.Note.Unset()
 }
 
+// GetDependants returns the Dependants field value if set, zero value otherwise.
+func (o *PublishRequest) GetDependants() []string {
+	if o == nil || IsNil(o.Dependants) {
+		var ret []string
+		return ret
+	}
+	return o.Dependants
+}
+
+// GetDependantsOk returns a tuple with the Dependants field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *PublishRequest) GetDependantsOk() ([]string, bool) {
+	if o == nil || IsNil(o.Dependants) {
+		return nil, false
+	}
+	return o.Dependants, true
+}
+
+// HasDependants returns a boolean if a field has been set.
+func (o *PublishRequest) HasDependants() bool {
+	if o != nil && !IsNil(o.Dependants) {
+		return true
+	}
+
+	return false
+}
+
+// SetDependants gets a reference to the given []string and assigns it to the Dependants field.
+func (o *PublishRequest) SetDependants(v []string) {
+	o.Dependants = v
+}
+
+// GetArtifactDigest returns the ArtifactDigest field value if set, zero value otherwise.
+func (o *PublishRequest) GetArtifactDigest() string {
+	if o == nil || IsNil(o.ArtifactDigest) {
+		var ret string
+		return ret
+	}
+	return *o.ArtifactDigest
+}
+
+// GetArtifactDigestOk returns a tuple with the ArtifactDigest field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *PublishRequest) GetArtifactDigestOk() (*string, bool) {
+	if o == nil || IsNil(o.ArtifactDigest) {
+		return nil, false
+	}
+	return o.ArtifactDigest, true
+}
+
+// HasArtifactDigest returns a boolean if a field has been set.
+func (o *PublishRequest) HasArtifactDigest() bool {
+	if o != nil && !IsNil(o.ArtifactDigest) {
+		return true
+	}
+
+	return false
+}
+
+// SetArtifactDigest gets a reference to the given string and assigns it to the ArtifactDigest field.
+func (o *PublishRequest) SetArtifactDigest(v string) {
+	o.ArtifactDigest = &v
+}
+
+// GetArtifactKeyId returns the ArtifactKeyId field value if set, zero value otherwise.
+func (o *PublishRequest) GetArtifactKeyId() string {
+	if o == nil || IsNil(o.ArtifactKeyId) {
+		var ret string
+		return ret
+	}
+	return *o.ArtifactKeyId
+}
+
+// GetArtifactKeyIdOk returns a tuple with the ArtifactKeyId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *PublishRequest) GetArtifactKeyIdOk() (*string, bool) {
+	if o == nil || IsNil(o.ArtifactKeyId) {
+		return nil, false
+	}
+	return o.ArtifactKeyId, true
+}
+
+// HasArtifactKeyId returns a boolean if a field has been set.
+func (o *PublishRequest) HasArtifactKeyId() bool {
+	if o != nil && !IsNil(o.ArtifactKeyId) {
+		return true
+	}
+
+	return false
+}
+
+// SetArtifactKeyId gets a reference to the given string and assigns it to the ArtifactKeyId field.
+func (o *PublishRequest) SetArtifactKeyId(v string) {
+	o.ArtifactKeyId = &v
+}
+
+// GetArtifactBytes returns the ArtifactBytes field value if set, zero value otherwise.
+func (o *PublishRequest) GetArtifactBytes() string {
+	if o == nil || IsNil(o.ArtifactBytes) {
+		var ret string
+		return ret
+	}
+	return *o.ArtifactBytes
+}
+
+// GetArtifactBytesOk returns a tuple with the ArtifactBytes field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *PublishRequest) GetArtifactBytesOk() (*string, bool) {
+	if o == nil || IsNil(o.ArtifactBytes) {
+		return nil, false
+	}
+	return o.ArtifactBytes, true
+}
+
+// HasArtifactBytes returns a boolean if a field has been set.
+func (o *PublishRequest) HasArtifactBytes() bool {
+	if o != nil && !IsNil(o.ArtifactBytes) {
+		return true
+	}
+
+	return false
+}
+
+// SetArtifactBytes gets a reference to the given string and assigns it to the ArtifactBytes field.
+func (o *PublishRequest) SetArtifactBytes(v string) {
+	o.ArtifactBytes = &v
+}
+
+// GetArtifactEnvelope returns the ArtifactEnvelope field value if set, zero value otherwise.
+func (o *PublishRequest) GetArtifactEnvelope() string {
+	if o == nil || IsNil(o.ArtifactEnvelope) {
+		var ret string
+		return ret
+	}
+	return *o.ArtifactEnvelope
+}
+
+// GetArtifactEnvelopeOk returns a tuple with the ArtifactEnvelope field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *PublishRequest) GetArtifactEnvelopeOk() (*string, bool) {
+	if o == nil || IsNil(o.ArtifactEnvelope) {
+		return nil, false
+	}
+	return o.ArtifactEnvelope, true
+}
+
+// HasArtifactEnvelope returns a boolean if a field has been set.
+func (o *PublishRequest) HasArtifactEnvelope() bool {
+	if o != nil && !IsNil(o.ArtifactEnvelope) {
+		return true
+	}
+
+	return false
+}
+
+// SetArtifactEnvelope gets a reference to the given string and assigns it to the ArtifactEnvelope field.
+func (o *PublishRequest) SetArtifactEnvelope(v string) {
+	o.ArtifactEnvelope = &v
+}
+
+// GetArtifactSignature returns the ArtifactSignature field value if set, zero value otherwise.
+func (o *PublishRequest) GetArtifactSignature() string {
+	if o == nil || IsNil(o.ArtifactSignature) {
+		var ret string
+		return ret
+	}
+	return *o.ArtifactSignature
+}
+
+// GetArtifactSignatureOk returns a tuple with the ArtifactSignature field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *PublishRequest) GetArtifactSignatureOk() (*string, bool) {
+	if o == nil || IsNil(o.ArtifactSignature) {
+		return nil, false
+	}
+	return o.ArtifactSignature, true
+}
+
+// HasArtifactSignature returns a boolean if a field has been set.
+func (o *PublishRequest) HasArtifactSignature() bool {
+	if o != nil && !IsNil(o.ArtifactSignature) {
+		return true
+	}
+
+	return false
+}
+
+// SetArtifactSignature gets a reference to the given string and assigns it to the ArtifactSignature field.
+func (o *PublishRequest) SetArtifactSignature(v string) {
+	o.ArtifactSignature = &v
+}
+
 func (o PublishRequest) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -152,6 +350,24 @@ func (o PublishRequest) ToMap() (map[string]interface{}, error) {
 	toSerialize["objective"] = o.Objective
 	if o.Note.IsSet() {
 		toSerialize["note"] = o.Note.Get()
+	}
+	if !IsNil(o.Dependants) {
+		toSerialize["dependants"] = o.Dependants
+	}
+	if !IsNil(o.ArtifactDigest) {
+		toSerialize["artifactDigest"] = o.ArtifactDigest
+	}
+	if !IsNil(o.ArtifactKeyId) {
+		toSerialize["artifactKeyId"] = o.ArtifactKeyId
+	}
+	if !IsNil(o.ArtifactBytes) {
+		toSerialize["artifactBytes"] = o.ArtifactBytes
+	}
+	if !IsNil(o.ArtifactEnvelope) {
+		toSerialize["artifactEnvelope"] = o.ArtifactEnvelope
+	}
+	if !IsNil(o.ArtifactSignature) {
+		toSerialize["artifactSignature"] = o.ArtifactSignature
 	}
 	return toSerialize, nil
 }

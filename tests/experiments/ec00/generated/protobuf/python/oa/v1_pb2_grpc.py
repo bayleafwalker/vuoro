@@ -44,6 +44,61 @@ class OwnerOperationsStub:
                 request_serializer=oa_dot_v1__pb2.ReviseRequest.SerializeToString,
                 response_deserializer=oa_dot_v1__pb2.MutationResult.FromString,
                 _registered_method=True)
+        self.WithdrawDependent = channel.unary_unary(
+                '/ec00.oa.v1.OwnerOperations/WithdrawDependent',
+                request_serializer=oa_dot_v1__pb2.WithdrawDependentRequest.SerializeToString,
+                response_deserializer=oa_dot_v1__pb2.MutationResult.FromString,
+                _registered_method=True)
+        self.ReportPerformed = channel.unary_unary(
+                '/ec00.oa.v1.OwnerOperations/ReportPerformed',
+                request_serializer=oa_dot_v1__pb2.ReportPerformedRequest.SerializeToString,
+                response_deserializer=oa_dot_v1__pb2.MutationResult.FromString,
+                _registered_method=True)
+        self.Verify = channel.unary_unary(
+                '/ec00.oa.v1.OwnerOperations/Verify',
+                request_serializer=oa_dot_v1__pb2.VerifyRequest.SerializeToString,
+                response_deserializer=oa_dot_v1__pb2.MutationResult.FromString,
+                _registered_method=True)
+        self.DecideArtifact = channel.unary_unary(
+                '/ec00.oa.v1.OwnerOperations/DecideArtifact',
+                request_serializer=oa_dot_v1__pb2.DecideArtifactRequest.SerializeToString,
+                response_deserializer=oa_dot_v1__pb2.MutationResult.FromString,
+                _registered_method=True)
+        self.Resolve = channel.unary_unary(
+                '/ec00.oa.v1.OwnerOperations/Resolve',
+                request_serializer=oa_dot_v1__pb2.ResolveRequest.SerializeToString,
+                response_deserializer=oa_dot_v1__pb2.MutationResult.FromString,
+                _registered_method=True)
+        self.AcknowledgeContinuation = channel.unary_unary(
+                '/ec00.oa.v1.OwnerOperations/AcknowledgeContinuation',
+                request_serializer=oa_dot_v1__pb2.AcknowledgeContinuationRequest.SerializeToString,
+                response_deserializer=oa_dot_v1__pb2.MutationResult.FromString,
+                _registered_method=True)
+        self.ReadRequest = channel.unary_unary(
+                '/ec00.oa.v1.OwnerOperations/ReadRequest',
+                request_serializer=oa_dot_v1__pb2.RequestById.SerializeToString,
+                response_deserializer=oa_dot_v1__pb2.JsonResult.FromString,
+                _registered_method=True)
+        self.ReadDependants = channel.unary_unary(
+                '/ec00.oa.v1.OwnerOperations/ReadDependants',
+                request_serializer=oa_dot_v1__pb2.RequestById.SerializeToString,
+                response_deserializer=oa_dot_v1__pb2.JsonResult.FromString,
+                _registered_method=True)
+        self.ReadArtifact = channel.unary_unary(
+                '/ec00.oa.v1.OwnerOperations/ReadArtifact',
+                request_serializer=oa_dot_v1__pb2.ReadArtifactRequest.SerializeToString,
+                response_deserializer=oa_dot_v1__pb2.JsonResult.FromString,
+                _registered_method=True)
+        self.ListRequests = channel.unary_unary(
+                '/ec00.oa.v1.OwnerOperations/ListRequests',
+                request_serializer=oa_dot_v1__pb2.PageRequest.SerializeToString,
+                response_deserializer=oa_dot_v1__pb2.JsonResult.FromString,
+                _registered_method=True)
+        self.Watch = channel.unary_unary(
+                '/ec00.oa.v1.OwnerOperations/Watch',
+                request_serializer=oa_dot_v1__pb2.PageRequest.SerializeToString,
+                response_deserializer=oa_dot_v1__pb2.JsonResult.FromString,
+                _registered_method=True)
 
 
 class OwnerOperationsServicer:
@@ -61,6 +116,72 @@ class OwnerOperationsServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def WithdrawDependent(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ReportPerformed(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Verify(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DecideArtifact(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Resolve(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def AcknowledgeContinuation(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ReadRequest(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ReadDependants(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ReadArtifact(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListRequests(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Watch(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_OwnerOperationsServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -73,6 +194,61 @@ def add_OwnerOperationsServicer_to_server(servicer, server):
                     servicer.Revise,
                     request_deserializer=oa_dot_v1__pb2.ReviseRequest.FromString,
                     response_serializer=oa_dot_v1__pb2.MutationResult.SerializeToString,
+            ),
+            'WithdrawDependent': grpc.unary_unary_rpc_method_handler(
+                    servicer.WithdrawDependent,
+                    request_deserializer=oa_dot_v1__pb2.WithdrawDependentRequest.FromString,
+                    response_serializer=oa_dot_v1__pb2.MutationResult.SerializeToString,
+            ),
+            'ReportPerformed': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReportPerformed,
+                    request_deserializer=oa_dot_v1__pb2.ReportPerformedRequest.FromString,
+                    response_serializer=oa_dot_v1__pb2.MutationResult.SerializeToString,
+            ),
+            'Verify': grpc.unary_unary_rpc_method_handler(
+                    servicer.Verify,
+                    request_deserializer=oa_dot_v1__pb2.VerifyRequest.FromString,
+                    response_serializer=oa_dot_v1__pb2.MutationResult.SerializeToString,
+            ),
+            'DecideArtifact': grpc.unary_unary_rpc_method_handler(
+                    servicer.DecideArtifact,
+                    request_deserializer=oa_dot_v1__pb2.DecideArtifactRequest.FromString,
+                    response_serializer=oa_dot_v1__pb2.MutationResult.SerializeToString,
+            ),
+            'Resolve': grpc.unary_unary_rpc_method_handler(
+                    servicer.Resolve,
+                    request_deserializer=oa_dot_v1__pb2.ResolveRequest.FromString,
+                    response_serializer=oa_dot_v1__pb2.MutationResult.SerializeToString,
+            ),
+            'AcknowledgeContinuation': grpc.unary_unary_rpc_method_handler(
+                    servicer.AcknowledgeContinuation,
+                    request_deserializer=oa_dot_v1__pb2.AcknowledgeContinuationRequest.FromString,
+                    response_serializer=oa_dot_v1__pb2.MutationResult.SerializeToString,
+            ),
+            'ReadRequest': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReadRequest,
+                    request_deserializer=oa_dot_v1__pb2.RequestById.FromString,
+                    response_serializer=oa_dot_v1__pb2.JsonResult.SerializeToString,
+            ),
+            'ReadDependants': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReadDependants,
+                    request_deserializer=oa_dot_v1__pb2.RequestById.FromString,
+                    response_serializer=oa_dot_v1__pb2.JsonResult.SerializeToString,
+            ),
+            'ReadArtifact': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReadArtifact,
+                    request_deserializer=oa_dot_v1__pb2.ReadArtifactRequest.FromString,
+                    response_serializer=oa_dot_v1__pb2.JsonResult.SerializeToString,
+            ),
+            'ListRequests': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListRequests,
+                    request_deserializer=oa_dot_v1__pb2.PageRequest.FromString,
+                    response_serializer=oa_dot_v1__pb2.JsonResult.SerializeToString,
+            ),
+            'Watch': grpc.unary_unary_rpc_method_handler(
+                    servicer.Watch,
+                    request_deserializer=oa_dot_v1__pb2.PageRequest.FromString,
+                    response_serializer=oa_dot_v1__pb2.JsonResult.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -129,6 +305,303 @@ class OwnerOperations:
             '/ec00.oa.v1.OwnerOperations/Revise',
             oa_dot_v1__pb2.ReviseRequest.SerializeToString,
             oa_dot_v1__pb2.MutationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def WithdrawDependent(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ec00.oa.v1.OwnerOperations/WithdrawDependent',
+            oa_dot_v1__pb2.WithdrawDependentRequest.SerializeToString,
+            oa_dot_v1__pb2.MutationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ReportPerformed(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ec00.oa.v1.OwnerOperations/ReportPerformed',
+            oa_dot_v1__pb2.ReportPerformedRequest.SerializeToString,
+            oa_dot_v1__pb2.MutationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Verify(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ec00.oa.v1.OwnerOperations/Verify',
+            oa_dot_v1__pb2.VerifyRequest.SerializeToString,
+            oa_dot_v1__pb2.MutationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DecideArtifact(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ec00.oa.v1.OwnerOperations/DecideArtifact',
+            oa_dot_v1__pb2.DecideArtifactRequest.SerializeToString,
+            oa_dot_v1__pb2.MutationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Resolve(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ec00.oa.v1.OwnerOperations/Resolve',
+            oa_dot_v1__pb2.ResolveRequest.SerializeToString,
+            oa_dot_v1__pb2.MutationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def AcknowledgeContinuation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ec00.oa.v1.OwnerOperations/AcknowledgeContinuation',
+            oa_dot_v1__pb2.AcknowledgeContinuationRequest.SerializeToString,
+            oa_dot_v1__pb2.MutationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ReadRequest(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ec00.oa.v1.OwnerOperations/ReadRequest',
+            oa_dot_v1__pb2.RequestById.SerializeToString,
+            oa_dot_v1__pb2.JsonResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ReadDependants(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ec00.oa.v1.OwnerOperations/ReadDependants',
+            oa_dot_v1__pb2.RequestById.SerializeToString,
+            oa_dot_v1__pb2.JsonResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ReadArtifact(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ec00.oa.v1.OwnerOperations/ReadArtifact',
+            oa_dot_v1__pb2.ReadArtifactRequest.SerializeToString,
+            oa_dot_v1__pb2.JsonResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListRequests(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ec00.oa.v1.OwnerOperations/ListRequests',
+            oa_dot_v1__pb2.PageRequest.SerializeToString,
+            oa_dot_v1__pb2.JsonResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Watch(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ec00.oa.v1.OwnerOperations/Watch',
+            oa_dot_v1__pb2.PageRequest.SerializeToString,
+            oa_dot_v1__pb2.JsonResult.FromString,
             options,
             channel_credentials,
             insecure,

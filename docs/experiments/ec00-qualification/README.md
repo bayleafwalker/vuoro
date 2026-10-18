@@ -208,6 +208,26 @@ The protobuf messages are generated with `protoc`; the official
 [Python generated-code guide](https://protobuf.dev/reference/python/python-generated/)
 describes the compiler's Python output.
 
+The wire-compatibility fixture preserves the generated Python and TypeScript
+publish/revise clients and disposable HTTP owner from commit
+`5ff5d82345d2b668ef4495656547a04877f1c275`. Its source files and local runner
+files are SHA-256 pinned in
+`tests/experiments/ec00/compat/merge-base-5ff5/manifest.json`; it is not
+regenerated from the new schemas. The compatibility test runs old Python and
+TypeScript clients against the expanded server, and current Python and
+TypeScript clients against the frozen server, for both protobuf-over-HTTP and
+TypeSpec/OpenAPI publish/revise. The frozen server does not implement native
+gRPC, so current gRPC-to-old-server compatibility is not claimed. This checks
+only the common publish/revise wire operations, not full-lifecycle old/new
+compatibility.
+
+The additive protobuf fields retain old-client wire interpretation in these
+tests, but language source compatibility differs: Rust struct literals for
+`PublishRequest` must add `..Default::default()` when generated fields are
+added. The Rust fixture uses that initializer explicitly. This is evidence of
+source-level construction friction, separate from the wire compatibility
+result.
+
 ## Second executable generated-client slice (18 October 2026)
 
 This bounded extension adds real Go and Rust generated clients to the same
@@ -292,13 +312,80 @@ matrix; they make no architecture selection or performance claim. The full
 ADR remains gated on those shared cases and representative EC-01 workload
 evidence.
 
-## Offline check
+## Third executable owner-lifecycle slice (18 October 2026)
 
-Run the dependency-free owner-oracle tests with standard library only. The
-generated-client integration test has a non-default pytest filename so regular
-workspace test collection does not import optional EC-00 generator runtimes;
-run it explicitly with the locked candidate project as shown above.
+This test-only extension exercises the predeclared publish/revise/withdraw,
+performed report, evidence verification, exact-artifact decision, resolve,
+per-dependent acknowledgement, bounded reads/watch, revocation and post-commit
+replay cases through the same file-backed SQLite owner oracle. Generated Python
+TypeSpec/OpenAPI and native protobuf/gRPC clients run the complete lifecycle;
+generated TypeScript clients exercise artifact publication/readback and initial
+withdraw/report transitions through both representations. TypeScript protobuf
+messages use binary protobuf over the test-only HTTP bridge; the native gRPC
+qualification is the Python generated protobuf client. Existing Go/Rust slices
+remain publish/revise only. The clients never supply role or workspace claims:
+the disposable server binds one seeded principal for the whole client process.
+
+Signed artifacts retain the exact binary artifact, canonical signed-envelope
+bytes and Ed25519 signature in SQLite BLOBs. The versioned test-only envelope
+binds domain `vuoro-ec00-artifact-decision/v1`, intent `accept`, key id,
+workspace, request id, material revision, material digest and artifact digest.
+The fixture keeps aggregate CAS/event `revision` separate from
+`material_revision`: publication starts both at 1, while each revise advances
+both, including a same-body revise. The artifact read route and its result name
+`material_revision` explicitly; mutation requests continue to use
+`expected_revision` for aggregate CAS. Report, verify, and artifact-decision events
+advance only the aggregate revision. This permits the declared publish → report
+→ verify → artifact-decision → resolve order; the decision uses the current
+aggregate expected revision and the signed artifact for the current material
+revision. The exact binary, envelope bytes and signature remain historical, but
+a prior material revision cannot authorize a decision after any revise. The deterministic
+fixture key is public test material only; it is not a product key or a
+production cryptography design. `cryptography==50.0.0` is pinned in the
+disposable Python lock and checked by the generator validation.
+
+The test-only HTTP adapter carries generated TypeSpec calls and protobuf
+binary messages to the same SQLite owner. The separate gRPC server delegates
+generated protobuf service methods directly to that owner. Injected response
+loss occurs only after the owner transaction commits; retrying the same
+idempotency key checks the persisted result. Cursor, role, workspace and
+revocation checks are owner-boundary test cases. They do not qualify real
+authentication, TLS, network middleware, storage power-loss durability,
+production evidence sources, browser/proxy behavior or a deployed service.
+The LC07 slice accepts unknown JSON/protobuf fields without adding them to the
+owner projection and rejects an unrecognized protobuf `NullValue` enum number
+rather than collapsing it into null. LC08 here covers frozen Python and
+TypeScript clients for common OpenAPI/protobuf-over-HTTP publish/revise
+operations; native gRPC old/new compatibility remains untested because the
+frozen baseline did not provide a native gRPC server/client boundary.
+
+Run the lifecycle tests explicitly with the pinned toolchain and a loopback-
+permitting test environment:
 
 ```bash
-python -m unittest discover -s tests/experiments/ec00 -p 'test_*.py' -v
+uv run --project tests/experiments/ec00/candidates --locked \
+  python tests/experiments/ec00/test_owner_oracle.py
+EC00_NODE=/path/to/node-24.21.0/bin/node uv run \
+  --project tests/experiments/ec00/candidates --locked \
+  python tests/experiments/ec00/lifecycle_slice_checks.py
+```
+
+This slice is still a correctness experiment, not an architecture decision.
+The full old/new compatibility matrix, Go/Rust lifecycle coverage, RPC
+cancellation/deadline behavior, browser/proxy and offline restore cases,
+representative workload/performance comparison, and EC-01 producer/consumer
+evidence remain open gates before the ADR.
+
+## Offline check
+
+Run the owner-oracle tests with the locked candidate project; they use the
+pinned test-only Ed25519 library, but make no network calls and read no runtime
+credentials. The generated-client integration test has a non-default pytest
+filename so regular workspace test collection does not import optional EC-00
+generator runtimes; run it explicitly with the locked candidate project as
+shown above.
+
+```bash
+uv run --project tests/experiments/ec00/candidates --locked \
+  python -m unittest discover -s tests/experiments/ec00 -p 'test_owner_oracle.py' -v
 ```

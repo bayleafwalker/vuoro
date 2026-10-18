@@ -6,6 +6,44 @@
   },
   "tags": [],
   "paths": {
+    "/v1/events": {
+      "get": {
+        "operationId": "watch",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/requests": {
       "post": {
         "operationId": "publish",
@@ -28,6 +66,42 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/PublishRequest"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listRequests",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadResult"
+                }
               }
             }
           }
@@ -69,11 +143,353 @@
             }
           }
         }
+      },
+      "get": {
+        "operationId": "readRequest",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/requests/{requestId}/acknowledge": {
+      "post": {
+        "operationId": "acknowledgeContinuation",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResult"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcknowledgeRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/requests/{requestId}/artifact-decision": {
+      "post": {
+        "operationId": "decideArtifact",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResult"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideArtifactRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/requests/{requestId}/artifact/{materialRevision}": {
+      "get": {
+        "operationId": "readArtifact",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "materialRevision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/requests/{requestId}/dependants": {
+      "get": {
+        "operationId": "readDependants",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/requests/{requestId}/report": {
+      "post": {
+        "operationId": "reportPerformed",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResult"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisionRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/requests/{requestId}/resolve": {
+      "post": {
+        "operationId": "resolve",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResult"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisionRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/requests/{requestId}/verify": {
+      "post": {
+        "operationId": "verify",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResult"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/requests/{requestId}/withdraw": {
+      "post": {
+        "operationId": "withdrawDependent",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResult"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawRequest"
+              }
+            }
+          }
+        }
       }
     }
   },
   "components": {
     "schemas": {
+      "AcknowledgeRequest": {
+        "type": "object",
+        "required": [
+          "dependentId",
+          "expectedRevision"
+        ],
+        "properties": {
+          "dependentId": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "DecideArtifactRequest": {
+        "type": "object",
+        "required": [
+          "expectedRevision",
+          "artifactDigest"
+        ],
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "artifactDigest": {
+            "type": "string"
+          }
+        }
+      },
       "MutationResult": {
         "type": "object",
         "required": [
@@ -87,6 +503,21 @@
           "revision": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "PageRequest": {
+        "type": "object",
+        "required": [
+          "limit"
+        ],
+        "properties": {
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -107,6 +538,41 @@
           "note": {
             "type": "string",
             "nullable": true
+          },
+          "dependants": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "artifactDigest": {
+            "type": "string"
+          },
+          "artifactKeyId": {
+            "type": "string"
+          },
+          "artifactBytes": {
+            "type": "string",
+            "format": "byte"
+          },
+          "artifactEnvelope": {
+            "type": "string",
+            "format": "byte"
+          },
+          "artifactSignature": {
+            "type": "string",
+            "format": "byte"
+          }
+        }
+      },
+      "ReadResult": {
+        "type": "object",
+        "required": [
+          "json"
+        ],
+        "properties": {
+          "json": {
+            "type": "string"
           }
         }
       },
@@ -132,6 +598,50 @@
           "note": {
             "type": "string",
             "nullable": true
+          }
+        }
+      },
+      "RevisionRequest": {
+        "type": "object",
+        "required": [
+          "expectedRevision"
+        ],
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "VerifyRequest": {
+        "type": "object",
+        "required": [
+          "expectedRevision",
+          "evidenceRef"
+        ],
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "evidenceRef": {
+            "type": "string"
+          }
+        }
+      },
+      "WithdrawRequest": {
+        "type": "object",
+        "required": [
+          "dependentId",
+          "expectedRevision"
+        ],
+        "properties": {
+          "dependentId": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       }

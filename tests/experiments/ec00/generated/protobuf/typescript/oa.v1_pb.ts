@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file oa.v1.proto.
  */
 export const file_oa_v1: GenFile = /*@__PURE__*/
-  fileDesc("CgtvYS52MS5wcm90bxIKZWMwMC5vYS52MSKZAQoOUHVibGlzaFJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIWCglvYmplY3RpdmUYAiABKAlIAYgBARIOCgRub3RlGAMgASgJSAASLwoJbm90ZV9udWxsGAQgASgOMhouZ29vZ2xlLnByb3RvYnVmLk51bGxWYWx1ZUgAQgwKCm5vdGVfdmFsdWVCDAoKX29iamVjdGl2ZSLOAQoNUmV2aXNlUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEh4KEWV4cGVjdGVkX3JldmlzaW9uGAIgASgDSAGIAQESFgoJb2JqZWN0aXZlGAMgASgJSAKIAQESDgoEbm90ZRgEIAEoCUgAEi8KCW5vdGVfbnVsbBgFIAEoDjIaLmdvb2dsZS5wcm90b2J1Zi5OdWxsVmFsdWVIAEIMCgpub3RlX3ZhbHVlQhQKEl9leHBlY3RlZF9yZXZpc2lvbkIMCgpfb2JqZWN0aXZlIjYKDk11dGF0aW9uUmVzdWx0EhIKCnJlcXVlc3RfaWQYASABKAkSEAoIcmV2aXNpb24YAiABKAMylQEKD093bmVyT3BlcmF0aW9ucxJBCgdQdWJsaXNoEhouZWMwMC5vYS52MS5QdWJsaXNoUmVxdWVzdBoaLmVjMDAub2EudjEuTXV0YXRpb25SZXN1bHQSPwoGUmV2aXNlEhkuZWMwMC5vYS52MS5SZXZpc2VSZXF1ZXN0GhouZWMwMC5vYS52MS5NdXRhdGlvblJlc3VsdEI8WjpleGFtcGxlLmNvbS92dW9yby1lYzAwL2VjMDAvZ2VuZXJhdGVkL3Byb3RvYnVmL2dvL29hL3YxO3YxYgZwcm90bzM", [file_google_protobuf_struct]);
+  fileDesc("CgtvYS52MS5wcm90bxIKZWMwMC5vYS52MSKxAgoOUHVibGlzaFJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIWCglvYmplY3RpdmUYAiABKAlIAYgBARIOCgRub3RlGAMgASgJSAASLwoJbm90ZV9udWxsGAQgASgOMhouZ29vZ2xlLnByb3RvYnVmLk51bGxWYWx1ZUgAEhUKDWRlcGVuZGVudF9pZHMYBSADKAkSFwoPYXJ0aWZhY3RfZGlnZXN0GAYgASgJEhcKD2FydGlmYWN0X2tleV9pZBgHIAEoCRIWCg5hcnRpZmFjdF9ieXRlcxgIIAEoDBIZChFhcnRpZmFjdF9lbnZlbG9wZRgJIAEoDBIaChJhcnRpZmFjdF9zaWduYXR1cmUYCiABKAxCDAoKbm90ZV92YWx1ZUIMCgpfb2JqZWN0aXZlIs4BCg1SZXZpc2VSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSHgoRZXhwZWN0ZWRfcmV2aXNpb24YAiABKANIAYgBARIWCglvYmplY3RpdmUYAyABKAlIAogBARIOCgRub3RlGAQgASgJSAASLwoJbm90ZV9udWxsGAUgASgOMhouZ29vZ2xlLnByb3RvYnVmLk51bGxWYWx1ZUgAQgwKCm5vdGVfdmFsdWVCFAoSX2V4cGVjdGVkX3JldmlzaW9uQgwKCl9vYmplY3RpdmUiNgoOTXV0YXRpb25SZXN1bHQSEgoKcmVxdWVzdF9pZBgBIAEoCRIQCghyZXZpc2lvbhgCIAEoAyJ6ChhXaXRoZHJhd0RlcGVuZGVudFJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIUCgxkZXBlbmRlbnRfaWQYAiABKAkSHgoRZXhwZWN0ZWRfcmV2aXNpb24YAyABKANIAIgBAUIUChJfZXhwZWN0ZWRfcmV2aXNpb24iYgoWUmVwb3J0UGVyZm9ybWVkUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEh4KEWV4cGVjdGVkX3JldmlzaW9uGAIgASgDSACIAQFCFAoSX2V4cGVjdGVkX3JldmlzaW9uIm8KDVZlcmlmeVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIeChFleHBlY3RlZF9yZXZpc2lvbhgCIAEoA0gAiAEBEhQKDGV2aWRlbmNlX3JlZhgDIAEoCUIUChJfZXhwZWN0ZWRfcmV2aXNpb24iegoVRGVjaWRlQXJ0aWZhY3RSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSHgoRZXhwZWN0ZWRfcmV2aXNpb24YAiABKANIAIgBARIXCg9hcnRpZmFjdF9kaWdlc3QYAyABKAlCFAoSX2V4cGVjdGVkX3JldmlzaW9uIloKDlJlc29sdmVSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSHgoRZXhwZWN0ZWRfcmV2aXNpb24YAiABKANIAIgBAUIUChJfZXhwZWN0ZWRfcmV2aXNpb24igAEKHkFja25vd2xlZGdlQ29udGludWF0aW9uUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEhQKDGRlcGVuZGVudF9pZBgCIAEoCRIeChFleHBlY3RlZF9yZXZpc2lvbhgDIAEoA0gAiAEBQhQKEl9leHBlY3RlZF9yZXZpc2lvbiIhCgtSZXF1ZXN0QnlJZBISCgpyZXF1ZXN0X2lkGAEgASgJIkQKE1JlYWRBcnRpZmFjdFJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIZChFtYXRlcmlhbF9yZXZpc2lvbhgCIAEoAyI8CgtQYWdlUmVxdWVzdBITCgZjdXJzb3IYASABKAlIAIgBARINCgVsaW1pdBgCIAEoBUIJCgdfY3Vyc29yIhoKCkpzb25SZXN1bHQSDAoEanNvbhgBIAEoCTK+BwoPT3duZXJPcGVyYXRpb25zEkEKB1B1Ymxpc2gSGi5lYzAwLm9hLnYxLlB1Ymxpc2hSZXF1ZXN0GhouZWMwMC5vYS52MS5NdXRhdGlvblJlc3VsdBI/CgZSZXZpc2USGS5lYzAwLm9hLnYxLlJldmlzZVJlcXVlc3QaGi5lYzAwLm9hLnYxLk11dGF0aW9uUmVzdWx0ElUKEVdpdGhkcmF3RGVwZW5kZW50EiQuZWMwMC5vYS52MS5XaXRoZHJhd0RlcGVuZGVudFJlcXVlc3QaGi5lYzAwLm9hLnYxLk11dGF0aW9uUmVzdWx0ElEKD1JlcG9ydFBlcmZvcm1lZBIiLmVjMDAub2EudjEuUmVwb3J0UGVyZm9ybWVkUmVxdWVzdBoaLmVjMDAub2EudjEuTXV0YXRpb25SZXN1bHQSPwoGVmVyaWZ5EhkuZWMwMC5vYS52MS5WZXJpZnlSZXF1ZXN0GhouZWMwMC5vYS52MS5NdXRhdGlvblJlc3VsdBJPCg5EZWNpZGVBcnRpZmFjdBIhLmVjMDAub2EudjEuRGVjaWRlQXJ0aWZhY3RSZXF1ZXN0GhouZWMwMC5vYS52MS5NdXRhdGlvblJlc3VsdBJBCgdSZXNvbHZlEhouZWMwMC5vYS52MS5SZXNvbHZlUmVxdWVzdBoaLmVjMDAub2EudjEuTXV0YXRpb25SZXN1bHQSYQoXQWNrbm93bGVkZ2VDb250aW51YXRpb24SKi5lYzAwLm9hLnYxLkFja25vd2xlZGdlQ29udGludWF0aW9uUmVxdWVzdBoaLmVjMDAub2EudjEuTXV0YXRpb25SZXN1bHQSPgoLUmVhZFJlcXVlc3QSFy5lYzAwLm9hLnYxLlJlcXVlc3RCeUlkGhYuZWMwMC5vYS52MS5Kc29uUmVzdWx0EkEKDlJlYWREZXBlbmRhbnRzEhcuZWMwMC5vYS52MS5SZXF1ZXN0QnlJZBoWLmVjMDAub2EudjEuSnNvblJlc3VsdBJHCgxSZWFkQXJ0aWZhY3QSHy5lYzAwLm9hLnYxLlJlYWRBcnRpZmFjdFJlcXVlc3QaFi5lYzAwLm9hLnYxLkpzb25SZXN1bHQSPwoMTGlzdFJlcXVlc3RzEhcuZWMwMC5vYS52MS5QYWdlUmVxdWVzdBoWLmVjMDAub2EudjEuSnNvblJlc3VsdBI4CgVXYXRjaBIXLmVjMDAub2EudjEuUGFnZVJlcXVlc3QaFi5lYzAwLm9hLnYxLkpzb25SZXN1bHRCPFo6ZXhhbXBsZS5jb20vdnVvcm8tZWMwMC9lYzAwL2dlbmVyYXRlZC9wcm90b2J1Zi9nby9vYS92MTt2MWIGcHJvdG8z", [file_google_protobuf_struct]);
 
 /**
  * @generated from message ec00.oa.v1.PublishRequest
@@ -47,6 +47,36 @@ export type PublishRequest = Message<"ec00.oa.v1.PublishRequest"> & {
     value: NullValue;
     case: "noteNull";
   } | { case: undefined; value?: undefined };
+
+  /**
+   * @generated from field: repeated string dependent_ids = 5;
+   */
+  dependentIds: string[];
+
+  /**
+   * @generated from field: string artifact_digest = 6;
+   */
+  artifactDigest: string;
+
+  /**
+   * @generated from field: string artifact_key_id = 7;
+   */
+  artifactKeyId: string;
+
+  /**
+   * @generated from field: bytes artifact_bytes = 8;
+   */
+  artifactBytes: Uint8Array;
+
+  /**
+   * @generated from field: bytes artifact_envelope = 9;
+   */
+  artifactEnvelope: Uint8Array;
+
+  /**
+   * @generated from field: bytes artifact_signature = 10;
+   */
+  artifactSignature: Uint8Array;
 };
 
 /**
@@ -123,6 +153,236 @@ export const MutationResultSchema: GenMessage<MutationResult> = /*@__PURE__*/
   messageDesc(file_oa_v1, 2);
 
 /**
+ * @generated from message ec00.oa.v1.WithdrawDependentRequest
+ */
+export type WithdrawDependentRequest = Message<"ec00.oa.v1.WithdrawDependentRequest"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string dependent_id = 2;
+   */
+  dependentId: string;
+
+  /**
+   * @generated from field: optional int64 expected_revision = 3;
+   */
+  expectedRevision?: bigint | undefined;
+};
+
+/**
+ * Describes the message ec00.oa.v1.WithdrawDependentRequest.
+ * Use `create(WithdrawDependentRequestSchema)` to create a new message.
+ */
+export const WithdrawDependentRequestSchema: GenMessage<WithdrawDependentRequest> = /*@__PURE__*/
+  messageDesc(file_oa_v1, 3);
+
+/**
+ * @generated from message ec00.oa.v1.ReportPerformedRequest
+ */
+export type ReportPerformedRequest = Message<"ec00.oa.v1.ReportPerformedRequest"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: optional int64 expected_revision = 2;
+   */
+  expectedRevision?: bigint | undefined;
+};
+
+/**
+ * Describes the message ec00.oa.v1.ReportPerformedRequest.
+ * Use `create(ReportPerformedRequestSchema)` to create a new message.
+ */
+export const ReportPerformedRequestSchema: GenMessage<ReportPerformedRequest> = /*@__PURE__*/
+  messageDesc(file_oa_v1, 4);
+
+/**
+ * @generated from message ec00.oa.v1.VerifyRequest
+ */
+export type VerifyRequest = Message<"ec00.oa.v1.VerifyRequest"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: optional int64 expected_revision = 2;
+   */
+  expectedRevision?: bigint | undefined;
+
+  /**
+   * @generated from field: string evidence_ref = 3;
+   */
+  evidenceRef: string;
+};
+
+/**
+ * Describes the message ec00.oa.v1.VerifyRequest.
+ * Use `create(VerifyRequestSchema)` to create a new message.
+ */
+export const VerifyRequestSchema: GenMessage<VerifyRequest> = /*@__PURE__*/
+  messageDesc(file_oa_v1, 5);
+
+/**
+ * @generated from message ec00.oa.v1.DecideArtifactRequest
+ */
+export type DecideArtifactRequest = Message<"ec00.oa.v1.DecideArtifactRequest"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: optional int64 expected_revision = 2;
+   */
+  expectedRevision?: bigint | undefined;
+
+  /**
+   * @generated from field: string artifact_digest = 3;
+   */
+  artifactDigest: string;
+};
+
+/**
+ * Describes the message ec00.oa.v1.DecideArtifactRequest.
+ * Use `create(DecideArtifactRequestSchema)` to create a new message.
+ */
+export const DecideArtifactRequestSchema: GenMessage<DecideArtifactRequest> = /*@__PURE__*/
+  messageDesc(file_oa_v1, 6);
+
+/**
+ * @generated from message ec00.oa.v1.ResolveRequest
+ */
+export type ResolveRequest = Message<"ec00.oa.v1.ResolveRequest"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: optional int64 expected_revision = 2;
+   */
+  expectedRevision?: bigint | undefined;
+};
+
+/**
+ * Describes the message ec00.oa.v1.ResolveRequest.
+ * Use `create(ResolveRequestSchema)` to create a new message.
+ */
+export const ResolveRequestSchema: GenMessage<ResolveRequest> = /*@__PURE__*/
+  messageDesc(file_oa_v1, 7);
+
+/**
+ * @generated from message ec00.oa.v1.AcknowledgeContinuationRequest
+ */
+export type AcknowledgeContinuationRequest = Message<"ec00.oa.v1.AcknowledgeContinuationRequest"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string dependent_id = 2;
+   */
+  dependentId: string;
+
+  /**
+   * @generated from field: optional int64 expected_revision = 3;
+   */
+  expectedRevision?: bigint | undefined;
+};
+
+/**
+ * Describes the message ec00.oa.v1.AcknowledgeContinuationRequest.
+ * Use `create(AcknowledgeContinuationRequestSchema)` to create a new message.
+ */
+export const AcknowledgeContinuationRequestSchema: GenMessage<AcknowledgeContinuationRequest> = /*@__PURE__*/
+  messageDesc(file_oa_v1, 8);
+
+/**
+ * @generated from message ec00.oa.v1.RequestById
+ */
+export type RequestById = Message<"ec00.oa.v1.RequestById"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+};
+
+/**
+ * Describes the message ec00.oa.v1.RequestById.
+ * Use `create(RequestByIdSchema)` to create a new message.
+ */
+export const RequestByIdSchema: GenMessage<RequestById> = /*@__PURE__*/
+  messageDesc(file_oa_v1, 9);
+
+/**
+ * @generated from message ec00.oa.v1.ReadArtifactRequest
+ */
+export type ReadArtifactRequest = Message<"ec00.oa.v1.ReadArtifactRequest"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: int64 material_revision = 2;
+   */
+  materialRevision: bigint;
+};
+
+/**
+ * Describes the message ec00.oa.v1.ReadArtifactRequest.
+ * Use `create(ReadArtifactRequestSchema)` to create a new message.
+ */
+export const ReadArtifactRequestSchema: GenMessage<ReadArtifactRequest> = /*@__PURE__*/
+  messageDesc(file_oa_v1, 10);
+
+/**
+ * @generated from message ec00.oa.v1.PageRequest
+ */
+export type PageRequest = Message<"ec00.oa.v1.PageRequest"> & {
+  /**
+   * @generated from field: optional string cursor = 1;
+   */
+  cursor?: string | undefined;
+
+  /**
+   * @generated from field: int32 limit = 2;
+   */
+  limit: number;
+};
+
+/**
+ * Describes the message ec00.oa.v1.PageRequest.
+ * Use `create(PageRequestSchema)` to create a new message.
+ */
+export const PageRequestSchema: GenMessage<PageRequest> = /*@__PURE__*/
+  messageDesc(file_oa_v1, 11);
+
+/**
+ * @generated from message ec00.oa.v1.JsonResult
+ */
+export type JsonResult = Message<"ec00.oa.v1.JsonResult"> & {
+  /**
+   * @generated from field: string json = 1;
+   */
+  json: string;
+};
+
+/**
+ * Describes the message ec00.oa.v1.JsonResult.
+ * Use `create(JsonResultSchema)` to create a new message.
+ */
+export const JsonResultSchema: GenMessage<JsonResult> = /*@__PURE__*/
+  messageDesc(file_oa_v1, 12);
+
+/**
  * @generated from service ec00.oa.v1.OwnerOperations
  */
 export const OwnerOperations: GenService<{
@@ -141,6 +401,94 @@ export const OwnerOperations: GenService<{
     methodKind: "unary";
     input: typeof ReviseRequestSchema;
     output: typeof MutationResultSchema;
+  },
+  /**
+   * @generated from rpc ec00.oa.v1.OwnerOperations.WithdrawDependent
+   */
+  withdrawDependent: {
+    methodKind: "unary";
+    input: typeof WithdrawDependentRequestSchema;
+    output: typeof MutationResultSchema;
+  },
+  /**
+   * @generated from rpc ec00.oa.v1.OwnerOperations.ReportPerformed
+   */
+  reportPerformed: {
+    methodKind: "unary";
+    input: typeof ReportPerformedRequestSchema;
+    output: typeof MutationResultSchema;
+  },
+  /**
+   * @generated from rpc ec00.oa.v1.OwnerOperations.Verify
+   */
+  verify: {
+    methodKind: "unary";
+    input: typeof VerifyRequestSchema;
+    output: typeof MutationResultSchema;
+  },
+  /**
+   * @generated from rpc ec00.oa.v1.OwnerOperations.DecideArtifact
+   */
+  decideArtifact: {
+    methodKind: "unary";
+    input: typeof DecideArtifactRequestSchema;
+    output: typeof MutationResultSchema;
+  },
+  /**
+   * @generated from rpc ec00.oa.v1.OwnerOperations.Resolve
+   */
+  resolve: {
+    methodKind: "unary";
+    input: typeof ResolveRequestSchema;
+    output: typeof MutationResultSchema;
+  },
+  /**
+   * @generated from rpc ec00.oa.v1.OwnerOperations.AcknowledgeContinuation
+   */
+  acknowledgeContinuation: {
+    methodKind: "unary";
+    input: typeof AcknowledgeContinuationRequestSchema;
+    output: typeof MutationResultSchema;
+  },
+  /**
+   * @generated from rpc ec00.oa.v1.OwnerOperations.ReadRequest
+   */
+  readRequest: {
+    methodKind: "unary";
+    input: typeof RequestByIdSchema;
+    output: typeof JsonResultSchema;
+  },
+  /**
+   * @generated from rpc ec00.oa.v1.OwnerOperations.ReadDependants
+   */
+  readDependants: {
+    methodKind: "unary";
+    input: typeof RequestByIdSchema;
+    output: typeof JsonResultSchema;
+  },
+  /**
+   * @generated from rpc ec00.oa.v1.OwnerOperations.ReadArtifact
+   */
+  readArtifact: {
+    methodKind: "unary";
+    input: typeof ReadArtifactRequestSchema;
+    output: typeof JsonResultSchema;
+  },
+  /**
+   * @generated from rpc ec00.oa.v1.OwnerOperations.ListRequests
+   */
+  listRequests: {
+    methodKind: "unary";
+    input: typeof PageRequestSchema;
+    output: typeof JsonResultSchema;
+  },
+  /**
+   * @generated from rpc ec00.oa.v1.OwnerOperations.Watch
+   */
+  watch: {
+    methodKind: "unary";
+    input: typeof PageRequestSchema;
+    output: typeof JsonResultSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_oa_v1, 0);

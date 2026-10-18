@@ -1,58 +1,44 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar, BinaryIO, TextIO, TYPE_CHECKING, Generator
+from typing import Any, Self, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..types import UNSET, Unset
-
-
-
-
-
-
-
 T = TypeVar("T", bound="MutationResult")
-
 
 
 @_attrs_define
 class MutationResult:
     """
-        Attributes:
-            request_id (str):
-            revision (int):
-     """
+    Attributes:
+        request_id (str):
+        revision (int):
+    """
 
     request_id: str
     revision: int
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
-
-
-
-
 
     def to_dict(self) -> dict[str, Any]:
         request_id = self.request_id
 
         revision = self.revision
 
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update({
-            "requestId": request_id,
-            "revision": revision,
-        })
+        field_dict.update(
+            {
+                "requestId": request_id,
+                "revision": revision,
+            }
+        )
 
         return field_dict
 
-
-
     @classmethod
-    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+    def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         d = dict(src_dict)
         request_id = d.pop("requestId")
 
@@ -62,7 +48,6 @@ class MutationResult:
             request_id=request_id,
             revision=revision,
         )
-
 
         mutation_result.additional_properties = d
         return mutation_result

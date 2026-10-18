@@ -1,10 +1,14 @@
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import { createClient } from "../generated/typespec/clients/typescript/client";
-import { publish, revise } from "../generated/typespec/clients/typescript/sdk.gen";
+import { publish, readArtifact, reportPerformed, revise, withdrawDependent } from "../generated/typespec/clients/typescript/sdk.gen";
 import {
   MutationResultSchema,
+  ReadArtifactRequestSchema,
+  JsonResultSchema,
   PublishRequestSchema,
+  ReportPerformedRequestSchema,
   ReviseRequestSchema,
+  WithdrawDependentRequestSchema,
 } from "../generated/protobuf/typescript/oa.v1_pb";
 
 declare const process: { env: Record<string, string | undefined> };
@@ -158,3 +162,77 @@ console.log(JSON.stringify({ protoId, protoRevision: Number(protoRevisedResult.r
   httpId, httpAbsentNoteId, httpEmptyNoteId,
   httpRevision: httpGood.data.revision, protoAbsentStatus: protoAbsent.status,
   protoZeroStatus: protoZero.status, httpAbsentStatus: 422, httpNullStatus: 422, httpZeroStatus: 409 }));
+
+// The lifecycle runner supplies an Ed25519-signed disposable artifact bundle.
+// This extends both generated client arms against the same owner database; the
+// Python harness binds the coordinator identity out of band for this process.
+const artifactWire = process.env.EC00_SIGNED_ARTIFACT;
+if (artifactWire) {
+  const artifacts = JSON.parse(artifactWire) as Record<string, {
+    artifact_digest: string; key_id: string; original_bytes: string;
+    envelope_bytes: string; signature: string;
+  }>;
+  const decode = (value: string) => Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
+  const encode = (value: Uint8Array) => btoa(String.fromCharCode(...value));
+  const runHttpLifecycle = async () => {
+    const id = "9007199254741123";
+    const signed = artifacts.http;
+    const client = createClient({ baseUrl });
+    const pub = await publish({ client, headers: { "Idempotency-Key": `ts-life-pub-${id}` }, body: {
+      requestId: id, objective: "generated TypeSpec lifecycle", dependants: ["work-a"],
+      artifactDigest: signed.artifact_digest, artifactKeyId: signed.key_id,
+      artifactBytes: signed.original_bytes, artifactEnvelope: signed.envelope_bytes,
+      artifactSignature: signed.signature,
+    } as never });
+    if (pub.error || pub.data?.revision !== 1) throw new Error(`TypeSpec lifecycle publish failed: ${JSON.stringify(pub)}`);
+    const read = await readArtifact({ client, path: { requestId: id, materialRevision: 1 } });
+    if (read.error || !read.data?.json) throw new Error("TypeSpec signed-artifact read failed");
+    const stored = JSON.parse(read.data.json);
+    if (stored.artifactDigest !== signed.artifact_digest || stored.originalBytes !== signed.original_bytes ||
+        stored.envelopeBytes !== signed.envelope_bytes || stored.signature !== signed.signature) {
+      throw new Error("TypeSpec signed-artifact read did not preserve exact bytes");
+    }
+    const withdrawn = await withdrawDependent({ client, path: { requestId: id },
+      headers: { "Idempotency-Key": `ts-life-withdraw-${id}` },
+      body: { expectedRevision: 1, dependentId: "work-a" } });
+    if (withdrawn.error || withdrawn.data?.revision !== 2) throw new Error("TypeSpec dependent withdrawal failed");
+    const reported = await reportPerformed({ client, path: { requestId: id },
+      headers: { "Idempotency-Key": `ts-life-report-${id}` },
+      body: { expectedRevision: 2 } });
+    if (reported.error || reported.data?.revision !== 3) throw new Error("TypeSpec report failed");
+    return id;
+  };
+  const runProtoLifecycle = async () => {
+    const id = "9007199254741125";
+    const signed = artifacts.proto;
+    const pub = await protoRequest("/proto/v1/requests",
+      toBinary(PublishRequestSchema, create(PublishRequestSchema, {
+        requestId: id, objective: "generated protobuf lifecycle", dependentIds: ["work-a"],
+        artifactDigest: signed.artifact_digest, artifactKeyId: signed.key_id,
+        artifactBytes: decode(signed.original_bytes), artifactEnvelope: decode(signed.envelope_bytes),
+        artifactSignature: decode(signed.signature),
+      })), `ts-proto-life-pub-${id}`);
+    await assertStatus(pub, 200, "protobuf lifecycle publish");
+    const read = await fetch(`${baseUrl}/proto/v1/requests/${id}/artifact/1`);
+    await assertStatus(read, 200, "protobuf lifecycle artifact read");
+    const wire = fromBinary(JsonResultSchema, new Uint8Array(await read.arrayBuffer()));
+    const stored = JSON.parse(wire.json);
+    if (stored.artifactDigest !== signed.artifact_digest || stored.originalBytes !== signed.original_bytes ||
+        stored.envelopeBytes !== signed.envelope_bytes || stored.signature !== signed.signature) {
+      throw new Error("protobuf signed-artifact read did not preserve exact bytes");
+    }
+    const withdrawn = await protoRequest(`/proto/v1/requests/${id}/withdraw`,
+      toBinary(WithdrawDependentRequestSchema, create(WithdrawDependentRequestSchema, {
+        requestId: id, expectedRevision: 1n, dependentId: "work-a",
+      })), `ts-proto-life-withdraw-${id}`);
+    await assertStatus(withdrawn, 200, "protobuf dependent withdrawal");
+    const reported = await protoRequest(`/proto/v1/requests/${id}/report`,
+      toBinary(ReportPerformedRequestSchema, create(ReportPerformedRequestSchema, {
+        requestId: id, expectedRevision: 2n,
+      })), `ts-proto-life-report-${id}`);
+    await assertStatus(reported, 200, "protobuf report performed");
+    return id;
+  };
+  const [httpLifecycleId, protoLifecycleId] = await Promise.all([runHttpLifecycle(), runProtoLifecycle()]);
+  console.log(JSON.stringify({ httpLifecycleId, protoLifecycleId }));
+}

@@ -94,7 +94,8 @@ def main() -> int:
                 or version("protobuf") != "7.36.2"
                 or version("httpx") != "0.28.1"
                 or version("grpcio") != "1.84.0"
-                or version("grpcio-tools") != "1.84.0"):
+                or version("grpcio-tools") != "1.84.0"
+                or version("cryptography") != "50.0.0"):
             raise SystemExit("Python generator/runtime version mismatch")
     except Exception as exc:
         raise SystemExit(f"pinned Python tools unavailable: {exc}") from exc

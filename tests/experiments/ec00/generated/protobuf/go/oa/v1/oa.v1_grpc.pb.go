@@ -19,8 +19,19 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	OwnerOperations_Publish_FullMethodName = "/ec00.oa.v1.OwnerOperations/Publish"
-	OwnerOperations_Revise_FullMethodName  = "/ec00.oa.v1.OwnerOperations/Revise"
+	OwnerOperations_Publish_FullMethodName                 = "/ec00.oa.v1.OwnerOperations/Publish"
+	OwnerOperations_Revise_FullMethodName                  = "/ec00.oa.v1.OwnerOperations/Revise"
+	OwnerOperations_WithdrawDependent_FullMethodName       = "/ec00.oa.v1.OwnerOperations/WithdrawDependent"
+	OwnerOperations_ReportPerformed_FullMethodName         = "/ec00.oa.v1.OwnerOperations/ReportPerformed"
+	OwnerOperations_Verify_FullMethodName                  = "/ec00.oa.v1.OwnerOperations/Verify"
+	OwnerOperations_DecideArtifact_FullMethodName          = "/ec00.oa.v1.OwnerOperations/DecideArtifact"
+	OwnerOperations_Resolve_FullMethodName                 = "/ec00.oa.v1.OwnerOperations/Resolve"
+	OwnerOperations_AcknowledgeContinuation_FullMethodName = "/ec00.oa.v1.OwnerOperations/AcknowledgeContinuation"
+	OwnerOperations_ReadRequest_FullMethodName             = "/ec00.oa.v1.OwnerOperations/ReadRequest"
+	OwnerOperations_ReadDependants_FullMethodName          = "/ec00.oa.v1.OwnerOperations/ReadDependants"
+	OwnerOperations_ReadArtifact_FullMethodName            = "/ec00.oa.v1.OwnerOperations/ReadArtifact"
+	OwnerOperations_ListRequests_FullMethodName            = "/ec00.oa.v1.OwnerOperations/ListRequests"
+	OwnerOperations_Watch_FullMethodName                   = "/ec00.oa.v1.OwnerOperations/Watch"
 )
 
 // OwnerOperationsClient is the client API for OwnerOperations service.
@@ -29,6 +40,17 @@ const (
 type OwnerOperationsClient interface {
 	Publish(ctx context.Context, in *PublishRequest, opts ...grpc.CallOption) (*MutationResult, error)
 	Revise(ctx context.Context, in *ReviseRequest, opts ...grpc.CallOption) (*MutationResult, error)
+	WithdrawDependent(ctx context.Context, in *WithdrawDependentRequest, opts ...grpc.CallOption) (*MutationResult, error)
+	ReportPerformed(ctx context.Context, in *ReportPerformedRequest, opts ...grpc.CallOption) (*MutationResult, error)
+	Verify(ctx context.Context, in *VerifyRequest, opts ...grpc.CallOption) (*MutationResult, error)
+	DecideArtifact(ctx context.Context, in *DecideArtifactRequest, opts ...grpc.CallOption) (*MutationResult, error)
+	Resolve(ctx context.Context, in *ResolveRequest, opts ...grpc.CallOption) (*MutationResult, error)
+	AcknowledgeContinuation(ctx context.Context, in *AcknowledgeContinuationRequest, opts ...grpc.CallOption) (*MutationResult, error)
+	ReadRequest(ctx context.Context, in *RequestById, opts ...grpc.CallOption) (*JsonResult, error)
+	ReadDependants(ctx context.Context, in *RequestById, opts ...grpc.CallOption) (*JsonResult, error)
+	ReadArtifact(ctx context.Context, in *ReadArtifactRequest, opts ...grpc.CallOption) (*JsonResult, error)
+	ListRequests(ctx context.Context, in *PageRequest, opts ...grpc.CallOption) (*JsonResult, error)
+	Watch(ctx context.Context, in *PageRequest, opts ...grpc.CallOption) (*JsonResult, error)
 }
 
 type ownerOperationsClient struct {
@@ -59,12 +81,133 @@ func (c *ownerOperationsClient) Revise(ctx context.Context, in *ReviseRequest, o
 	return out, nil
 }
 
+func (c *ownerOperationsClient) WithdrawDependent(ctx context.Context, in *WithdrawDependentRequest, opts ...grpc.CallOption) (*MutationResult, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MutationResult)
+	err := c.cc.Invoke(ctx, OwnerOperations_WithdrawDependent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ownerOperationsClient) ReportPerformed(ctx context.Context, in *ReportPerformedRequest, opts ...grpc.CallOption) (*MutationResult, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MutationResult)
+	err := c.cc.Invoke(ctx, OwnerOperations_ReportPerformed_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ownerOperationsClient) Verify(ctx context.Context, in *VerifyRequest, opts ...grpc.CallOption) (*MutationResult, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MutationResult)
+	err := c.cc.Invoke(ctx, OwnerOperations_Verify_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ownerOperationsClient) DecideArtifact(ctx context.Context, in *DecideArtifactRequest, opts ...grpc.CallOption) (*MutationResult, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MutationResult)
+	err := c.cc.Invoke(ctx, OwnerOperations_DecideArtifact_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ownerOperationsClient) Resolve(ctx context.Context, in *ResolveRequest, opts ...grpc.CallOption) (*MutationResult, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MutationResult)
+	err := c.cc.Invoke(ctx, OwnerOperations_Resolve_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ownerOperationsClient) AcknowledgeContinuation(ctx context.Context, in *AcknowledgeContinuationRequest, opts ...grpc.CallOption) (*MutationResult, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MutationResult)
+	err := c.cc.Invoke(ctx, OwnerOperations_AcknowledgeContinuation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ownerOperationsClient) ReadRequest(ctx context.Context, in *RequestById, opts ...grpc.CallOption) (*JsonResult, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(JsonResult)
+	err := c.cc.Invoke(ctx, OwnerOperations_ReadRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ownerOperationsClient) ReadDependants(ctx context.Context, in *RequestById, opts ...grpc.CallOption) (*JsonResult, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(JsonResult)
+	err := c.cc.Invoke(ctx, OwnerOperations_ReadDependants_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ownerOperationsClient) ReadArtifact(ctx context.Context, in *ReadArtifactRequest, opts ...grpc.CallOption) (*JsonResult, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(JsonResult)
+	err := c.cc.Invoke(ctx, OwnerOperations_ReadArtifact_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ownerOperationsClient) ListRequests(ctx context.Context, in *PageRequest, opts ...grpc.CallOption) (*JsonResult, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(JsonResult)
+	err := c.cc.Invoke(ctx, OwnerOperations_ListRequests_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ownerOperationsClient) Watch(ctx context.Context, in *PageRequest, opts ...grpc.CallOption) (*JsonResult, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(JsonResult)
+	err := c.cc.Invoke(ctx, OwnerOperations_Watch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OwnerOperationsServer is the server API for OwnerOperations service.
 // All implementations must embed UnimplementedOwnerOperationsServer
 // for forward compatibility.
 type OwnerOperationsServer interface {
 	Publish(context.Context, *PublishRequest) (*MutationResult, error)
 	Revise(context.Context, *ReviseRequest) (*MutationResult, error)
+	WithdrawDependent(context.Context, *WithdrawDependentRequest) (*MutationResult, error)
+	ReportPerformed(context.Context, *ReportPerformedRequest) (*MutationResult, error)
+	Verify(context.Context, *VerifyRequest) (*MutationResult, error)
+	DecideArtifact(context.Context, *DecideArtifactRequest) (*MutationResult, error)
+	Resolve(context.Context, *ResolveRequest) (*MutationResult, error)
+	AcknowledgeContinuation(context.Context, *AcknowledgeContinuationRequest) (*MutationResult, error)
+	ReadRequest(context.Context, *RequestById) (*JsonResult, error)
+	ReadDependants(context.Context, *RequestById) (*JsonResult, error)
+	ReadArtifact(context.Context, *ReadArtifactRequest) (*JsonResult, error)
+	ListRequests(context.Context, *PageRequest) (*JsonResult, error)
+	Watch(context.Context, *PageRequest) (*JsonResult, error)
 	mustEmbedUnimplementedOwnerOperationsServer()
 }
 
@@ -80,6 +223,39 @@ func (UnimplementedOwnerOperationsServer) Publish(context.Context, *PublishReque
 }
 func (UnimplementedOwnerOperationsServer) Revise(context.Context, *ReviseRequest) (*MutationResult, error) {
 	return nil, status.Error(codes.Unimplemented, "method Revise not implemented")
+}
+func (UnimplementedOwnerOperationsServer) WithdrawDependent(context.Context, *WithdrawDependentRequest) (*MutationResult, error) {
+	return nil, status.Error(codes.Unimplemented, "method WithdrawDependent not implemented")
+}
+func (UnimplementedOwnerOperationsServer) ReportPerformed(context.Context, *ReportPerformedRequest) (*MutationResult, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReportPerformed not implemented")
+}
+func (UnimplementedOwnerOperationsServer) Verify(context.Context, *VerifyRequest) (*MutationResult, error) {
+	return nil, status.Error(codes.Unimplemented, "method Verify not implemented")
+}
+func (UnimplementedOwnerOperationsServer) DecideArtifact(context.Context, *DecideArtifactRequest) (*MutationResult, error) {
+	return nil, status.Error(codes.Unimplemented, "method DecideArtifact not implemented")
+}
+func (UnimplementedOwnerOperationsServer) Resolve(context.Context, *ResolveRequest) (*MutationResult, error) {
+	return nil, status.Error(codes.Unimplemented, "method Resolve not implemented")
+}
+func (UnimplementedOwnerOperationsServer) AcknowledgeContinuation(context.Context, *AcknowledgeContinuationRequest) (*MutationResult, error) {
+	return nil, status.Error(codes.Unimplemented, "method AcknowledgeContinuation not implemented")
+}
+func (UnimplementedOwnerOperationsServer) ReadRequest(context.Context, *RequestById) (*JsonResult, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReadRequest not implemented")
+}
+func (UnimplementedOwnerOperationsServer) ReadDependants(context.Context, *RequestById) (*JsonResult, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReadDependants not implemented")
+}
+func (UnimplementedOwnerOperationsServer) ReadArtifact(context.Context, *ReadArtifactRequest) (*JsonResult, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReadArtifact not implemented")
+}
+func (UnimplementedOwnerOperationsServer) ListRequests(context.Context, *PageRequest) (*JsonResult, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListRequests not implemented")
+}
+func (UnimplementedOwnerOperationsServer) Watch(context.Context, *PageRequest) (*JsonResult, error) {
+	return nil, status.Error(codes.Unimplemented, "method Watch not implemented")
 }
 func (UnimplementedOwnerOperationsServer) mustEmbedUnimplementedOwnerOperationsServer() {}
 func (UnimplementedOwnerOperationsServer) testEmbeddedByValue()                         {}
@@ -138,6 +314,204 @@ func _OwnerOperations_Revise_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OwnerOperations_WithdrawDependent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WithdrawDependentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OwnerOperationsServer).WithdrawDependent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OwnerOperations_WithdrawDependent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OwnerOperationsServer).WithdrawDependent(ctx, req.(*WithdrawDependentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OwnerOperations_ReportPerformed_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReportPerformedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OwnerOperationsServer).ReportPerformed(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OwnerOperations_ReportPerformed_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OwnerOperationsServer).ReportPerformed(ctx, req.(*ReportPerformedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OwnerOperations_Verify_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VerifyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OwnerOperationsServer).Verify(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OwnerOperations_Verify_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OwnerOperationsServer).Verify(ctx, req.(*VerifyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OwnerOperations_DecideArtifact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DecideArtifactRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OwnerOperationsServer).DecideArtifact(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OwnerOperations_DecideArtifact_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OwnerOperationsServer).DecideArtifact(ctx, req.(*DecideArtifactRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OwnerOperations_Resolve_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OwnerOperationsServer).Resolve(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OwnerOperations_Resolve_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OwnerOperationsServer).Resolve(ctx, req.(*ResolveRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OwnerOperations_AcknowledgeContinuation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AcknowledgeContinuationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OwnerOperationsServer).AcknowledgeContinuation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OwnerOperations_AcknowledgeContinuation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OwnerOperationsServer).AcknowledgeContinuation(ctx, req.(*AcknowledgeContinuationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OwnerOperations_ReadRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestById)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OwnerOperationsServer).ReadRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OwnerOperations_ReadRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OwnerOperationsServer).ReadRequest(ctx, req.(*RequestById))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OwnerOperations_ReadDependants_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestById)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OwnerOperationsServer).ReadDependants(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OwnerOperations_ReadDependants_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OwnerOperationsServer).ReadDependants(ctx, req.(*RequestById))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OwnerOperations_ReadArtifact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReadArtifactRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OwnerOperationsServer).ReadArtifact(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OwnerOperations_ReadArtifact_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OwnerOperationsServer).ReadArtifact(ctx, req.(*ReadArtifactRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OwnerOperations_ListRequests_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OwnerOperationsServer).ListRequests(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OwnerOperations_ListRequests_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OwnerOperationsServer).ListRequests(ctx, req.(*PageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OwnerOperations_Watch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OwnerOperationsServer).Watch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OwnerOperations_Watch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OwnerOperationsServer).Watch(ctx, req.(*PageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OwnerOperations_ServiceDesc is the grpc.ServiceDesc for OwnerOperations service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +526,50 @@ var OwnerOperations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Revise",
 			Handler:    _OwnerOperations_Revise_Handler,
+		},
+		{
+			MethodName: "WithdrawDependent",
+			Handler:    _OwnerOperations_WithdrawDependent_Handler,
+		},
+		{
+			MethodName: "ReportPerformed",
+			Handler:    _OwnerOperations_ReportPerformed_Handler,
+		},
+		{
+			MethodName: "Verify",
+			Handler:    _OwnerOperations_Verify_Handler,
+		},
+		{
+			MethodName: "DecideArtifact",
+			Handler:    _OwnerOperations_DecideArtifact_Handler,
+		},
+		{
+			MethodName: "Resolve",
+			Handler:    _OwnerOperations_Resolve_Handler,
+		},
+		{
+			MethodName: "AcknowledgeContinuation",
+			Handler:    _OwnerOperations_AcknowledgeContinuation_Handler,
+		},
+		{
+			MethodName: "ReadRequest",
+			Handler:    _OwnerOperations_ReadRequest_Handler,
+		},
+		{
+			MethodName: "ReadDependants",
+			Handler:    _OwnerOperations_ReadDependants_Handler,
+		},
+		{
+			MethodName: "ReadArtifact",
+			Handler:    _OwnerOperations_ReadArtifact_Handler,
+		},
+		{
+			MethodName: "ListRequests",
+			Handler:    _OwnerOperations_ListRequests_Handler,
+		},
+		{
+			MethodName: "Watch",
+			Handler:    _OwnerOperations_Watch_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -1,0 +1,156 @@
+{
+  "purpose": "Frozen test-only generated clients plus the old disposable HTTP adapter and owner oracle for common publish/revise compatibility checks.",
+  "source_commit": "5ff5d82345d2b668ef4495656547a04877f1c275",
+  "source_files": [
+    {
+      "path": "candidate_owner_http.py",
+      "sha256_base64": "Oy7KUKwjv40gDsA+QeYJ9TGRzUM/ZDYwe18pdbbW3jQ="
+    },
+    {
+      "path": "generated/protobuf/python/oa/v1_pb2.py",
+      "sha256_base64": "NaVZ2G++1Jylk+V2R+CB4M2urgQHY/g+mlIsMUU/SaU="
+    },
+    {
+      "path": "generated/protobuf/python/oa/v1_pb2.pyi",
+      "sha256_base64": "Ou1FDbtz702FGpEEwAyZEGZAJ4fjhbQTq+11TbYvreM="
+    },
+    {
+      "path": "generated/protobuf/typescript/oa.v1_pb.ts",
+      "sha256_base64": "aHN33nrPYRo3H5jJ0v9PrHDrMtFnF7zGwNm9QDKERUw="
+    },
+    {
+      "path": "generated/typespec/clients/python/ec00_oa_python_client/__init__.py",
+      "sha256_base64": "doAtGNMvndb2QXnMWalVymvf0wa3fhQ7vhfTT9G0euA="
+    },
+    {
+      "path": "generated/typespec/clients/python/ec00_oa_python_client/api/__init__.py",
+      "sha256_base64": "zTSiG/ujSjAqWPyc435YXaX9XTlpMjiJWBbV+f+YtdA="
+    },
+    {
+      "path": "generated/typespec/clients/python/ec00_oa_python_client/api/default/__init__.py",
+      "sha256_base64": "5vd9uJWAjRqa9xzxzYkLD1yoZ12Ld/bAaNB5WX4fbE8="
+    },
+    {
+      "path": "generated/typespec/clients/python/ec00_oa_python_client/api/default/publish.py",
+      "sha256_base64": "mfgo6aSwtlB7rHHdKYdsEaSe6FuZ0ZbyIzkW16pKyA4="
+    },
+    {
+      "path": "generated/typespec/clients/python/ec00_oa_python_client/api/default/revise.py",
+      "sha256_base64": "muAq5DnrVtbZBcYc5D1nD0okdF5q4ojPVSVUNIeWlGI="
+    },
+    {
+      "path": "generated/typespec/clients/python/ec00_oa_python_client/client.py",
+      "sha256_base64": "1T9SkCV9kmuiwOQqpXNCw9M1pQ94LV5q8FZGwuN0ftM="
+    },
+    {
+      "path": "generated/typespec/clients/python/ec00_oa_python_client/errors.py",
+      "sha256_base64": "gO8GBmKqmSNgAg+E5oT+oOyxztvp7V/6XG7OUTT15q0="
+    },
+    {
+      "path": "generated/typespec/clients/python/ec00_oa_python_client/models/__init__.py",
+      "sha256_base64": "+dvMhsg+nnJk2LBDn/k2ihxs1lB91ggzUA1Im/r5fq0="
+    },
+    {
+      "path": "generated/typespec/clients/python/ec00_oa_python_client/models/mutation_result.py",
+      "sha256_base64": "EblBCo93XRGVSl8xrVm/oZHvYPMECXSONZHnD/y36GA="
+    },
+    {
+      "path": "generated/typespec/clients/python/ec00_oa_python_client/models/publish_request.py",
+      "sha256_base64": "zLsf2zxCSEaB7d12+XhSNHw2SdAxHqZwPZKadKDmsNs="
+    },
+    {
+      "path": "generated/typespec/clients/python/ec00_oa_python_client/models/revise_request.py",
+      "sha256_base64": "MszrGJl6KGIFPhHMtrFZIA/6VE6JH6rdPyj8vq9QnfQ="
+    },
+    {
+      "path": "generated/typespec/clients/python/ec00_oa_python_client/types.py",
+      "sha256_base64": "0We4NPvhIYASRpQ3le41nmJeEAVm42+2VKdzlJ4Ogok="
+    },
+    {
+      "path": "generated/typespec/clients/typescript/client.gen.ts",
+      "sha256_base64": "syWCIYSrx67ZHEK7HqBpe7iuF4gzw/ypf27EmDmME3c="
+    },
+    {
+      "path": "generated/typespec/clients/typescript/client/client.gen.ts",
+      "sha256_base64": "ihewvxVAJYc0oSjxdvbLkVyEm5fYBkphPbpe+DkOWNk="
+    },
+    {
+      "path": "generated/typespec/clients/typescript/client/index.ts",
+      "sha256_base64": "lJzHMzUnyRkowyQQxKSi3SuQuZ/ggOuM5FBWR4Uvvhs="
+    },
+    {
+      "path": "generated/typespec/clients/typescript/client/types.gen.ts",
+      "sha256_base64": "GhgoiCNbwh+i7+sECVid34MzF7jdfbSFXxmN/BxHu0o="
+    },
+    {
+      "path": "generated/typespec/clients/typescript/client/utils.gen.ts",
+      "sha256_base64": "3OlhiPff2OnlVDGZpCpRF+IwQqfdSOHOr/m7IImPhSI="
+    },
+    {
+      "path": "generated/typespec/clients/typescript/core/auth.gen.ts",
+      "sha256_base64": "S0rKW9myxDoRK7dGFylSeNhPhjYK2nGo21fwnNDCVPQ="
+    },
+    {
+      "path": "generated/typespec/clients/typescript/core/bodySerializer.gen.ts",
+      "sha256_base64": "p0Fj3mcx8G8YWUiJXMS1+JAOfTDOdrlYhxe62ZqxZac="
+    },
+    {
+      "path": "generated/typespec/clients/typescript/core/params.gen.ts",
+      "sha256_base64": "CXx19uJpxshoBkEJGDKmmzjogo6O6EZTGNMqF3WTMw8="
+    },
+    {
+      "path": "generated/typespec/clients/typescript/core/pathSerializer.gen.ts",
+      "sha256_base64": "boChlifTb9Kp6NruETcTsuBH0QfULq2bSpqzRGkLmYw="
+    },
+    {
+      "path": "generated/typespec/clients/typescript/core/queryKeySerializer.gen.ts",
+      "sha256_base64": "rcVwyTV6CGJMzoHcUDq9jY/2CnbSW9TTpK++NJ2C0fA="
+    },
+    {
+      "path": "generated/typespec/clients/typescript/core/serverSentEvents.gen.ts",
+      "sha256_base64": "35k1Z6u+PltHfYFRf7lnz2PPQLeGaVfV3GzAMjjLFCY="
+    },
+    {
+      "path": "generated/typespec/clients/typescript/core/types.gen.ts",
+      "sha256_base64": "DDPF4JZgj8H4WdibwXzkKOMGx6o8LDCs2K/6WnNDcK8="
+    },
+    {
+      "path": "generated/typespec/clients/typescript/core/utils.gen.ts",
+      "sha256_base64": "G2N8Uh2BNt/b+N/E/Mi7c+DFVEZuTSypyQhtTHEpg8Q="
+    },
+    {
+      "path": "generated/typespec/clients/typescript/index.ts",
+      "sha256_base64": "DKA84c7e4svFe+PN8OigqQPJsLtLRlletwzG6efb6Wo="
+    },
+    {
+      "path": "generated/typespec/clients/typescript/sdk.gen.ts",
+      "sha256_base64": "5M5NHnOrMNS0d81bYdA08UTZdvQtCwp1lJ3zjdNA1e0="
+    },
+    {
+      "path": "generated/typespec/clients/typescript/types.gen.ts",
+      "sha256_base64": "aIH3TkMoSpu4j0n2pplBTnywkYqMjtXyvuOgYIU/Akg="
+    },
+    {
+      "path": "owner_oracle.py",
+      "sha256_base64": "dS04JOG2vg7GvNzWcjgvE3BWRvlKzh+jOhPgxUM43J8="
+    }
+  ],
+  "test_harness_files": [
+    {
+      "path": "package.json",
+      "sha256_base64": "qQ/DNBivornL9HaFJLAhE1uWXs35k0V1Bb+uOsRKhCg="
+    },
+    {
+      "path": "run_old_python_clients.py",
+      "sha256_base64": "yY2Xap8d0Xu0BIkDJnxOAUg7lYNEkVgXbic3zuZTpkY="
+    },
+    {
+      "path": "run_old_typescript_clients.ts",
+      "sha256_base64": "5Kv7m7gQ2x4HiYkg4yb3vCmDHHFE1Q90mD0/9dOeVEE="
+    },
+    {
+      "path": "serve_old.py",
+      "sha256_base64": "xeKIafJhNNdWzWjUfP5ca5dhs4NYIsGrf/5gXebvOUk="
+    }
+  ]
+}
