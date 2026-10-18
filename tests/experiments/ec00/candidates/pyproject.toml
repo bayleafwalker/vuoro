@@ -1,0 +1,11 @@
+[project]
+name = "vuoro-ec00-candidate-tools"
+version = "0.0.0"
+requires-python = ">=3.11,<3.15"
+dependencies = [
+  "httpx==0.28.1",
+  "protobuf==7.36.2",
+]
+
+[dependency-groups]
+dev = ["openapi-python-client==0.29.1"]

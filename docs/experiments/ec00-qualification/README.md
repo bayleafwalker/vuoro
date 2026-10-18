@@ -5,7 +5,11 @@ API, selected architecture, or owner implementation. It exists to make the
 architecture comparison reproducible after EC-01 provides observed consumers
 and payload classes. Do not publish these Python objects as an API.
 
-## Source and toolchain observations
+## Initial source and toolchain observations
+
+The initial EC-00 baseline was recorded before a generated-client toolchain was
+assembled; its tool-availability statements below are historical and are
+superseded by the later executable slice in this document.
 
 Prepared from Vuoro commit `6c5a8ea96b100cf45697f7317e7f7fb6227146ee` in a
 detached `/tmp` worktree. Vuoro's `AGENTS.md` assigns state-machine and owner
@@ -107,9 +111,109 @@ The included owner stub is a disposable oracle only; it is not an OA schema,
 public contract, production API, persistence recommendation or final transaction
 design.
 
+## First executable generated-client slice (18 October 2026)
+
+This is a narrow correctness comparison for `publish` and `revise`, executed by
+generated Python and TypeScript clients against the same temporary,
+file-backed `OwnerOracle` database. It does not select A or C, model the full OA
+lifecycle, qualify authentication, qualify a network/proxy path, or report
+performance. The HTTP/protobuf bridge is a test-only loopback adapter that
+delegates every accepted mutation to the existing oracle; it is not a proposed
+Vuoro service or production API. The protobuf arm exercises generated protobuf
+binary messages and service descriptors, not a gRPC transport. Native gRPC,
+Connect, event replay between clients, and the broader decision gate remain to
+be qualified.
+
+The predeclared cases in this slice are:
+
+- publish and revise through both Python and TypeScript generated clients;
+- decimal-string request identifiers `9007199254740993` and
+  `9007199254740995`, above JavaScript's safe integer limit, with persisted
+  values checked byte-for-byte after client serialization;
+- optional protobuf field presence: absent objective is refused while a
+  present empty objective is accepted; absent optional `expected_revision` is
+  refused and zero reaches the owner's stale-revision refusal;
+- TypeSpec/OpenAPI optional and nullable `expectedRevision`: absent and `null`
+  are refused before the owner call, zero reaches the owner's stale-revision
+  refusal, and revision 1 succeeds; and
+- optional nullable note semantics through both representations: absent,
+  present empty string and explicit `null` reach the same persisted JSON
+  shapes. The protobuf candidate uses a oneof with a `NullValue` arm to encode
+  `null`; OpenAPI uses its optional nullable string field.
+
+The `expectedRevision: null` case is exercised only in the OpenAPI arm because
+the protobuf candidate models `expected_revision` as an optional `int64`, which
+has absence and integer values but no scalar `null`. Both arms exercise absent,
+zero and valid expected revisions.
+
+The Python and TypeScript clients both exercise both candidate representations
+against one actual SQLite oracle per test. This proves only the shown
+transaction and serialization cases. In particular, the generated OpenAPI
+TypeScript client represents `int64` revision values as JavaScript `number`;
+tested revision numbers are small. Large revision counters are not qualified
+by this slice. The request ID remains a decimal string in both arms so its
+precision does not depend on JavaScript number behavior. Protobuf has absent
+versus present scalar presence but no separate `null` scalar value; that
+difference is kept explicit rather than papered over.
+
+The executable generator inputs and outputs are under
+`tests/experiments/ec00/candidates/` and `tests/experiments/ec00/generated/`.
+`package-lock.json` and `uv.lock` pin package versions and transitive
+artifacts. The verified local generator toolchain was Node 24.21.0 (binary
+SHA-256 `f89c69d163e2686ed04cae19f5680668d4c1c64a072a70c1a6e50842a7a9e433`),
+npm 11.19.0, protoc 36.2 (binary SHA-256
+`2c089b2c3fdcac51b420e467f9594ad0176b396998d2b4571f93b9f2ad8ee953`),
+TypeSpec compiler/OpenAPI emitter 1.17.0, Buf `protoc-gen-es` and protobuf
+runtime 2.16.0, Hey API OpenAPI TypeScript generator 0.99.0 with TypeScript
+5.9.3 (within its declared peer range), Python 3.13.16 with protobuf 7.36.2,
+httpx 0.28.1 and `openapi-python-client` 0.29.1, managed with uv 0.13.0. The
+two compiler binary hashes are deliberate environment pins; a different
+binary must be reviewed and recorded as a toolchain change.
+
+From the repository root, install the locked generators and runtime, then
+verify generated output and run the full disposable experiment tests. Set the
+two binary paths to files whose hashes match the recorded values:
+
+```bash
+export EC00_NODE=/path/to/node-24.21.0/bin/node
+export EC00_PROTOC=/path/to/protoc-36.2/bin/protoc
+export PATH="$(dirname "$EC00_NODE"):$PATH"
+npm ci --prefix tests/experiments/ec00/candidates --ignore-scripts --no-audit --no-fund
+uv sync --project tests/experiments/ec00/candidates --locked
+uv run --project tests/experiments/ec00/candidates --locked \
+  python scripts/experiments/ec00/generate_candidates.py
+uv run --project tests/experiments/ec00/candidates --locked \
+  python -m unittest discover -s tests/experiments/ec00 -p 'test_*.py' -v
+uv run --project tests/experiments/ec00/candidates --locked \
+  python -m unittest discover -s tests/experiments/ec00 -p 'candidate_slice_checks.py' -v
+```
+
+The generator check also runs `tsc --project
+tests/experiments/ec00/candidates/tsconfig.json` with the locked TypeScript
+compiler before comparing regenerated output.
+
+`generate_candidates.py --write` deliberately refreshes only the disposable
+generated-artifact directory. The default command regenerates to a temporary
+directory and fails on any difference. The integration tests bind only an
+ephemeral loopback port, seed identities and links in a temporary database,
+and use no network credentials.
+
+The TypeSpec-to-OpenAPI mapping is documented by the
+[TypeSpec OpenAPI emitter](https://typespec.io/docs/emitters/openapi3/openapi/).
+Python client generation uses the
+[openapi-python-client file-input workflow](https://github.com/openapi-generators/openapi-python-client),
+and TypeScript client generation uses
+[Hey API's OpenAPI TypeScript generator](https://heyapi.dev/docs/openapi/typescript/get-started/).
+The protobuf messages are generated with `protoc`; the official
+[Python generated-code guide](https://protobuf.dev/reference/python/python-generated/)
+describes the compiler's Python output.
+
 ## Offline check
 
-Run with standard library only:
+Run the dependency-free owner-oracle tests with standard library only. The
+generated-client integration test has a non-default pytest filename so regular
+workspace test collection does not import optional EC-00 generator runtimes;
+run it explicitly with the locked candidate project as shown above.
 
 ```bash
 python -m unittest discover -s tests/experiments/ec00 -p 'test_*.py' -v
