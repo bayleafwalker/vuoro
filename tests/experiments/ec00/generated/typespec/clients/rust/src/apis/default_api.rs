@@ -15,10 +15,66 @@ use crate::{apis::ResponseContent, models};
 use super::{Error, configuration, ContentType};
 
 
+/// struct for typed errors of method [`acknowledge_continuation`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum AcknowledgeContinuationError {
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`decide_artifact`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum DecideArtifactError {
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`list_requests`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ListRequestsError {
+    UnknownValue(serde_json::Value),
+}
+
 /// struct for typed errors of method [`publish`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PublishError {
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`read_artifact`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ReadArtifactError {
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`read_dependants`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ReadDependantsError {
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`read_request`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ReadRequestError {
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`report_performed`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ReportPerformedError {
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`resolve`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ResolveError {
     UnknownValue(serde_json::Value),
 }
 
@@ -29,6 +85,146 @@ pub enum ReviseError {
     UnknownValue(serde_json::Value),
 }
 
+/// struct for typed errors of method [`verify`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum VerifyError {
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`watch`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum WatchError {
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`withdraw_dependent`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum WithdrawDependentError {
+    UnknownValue(serde_json::Value),
+}
+
+
+pub async fn acknowledge_continuation(configuration: &configuration::Configuration, request_id: &str, acknowledge_request: models::AcknowledgeRequest) -> Result<models::MutationResult, Error<AcknowledgeContinuationError>> {
+    // add a prefix to parameters to efficiently prevent name collisions
+    let p_path_request_id = request_id;
+    let p_body_acknowledge_request = acknowledge_request;
+
+    let uri_str = format!("{}/v1/requests/{requestId}/acknowledge", configuration.base_path, requestId=crate::apis::urlencode(p_path_request_id));
+    let mut req_builder = configuration.client.request(reqwest::Method::POST, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    req_builder = req_builder.json(&p_body_acknowledge_request);
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/octet-stream");
+    let content_type = super::ContentType::from(content_type);
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        match content_type {
+            ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
+            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::MutationResult`"))),
+            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::MutationResult`")))),
+        }
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<AcknowledgeContinuationError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+pub async fn decide_artifact(configuration: &configuration::Configuration, request_id: &str, decide_artifact_request: models::DecideArtifactRequest) -> Result<models::MutationResult, Error<DecideArtifactError>> {
+    // add a prefix to parameters to efficiently prevent name collisions
+    let p_path_request_id = request_id;
+    let p_body_decide_artifact_request = decide_artifact_request;
+
+    let uri_str = format!("{}/v1/requests/{requestId}/artifact-decision", configuration.base_path, requestId=crate::apis::urlencode(p_path_request_id));
+    let mut req_builder = configuration.client.request(reqwest::Method::POST, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    req_builder = req_builder.json(&p_body_decide_artifact_request);
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/octet-stream");
+    let content_type = super::ContentType::from(content_type);
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        match content_type {
+            ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
+            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::MutationResult`"))),
+            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::MutationResult`")))),
+        }
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<DecideArtifactError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+pub async fn list_requests(configuration: &configuration::Configuration, cursor: Option<&str>, limit: Option<i32>) -> Result<models::ReadResult, Error<ListRequestsError>> {
+    // add a prefix to parameters to efficiently prevent name collisions
+    let p_query_cursor = cursor;
+    let p_query_limit = limit;
+
+    let uri_str = format!("{}/v1/requests", configuration.base_path);
+    let mut req_builder = configuration.client.request(reqwest::Method::GET, &uri_str);
+
+    if let Some(ref param_value) = p_query_cursor {
+        req_builder = req_builder.query(&[("cursor", &param_value.to_string())]);
+    }
+    if let Some(ref param_value) = p_query_limit {
+        req_builder = req_builder.query(&[("limit", &param_value.to_string())]);
+    }
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/octet-stream");
+    let content_type = super::ContentType::from(content_type);
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        match content_type {
+            ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
+            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::ReadResult`"))),
+            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::ReadResult`")))),
+        }
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<ListRequestsError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
 
 pub async fn publish(configuration: &configuration::Configuration, publish_request: models::PublishRequest) -> Result<models::MutationResult, Error<PublishError>> {
     // add a prefix to parameters to efficiently prevent name collisions
@@ -67,6 +263,191 @@ pub async fn publish(configuration: &configuration::Configuration, publish_reque
     }
 }
 
+pub async fn read_artifact(configuration: &configuration::Configuration, request_id: &str, material_revision: i64) -> Result<models::ReadResult, Error<ReadArtifactError>> {
+    // add a prefix to parameters to efficiently prevent name collisions
+    let p_path_request_id = request_id;
+    let p_path_material_revision = material_revision;
+
+    let uri_str = format!("{}/v1/requests/{requestId}/artifact/{materialRevision}", configuration.base_path, requestId=crate::apis::urlencode(p_path_request_id), materialRevision=p_path_material_revision);
+    let mut req_builder = configuration.client.request(reqwest::Method::GET, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/octet-stream");
+    let content_type = super::ContentType::from(content_type);
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        match content_type {
+            ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
+            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::ReadResult`"))),
+            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::ReadResult`")))),
+        }
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<ReadArtifactError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+pub async fn read_dependants(configuration: &configuration::Configuration, request_id: &str) -> Result<models::ReadResult, Error<ReadDependantsError>> {
+    // add a prefix to parameters to efficiently prevent name collisions
+    let p_path_request_id = request_id;
+
+    let uri_str = format!("{}/v1/requests/{requestId}/dependants", configuration.base_path, requestId=crate::apis::urlencode(p_path_request_id));
+    let mut req_builder = configuration.client.request(reqwest::Method::GET, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/octet-stream");
+    let content_type = super::ContentType::from(content_type);
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        match content_type {
+            ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
+            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::ReadResult`"))),
+            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::ReadResult`")))),
+        }
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<ReadDependantsError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+pub async fn read_request(configuration: &configuration::Configuration, request_id: &str) -> Result<models::ReadResult, Error<ReadRequestError>> {
+    // add a prefix to parameters to efficiently prevent name collisions
+    let p_path_request_id = request_id;
+
+    let uri_str = format!("{}/v1/requests/{requestId}", configuration.base_path, requestId=crate::apis::urlencode(p_path_request_id));
+    let mut req_builder = configuration.client.request(reqwest::Method::GET, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/octet-stream");
+    let content_type = super::ContentType::from(content_type);
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        match content_type {
+            ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
+            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::ReadResult`"))),
+            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::ReadResult`")))),
+        }
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<ReadRequestError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+pub async fn report_performed(configuration: &configuration::Configuration, request_id: &str, revision_request: models::RevisionRequest) -> Result<models::MutationResult, Error<ReportPerformedError>> {
+    // add a prefix to parameters to efficiently prevent name collisions
+    let p_path_request_id = request_id;
+    let p_body_revision_request = revision_request;
+
+    let uri_str = format!("{}/v1/requests/{requestId}/report", configuration.base_path, requestId=crate::apis::urlencode(p_path_request_id));
+    let mut req_builder = configuration.client.request(reqwest::Method::POST, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    req_builder = req_builder.json(&p_body_revision_request);
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/octet-stream");
+    let content_type = super::ContentType::from(content_type);
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        match content_type {
+            ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
+            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::MutationResult`"))),
+            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::MutationResult`")))),
+        }
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<ReportPerformedError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+pub async fn resolve(configuration: &configuration::Configuration, request_id: &str, revision_request: models::RevisionRequest) -> Result<models::MutationResult, Error<ResolveError>> {
+    // add a prefix to parameters to efficiently prevent name collisions
+    let p_path_request_id = request_id;
+    let p_body_revision_request = revision_request;
+
+    let uri_str = format!("{}/v1/requests/{requestId}/resolve", configuration.base_path, requestId=crate::apis::urlencode(p_path_request_id));
+    let mut req_builder = configuration.client.request(reqwest::Method::POST, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    req_builder = req_builder.json(&p_body_revision_request);
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/octet-stream");
+    let content_type = super::ContentType::from(content_type);
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        match content_type {
+            ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
+            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::MutationResult`"))),
+            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::MutationResult`")))),
+        }
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<ResolveError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
 pub async fn revise(configuration: &configuration::Configuration, request_id: &str, revise_request: models::ReviseRequest) -> Result<models::MutationResult, Error<ReviseError>> {
     // add a prefix to parameters to efficiently prevent name collisions
     let p_path_request_id = request_id;
@@ -101,6 +482,125 @@ pub async fn revise(configuration: &configuration::Configuration, request_id: &s
     } else {
         let content = resp.text().await?;
         let entity: Option<ReviseError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+pub async fn verify(configuration: &configuration::Configuration, request_id: &str, verify_request: models::VerifyRequest) -> Result<models::MutationResult, Error<VerifyError>> {
+    // add a prefix to parameters to efficiently prevent name collisions
+    let p_path_request_id = request_id;
+    let p_body_verify_request = verify_request;
+
+    let uri_str = format!("{}/v1/requests/{requestId}/verify", configuration.base_path, requestId=crate::apis::urlencode(p_path_request_id));
+    let mut req_builder = configuration.client.request(reqwest::Method::POST, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    req_builder = req_builder.json(&p_body_verify_request);
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/octet-stream");
+    let content_type = super::ContentType::from(content_type);
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        match content_type {
+            ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
+            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::MutationResult`"))),
+            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::MutationResult`")))),
+        }
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<VerifyError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+pub async fn watch(configuration: &configuration::Configuration, cursor: Option<&str>, limit: Option<i32>) -> Result<models::ReadResult, Error<WatchError>> {
+    // add a prefix to parameters to efficiently prevent name collisions
+    let p_query_cursor = cursor;
+    let p_query_limit = limit;
+
+    let uri_str = format!("{}/v1/events", configuration.base_path);
+    let mut req_builder = configuration.client.request(reqwest::Method::GET, &uri_str);
+
+    if let Some(ref param_value) = p_query_cursor {
+        req_builder = req_builder.query(&[("cursor", &param_value.to_string())]);
+    }
+    if let Some(ref param_value) = p_query_limit {
+        req_builder = req_builder.query(&[("limit", &param_value.to_string())]);
+    }
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/octet-stream");
+    let content_type = super::ContentType::from(content_type);
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        match content_type {
+            ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
+            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::ReadResult`"))),
+            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::ReadResult`")))),
+        }
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<WatchError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+pub async fn withdraw_dependent(configuration: &configuration::Configuration, request_id: &str, withdraw_request: models::WithdrawRequest) -> Result<models::MutationResult, Error<WithdrawDependentError>> {
+    // add a prefix to parameters to efficiently prevent name collisions
+    let p_path_request_id = request_id;
+    let p_body_withdraw_request = withdraw_request;
+
+    let uri_str = format!("{}/v1/requests/{requestId}/withdraw", configuration.base_path, requestId=crate::apis::urlencode(p_path_request_id));
+    let mut req_builder = configuration.client.request(reqwest::Method::POST, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    req_builder = req_builder.json(&p_body_withdraw_request);
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/octet-stream");
+    let content_type = super::ContentType::from(content_type);
+
+    if !status.is_client_error() && !status.is_server_error() {
+        let content = resp.text().await?;
+        match content_type {
+            ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
+            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::MutationResult`"))),
+            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::MutationResult`")))),
+        }
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<WithdrawDependentError> = serde_json::from_str(&content).ok();
         Err(Error::ResponseError(ResponseContent { status, content, entity }))
     }
 }

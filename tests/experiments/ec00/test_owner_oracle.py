@@ -3,15 +3,17 @@ import threading
 import unittest
 from pathlib import Path
 import sqlite3
+import json
 
 from owner_oracle import Conflict, OwnerOracle, ResponseLost, material_digest
+from artifact_semantics import make_signed_artifact
 
 
 class OwnerOracleTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="ec00-owner-")
         self.path = Path(self.tmp.name) / "owner.sqlite"
-        default_body = {"purpose": "test-only", "procedure_revision": "source-r1", "artifact_digest": "sha256:" + "a" * 64}
+        default_body = {"purpose": "test-only", "procedure_revision": "source-r1"}
         digest = material_digest(default_body)
         OwnerOracle.initialize(self.path, [
             {"principal_id": "requester-a", "workspace_id": "workspace-a", "role": "requester"},
@@ -47,7 +49,7 @@ class OwnerOracleTests(unittest.TestCase):
         owner = principal or self.owner
         return owner.publish(
             request_id,
-            body or {"purpose": "test-only", "procedure_revision": "source-r1", "artifact_digest": "sha256:" + "a" * 64},
+            body or {"purpose": "test-only", "procedure_revision": "source-r1"},
             dependants or ["work-a", "work-b"],
             f"publish-{request_id}",
         )
@@ -168,8 +170,17 @@ class OwnerOracleTests(unittest.TestCase):
         self.assertEqual({"work-a": {"active": 0, "continuation_ack": 0}, "work-b": {"active": 1, "continuation_ack": 0}}, self.owner.dependants("request-1"))
 
     def test_exact_artifact_decision_is_digest_bound_and_material_revision_invalidates_it(self):
-        self.publish()
-        digest_a = "sha256:" + "a" * 64
+        body = {"purpose": "test-only", "procedure_revision": "source-r1"}
+        artifact = make_signed_artifact(workspace_id="workspace-a", request_id="request-1", material_revision=1,
+                                        material_digest=material_digest(body),
+                                        original_bytes=b"exact original artifact\x00with bytes")
+        self.owner.publish("request-1", body, ["work-a", "work-b"], "publish-request-1",
+                           signed_artifact=artifact)
+        stored_artifact = self.owner.signed_artifact("request-1", 1)
+        self.assertEqual(b"exact original artifact\x00with bytes", stored_artifact["original_bytes"])
+        self.assertEqual(artifact["envelope_bytes"], stored_artifact["envelope_bytes"])
+        self.assertEqual(artifact["signature"], stored_artifact["signature"])
+        digest_a = artifact["artifact_digest"]
         digest_b = "sha256:" + "b" * 64
         with self.assertRaises(Conflict):
             self.owner.decide_artifact("request-1", 1, digest_b, "decision-wrong-digest")
@@ -180,10 +191,81 @@ class OwnerOracleTests(unittest.TestCase):
         self.assertEqual(digest_a, self.owner.request("request-1")["artifact_decision_digest"])
         with self.assertRaises(Conflict):
             self.owner.decide_artifact("request-1", 2, "not-a-digest", "decision-invalid")
-        self.owner.revise("request-1", 2, {"procedure": "new artifact", "artifact_digest": digest_b}, "revise-artifact")
+        self.owner.revise("request-1", 2, {"procedure": "new artifact"}, "revise-artifact")
         current = self.owner.request("request-1")
         self.assertEqual(3, current["revision"])
+        self.assertEqual(2, current["material_revision"])
         self.assertIsNone(current["artifact_decision_digest"])
+        self.assertEqual(b"exact original artifact\x00with bytes",
+                         self.owner.signed_artifact("request-1", 1)["original_bytes"])
+        with self.assertRaises(Conflict):
+            self.operator.decide_artifact("request-1", 3, digest_a, "decision-old-revision")
+
+    def test_same_body_revise_advances_material_epoch_and_rejects_old_signature(self):
+        body = {"purpose": "same material bytes", "procedure_revision": "source-r1"}
+        artifact = make_signed_artifact(workspace_id="workspace-a", request_id="request-1", material_revision=1,
+                                        material_digest=material_digest(body), original_bytes=b"same-body artifact")
+        self.owner.publish("request-1", body, ["work-a"], "same-body-publish", signed_artifact=artifact)
+        changed = self.owner.revise("request-1", 1, body, "same-body-revise")
+        current = self.owner.request("request-1")
+        self.assertEqual(2, changed["revision"])
+        self.assertEqual(2, current["material_revision"])
+        self.assertEqual(material_digest(body), material_digest(json.loads(current["body_json"])))
+        self.assertEqual(b"same-body artifact", self.owner.signed_artifact("request-1", 1)["original_bytes"])
+        with self.assertRaises(Conflict):
+            self.operator.decide_artifact("request-1", 2, artifact["artifact_digest"], "same-body-old-signature")
+
+    def test_signed_artifact_refuses_byte_signature_context_and_domain_tampering(self):
+        body = {"purpose": "test-only", "procedure_revision": "source-r1"}
+        valid = make_signed_artifact(workspace_id="workspace-a", request_id="signed-request", material_revision=1,
+                                     material_digest=material_digest(body), original_bytes=b"signed bytes")
+        for field, value in (
+            ("original_bytes", b"changed bytes"),
+            ("artifact_digest", "sha256:" + "0" * 64),
+            ("envelope_bytes", valid["envelope_bytes"].replace(b"/v1", b"/v2")),
+            ("signature", bytes([valid["signature"][0] ^ 1]) + valid["signature"][1:]),
+        ):
+            broken = dict(valid, **{field: value})
+            with self.subTest(field=field), self.assertRaises(Conflict):
+                self.owner.publish("signed-request", body, ["work-a"], f"bad-{field}",
+                                   signed_artifact=broken)
+            self.assertEqual(0, self.owner.request_count())
+
+        wrong_context = make_signed_artifact(workspace_id="workspace-b", request_id="signed-request", material_revision=1,
+                                             material_digest=material_digest(body), original_bytes=b"signed bytes")
+        with self.assertRaises(Conflict):
+            self.owner.publish("signed-request", body, ["work-a"], "bad-tenant", signed_artifact=wrong_context)
+        for label, context in (
+            ("request", dict(workspace_id="workspace-a", request_id="different-request", material_revision=1)),
+            ("revision", dict(workspace_id="workspace-a", request_id="signed-request", material_revision=2)),
+            ("domain-version", dict(workspace_id="workspace-a", request_id="signed-request", material_revision=1,
+                                     domain="vuoro-ec00-artifact-decision/v2")),
+        ):
+            context.setdefault("material_digest", material_digest(body))
+            context.setdefault("original_bytes", b"signed bytes")
+            wrong = make_signed_artifact(**context)
+            with self.subTest(context=label), self.assertRaises(Conflict):
+                self.owner.publish("signed-request", body, ["work-a"], f"bad-{label}", signed_artifact=wrong)
+
+        self.owner.publish("signed-request", body, ["work-a"], "good-signed-publish", signed_artifact=valid)
+        self.owner.publish("other-request", body, ["work-a"], "publish-other-request")
+        for column, value in (
+            ("original_bytes", sqlite3.Binary(b"changed bytes")),
+            ("envelope_bytes", sqlite3.Binary(valid["envelope_bytes"] + b"x")),
+            ("signature", sqlite3.Binary(valid["signature"][:-1] + bytes([valid["signature"][-1] ^ 1]))),
+            ("material_digest", "sha256:" + "f" * 64),
+            ("workspace_id", "workspace-b"),
+            ("request_id", "other-request"),
+            ("material_revision", 2),
+            ("key_id", "unknown-test-key"),
+        ):
+            with self.subTest(column=column):
+                saved = self.owner.db.execute(f"SELECT {column} FROM signed_artifact WHERE request_id=?", ("signed-request",)).fetchone()[0]
+                self.owner.db.execute(f"UPDATE signed_artifact SET {column}=? WHERE request_id=?", (value, "signed-request"))
+                with self.assertRaises(Conflict):
+                    self.operator.decide_artifact("signed-request", 1, valid["artifact_digest"], f"tampered-{column}")
+                restore_key = value if column == "request_id" else "signed-request"
+                self.owner.db.execute(f"UPDATE signed_artifact SET {column}=? WHERE request_id=?", (saved, restore_key))
 
     def test_resolution_and_each_dependent_ack_have_distinct_revisioned_events(self):
         self.publish()

@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 from google.protobuf import struct_pb2 as google_dot_protobuf_dot_struct__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0boa.v1.proto\x12\nec00.oa.v1\x1a\x1cgoogle/protobuf/struct.proto\"\x99\x01\n\x0ePublishRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x16\n\tobjective\x18\x02 \x01(\tH\x01\x88\x01\x01\x12\x0e\n\x04note\x18\x03 \x01(\tH\x00\x12/\n\tnote_null\x18\x04 \x01(\x0e\x32\x1a.google.protobuf.NullValueH\x00\x42\x0c\n\nnote_valueB\x0c\n\n_objective\"\xce\x01\n\rReviseRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x1e\n\x11\x65xpected_revision\x18\x02 \x01(\x03H\x01\x88\x01\x01\x12\x16\n\tobjective\x18\x03 \x01(\tH\x02\x88\x01\x01\x12\x0e\n\x04note\x18\x04 \x01(\tH\x00\x12/\n\tnote_null\x18\x05 \x01(\x0e\x32\x1a.google.protobuf.NullValueH\x00\x42\x0c\n\nnote_valueB\x14\n\x12_expected_revisionB\x0c\n\n_objective\"6\n\x0eMutationResult\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x10\n\x08revision\x18\x02 \x01(\x03\x32\x95\x01\n\x0fOwnerOperations\x12\x41\n\x07Publish\x12\x1a.ec00.oa.v1.PublishRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12?\n\x06Revise\x12\x19.ec00.oa.v1.ReviseRequest\x1a\x1a.ec00.oa.v1.MutationResultB<Z:example.com/vuoro-ec00/ec00/generated/protobuf/go/oa/v1;v1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0boa.v1.proto\x12\nec00.oa.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xb1\x02\n\x0ePublishRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x16\n\tobjective\x18\x02 \x01(\tH\x01\x88\x01\x01\x12\x0e\n\x04note\x18\x03 \x01(\tH\x00\x12/\n\tnote_null\x18\x04 \x01(\x0e\x32\x1a.google.protobuf.NullValueH\x00\x12\x15\n\rdependent_ids\x18\x05 \x03(\t\x12\x17\n\x0f\x61rtifact_digest\x18\x06 \x01(\t\x12\x17\n\x0f\x61rtifact_key_id\x18\x07 \x01(\t\x12\x16\n\x0e\x61rtifact_bytes\x18\x08 \x01(\x0c\x12\x19\n\x11\x61rtifact_envelope\x18\t \x01(\x0c\x12\x1a\n\x12\x61rtifact_signature\x18\n \x01(\x0c\x42\x0c\n\nnote_valueB\x0c\n\n_objective\"\xce\x01\n\rReviseRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x1e\n\x11\x65xpected_revision\x18\x02 \x01(\x03H\x01\x88\x01\x01\x12\x16\n\tobjective\x18\x03 \x01(\tH\x02\x88\x01\x01\x12\x0e\n\x04note\x18\x04 \x01(\tH\x00\x12/\n\tnote_null\x18\x05 \x01(\x0e\x32\x1a.google.protobuf.NullValueH\x00\x42\x0c\n\nnote_valueB\x14\n\x12_expected_revisionB\x0c\n\n_objective\"6\n\x0eMutationResult\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x10\n\x08revision\x18\x02 \x01(\x03\"z\n\x18WithdrawDependentRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x14\n\x0c\x64\x65pendent_id\x18\x02 \x01(\t\x12\x1e\n\x11\x65xpected_revision\x18\x03 \x01(\x03H\x00\x88\x01\x01\x42\x14\n\x12_expected_revision\"b\n\x16ReportPerformedRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x1e\n\x11\x65xpected_revision\x18\x02 \x01(\x03H\x00\x88\x01\x01\x42\x14\n\x12_expected_revision\"o\n\rVerifyRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x1e\n\x11\x65xpected_revision\x18\x02 \x01(\x03H\x00\x88\x01\x01\x12\x14\n\x0c\x65vidence_ref\x18\x03 \x01(\tB\x14\n\x12_expected_revision\"z\n\x15\x44\x65\x63ideArtifactRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x1e\n\x11\x65xpected_revision\x18\x02 \x01(\x03H\x00\x88\x01\x01\x12\x17\n\x0f\x61rtifact_digest\x18\x03 \x01(\tB\x14\n\x12_expected_revision\"Z\n\x0eResolveRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x1e\n\x11\x65xpected_revision\x18\x02 \x01(\x03H\x00\x88\x01\x01\x42\x14\n\x12_expected_revision\"\x80\x01\n\x1e\x41\x63knowledgeContinuationRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x14\n\x0c\x64\x65pendent_id\x18\x02 \x01(\t\x12\x1e\n\x11\x65xpected_revision\x18\x03 \x01(\x03H\x00\x88\x01\x01\x42\x14\n\x12_expected_revision\"!\n\x0bRequestById\x12\x12\n\nrequest_id\x18\x01 \x01(\t\"D\n\x13ReadArtifactRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x19\n\x11material_revision\x18\x02 \x01(\x03\"<\n\x0bPageRequest\x12\x13\n\x06\x63ursor\x18\x01 \x01(\tH\x00\x88\x01\x01\x12\r\n\x05limit\x18\x02 \x01(\x05\x42\t\n\x07_cursor\"\x1a\n\nJsonResult\x12\x0c\n\x04json\x18\x01 \x01(\t2\xbe\x07\n\x0fOwnerOperations\x12\x41\n\x07Publish\x12\x1a.ec00.oa.v1.PublishRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12?\n\x06Revise\x12\x19.ec00.oa.v1.ReviseRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12U\n\x11WithdrawDependent\x12$.ec00.oa.v1.WithdrawDependentRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12Q\n\x0fReportPerformed\x12\".ec00.oa.v1.ReportPerformedRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12?\n\x06Verify\x12\x19.ec00.oa.v1.VerifyRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12O\n\x0e\x44\x65\x63ideArtifact\x12!.ec00.oa.v1.DecideArtifactRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12\x41\n\x07Resolve\x12\x1a.ec00.oa.v1.ResolveRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12\x61\n\x17\x41\x63knowledgeContinuation\x12*.ec00.oa.v1.AcknowledgeContinuationRequest\x1a\x1a.ec00.oa.v1.MutationResult\x12>\n\x0bReadRequest\x12\x17.ec00.oa.v1.RequestById\x1a\x16.ec00.oa.v1.JsonResult\x12\x41\n\x0eReadDependants\x12\x17.ec00.oa.v1.RequestById\x1a\x16.ec00.oa.v1.JsonResult\x12G\n\x0cReadArtifact\x12\x1f.ec00.oa.v1.ReadArtifactRequest\x1a\x16.ec00.oa.v1.JsonResult\x12?\n\x0cListRequests\x12\x17.ec00.oa.v1.PageRequest\x1a\x16.ec00.oa.v1.JsonResult\x12\x38\n\x05Watch\x12\x17.ec00.oa.v1.PageRequest\x1a\x16.ec00.oa.v1.JsonResultB<Z:example.com/vuoro-ec00/ec00/generated/protobuf/go/oa/v1;v1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -34,11 +34,31 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z:example.com/vuoro-ec00/ec00/generated/protobuf/go/oa/v1;v1'
   _globals['_PUBLISHREQUEST']._serialized_start=58
-  _globals['_PUBLISHREQUEST']._serialized_end=211
-  _globals['_REVISEREQUEST']._serialized_start=214
-  _globals['_REVISEREQUEST']._serialized_end=420
-  _globals['_MUTATIONRESULT']._serialized_start=422
-  _globals['_MUTATIONRESULT']._serialized_end=476
-  _globals['_OWNEROPERATIONS']._serialized_start=479
-  _globals['_OWNEROPERATIONS']._serialized_end=628
+  _globals['_PUBLISHREQUEST']._serialized_end=363
+  _globals['_REVISEREQUEST']._serialized_start=366
+  _globals['_REVISEREQUEST']._serialized_end=572
+  _globals['_MUTATIONRESULT']._serialized_start=574
+  _globals['_MUTATIONRESULT']._serialized_end=628
+  _globals['_WITHDRAWDEPENDENTREQUEST']._serialized_start=630
+  _globals['_WITHDRAWDEPENDENTREQUEST']._serialized_end=752
+  _globals['_REPORTPERFORMEDREQUEST']._serialized_start=754
+  _globals['_REPORTPERFORMEDREQUEST']._serialized_end=852
+  _globals['_VERIFYREQUEST']._serialized_start=854
+  _globals['_VERIFYREQUEST']._serialized_end=965
+  _globals['_DECIDEARTIFACTREQUEST']._serialized_start=967
+  _globals['_DECIDEARTIFACTREQUEST']._serialized_end=1089
+  _globals['_RESOLVEREQUEST']._serialized_start=1091
+  _globals['_RESOLVEREQUEST']._serialized_end=1181
+  _globals['_ACKNOWLEDGECONTINUATIONREQUEST']._serialized_start=1184
+  _globals['_ACKNOWLEDGECONTINUATIONREQUEST']._serialized_end=1312
+  _globals['_REQUESTBYID']._serialized_start=1314
+  _globals['_REQUESTBYID']._serialized_end=1347
+  _globals['_READARTIFACTREQUEST']._serialized_start=1349
+  _globals['_READARTIFACTREQUEST']._serialized_end=1417
+  _globals['_PAGEREQUEST']._serialized_start=1419
+  _globals['_PAGEREQUEST']._serialized_end=1479
+  _globals['_JSONRESULT']._serialized_start=1481
+  _globals['_JSONRESULT']._serialized_end=1507
+  _globals['_OWNEROPERATIONS']._serialized_start=1510
+  _globals['_OWNEROPERATIONS']._serialized_end=2468
 # @@protoc_insertion_point(module_scope)

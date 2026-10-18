@@ -71,6 +71,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         request_id: proto_id.clone(),
         objective: Some("Rust native gRPC publish".to_owned()),
         note_value: Some(oa::publish_request::NoteValue::NoteNull(0)),
+        ..Default::default()
     }, "rust-grpc-publish")?;
     let published = client.publish(proto_publish).await?.into_inner();
     if published.request_id != proto_id || published.revision != 1 {
@@ -81,6 +82,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         request_id: proto_null_note_id.clone(),
         objective: Some("Rust native gRPC null note".into()),
         note_value: Some(oa::publish_request::NoteValue::NoteNull(0)),
+        ..Default::default()
     }, "rust-grpc-publish-null-note")?;
     client.publish(null_note).await?;
     let proto_absent_note_id = "9007199254741043".to_owned();
@@ -88,6 +90,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         request_id: proto_absent_note_id.clone(),
         objective: Some("Rust native gRPC absent note".into()),
         note_value: None,
+        ..Default::default()
     }, "rust-grpc-publish-absent-note")?;
     client.publish(absent_note).await?;
 

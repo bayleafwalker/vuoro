@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { PublishData, PublishResponses, ReviseData, ReviseResponses } from './types.gen';
+import type { AcknowledgeContinuationData, AcknowledgeContinuationResponses, DecideArtifactData, DecideArtifactResponses, ListRequestsData, ListRequestsResponses, PublishData, PublishResponses, ReadArtifactData, ReadArtifactResponses, ReadDependantsData, ReadDependantsResponses, ReadRequestData, ReadRequestResponses, ReportPerformedData, ReportPerformedResponses, ResolveData, ResolveResponses, ReviseData, ReviseResponses, VerifyData, VerifyResponses, WatchData, WatchResponses, WithdrawDependentData, WithdrawDependentResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -18,6 +18,10 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
 
+export const watch = <ThrowOnError extends boolean = false>(options?: Options<WatchData, ThrowOnError>): RequestResult<WatchResponses, unknown, ThrowOnError> => (options?.client ?? client).get<WatchResponses, unknown, ThrowOnError>({ url: '/v1/events', ...options });
+
+export const listRequests = <ThrowOnError extends boolean = false>(options?: Options<ListRequestsData, ThrowOnError>): RequestResult<ListRequestsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListRequestsResponses, unknown, ThrowOnError>({ url: '/v1/requests', ...options });
+
 export const publish = <ThrowOnError extends boolean = false>(options: Options<PublishData, ThrowOnError>): RequestResult<PublishResponses, unknown, ThrowOnError> => (options.client ?? client).post<PublishResponses, unknown, ThrowOnError>({
     url: '/v1/requests',
     ...options,
@@ -27,8 +31,68 @@ export const publish = <ThrowOnError extends boolean = false>(options: Options<P
     }
 });
 
+export const readRequest = <ThrowOnError extends boolean = false>(options: Options<ReadRequestData, ThrowOnError>): RequestResult<ReadRequestResponses, unknown, ThrowOnError> => (options.client ?? client).get<ReadRequestResponses, unknown, ThrowOnError>({ url: '/v1/requests/{requestId}', ...options });
+
 export const revise = <ThrowOnError extends boolean = false>(options: Options<ReviseData, ThrowOnError>): RequestResult<ReviseResponses, unknown, ThrowOnError> => (options.client ?? client).patch<ReviseResponses, unknown, ThrowOnError>({
     url: '/v1/requests/{requestId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const acknowledgeContinuation = <ThrowOnError extends boolean = false>(options: Options<AcknowledgeContinuationData, ThrowOnError>): RequestResult<AcknowledgeContinuationResponses, unknown, ThrowOnError> => (options.client ?? client).post<AcknowledgeContinuationResponses, unknown, ThrowOnError>({
+    url: '/v1/requests/{requestId}/acknowledge',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const decideArtifact = <ThrowOnError extends boolean = false>(options: Options<DecideArtifactData, ThrowOnError>): RequestResult<DecideArtifactResponses, unknown, ThrowOnError> => (options.client ?? client).post<DecideArtifactResponses, unknown, ThrowOnError>({
+    url: '/v1/requests/{requestId}/artifact-decision',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const readArtifact = <ThrowOnError extends boolean = false>(options: Options<ReadArtifactData, ThrowOnError>): RequestResult<ReadArtifactResponses, unknown, ThrowOnError> => (options.client ?? client).get<ReadArtifactResponses, unknown, ThrowOnError>({ url: '/v1/requests/{requestId}/artifact/{materialRevision}', ...options });
+
+export const readDependants = <ThrowOnError extends boolean = false>(options: Options<ReadDependantsData, ThrowOnError>): RequestResult<ReadDependantsResponses, unknown, ThrowOnError> => (options.client ?? client).get<ReadDependantsResponses, unknown, ThrowOnError>({ url: '/v1/requests/{requestId}/dependants', ...options });
+
+export const reportPerformed = <ThrowOnError extends boolean = false>(options: Options<ReportPerformedData, ThrowOnError>): RequestResult<ReportPerformedResponses, unknown, ThrowOnError> => (options.client ?? client).post<ReportPerformedResponses, unknown, ThrowOnError>({
+    url: '/v1/requests/{requestId}/report',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const resolve = <ThrowOnError extends boolean = false>(options: Options<ResolveData, ThrowOnError>): RequestResult<ResolveResponses, unknown, ThrowOnError> => (options.client ?? client).post<ResolveResponses, unknown, ThrowOnError>({
+    url: '/v1/requests/{requestId}/resolve',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const verify = <ThrowOnError extends boolean = false>(options: Options<VerifyData, ThrowOnError>): RequestResult<VerifyResponses, unknown, ThrowOnError> => (options.client ?? client).post<VerifyResponses, unknown, ThrowOnError>({
+    url: '/v1/requests/{requestId}/verify',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const withdrawDependent = <ThrowOnError extends boolean = false>(options: Options<WithdrawDependentData, ThrowOnError>): RequestResult<WithdrawDependentResponses, unknown, ThrowOnError> => (options.client ?? client).post<WithdrawDependentResponses, unknown, ThrowOnError>({
+    url: '/v1/requests/{requestId}/withdraw',
     ...options,
     headers: {
         'Content-Type': 'application/json',

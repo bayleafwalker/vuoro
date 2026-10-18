@@ -4,9 +4,24 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type AcknowledgeRequest = {
+    dependentId: string;
+    expectedRevision: number;
+};
+
+export type DecideArtifactRequest = {
+    expectedRevision: number;
+    artifactDigest: string;
+};
+
 export type MutationResult = {
     requestId: string;
     revision: number;
+};
+
+export type PageRequest = {
+    cursor?: string;
+    limit: number;
 };
 
 export type PublishRequest = {
@@ -16,6 +31,16 @@ export type PublishRequest = {
     requestId: string;
     objective: string;
     note?: string | null;
+    dependants?: Array<string>;
+    artifactDigest?: string;
+    artifactKeyId?: string;
+    artifactBytes?: string;
+    artifactEnvelope?: string;
+    artifactSignature?: string;
+};
+
+export type ReadResult = {
+    json: string;
 };
 
 export type ReviseRequest = {
@@ -27,6 +52,58 @@ export type ReviseRequest = {
     objective: string;
     note?: string | null;
 };
+
+export type RevisionRequest = {
+    expectedRevision: number;
+};
+
+export type VerifyRequest = {
+    expectedRevision: number;
+    evidenceRef: string;
+};
+
+export type WithdrawRequest = {
+    dependentId: string;
+    expectedRevision: number;
+};
+
+export type WatchData = {
+    body?: never;
+    path?: never;
+    query?: {
+        cursor?: string;
+        limit?: number;
+    };
+    url: '/v1/events';
+};
+
+export type WatchResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: ReadResult;
+};
+
+export type WatchResponse = WatchResponses[keyof WatchResponses];
+
+export type ListRequestsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        cursor?: string;
+        limit?: number;
+    };
+    url: '/v1/requests';
+};
+
+export type ListRequestsResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: ReadResult;
+};
+
+export type ListRequestsResponse = ListRequestsResponses[keyof ListRequestsResponses];
 
 export type PublishData = {
     body: PublishRequest;
@@ -43,6 +120,24 @@ export type PublishResponses = {
 };
 
 export type PublishResponse = PublishResponses[keyof PublishResponses];
+
+export type ReadRequestData = {
+    body?: never;
+    path: {
+        requestId: string;
+    };
+    query?: never;
+    url: '/v1/requests/{requestId}';
+};
+
+export type ReadRequestResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: ReadResult;
+};
+
+export type ReadRequestResponse = ReadRequestResponses[keyof ReadRequestResponses];
 
 export type ReviseData = {
     body: ReviseRequest;
@@ -61,3 +156,148 @@ export type ReviseResponses = {
 };
 
 export type ReviseResponse = ReviseResponses[keyof ReviseResponses];
+
+export type AcknowledgeContinuationData = {
+    body: AcknowledgeRequest;
+    path: {
+        requestId: string;
+    };
+    query?: never;
+    url: '/v1/requests/{requestId}/acknowledge';
+};
+
+export type AcknowledgeContinuationResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: MutationResult;
+};
+
+export type AcknowledgeContinuationResponse = AcknowledgeContinuationResponses[keyof AcknowledgeContinuationResponses];
+
+export type DecideArtifactData = {
+    body: DecideArtifactRequest;
+    path: {
+        requestId: string;
+    };
+    query?: never;
+    url: '/v1/requests/{requestId}/artifact-decision';
+};
+
+export type DecideArtifactResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: MutationResult;
+};
+
+export type DecideArtifactResponse = DecideArtifactResponses[keyof DecideArtifactResponses];
+
+export type ReadArtifactData = {
+    body?: never;
+    path: {
+        requestId: string;
+        materialRevision: number;
+    };
+    query?: never;
+    url: '/v1/requests/{requestId}/artifact/{materialRevision}';
+};
+
+export type ReadArtifactResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: ReadResult;
+};
+
+export type ReadArtifactResponse = ReadArtifactResponses[keyof ReadArtifactResponses];
+
+export type ReadDependantsData = {
+    body?: never;
+    path: {
+        requestId: string;
+    };
+    query?: never;
+    url: '/v1/requests/{requestId}/dependants';
+};
+
+export type ReadDependantsResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: ReadResult;
+};
+
+export type ReadDependantsResponse = ReadDependantsResponses[keyof ReadDependantsResponses];
+
+export type ReportPerformedData = {
+    body: RevisionRequest;
+    path: {
+        requestId: string;
+    };
+    query?: never;
+    url: '/v1/requests/{requestId}/report';
+};
+
+export type ReportPerformedResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: MutationResult;
+};
+
+export type ReportPerformedResponse = ReportPerformedResponses[keyof ReportPerformedResponses];
+
+export type ResolveData = {
+    body: RevisionRequest;
+    path: {
+        requestId: string;
+    };
+    query?: never;
+    url: '/v1/requests/{requestId}/resolve';
+};
+
+export type ResolveResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: MutationResult;
+};
+
+export type ResolveResponse = ResolveResponses[keyof ResolveResponses];
+
+export type VerifyData = {
+    body: VerifyRequest;
+    path: {
+        requestId: string;
+    };
+    query?: never;
+    url: '/v1/requests/{requestId}/verify';
+};
+
+export type VerifyResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: MutationResult;
+};
+
+export type VerifyResponse = VerifyResponses[keyof VerifyResponses];
+
+export type WithdrawDependentData = {
+    body: WithdrawRequest;
+    path: {
+        requestId: string;
+    };
+    query?: never;
+    url: '/v1/requests/{requestId}/withdraw';
+};
+
+export type WithdrawDependentResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: MutationResult;
+};
+
+export type WithdrawDependentResponse = WithdrawDependentResponses[keyof WithdrawDependentResponses];

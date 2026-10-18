@@ -1,5 +1,5 @@
+"""A client library for accessing EC-00 disposable OA candidate"""
 
-""" A client library for accessing EC-00 disposable OA candidate """
 from .client import AuthenticatedClient, Client
 
 __all__ = (
