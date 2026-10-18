@@ -41,7 +41,7 @@ def make_journal(directory: Path, effects: list[dict]) -> Path:
     directory.mkdir(mode=0o700)
     (directory / "journal.lock").touch(mode=0o600)
     connection = sqlite3.connect(directory / "journal.sqlite3", isolation_level=None)
-    for sql in (*journal_module._TABLE_SQL.values(), *journal_module._TRIGGER_SQL.values()):
+    for sql in (*journal_module._V1_TABLE_SQL.values(), *journal_module._V1_TRIGGER_SQL.values()):
         connection.execute(sql)
     connection.execute("PRAGMA user_version=1")
     connection.execute("INSERT INTO journal_metadata VALUES (1,1,'host',?,?)", (b"{}", _sha(b"{}")))
