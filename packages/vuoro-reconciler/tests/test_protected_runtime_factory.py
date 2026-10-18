@@ -1,5 +1,6 @@
 """Composition ownership and refusal gates; no installed authority fixture."""
 
+from contextlib import nullcontext
 from types import SimpleNamespace
 import os
 
@@ -314,6 +315,9 @@ def test_registry_rebind_receipt_factory_joins_current_admission_and_journal(
             assert operation_id == "a" * 32
             return receipt
 
+        def cycle(self):
+            return nullcontext(self)
+
         def close(self):
             events.append("journal-close")
 
@@ -350,6 +354,9 @@ def test_registry_rebind_receipt_factory_rechecks_journal_path_after_read(
         def registry_rebind_receipt(self, operation_id):
             return {"operation_id": operation_id}
 
+        def cycle(self):
+            return nullcontext(self)
+
         def close(self):
             events.append("journal-close")
 
@@ -378,6 +385,9 @@ def test_registry_rebind_receipt_factory_refuses_marker_created_during_read(
         def registry_rebind_receipt(self, operation_id):
             active_path.write_text("active")
             return {"operation_id": operation_id}
+
+        def cycle(self):
+            return nullcontext(self)
 
         def close(self):
             events.append("journal-close")
@@ -447,11 +457,14 @@ def real_storage_fixture(monkeypatch, tmp_path):
     artifacts = tmp_path / "artifacts"
     artifacts.mkdir(mode=0o700)
     digest = "sha256:" + "a" * 64
+    registry = b'{"fixture":true}'
     profile = SimpleNamespace(
-        data={"artifact_root": str(artifacts), "runtime_profile_sha256": digest}
+        profile_sha256="sha256:" + "e" * 64,
+        registry_sha256=module._hash(registry),
+        data={"artifact_root": str(artifacts), "runtime_profile_sha256": digest},
     )
     snapshot = SimpleNamespace(
-        profile=profile, host_id="fixture", registry_utf8=b'{"fixture":true}'
+        profile=profile, host_id="fixture", registry_utf8=registry
     )
     runtime = SimpleNamespace(profile_sha256=digest)
     monkeypatch.setattr(module, "_root", lambda: root)
@@ -463,9 +476,108 @@ def real_storage_fixture(monkeypatch, tmp_path):
     monkeypatch.setitem(
         sys.modules,
         "vuoro_reconciler.protected_provider_registry",
-        SimpleNamespace(_filesystem=lambda descriptor: 123, _LOCAL_FILESYSTEMS={123}),
+        SimpleNamespace(
+            _filesystem=lambda descriptor: 123,
+            _LOCAL_FILESYSTEMS={123},
+            _owned=protected_provider_registry._owned,
+        ),
     )
     return parent, snapshot
+
+
+def real_rebound_journal_fixture(monkeypatch, tmp_path):
+    import sys
+
+    parent, snapshot = real_storage_fixture(monkeypatch, tmp_path)
+    old_registry = snapshot.registry_utf8
+    old_registry_sha256 = module._hash(old_registry)
+    module.install_profile_journal("fixture")
+    snapshot.registry_utf8 = b'{"fixture":true,"revision":2}'
+    snapshot.profile.registry_sha256 = module._hash(snapshot.registry_utf8)
+    snapshot.profile.profile_sha256 = "sha256:" + "f" * 64
+
+    state_dir = tmp_path / "operation-state"
+    state_dir.mkdir(mode=0o700)
+    state_dir.chmod(0o700)
+    lock_path = state_dir / "fixture.lock"
+    lock_path.touch(mode=0o600)
+    lock_path.chmod(0o600)
+    registry_stub = sys.modules["vuoro_reconciler.protected_provider_registry"]
+    registry_stub._state_paths = lambda profile_id: (state_dir, lock_path, "fixture.active")
+
+    class Provider:
+        def __init__(self):
+            self._state = SimpleNamespace(
+                profile=snapshot.profile,
+                directory=os.open(state_dir, os.O_RDONLY | os.O_DIRECTORY),
+                lock=os.open(lock_path, os.O_RDWR),
+            )
+
+        def close(self):
+            os.close(self._state.lock)
+            os.close(self._state.directory)
+
+    monkeypatch.setattr(module, "_provider", lambda profile_id: Provider())
+    result = module.rebind_empty_profile_journal(
+        "fixture",
+        expected_old_registry_sha256=old_registry_sha256,
+        expected_profile_sha256=snapshot.profile.profile_sha256,
+        expected_host_id=snapshot.host_id,
+        operation_id="a" * 32,
+    )
+    return parent, snapshot, old_registry_sha256, result
+
+
+def test_factory_receipt_reads_real_rebound_temporary_journal_and_missing_id(
+    monkeypatch, tmp_path
+):
+    _, snapshot, old_hash, actual = real_rebound_journal_fixture(monkeypatch, tmp_path)
+    expected = {
+        "profile_id": "fixture",
+        "host_id": snapshot.host_id,
+        "profile_sha256": snapshot.profile.profile_sha256,
+        "operation_id": "a" * 32,
+        "old_registry_sha256": old_hash,
+        "new_registry_sha256": snapshot.profile.registry_sha256,
+    }
+    assert actual == expected
+    observed = module.read_profile_journal_rebind_receipt(
+        "fixture",
+        operation_id="a" * 32,
+        expected_profile_sha256=snapshot.profile.profile_sha256,
+        expected_host_id=snapshot.host_id,
+    )
+    assert observed == {
+        "operation_id": "a" * 32,
+        "host_id": snapshot.host_id,
+        "profile_id": "fixture",
+        "old_registry_sha256": old_hash,
+        "new_registry_sha256": snapshot.profile.registry_sha256,
+    }
+    assert module.read_profile_journal_rebind_receipt(
+        "fixture",
+        operation_id="b" * 32,
+        expected_profile_sha256=snapshot.profile.profile_sha256,
+        expected_host_id=snapshot.host_id,
+    ) is None
+
+
+def test_factory_receipt_refuses_catalog_corruption_in_real_journal(
+    monkeypatch, tmp_path
+):
+    import sqlite3
+
+    parent, snapshot, _, _ = real_rebound_journal_fixture(monkeypatch, tmp_path)
+    db_path = parent / "journal" / "journal.sqlite3"
+    with sqlite3.connect(db_path) as connection:
+        connection.execute("DROP TRIGGER registry_rebinds_no_delete")
+    with pytest.raises(RuntimeRefused):
+        module.read_profile_journal_rebind_receipt(
+            "fixture",
+            operation_id="a" * 32,
+            expected_profile_sha256=snapshot.profile.profile_sha256,
+            expected_host_id=snapshot.host_id,
+        )
 
 
 @pytest.mark.parametrize("drift", ["mode", "replacement700", "replacement755"])

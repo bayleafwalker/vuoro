@@ -424,7 +424,8 @@ def read_profile_journal_rebind_receipt(
                 registry_utf8=snapshot.registry_utf8,
             )
             try:
-                receipt = journal.registry_rebind_receipt(operation_id)
+                with journal.cycle():
+                    receipt = journal.registry_rebind_receipt(operation_id)
             finally:
                 journal.close()
             _need(_snapshot(profile_id) == snapshot)
