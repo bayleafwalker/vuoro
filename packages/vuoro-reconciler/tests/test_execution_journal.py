@@ -3,6 +3,7 @@
 import asyncio
 import base64
 from dataclasses import FrozenInstanceError
+import fcntl
 import json
 import os
 import select
@@ -33,6 +34,312 @@ def installed(tmp_path):
     path = tmp_path / "journal"
     install_journal(path, host_id=HOST, registry_utf8=REGISTRY)
     return path
+
+
+def installed_v1(tmp_path):
+    path = tmp_path / "journal-v1"
+    path.mkdir(mode=0o700)
+    (path / module.LOCK_NAME).touch(mode=0o600)
+    database = path / module.DB_NAME
+    database.touch(mode=0o600)
+    with sqlite3.connect(database) as connection:
+        for sql in (*module._V1_TABLE_SQL.values(), *module._V1_TRIGGER_SQL.values()):
+            connection.execute(sql)
+        connection.execute("PRAGMA user_version=1")
+        connection.execute(
+            "INSERT INTO journal_metadata VALUES (1,1,?,?,?)",
+            (HOST, REGISTRY, sha(REGISTRY)),
+        )
+    return path
+
+
+def test_empty_v1_journal_rebind_is_atomic_and_audits_exact_registry_bytes(tmp_path):
+    path = installed_v1(tmp_path)
+    updated = canonical({"schema": "test-registry/v1", "profile": "updated"})
+    receipt = module.rebind_empty_journal(
+        path,
+        host_id=HOST,
+        profile_id="fixture-profile",
+        expected_old_registry_sha256=sha(REGISTRY),
+        new_registry_utf8=updated,
+        operation_id="a" * 32,
+    )
+    assert receipt == {
+        "operation_id": "a" * 32,
+        "old_registry_sha256": sha(REGISTRY),
+        "new_registry_sha256": sha(updated),
+    }
+    with sqlite3.connect(path / module.DB_NAME) as connection:
+        assert connection.execute("PRAGMA user_version").fetchone() == (2,)
+        assert connection.execute(
+            "SELECT host_id,registry_utf8,registry_sha256 FROM journal_metadata"
+        ).fetchone() == (HOST, updated, sha(updated))
+        assert connection.execute(
+            "SELECT host_id,profile_id,old_registry_utf8,old_registry_sha256,new_registry_utf8,new_registry_sha256 FROM registry_rebinds"
+        ).fetchone() == (HOST, "fixture-profile", REGISTRY, sha(REGISTRY), updated, sha(updated))
+        assert connection.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+    opened = ExecutionJournal(path, host_id=HOST, registry_utf8=updated)
+    with opened.cycle():
+        assert opened.registry_rebind_receipt("a" * 32) == {
+            "operation_id": "a" * 32,
+            "host_id": HOST,
+            "profile_id": "fixture-profile",
+            "old_registry_sha256": sha(REGISTRY),
+            "new_registry_sha256": sha(updated),
+        }
+    opened.close()
+
+
+def test_rebind_refuses_journal_replaced_between_factory_pin_and_lowlevel_open(tmp_path):
+    path = installed_v1(tmp_path)
+    pinned = tuple(
+        (os.stat(path / name).st_dev, os.stat(path / name).st_ino)
+        for name in (".", module.LOCK_NAME, module.DB_NAME)
+    )
+    backup = path / "journal.lock.old"
+    os.replace(path / module.LOCK_NAME, backup)
+    replacement = path / module.LOCK_NAME
+    replacement.touch(mode=0o600)
+    replacement.chmod(0o600)
+
+    with pytest.raises(JournalRefused):
+        module.rebind_empty_journal(
+            path,
+            host_id=HOST,
+            profile_id="fixture-profile",
+            expected_old_registry_sha256=sha(REGISTRY),
+            new_registry_utf8=canonical({"schema": "test-registry/v1", "profile": "updated"}),
+            operation_id="b" * 32,
+            expected_physical_identities=pinned,
+        )
+    with sqlite3.connect(path / module.DB_NAME) as connection:
+        assert connection.execute("PRAGMA user_version").fetchone() == (1,)
+
+
+def test_rebind_identity_handoff_failure_before_commit_rolls_back_v1(tmp_path):
+    path = installed_v1(tmp_path)
+    calls = 0
+
+    def identity_check():
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise JournalRefused("fixture handoff drift")
+
+    with pytest.raises(JournalRefused):
+        module.rebind_empty_journal(
+            path,
+            host_id=HOST,
+            profile_id="fixture-profile",
+            expected_old_registry_sha256=sha(REGISTRY),
+            new_registry_utf8=canonical({"schema": "test-registry/v1", "profile": "updated"}),
+            operation_id="c" * 32,
+            identity_check=identity_check,
+        )
+    assert calls == 2
+    with sqlite3.connect(path / module.DB_NAME) as connection:
+        assert connection.execute("PRAGMA user_version").fetchone() == (1,)
+        assert connection.execute(
+            "SELECT registry_utf8,registry_sha256 FROM journal_metadata"
+        ).fetchone() == (REGISTRY, sha(REGISTRY))
+
+
+def test_rebind_post_fsync_identity_failure_is_receiptable_without_retry(tmp_path):
+    path = installed_v1(tmp_path)
+    updated = canonical({"schema": "test-registry/v1", "profile": "updated"})
+    calls = 0
+
+    def identity_check():
+        nonlocal calls
+        calls += 1
+        if calls == 3:
+            raise JournalRefused("fixture post-fsync drift")
+
+    with pytest.raises(JournalRefused):
+        module.rebind_empty_journal(
+            path,
+            host_id=HOST,
+            profile_id="fixture-profile",
+            expected_old_registry_sha256=sha(REGISTRY),
+            new_registry_utf8=updated,
+            operation_id="d" * 32,
+            identity_check=identity_check,
+        )
+    assert calls == 3
+    journal = ExecutionJournal(path, host_id=HOST, registry_utf8=updated)
+    try:
+        with journal.cycle():
+            assert journal.registry_rebind_receipt("d" * 32)["new_registry_sha256"] == sha(updated)
+    finally:
+        journal.close()
+
+
+def test_empty_journal_can_rebind_twice_without_losing_transition_history(tmp_path):
+    path = installed_v1(tmp_path)
+    first = canonical({"schema": "test-registry/v1", "profile": "first"})
+    second = canonical({"schema": "test-registry/v1", "profile": "second"})
+    module.rebind_empty_journal(
+        path,
+        host_id=HOST,
+        profile_id="fixture-profile",
+        expected_old_registry_sha256=sha(REGISTRY),
+        new_registry_utf8=first,
+        operation_id="e" * 32,
+    )
+    module.rebind_empty_journal(
+        path,
+        host_id=HOST,
+        profile_id="fixture-profile",
+        expected_old_registry_sha256=sha(first),
+        new_registry_utf8=second,
+        operation_id="f" * 32,
+    )
+    with sqlite3.connect(path / module.DB_NAME) as connection:
+        rows = connection.execute(
+            "SELECT operation_id,old_registry_utf8,new_registry_utf8 FROM registry_rebinds ORDER BY rowid"
+        ).fetchall()
+        assert rows == [("e" * 32, REGISTRY, first), ("f" * 32, first, second)]
+    opened = ExecutionJournal(path, host_id=HOST, registry_utf8=second)
+    opened.close()
+
+
+def test_existing_v1_journal_remains_operational_without_implicit_migration(tmp_path):
+    path = installed_v1(tmp_path)
+    journal = ExecutionJournal(path, host_id=HOST, registry_utf8=REGISTRY)
+    try:
+        with journal.cycle():
+            assert journal.read("a" * 64) is None
+            bind(journal)
+    finally:
+        journal.close()
+    with sqlite3.connect(path / module.DB_NAME) as connection:
+        assert connection.execute("PRAGMA user_version").fetchone() == (1,)
+        assert connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='registry_rebinds'"
+        ).fetchone() is None
+
+
+@pytest.mark.parametrize("failure", ["stale-hash", "foreign-host", "nonempty"])
+def test_empty_v1_rebind_refuses_without_changing_legacy_journal(tmp_path, failure):
+    path = installed_v1(tmp_path)
+    if failure == "nonempty":
+        with sqlite3.connect(path / module.DB_NAME) as connection:
+            connection.execute(
+                "INSERT INTO effect_bindings VALUES (?,?,?,?,?)",
+                ("a" * 64, b"{}", sha(b"{}"), b"{}", sha(b"{}")),
+            )
+    with pytest.raises(JournalRefused):
+        module.rebind_empty_journal(
+            path,
+            host_id="foreign" if failure == "foreign-host" else HOST,
+            profile_id="fixture-profile",
+            expected_old_registry_sha256="sha256:" + "0" * 64 if failure == "stale-hash" else sha(REGISTRY),
+            new_registry_utf8=canonical({"schema": "test-registry/v1", "profile": "updated"}),
+            operation_id="b" * 32,
+        )
+    with sqlite3.connect(path / module.DB_NAME) as connection:
+        assert connection.execute("PRAGMA user_version").fetchone() == (1,)
+        assert connection.execute("SELECT registry_utf8 FROM journal_metadata").fetchone() == (REGISTRY,)
+
+
+def test_empty_v1_rebind_schema_failure_rolls_back_to_exact_v1_catalog(tmp_path, monkeypatch):
+    path = installed_v1(tmp_path)
+    original = (path / module.DB_NAME).read_bytes()
+    catalog = module._catalog
+
+    def fail_after_upgrade(connection):
+        if connection.execute("PRAGMA user_version").fetchone()[0] == 2:
+            raise ValueError("fixture failure")
+        return catalog(connection)
+
+    monkeypatch.setattr(module, "_catalog", fail_after_upgrade)
+    with pytest.raises(JournalRefused):
+        module.rebind_empty_journal(
+            path,
+            host_id=HOST,
+            profile_id="fixture-profile",
+            expected_old_registry_sha256=sha(REGISTRY),
+            new_registry_utf8=canonical({"schema": "test-registry/v1", "profile": "updated"}),
+            operation_id="c" * 32,
+        )
+    with sqlite3.connect(path / module.DB_NAME) as connection:
+        assert connection.execute("PRAGMA user_version").fetchone() == (1,)
+        assert connection.execute("SELECT registry_utf8 FROM journal_metadata").fetchone() == (REGISTRY,)
+        assert connection.execute("SELECT name FROM sqlite_master WHERE name='registry_rebinds'").fetchone() is None
+
+
+def test_empty_v1_rebind_refuses_while_existing_journal_flock_is_held(tmp_path):
+    path = installed_v1(tmp_path)
+    lock_fd = os.open(path / module.LOCK_NAME, os.O_RDWR)
+    fcntl.flock(lock_fd, fcntl.LOCK_EX)
+    try:
+        with pytest.raises(JournalRefused):
+            module.rebind_empty_journal(
+                path,
+                host_id=HOST,
+                profile_id="fixture-profile",
+                expected_old_registry_sha256=sha(REGISTRY),
+                new_registry_utf8=canonical({"schema": "test-registry/v1", "profile": "updated"}),
+                operation_id="9" * 32,
+            )
+        with sqlite3.connect(path / module.DB_NAME) as connection:
+            assert connection.execute("PRAGMA user_version").fetchone() == (1,)
+            assert connection.execute("SELECT registry_utf8 FROM journal_metadata").fetchone() == (REGISTRY,)
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        os.close(lock_fd)
+
+
+@pytest.mark.parametrize("phase", ["before-commit", "after-commit"])
+@pytest.mark.parametrize("target", [module.DB_NAME, module.LOCK_NAME])
+def test_empty_v1_rebind_detects_named_database_or_lock_replacement(
+    tmp_path, monkeypatch, phase, target
+):
+    path = installed_v1(tmp_path)
+    backup = path / (target + ".original")
+    if phase == "before-commit":
+        check = module._rebind_files_check
+        calls = 0
+
+        def replace_before_commit(directory, directory_fd, lock_fd, database_fd, identities):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                os.replace(path / target, backup)
+                replacement = path / target
+                replacement.touch(mode=0o600)
+                replacement.chmod(0o600)
+            return check(directory, directory_fd, lock_fd, database_fd, identities)
+
+        monkeypatch.setattr(module, "_rebind_files_check", replace_before_commit)
+    else:
+        fsync = module._fsync_files
+
+        def replace_after_commit(directory_fd, database_fd):
+            fsync(directory_fd, database_fd)
+            os.replace(path / target, backup)
+            replacement = path / target
+            replacement.touch(mode=0o600)
+            replacement.chmod(0o600)
+
+        monkeypatch.setattr(module, "_fsync_files", replace_after_commit)
+    with pytest.raises(JournalRefused):
+        module.rebind_empty_journal(
+            path,
+            host_id=HOST,
+            profile_id="fixture-profile",
+            expected_old_registry_sha256=sha(REGISTRY),
+            new_registry_utf8=canonical({"schema": "test-registry/v1", "profile": "updated"}),
+            operation_id="8" * 32,
+        )
+    assert backup.exists()
+    if phase == "before-commit":
+        with sqlite3.connect(backup if target == module.DB_NAME else path / module.DB_NAME) as connection:
+            assert connection.execute("PRAGMA user_version").fetchone() == (1,)
+    elif target == module.DB_NAME:
+        with sqlite3.connect(backup) as connection:
+            assert connection.execute("PRAGMA user_version").fetchone() == (2,)
+            assert connection.execute("SELECT operation_id FROM registry_rebinds").fetchone() == ("8" * 32,)
 
 
 @pytest.fixture
@@ -227,7 +534,7 @@ def test_installed_metadata_and_exact_catalog_drift_refused(tmp_path, change):
     if change not in ("host", "registry"):
         with sqlite3.connect(path / module.DB_NAME) as connection:
             if change == "version":
-                connection.execute("PRAGMA user_version=2")
+                connection.execute("PRAGMA user_version=3")
             elif change == "extra-table":
                 connection.execute("CREATE TABLE extra (x TEXT)")
             elif change == "drop-trigger":
@@ -247,7 +554,7 @@ def test_installed_metadata_and_exact_catalog_drift_refused(tmp_path, change):
         )
 
 
-@pytest.mark.parametrize("table", list(module._TABLE_SQL))
+@pytest.mark.parametrize("table", [name for name in module._TABLE_SQL if name != "registry_rebinds"])
 @pytest.mark.parametrize("verb", ["UPDATE", "DELETE"])
 def test_every_table_has_actual_immutable_guard(journal, table, verb):
     with journal.cycle():
@@ -261,6 +568,28 @@ def test_every_table_has_actual_immutable_guard(journal, table, verb):
             else:
                 field = "host_id" if table == "journal_metadata" else "effect_key"
                 journal._connection.execute(f"UPDATE {table} SET {field}={field}")
+
+
+@pytest.mark.parametrize("verb", ["UPDATE", "DELETE"])
+def test_registry_rebind_receipt_has_actual_immutable_guard(tmp_path, verb):
+    path = installed_v1(tmp_path)
+    updated = canonical({"schema": "test-registry/v1", "profile": "updated"})
+    module.rebind_empty_journal(
+        path,
+        host_id=HOST,
+        profile_id="fixture-profile",
+        expected_old_registry_sha256=sha(REGISTRY),
+        new_registry_utf8=updated,
+        operation_id="d" * 32,
+    )
+    with sqlite3.connect(path / module.DB_NAME) as connection:
+        with pytest.raises(sqlite3.IntegrityError, match="immutable-journal"):
+            connection.execute(
+                f"{verb} registry_rebinds SET operation_id=operation_id WHERE operation_id=?"
+                if verb == "UPDATE"
+                else "DELETE FROM registry_rebinds WHERE operation_id=?",
+                ("d" * 32,),
+            )
 
 
 @pytest.mark.parametrize(

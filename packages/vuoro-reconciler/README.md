@@ -238,6 +238,8 @@ boundary. It has a separate fixed entrypoint:
 python -I -B -m vuoro_reconciler.protected_runtime_cli list-accepted PROFILE_ID
 python -I -B -m vuoro_reconciler.protected_runtime_cli execute PROFILE_ID ACCEPTANCE_ID
 python -I -B -m vuoro_reconciler.protected_runtime_cli install-journal PROFILE_ID
+python -I -B -m vuoro_reconciler.protected_runtime_cli rebind-empty-journal PROFILE_ID --expected-old-registry-sha256 OLD_SHA --expected-profile-sha256 PROFILE_SHA --expected-host-id HOST_SHA --operation-id OPERATION_ID
+python -I -B -m vuoro_reconciler.protected_runtime_cli journal-rebind-receipt PROFILE_ID OPERATION_ID --expected-profile-sha256 PROFILE_SHA --expected-host-id HOST_SHA
 ```
 
 Only an installed profile ID selects authority. There are no caller-selected
@@ -247,6 +249,24 @@ capabilities, private regular owner files on an admitted local filesystem,
 and an existing delegated empty cgroup root. Registry and runtime profile
 digests bind the journal and every contained operation. Journal installation
 is explicit and exclusive; startup never repairs, migrates or resets state.
+`rebind-empty-journal` is a separate offline maintenance operation for an
+already-installed registry/profile update. The protected service must be
+stopped and independently verified stopped first. The operation takes the
+profile operation lock and journal lock without waiting, refuses an active
+marker or any nonzero effect-table count, checks the exact old registry digest,
+host ID and current provider-profile digest, and atomically records exact old
+and new registry bytes in an immutable receipt while updating journal metadata.
+It upgrades an exact v1 catalog or appends to a valid v2 rebind history; it
+never rewrites a nonempty journal. The new registry/profile must already be
+installed and admitted; this operation does not install them or change the
+runtime profile. Supply and record a unique 32-hex operation ID before running
+it. If the command result is ambiguous, use `journal-rebind-receipt` with that
+ID to resolve the committed result; do not retry with a new ID or reinstall the
+journal. Receipt lookup requires the current installed registry to match the
+journal. If the registry is already updated but the transaction did not commit,
+the old v1 journal will refuse open and lookup will return `UNAVAILABLE`, not
+`NOT_FOUND`. That result does not prove the transition absent or authorize a
+retry; keep the service stopped and resolve it through a fresh owner review.
 
 Private credential reads and local Git/signing operations start only after
 durable active state and containment are established. The signer uses an
