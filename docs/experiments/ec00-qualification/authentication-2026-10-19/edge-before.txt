@@ -1,0 +1,40 @@
+test_generated_clients_fresh_assertion_retry_and_principal_scoped_durable_effect (__main__.AuthenticatedTransportTests.test_generated_clients_fresh_assertion_retry_and_principal_scoped_durable_effect) ... 
+  test_generated_clients_fresh_assertion_retry_and_principal_scoped_durable_effect (__main__.AuthenticatedTransportTests.test_generated_clients_fresh_assertion_retry_and_principal_scoped_durable_effect) (arm='edge-json') ... FAIL
+  test_generated_clients_fresh_assertion_retry_and_principal_scoped_durable_effect (__main__.AuthenticatedTransportTests.test_generated_clients_fresh_assertion_retry_and_principal_scoped_durable_effect) (arm='edge-binary') ... FAIL
+
+======================================================================
+FAIL: test_generated_clients_fresh_assertion_retry_and_principal_scoped_durable_effect (__main__.AuthenticatedTransportTests.test_generated_clients_fresh_assertion_retry_and_principal_scoped_durable_effect) (arm='edge-json')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/vuoro-ec00-full-stack-20261019/tests/experiments/ec00/authenticated_transport_checks.py", line 132, in test_generated_clients_fresh_assertion_retry_and_principal_scoped_durable_effect
+    self.assertEqual(('ok', '9007199254741201'), transport.publish(headers))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Tuples differ: ('ok', '9007199254741201') != ('identity', None)
+
+First differing element 0:
+'ok'
+'identity'
+
+- ('ok', '9007199254741201')
++ ('identity', None)
+
+======================================================================
+FAIL: test_generated_clients_fresh_assertion_retry_and_principal_scoped_durable_effect (__main__.AuthenticatedTransportTests.test_generated_clients_fresh_assertion_retry_and_principal_scoped_durable_effect) (arm='edge-binary')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/vuoro-ec00-full-stack-20261019/tests/experiments/ec00/authenticated_transport_checks.py", line 132, in test_generated_clients_fresh_assertion_retry_and_principal_scoped_durable_effect
+    self.assertEqual(('ok', '9007199254741201'), transport.publish(headers))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Tuples differ: ('ok', '9007199254741201') != ('identity', None)
+
+First differing element 0:
+'ok'
+'identity'
+
+- ('ok', '9007199254741201')
++ ('identity', None)
+
+----------------------------------------------------------------------
+Ran 1 test in 6.799s
+
+FAILED (failures=2)

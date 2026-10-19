@@ -854,3 +854,40 @@ restore. It preserves receipts and diagnostics, including failures. It does
 not upload the large dependency bundle or publish packages. Experimental ingress,
 production authentication, streaming/backpressure, representative operations and
 performance, and the final architectural comparison remain separate gates.
+
+## Signed identity across candidate transports (19 October 2026)
+
+The disposable adapters now use the unchanged service
+`GatewayAssertionIdentityResolver` with an ephemeral Ed25519 fixture key. HTTP v2,
+native gRPC, direct Python Connect JSON/binary and Node-forwarded Connect
+JSON/binary carry the signed assertion and matching request correlation into a
+request-local identity. The same SQLite owner resolves that verified principal
+and rechecks active membership inside its transaction. Fixture read/write
+authorities are explicit experiment policy, not a selected production OA model.
+
+Before repair, both forwarding encodings dropped identity metadata; all five
+browser paths also failed authenticated publication. The fixture clients,
+forwarding edge and CORS proxy now preserve the assertion and correlation. They
+do not turn an unsigned actor header into authority. The proxy preserves repeated
+headers so an ambiguous request is refused rather than silently normalized.
+
+The [source-bound receipt](authentication-2026-10-19/receipt.json) retains raw
+before/after logs, including a development test-route error. Five tests pass:
+four across all six native/generated transport combinations, plus actual
+Chromium across five browser combinations. They cover signed publication,
+assertion replay refusal, fresh-assertion retry of the same idempotency key,
+changed-body refusal, wrong issuer/audience/workspace/repository/signature,
+expired/future assertions, request correlation, missing/unsigned identity,
+repeated identity/correlation headers, insufficient fixture authority, owner
+role/membership refusal and revocation after commit. Sixteen concurrent
+publications per arm (eight workers, two principals sharing key names) retain
+principal-bound links and durable idempotency records. Every refusal checks the
+owner rows for absence of effects. The six existing browser lifecycle/failure
+checks, generated Python Connect check and TypeScript typecheck also pass.
+
+This imports actual verifier source from the recorded Vuoro base, with candidate
+runtime dependencies pinned in the candidate lock; it does not assert production
+dependency parity. Keys and credentials are disposable, and no assertion is
+included in receipts. These are bounded loopback examples. They do not qualify
+production gateway/bootstrap, TLS, actual ingress, full authenticated lifecycle,
+performance or an architecture choice. The EC-00 gate remains open.

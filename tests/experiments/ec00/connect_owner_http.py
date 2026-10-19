@@ -40,8 +40,9 @@ class _Context:
 
 class DirectConnectServer:
     """One Python process, no gRPC forwarding hop and no additional owner store."""
-    def __init__(self, path, principal_id='requester-a', fault_plan=None):
-        self.owner = _Server(path, principal_id, fault_plan)
+    def __init__(self, path, principal_id='requester-a', fault_plan=None, *,
+                 owner_factory=_Server, middleware=None):
+        self.owner = owner_factory(path, principal_id, fault_plan)
         projection = _GrpcOwner(SimpleNamespace(httpd=self.owner))
         def method(rpc):
             async def invoke(service, request, context):
@@ -60,7 +61,10 @@ class DirectConnectServer:
         self.socket = socket.socket()
         self.socket.bind(('127.0.0.1', 0))
         self.socket.listen(64)
-        config = uvicorn.Config(OwnerOperationsASGIApplication(service), host='127.0.0.1',
+        application = OwnerOperationsASGIApplication(service)
+        if middleware is not None:
+            application = middleware(application)
+        config = uvicorn.Config(application, host='127.0.0.1',
                                 log_level='critical', access_log=False, lifespan='off')
         self.httpd = uvicorn.Server(config)
         self.thread = threading.Thread(target=self.httpd.run, kwargs={'sockets': [self.socket]}, daemon=True)

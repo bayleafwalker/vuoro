@@ -15,6 +15,7 @@ declare global {
       idemKey?: string,
       timeoutMs?: number,
       cancelAfterMs?: number,
+      identityHeaders?: Record<string, string>,
     ) => Promise<
       | { ok: true; value: JsonValue }
       | { ok: false; code: ConnectError["code"]; message: string }
@@ -26,6 +27,7 @@ declare global {
       idemKey?: string,
       timeoutMs?: number,
       cancelAfterMs?: number,
+      identityHeaders?: Record<string, string>,
     ) => Promise<{ ok: boolean; status: number; value: unknown; errorName?: string }>;
   }
 }
@@ -43,6 +45,7 @@ window.ec00Rpc = async (
   idemKey = "",
   timeoutMs = 5_000,
   cancelAfterMs = 0,
+  identityHeaders: Record<string, string> = {},
 ) => {
   const controller = new AbortController();
   const cancelTimer = cancelAfterMs > 0
@@ -61,7 +64,7 @@ window.ec00Rpc = async (
     if (!call) throw new Error(`missing generated client method: ${method.localName}`);
     const response = await call(request, {
       timeoutMs,
-      headers: { "idempotency-key": idemKey },
+      headers: { ...identityHeaders, "idempotency-key": idemKey },
       signal: controller.signal,
     });
     return {
@@ -93,6 +96,7 @@ window.ec00Http = async (
   idemKey = "",
   timeoutMs = 5_000,
   cancelAfterMs = 0,
+  identityHeaders = {},
 ) => {
   const controller = new AbortController();
   const cancelTimer = cancelAfterMs > 0
@@ -104,7 +108,7 @@ window.ec00Http = async (
     const value = input as Record<string, unknown>;
     const options: Record<string, unknown> = {
       client,
-      headers: { "idempotency-key": idemKey },
+      headers: { ...identityHeaders, "idempotency-key": idemKey },
       signal: AbortSignal.any([AbortSignal.timeout(timeoutMs), controller.signal]),
     };
 

@@ -1,0 +1,96 @@
+..FFFF                                                                   [100%]
+=================================== FAILURES ===================================
+___________ test_built_client_wheel_contains_only_transport_package ____________
+
+    def test_built_client_wheel_contains_only_transport_package() -> None:
+>       with zipfile.ZipFile(_one_wheel("vuoro-client")) as wheel:
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_distribution_boundaries.py:67: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+distribution = 'vuoro-client'
+
+    def _one_wheel(distribution: str) -> Path:
+        wheels = sorted((ROOT / "dist" / distribution).glob("*.whl"))
+>       assert len(wheels) == 1, f"expected one built {distribution} wheel, found {wheels}"
+E       AssertionError: expected one built vuoro-client wheel, found []
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+tests/test_distribution_boundaries.py:41: AssertionError
+_________________ test_client_and_service_are_distinct_wheels __________________
+
+    def test_client_and_service_are_distinct_wheels() -> None:
+>       client = _one_wheel("vuoro-client")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_distribution_boundaries.py:86: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+distribution = 'vuoro-client'
+
+    def _one_wheel(distribution: str) -> Path:
+        wheels = sorted((ROOT / "dist" / distribution).glob("*.whl"))
+>       assert len(wheels) == 1, f"expected one built {distribution} wheel, found {wheels}"
+E       AssertionError: expected one built vuoro-client wheel, found []
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+tests/test_distribution_boundaries.py:41: AssertionError
+___ test_shared_packages_are_stdlib_only_and_have_isolated_wheel_boundaries ____
+
+    def test_shared_packages_are_stdlib_only_and_have_isolated_wheel_boundaries() -> None:
+        for distribution, module in SHARED_PACKAGES.items():
+            project = _project(ROOT / "packages" / distribution / "pyproject.toml")
+            # Pinned per package rather than as one literal, because these versions
+            # are what the composition pins: bumping one here without repinning
+            # adapter-pins.json ships a release whose manifest names a wheel that no
+            # longer matches the source. During a release the source leads the pin
+            # for exactly as long as it takes the tag to build, which is why this is
+            # a table and not a comparison against the manifest.
+            assert project["version"] == SHARED_PACKAGE_VERSIONS[distribution]
+            assert project["requires-python"] == ">=3.11"
+            assert project["dependencies"] == []
+>           with zipfile.ZipFile(_one_wheel(distribution)) as wheel:
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_distribution_boundaries.py:104: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+distribution = 'vuoro-schema-runtime'
+
+    def _one_wheel(distribution: str) -> Path:
+        wheels = sorted((ROOT / "dist" / distribution).glob("*.whl"))
+>       assert len(wheels) == 1, f"expected one built {distribution} wheel, found {wheels}"
+E       AssertionError: expected one built vuoro-schema-runtime wheel, found []
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+tests/test_distribution_boundaries.py:41: AssertionError
+__ test_candidate_kit_wheel_contains_pure_admission_values_without_fake_owner __
+
+    def test_candidate_kit_wheel_contains_pure_admission_values_without_fake_owner() -> None:
+        import ast
+>       with zipfile.ZipFile(_one_wheel("vuoro-adapter-kit")) as wheel:
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_distribution_boundaries.py:121: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+distribution = 'vuoro-adapter-kit'
+
+    def _one_wheel(distribution: str) -> Path:
+        wheels = sorted((ROOT / "dist" / distribution).glob("*.whl"))
+>       assert len(wheels) == 1, f"expected one built {distribution} wheel, found {wheels}"
+E       AssertionError: expected one built vuoro-adapter-kit wheel, found []
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+tests/test_distribution_boundaries.py:41: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_distribution_boundaries.py::test_built_client_wheel_contains_only_transport_package
+FAILED tests/test_distribution_boundaries.py::test_client_and_service_are_distinct_wheels
+FAILED tests/test_distribution_boundaries.py::test_shared_packages_are_stdlib_only_and_have_isolated_wheel_boundaries
+FAILED tests/test_distribution_boundaries.py::test_candidate_kit_wheel_contains_pure_admission_values_without_fake_owner
+4 failed, 2 passed in 0.03s
