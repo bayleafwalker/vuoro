@@ -1,0 +1,49 @@
+test_bad_identity_and_authority_refuse_before_any_owner_effect (__main__.AuthenticatedTransportTests.test_bad_identity_and_authority_refuse_before_any_owner_effect) ... ok
+test_concurrent_request_identity_never_crosses_thread_or_async_boundaries (__main__.AuthenticatedTransportTests.test_concurrent_request_identity_never_crosses_thread_or_async_boundaries) ... ok
+test_generated_clients_fresh_assertion_retry_and_principal_scoped_durable_effect (__main__.AuthenticatedTransportTests.test_generated_clients_fresh_assertion_retry_and_principal_scoped_durable_effect) ... ok
+test_repeated_identity_or_correlation_headers_are_refused (__main__.AuthenticatedTransportTests.test_repeated_identity_or_correlation_headers_are_refused) ... 
+  test_repeated_identity_or_correlation_headers_are_refused (__main__.AuthenticatedTransportTests.test_repeated_identity_or_correlation_headers_are_refused) (arm='edge-json', duplicate='x-vuoro-identity') ... FAIL
+  test_repeated_identity_or_correlation_headers_are_refused (__main__.AuthenticatedTransportTests.test_repeated_identity_or_correlation_headers_are_refused) (arm='edge-json', duplicate='x-request-id') ... FAIL
+  test_repeated_identity_or_correlation_headers_are_refused (__main__.AuthenticatedTransportTests.test_repeated_identity_or_correlation_headers_are_refused) (arm='edge-binary', duplicate='x-vuoro-identity') ... FAIL
+  test_repeated_identity_or_correlation_headers_are_refused (__main__.AuthenticatedTransportTests.test_repeated_identity_or_correlation_headers_are_refused) (arm='edge-binary', duplicate='x-request-id') ... FAIL
+
+======================================================================
+FAIL: test_repeated_identity_or_correlation_headers_are_refused (__main__.AuthenticatedTransportTests.test_repeated_identity_or_correlation_headers_are_refused) (arm='edge-json', duplicate='x-vuoro-identity')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/vuoro-ec00-full-stack-20261019/tests/experiments/ec00/authenticated_transport_checks.py", line 200, in test_repeated_identity_or_correlation_headers_are_refused
+    self.assertEqual(401, response.status_code)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 401 != 404
+
+======================================================================
+FAIL: test_repeated_identity_or_correlation_headers_are_refused (__main__.AuthenticatedTransportTests.test_repeated_identity_or_correlation_headers_are_refused) (arm='edge-json', duplicate='x-request-id')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/vuoro-ec00-full-stack-20261019/tests/experiments/ec00/authenticated_transport_checks.py", line 200, in test_repeated_identity_or_correlation_headers_are_refused
+    self.assertEqual(401, response.status_code)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 401 != 404
+
+======================================================================
+FAIL: test_repeated_identity_or_correlation_headers_are_refused (__main__.AuthenticatedTransportTests.test_repeated_identity_or_correlation_headers_are_refused) (arm='edge-binary', duplicate='x-vuoro-identity')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/vuoro-ec00-full-stack-20261019/tests/experiments/ec00/authenticated_transport_checks.py", line 200, in test_repeated_identity_or_correlation_headers_are_refused
+    self.assertEqual(401, response.status_code)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 401 != 404
+
+======================================================================
+FAIL: test_repeated_identity_or_correlation_headers_are_refused (__main__.AuthenticatedTransportTests.test_repeated_identity_or_correlation_headers_are_refused) (arm='edge-binary', duplicate='x-request-id')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/vuoro-ec00-full-stack-20261019/tests/experiments/ec00/authenticated_transport_checks.py", line 200, in test_repeated_identity_or_correlation_headers_are_refused
+    self.assertEqual(401, response.status_code)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 401 != 404
+
+----------------------------------------------------------------------
+Ran 4 tests in 49.246s
+
+FAILED (failures=4)

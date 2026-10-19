@@ -1,0 +1,19 @@
+warning: Git tree '/tmp/vuoro-ec00-full-stack-20261019' is dirty
+{"runtime": "actualChromium", "version": "155.0.8059.79", "node": "v24.21.0", "python": "3.13.16"}
+test_actual_chromium_full_signed_lifecycle_shared_requests_partial_continuation (connect_browser_checks.ConnectBrowserTests.test_actual_chromium_full_signed_lifecycle_shared_requests_partial_continuation) ... ok
+test_browser_changed_signature_is_refused_without_any_owner_effect (connect_browser_checks.ConnectBrowserTests.test_browser_changed_signature_is_refused_without_any_owner_effect) ... ok
+test_browser_deadline_and_cancel_before_and_after_owner_commit (connect_browser_checks.ConnectBrowserTests.test_browser_deadline_and_cancel_before_and_after_owner_commit) ... ok
+test_browser_large_cas_exact_result_changed_key_and_wire (connect_browser_checks.ConnectBrowserTests.test_browser_large_cas_exact_result_changed_key_and_wire) ... ok
+test_browser_postcommit_response_loss_reconciles_same_key (connect_browser_checks.ConnectBrowserTests.test_browser_postcommit_response_loss_reconciles_same_key) ... ok
+test_browser_presence_cursor_replay_principal_and_cors_refusal (connect_browser_checks.ConnectBrowserTests.test_browser_presence_cursor_replay_principal_and_cors_refusal) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 166.953s
+
+OK
+test_both_codecs_and_compositions_preserve_counter_replay_and_refusal (connect_python_checks.GeneratedPythonConnectTests.test_both_codecs_and_compositions_preserve_counter_replay_and_refusal) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 14.226s
+
+OK

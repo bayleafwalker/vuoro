@@ -1,0 +1,106 @@
+{
+  "schema_version": "ec00-authentication-observation/v1",
+  "base": "bcf05242276fd59f48d48cfbf7265eb962e7290e",
+  "scope": "disposable local generated-client transport qualification; no production auth composition or ingress claim",
+  "source_sha256": [
+    {
+      "path": "tests/experiments/ec00/authenticated_owner.py",
+      "sha256": "a2e7294cb5d4326adbdfcc8abd0f1f3d2d60edc53234a35e749aa28d3b857039"
+    },
+    {
+      "path": "tests/experiments/ec00/authenticated_transport_checks.py",
+      "sha256": "23326c420fda5a9a57afad9ce2cb1a379ff03bb66eb60dc5ee3cb2785330c004"
+    },
+    {
+      "path": "tests/experiments/ec00/authenticated_browser_checks.py",
+      "sha256": "2d0ec58574e1b4ddd0d67dd30036094356b6aa6e3251ec441a2f1218f8344785"
+    },
+    {
+      "path": "tests/experiments/ec00/candidate_owner_http.py",
+      "sha256": "094b10b6e91e177a5a5ea648f02b7e7fd91cb52c39b474dcb5d10c061e623640"
+    },
+    {
+      "path": "tests/experiments/ec00/connect_owner_http.py",
+      "sha256": "02289ce9619cf12176840ab5ff563bc9a0f23954adc31bb72c39f6c2cbf1cd03"
+    },
+    {
+      "path": "tests/experiments/ec00/browser_fixture.py",
+      "sha256": "5cb834f8c77f006eca4bb7b2aeed58561e08290f0f2f038ba1a0816f8b86e3cc"
+    },
+    {
+      "path": "tests/experiments/ec00/candidates/connect_browser_client.ts",
+      "sha256": "e58f9449df3cef57965bcee354aa7d608b3929faa612f2bbe9814fb52ec006aa"
+    },
+    {
+      "path": "tests/experiments/ec00/candidates/serve_connect_edge.ts",
+      "sha256": "7080ecc5407c2a1c5139054a73dc9f63a29cdea7ee7604a7bb0abefe116b193d"
+    },
+    {
+      "path": "tests/experiments/ec00/candidates/pyproject.toml",
+      "sha256": "7e22de95844eb369ebe08f84a55901c674a16ffdda871fac8db35823f8c3f8e1"
+    },
+    {
+      "path": "tests/experiments/ec00/candidates/uv.lock",
+      "sha256": "e75cf8b879db50e337ee5010a97c9c4a4dea15cf6c1e8010b1b847aaa9846b00"
+    }
+  ],
+  "unchanged_service_verifier_sha256": [
+    {
+      "path": "packages/vuoro-service/src/vuoro_service/gateway_identity.py",
+      "sha256": "484d38b506a64153cd20286f0e4cb5261df7e1f5d8ad9932f39a06fcc1c47b62"
+    },
+    {
+      "path": "packages/vuoro-service/src/vuoro_service/identity.py",
+      "sha256": "92fd53b5e2683ebbd4aec13a734fe1f68a7e9ebcfee7807f36e0032a39208757"
+    },
+    {
+      "path": "packages/vuoro-service/src/vuoro_service/replay.py",
+      "sha256": "e633a231a883e5fc2595fa47e04eee899c9f22de59b36efb76ebf538c12b87fa"
+    },
+    {
+      "path": "packages/vuoro-service/src/vuoro_service/edge_proof.py",
+      "sha256": "add9eb55c6e405f395786aa7c0ae2459c6cfb65229bc8bad2e483565ba5a4a0d"
+    }
+  ],
+  "logs_sha256": {
+    "edge-before.txt": "856ed32c6bad5c679d8484d8feaf520ed4830a74f15f71e8b98609e7dc5503f8",
+    "browser-before.txt": "06fd5f3beaf6f4595d49778fcc95eb7d9afd6c26f0f7a8f18ebc843214651149",
+    "transports-after-initial.txt": "357cf0e3c0d8e8224f9268fd391af90965da850fdbd9074337187d8b50352f07",
+    "development-wrong-raw-route.txt": "9faaf9092cc9094981eeeab7e82c4b1c876f787e52ee9ef740dbb338e759f24b",
+    "authenticated-complete.txt": "7291a9f37b05377283060c1cc16bc778f27538157f276f6db225ac72cb156e9f",
+    "legacy-regressions.txt": "6150c5aa4db91ed2cf430905e590b7745890d97d7cd2fd686e53164646fe62b6",
+    "boundaries-missing-builds.txt": "de94698f7f953a8fef3619614d80079cb07b6390d99484cc15fd2cf0d062095e",
+    "boundaries-after-build.txt": "3ab69c44c0781c70d7a226d92c2a74efdd9fbb158b6a5cd1669d62cace44568c"
+  },
+  "runtime": {
+    "python": "3.13.16",
+    "node": "24.21.0",
+    "chromium": "155.0.8059.79",
+    "dependencies": "candidate pyproject.toml and uv.lock; not production dependency parity"
+  },
+  "tests": {
+    "authenticated_tests": 5,
+    "native_generated_transport_arms": 6,
+    "browser_arms": 5,
+    "concurrent_publications_per_arm": 16,
+    "concurrent_workers": 8,
+    "existing_browser_tests": 6,
+    "existing_python_connect_tests": 1,
+    "typescript_typecheck": "passed",
+    "distribution_boundaries": 6
+  },
+  "failures_retained": {
+    "before_forwarding_edge": "2 encodings rejected correctly signed identity because existing edge omitted headers",
+    "before_browser": "all5 paths rejected correctly signed identity because browser/proxy omitted headers",
+    "development_raw_route": "4 edge duplicate-header cases reached wrong service route and got404; corrected to generated descriptor and required positive invocation after each refusal",
+    "initial_boundary_invocation": "4 failures because required wheels were not built; built the four declared wheels and all6 boundary tests passed, no source changes"
+  },
+  "boundaries": [
+    "ephemeral Ed25519 fixture key only; no hosted token, gateway issuer bootstrap, or private-key publication",
+    "fixture read/write authorities are not a selected production OA authority model",
+    "same owner SQLite database and transactional membership checks; no second authority/store",
+    "request-local ContextVar is reset; concurrency observations are bounded examples, not proof of all interleavings",
+    "owner reads/full lifecycle/failure matrix previously qualified without assertions; this increment authenticates publication and refuses identity failures",
+    "TLS, actual ingress, workload performance, production deployment and EC00 stack selection remain unqualified here"
+  ]
+}

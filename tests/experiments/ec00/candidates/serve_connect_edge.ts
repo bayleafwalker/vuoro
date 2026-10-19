@@ -36,10 +36,17 @@ for (const method of OwnerOperations.methods) {
   if (!call) throw new Error(`missing upstream method: ${method.localName}`);
   implementation[method.localName] = (request, context) => {
     const remaining = context.timeoutMs();
+    // The disposable authenticated fixture verifies these at the owner. The
+    // forwarding edge does not turn unsigned actor/authority headers into identity.
+    const headers = new Headers();
+    for (const name of ["idempotency-key", "x-vuoro-identity", "x-request-id"]) {
+      const value = context.requestHeader.get(name);
+      if (value !== null) headers.set(name, value);
+    }
     return call(request, {
       signal: context.signal,
       timeoutMs: Math.min(remaining ?? 5_000, 5_000),
-      headers: { "idempotency-key": context.requestHeader.get("idempotency-key") ?? "" },
+      headers,
     });
   };
 }

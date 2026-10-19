@@ -1,0 +1,8 @@
+test_bad_identity_and_authority_refuse_before_any_owner_effect (__main__.AuthenticatedTransportTests.test_bad_identity_and_authority_refuse_before_any_owner_effect) ... ok
+test_concurrent_request_identity_never_crosses_thread_or_async_boundaries (__main__.AuthenticatedTransportTests.test_concurrent_request_identity_never_crosses_thread_or_async_boundaries) ... ok
+test_generated_clients_fresh_assertion_retry_and_principal_scoped_durable_effect (__main__.AuthenticatedTransportTests.test_generated_clients_fresh_assertion_retry_and_principal_scoped_durable_effect) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 34.356s
+
+OK

@@ -46,7 +46,7 @@ class CorsProxy(BrowserOrigin):
                     self.send_header('Access-Control-Allow-Origin', origin)
                     self.send_header('Vary', 'Origin')
                     self.send_header('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS')
-                    self.send_header('Access-Control-Allow-Headers', 'content-type, idempotency-key, connect-protocol-version, connect-timeout-ms')
+                    self.send_header('Access-Control-Allow-Headers', 'content-type, idempotency-key, connect-protocol-version, connect-timeout-ms, x-vuoro-identity, x-request-id')
                     self.send_header('Access-Control-Expose-Headers', 'content-type')
                 self.send_header('Content-Type', content_type)
                 self.send_header('Content-Length', str(len(content)))
@@ -66,9 +66,9 @@ class CorsProxy(BrowserOrigin):
                     self.reply(403)
                     return
                 body = self.rfile.read(int(self.headers.get('Content-Length', '0')))
-                headers = {k: v for k, v in self.headers.items()
-                           if k.lower() in ('content-type', 'idempotency-key', 'connect-protocol-version', 'connect-timeout-ms')}
-                headers['accept-encoding'] = 'identity'
+                headers = [(k, v) for k, v in self.headers.items()
+                           if k.lower() in ('content-type', 'idempotency-key', 'connect-protocol-version', 'connect-timeout-ms', 'x-vuoro-identity', 'x-request-id')]
+                headers.append(('accept-encoding', 'identity'))
                 try:
                     with httpx.Client(timeout=10) as client:
                         response = client.request(self.command, upstream + self.path, content=body, headers=headers)
@@ -77,7 +77,7 @@ class CorsProxy(BrowserOrigin):
                                  'request': body, 'error': type(exc).__name__})
                     self.close_connection = True
                     return
-                wire.append({'method': self.command, 'path': self.path, 'content_type': headers.get('Content-Type', headers.get('content-type')),
+                wire.append({'method': self.command, 'path': self.path, 'content_type': next((v for k,v in headers if k.lower() == 'content-type'), None),
                              'request': body, 'status': response.status_code, 'response': response.content})
                 self.reply(response.status_code, response.content, response.headers.get('content-type', 'application/octet-stream'))
             do_POST = forward

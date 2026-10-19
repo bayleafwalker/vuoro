@@ -1,0 +1,57 @@
+{"runtime": "actualChromium", "version": "155.0.8059.79", "node": "v24.21.0", "python": "3.13.16"}
+test_signed_identity_missing_replayed_and_fresh_assertion_retry (__main__.AuthenticatedBrowserTests.test_signed_identity_missing_replayed_and_fresh_assertion_retry) ... 
+  test_signed_identity_missing_replayed_and_fresh_assertion_retry (__main__.AuthenticatedBrowserTests.test_signed_identity_missing_replayed_and_fresh_assertion_retry) (arm='http-v2') ... FAIL
+  test_signed_identity_missing_replayed_and_fresh_assertion_retry (__main__.AuthenticatedBrowserTests.test_signed_identity_missing_replayed_and_fresh_assertion_retry) (arm='python-json') ... FAIL
+  test_signed_identity_missing_replayed_and_fresh_assertion_retry (__main__.AuthenticatedBrowserTests.test_signed_identity_missing_replayed_and_fresh_assertion_retry) (arm='python-binary') ... FAIL
+  test_signed_identity_missing_replayed_and_fresh_assertion_retry (__main__.AuthenticatedBrowserTests.test_signed_identity_missing_replayed_and_fresh_assertion_retry) (arm='edge-json') ... FAIL
+  test_signed_identity_missing_replayed_and_fresh_assertion_retry (__main__.AuthenticatedBrowserTests.test_signed_identity_missing_replayed_and_fresh_assertion_retry) (arm='edge-binary') ... FAIL
+
+======================================================================
+FAIL: test_signed_identity_missing_replayed_and_fresh_assertion_retry (__main__.AuthenticatedBrowserTests.test_signed_identity_missing_replayed_and_fresh_assertion_retry) (arm='http-v2')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/vuoro-ec00-full-stack-20261019/tests/experiments/ec00/authenticated_browser_checks.py", line 43, in test_signed_identity_missing_replayed_and_fresh_assertion_retry
+    self.assertTrue(first['ok'], first)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : {'ok': False, 'status': 401, 'value': {'error': 'identity-required'}, 'errorName': None}
+
+======================================================================
+FAIL: test_signed_identity_missing_replayed_and_fresh_assertion_retry (__main__.AuthenticatedBrowserTests.test_signed_identity_missing_replayed_and_fresh_assertion_retry) (arm='python-json')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/vuoro-ec00-full-stack-20261019/tests/experiments/ec00/authenticated_browser_checks.py", line 43, in test_signed_identity_missing_replayed_and_fresh_assertion_retry
+    self.assertTrue(first['ok'], first)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : {'ok': False, 'code': 16, 'message': 'fixture identity refused'}
+
+======================================================================
+FAIL: test_signed_identity_missing_replayed_and_fresh_assertion_retry (__main__.AuthenticatedBrowserTests.test_signed_identity_missing_replayed_and_fresh_assertion_retry) (arm='python-binary')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/vuoro-ec00-full-stack-20261019/tests/experiments/ec00/authenticated_browser_checks.py", line 43, in test_signed_identity_missing_replayed_and_fresh_assertion_retry
+    self.assertTrue(first['ok'], first)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : {'ok': False, 'code': 16, 'message': 'fixture identity refused'}
+
+======================================================================
+FAIL: test_signed_identity_missing_replayed_and_fresh_assertion_retry (__main__.AuthenticatedBrowserTests.test_signed_identity_missing_replayed_and_fresh_assertion_retry) (arm='edge-json')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/vuoro-ec00-full-stack-20261019/tests/experiments/ec00/authenticated_browser_checks.py", line 43, in test_signed_identity_missing_replayed_and_fresh_assertion_retry
+    self.assertTrue(first['ok'], first)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : {'ok': False, 'code': 16, 'message': 'fixture identity refused'}
+
+======================================================================
+FAIL: test_signed_identity_missing_replayed_and_fresh_assertion_retry (__main__.AuthenticatedBrowserTests.test_signed_identity_missing_replayed_and_fresh_assertion_retry) (arm='edge-binary')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/vuoro-ec00-full-stack-20261019/tests/experiments/ec00/authenticated_browser_checks.py", line 43, in test_signed_identity_missing_replayed_and_fresh_assertion_retry
+    self.assertTrue(first['ok'], first)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : {'ok': False, 'code': 16, 'message': 'fixture identity refused'}
+
+----------------------------------------------------------------------
+Ran 1 test in 10.928s
+
+FAILED (failures=5)

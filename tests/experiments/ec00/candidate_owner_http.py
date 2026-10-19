@@ -38,7 +38,7 @@ class _Server(ThreadingHTTPServer):
         fault = (once_operation.get(operation, ""), str(args[-1]) if operation in once_operation else "")
         if fault in self.fault_plan and fault not in self.fault_consumed:
             kwargs["drop_after_commit"] = True
-        owner = OwnerOracle.connect_as(self.db_path, self.principal_id)
+        owner = self.connect_owner()
         try:
             try:
                 return getattr(owner, operation)(*args, **kwargs)
@@ -47,6 +47,9 @@ class _Server(ThreadingHTTPServer):
                 raise
         finally:
             owner.close()
+
+    def connect_owner(self) -> OwnerOracle:
+        return OwnerOracle.connect_as(self.db_path, self.principal_id)
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -76,7 +79,7 @@ class _Handler(BaseHTTPRequestHandler):
         return self.rfile.read(size)
 
     def _owner(self) -> OwnerOracle:
-        return OwnerOracle.connect_as(self.server.db_path, self.server.principal_id)
+        return self.server.connect_owner()
 
     def _call_owner(self, operation: str, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return self.server.owner_call(operation, *args, **kwargs)
