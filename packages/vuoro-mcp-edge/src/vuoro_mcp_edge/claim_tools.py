@@ -63,6 +63,8 @@ from collections.abc import Mapping
 from typing import Any
 
 from .idempotency import IDEMPOTENCY_KEY_SCHEMA, require_key
+from .parking import evidence_reference
+from .rate_limit_records import observe_reclaim
 from .record_tools import RECORD_OWNER_INCOMPATIBLE, RecordShellClient
 from .runs import RUN_ID, RunRegistry, UnavailableRunRegistry, binding_for
 from .toolsets import WRITE_ANNOTATIONS, ToolFailure, ToolSet, ToolsetContext, ToolSpec
@@ -227,6 +229,9 @@ _CLAIM_WORK_DEFINITION: dict[str, Any] = {
         "taken over is claim-superseded. Other refusals: work-blocked, "
         "work-not-active, work-settled, work-awaiting-verification, "
         "verification-unsupported, maintenance-active, work-not-found. "
+        "work-parked means this item cannot be retried until an explicit release "
+        "to pending. Reclaim facts are recorded with work:read and work:evidence; "
+        "observation failures return warnings and the claim stands. "
         "ttl_seconds is not an argument. Mutating."
     ),
     "inputSchema": {
@@ -295,7 +300,11 @@ _REPORT_OUTCOME_DEFINITION: dict[str, Any] = {
         "lease-ended, work-not-active, work-blocked, "
         "verification-unsatisfied. Idempotent: the same idempotency_key "
         "with the same arguments returns the same answer; different "
-        "arguments are idempotency-conflict. Mutating."
+        "arguments are idempotency-conflict. A failed report with disposition "
+        "parked and reason_ref releases the lease and parks the item. Cite "
+        "vuoro-evidence:<run_id>/seq/<chain_seq> for a recorded rejected "
+        "rate_limit_event in your run. Missing/other-kind refs are "
+        "reason-ref-unresolved; another run is reason-ref-foreign-run. Mutating."
     ),
     "inputSchema": {
         "type": "object",
@@ -303,6 +312,8 @@ _REPORT_OUTCOME_DEFINITION: dict[str, Any] = {
             "lease_id": _LEASE_ID_INPUT,
             "run_id": _RUN_ID_INPUT,
             "outcome": {"enum": ["succeeded", "failed"]},
+            "disposition": {"const": "parked"},
+            "reason_ref": {"type": "string", "minLength": 1, "maxLength": 512},
             "summary": {"type": "string", "maxLength": _SUMMARY_MAX},
             "payload": {
                 "type": "object",
@@ -405,7 +416,7 @@ def _parse_report_outcome(arguments: dict[str, Any]) -> dict[str, Any]:
     _refuse_unexpected(
         "report_outcome",
         arguments,
-        {"lease_id", "run_id", "outcome", "summary", "payload", "checks", "idempotency_key"},
+        {"lease_id", "run_id", "outcome", "summary", "payload", "checks", "idempotency_key", "disposition", "reason_ref"},
     )
     outcome = arguments.get("outcome")
     if outcome not in ("succeeded", "failed"):
@@ -433,6 +444,14 @@ def _parse_report_outcome(arguments: dict[str, Any]) -> dict[str, Any]:
                 "invalid-arguments", f"checks must be a list of at most {_CHECKS_MAX}"
             )
         parsed["checks"] = [_parse_check(check) for check in checks]
+    for field in ("disposition", "reason_ref"):
+        if field in arguments:
+            parsed[field] = arguments[field]
+    if "disposition" in parsed and (parsed["disposition"] != "parked" or outcome != "failed" or "reason_ref" not in parsed):
+        raise ToolFailure("invalid-arguments", "parking requires a failed outcome and a reason_ref")
+    if "reason_ref" in parsed and (not isinstance(parsed["reason_ref"], str) or not 1 <= len(parsed["reason_ref"]) <= 512
+                                    or parsed["reason_ref"].strip() != parsed["reason_ref"]):
+        raise ToolFailure("invalid-arguments", "reason_ref must be 1-512 characters without surrounding whitespace")
     parsed["idempotency_key"] = require_key(arguments)
     return parsed
 
@@ -460,7 +479,8 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
         parsed: dict[str, Any], forwarded: ForwardedIdentity
     ) -> dict[str, Any]:
         await _resolve(parsed, forwarded)
-        return await owner.acquire(parsed, forwarded)
+        result = await owner.acquire(parsed, forwarded)
+        return await observe_reclaim(context, runs, result, parsed, forwarded)
 
     async def _run_heartbeat(
         parsed: dict[str, Any], forwarded: ForwardedIdentity
@@ -472,6 +492,16 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
         parsed: dict[str, Any], forwarded: ForwardedIdentity
     ) -> dict[str, Any]:
         await _resolve(parsed, forwarded)
+        ref = parsed.get("reason_ref", "")
+        if ref.startswith("vuoro-evidence:"):
+            sequence = evidence_reference(ref, parsed["run_id"])
+            item = await runs.evidence_entry(parsed["run_id"], sequence, forwarded=forwarded)
+            if item is None or item.get("kind") != "rate_limit_event":
+                raise ToolFailure("reason-ref-unresolved", "the cited entry is not a rate_limit_event in this run")
+            provenance = item.get("provenance")
+            observation = provenance.get("observation") if isinstance(provenance, dict) else None
+            if not isinstance(observation, dict) or observation.get("status") != "rejected":
+                raise ToolFailure("reason-ref-unresolved", "only a recorded rejected rate limit justifies parking")
         return await owner.report_outcome(parsed, forwarded)
 
     return ToolSet(

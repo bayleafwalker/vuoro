@@ -89,6 +89,7 @@ OPERATION_RUN_REGISTER = "work.run.register-v1"
 OPERATION_RUN_REGISTER_CORRELATED = "work.run.register-correlated-v1"
 OPERATION_RUN_RESOLVE = "work.run.resolve-v1"
 OPERATION_EVIDENCE_TAIL = "work.evidence.tail-v1"
+OPERATION_EVIDENCE_ENTRY = "work.evidence.entry-v1"
 OPERATION_EVIDENCE_APPEND = "work.evidence.append-v1"
 OPERATION_SESSION_NOTE_WRITE = "work.session-note.write-v1"
 #: agentops#2525 (sprintctl 0.11.0, schema 20).  Its presence in the shell's
@@ -560,6 +561,10 @@ class SprintctlRecordStore:
             operations is not None and OPERATION_RUN_REGISTER_CORRELATED in operations
         )
 
+    async def operation_available(self, operation: str) -> bool:
+        operations = await self._available_operations()
+        return operations is not None and operation in operations
+
     async def _available_operations(self) -> frozenset[str] | None:
         if self._catalog_operations is not None:
             return self._catalog_operations
@@ -781,6 +786,25 @@ class SprintctlRecordStore:
         if item is None:
             return None
         return _expect_mapping(item, OPERATION_EVIDENCE_TAIL)
+
+    async def evidence_entry(
+        self, run_id: str, chain_seq: int, *, forwarded: ForwardedIdentity
+    ) -> dict[str, Any] | None:
+        if not await self.operation_available(OPERATION_EVIDENCE_ENTRY):
+            raise ToolFailure(RECORD_OWNER_INCOMPATIBLE, "the owner does not advertise exact evidence reads")
+        result = await self._client.invoke(
+            OPERATION_EVIDENCE_ENTRY, {"run_id": run_id, "chain_seq": chain_seq}, forwarded
+        )
+        body = _expect_mapping(result, OPERATION_EVIDENCE_ENTRY)
+        if "item" not in body or body.get("run_id") != run_id or body.get("repo_id") != forwarded.repo_id:
+            raise ToolFailure("record-shell-unavailable", "exact evidence result names a different run or repository")
+        item = body.get("item")
+        if item is None:
+            return None
+        item = _expect_mapping(item, OPERATION_EVIDENCE_ENTRY)
+        if type(item.get("chain_seq")) is not int or item["chain_seq"] != chain_seq:
+            raise ToolFailure("record-shell-unavailable", "exact evidence result names a different entry")
+        return item
 
     async def append_evidence(
         self,

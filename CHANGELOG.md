@@ -5,6 +5,16 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service 0.1.97 / vuoro-mcp-edge 0.1.8: E4 records a rejected
+  rate-limit citation, forwards the owner parking disposition, and observes
+  a later explicit release/reclaim through bounded work facts. Exact owned
+  evidence reads never substitute the tail. Read-only refillability uses
+  the owner clock; reclaim recording uses existing caller scopes and cannot
+  undo a successful claim. Declared model families label observations only;
+  unknown family comparisons stay unknown. No model selection, scheduled
+  release or new credential is introduced. Sprintctl 0.22.0 provides the
+  additive reads on unchanged schema27; rollout needs no migration.
+
 - vuoro-service 0.1.96 candidate: composes the released vuoro-workspace 0.1.0
   knowledge owner (`vuoro-workspace-v0.1.0`, SHA-256
   `b563f5bfdda15d97ae1e89533fe9b0e906c5d2cd50edee371b1d3fc336e7b22f`) as a
