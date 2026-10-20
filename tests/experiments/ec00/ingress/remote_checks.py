@@ -21,11 +21,16 @@ headers with assertions redacted), so absence of effect is still asserted
 remotely. Dropped relative to the loopback suite: revocation after commit (it
 needs an owner-store write the fixture does not expose).
 
-Exit status is 1 when a security invariant fails (a refused request changed
-owner state, a bad assertion was accepted, a request carrying a repeated
-identity header at the fixture was not refused, or a request observed another
-request's identity). Ingress behaviour (header rewriting, versions, grpc-web) is
-recorded as observation, never judged.
+Exit status is 1 when any judged case differs from its expectation: wrong
+outcome, or owner state changed when it should not have (or did not when it
+should). Each failure carries a kind: "security" (a request that should be
+refused was accepted or changed owner state, a repeated identity header that
+reached the fixture was not refused, or identity crossed requests) or
+"expectation" (for example a signed publication refused because the ingress
+rewrote x-request-id). Probes of ingress behaviour (versions, header spelling,
+grpc-web) are never judged. A repeated identity/correlation header that the
+ingress collapsed to one value and that was then accepted is raised as a
+top-level ER-010 warning.
 """
 from __future__ import annotations
 
@@ -35,6 +40,7 @@ import hashlib
 import ipaddress
 import json
 import os
+import re
 from pathlib import Path
 import secrets
 import socket
@@ -42,6 +48,7 @@ import ssl
 import statistics
 import struct
 import sys
+import threading
 import time
 from urllib.parse import urlencode, urlsplit
 import uuid
@@ -74,9 +81,20 @@ def is_loopback(host: str) -> bool:
         return False
 
 
-def token_tag(value: str) -> str:
-    """The redaction tag serve_fixture reports for a received assertion."""
-    return f'<redacted sha256:{hashlib.sha256(value.encode("latin1")).hexdigest()[:16]} len:{len(value)}>'
+_TAG = re.compile(r'<redacted sha256:([0-9a-f]{16}) len:(\d+)(?: commas:(\d+))?>')
+
+
+def token_digest(value: str) -> str:
+    """The sha256 prefix serve_fixture puts in a received assertion's redaction tag."""
+    return hashlib.sha256(value.encode('latin1')).hexdigest()[:16]
+
+
+def parse_tag(received: str):
+    """(digest, comma count) of a redaction tag; comma count is None for older fixtures."""
+    match = _TAG.fullmatch(received)
+    if not match:
+        return None, received.count(',')
+    return match.group(1), None if match.group(3) is None else int(match.group(3))
 
 
 def system_ca_path() -> Path:
@@ -204,10 +222,13 @@ class Runner:
         self.run_id = uuid.uuid4().hex[:12]
         self._rid = 9007199254740993 + secrets.randbelow(10 ** 12) * 1000
         self.cases, self.failures, self.latency, self.ingress = [], [], {}, {}
+        self.er010_warnings = []
+        self._rid_lock = threading.Lock()
 
     def rid(self):
-        self._rid += 1
-        return str(self._rid)
+        with self._rid_lock:  # called from the concurrency workers
+            self._rid += 1
+            return str(self._rid)
 
     def sign(self, subject='alice', *, rid, claims=None, key=None):
         return sign_fixture_assertion(key or self.key, subject, request_id=rid, claims=claims)
@@ -256,6 +277,9 @@ class Runner:
         ok = outcome == expected and (unchanged is None or unchanged != effect_expected)
         entry = dict(arm=arm, case=case, expected=expected, observed=outcome, owner_state_unchanged=unchanged,
                      passed=ok, **extra)
+        if not ok:
+            refused_case = expected != 'ok'
+            entry['failure_kind'] = 'security' if refused_case and (outcome == 'ok' or unchanged is False) else 'expectation'
         self.cases.append(entry)
         if not ok:
             self.failures.append(entry)
@@ -331,15 +355,20 @@ class Runner:
             after = t.state()
             received = [v for k, v in headers_of(t.wire(probe)) if k.lower() == name]
             sent = [headers[name], second]
-            tags = [token_tag(v) for v in sent] if name == 'x-vuoro-identity' else sent
-            arrived = 'repeated' if len(received) >= 2 else ('none' if not received else
-                      ('joined' if ',' in received[0] and received[0] not in tags else
-                       f'single:{"first" if received[0] == tags[0] else "second" if received[0] == tags[1] else "other"}'))
+            arrived, commas = classify_arrival(name, sent, received)
             entry = dict(arm=arm, case=f'repeated-{name}-{mode}', observed=outcome, client_http_version=version,
-                         received_count=len(received), arrived_as=arrived,
+                         received_count=len(received), received_comma_counts=commas, arrived_as=arrived,
                          owner_state_unchanged=before['sha256'] == after['sha256'])
             # Invariant only where the fixture itself saw the repetition.
             entry['passed'] = (outcome == 'identity' and entry['owner_state_unchanged']) if len(received) >= 2 else None
+            if entry['passed'] is False:
+                entry['failure_kind'] = 'security'
+            if len(received) < 2 and outcome == 'ok':
+                warning = dict(arm=arm, case=entry['case'], arrived_as=arrived,
+                               message=(f'ER-010: the ingress delivered a repeated {name} as {arrived} and the '
+                                        'request was accepted; the fixture could not see the ambiguity'))
+                entry['er010_warning'] = warning['message']
+                self.er010_warnings.append(warning)
             self.cases.append(entry)
             if entry['passed'] is False:
                 self.failures.append(entry)
@@ -368,6 +397,8 @@ class Runner:
         entry = dict(arm=arm, case='concurrent-16x8-no-identity-carry-over',
                      passed=not problems and coverage and after['tables']['request'] == before['tables']['request'] + 16,
                      problems=problems[:5], owner_records=len(observed['owner']))
+        if not entry['passed']:
+            entry['failure_kind'] = 'security'
         self.cases.append(entry)
         if not entry['passed']:
             self.failures.append(entry)
@@ -460,6 +491,30 @@ class Runner:
         self.ingress['grpc_web_on_grpc_host'] = out
 
 
+def classify_arrival(name, sent, received):
+    """How a header sent twice (``sent``) arrived at the fixture (``received``).
+
+    Returns (arrived_as, per-value comma counts). Assertions come back only as
+    redaction tags, so they are matched by digest, and the tag's comma count
+    flags a join that matches neither known join spelling.
+    """
+    joins = [f'{sent[0]}, {sent[1]}', f'{sent[0]},{sent[1]}']
+    if name == 'x-vuoro-identity':
+        parsed = [parse_tag(v) for v in received]
+        keys, commas = [d for d, _ in parsed], [c for _, c in parsed]
+        sent_keys, join_keys = [token_digest(v) for v in sent], [token_digest(v) for v in joins]
+    else:
+        keys, commas, sent_keys, join_keys = received, [v.count(',') for v in received], sent, joins
+    if len(received) >= 2:
+        return 'repeated', commas
+    if not received:
+        return 'none', commas
+    if keys[0] in join_keys or (keys[0] not in sent_keys and (commas[0] or 0) > 0):
+        return 'joined', commas
+    return 'single:' + ('first' if keys[0] == sent_keys[0] else
+                        'second' if keys[0] == sent_keys[1] else 'other'), commas
+
+
 def headers_of(entries):
     return [tuple(pair) for entry in entries for pair in entry['headers']]
 
@@ -527,6 +582,9 @@ def run(args):
                   latency_note=('client-side wall time per request on a reused connection, first request '
                                 'excluded; no cross-target comparison is implied'),
                   cases=runner.cases, latency=runner.latency, ingress=runner.ingress,
+                  er010_warnings=runner.er010_warnings,
+                  failure_kinds={kind: sum(1 for f in runner.failures if f.get('failure_kind') == kind)
+                                 for kind in ('security', 'expectation')},
                   invariant_failures=runner.failures)
     text = json.dumps(report, indent=2, sort_keys=True)
     if args.report:
@@ -534,7 +592,8 @@ def run(args):
     passed = sum(1 for c in runner.cases if c.get('passed'))
     print(json.dumps({'cases': len(runner.cases), 'passed': passed, 'observations_only':
                       sum(1 for c in runner.cases if c.get('passed') is None),
-                      'invariant_failures': len(runner.failures), 'latency': runner.latency}, indent=2))
+                      'invariant_failures': len(runner.failures), 'er010_warnings': len(runner.er010_warnings),
+                      'latency': runner.latency}, indent=2))
     return 1 if runner.failures else 0
 
 

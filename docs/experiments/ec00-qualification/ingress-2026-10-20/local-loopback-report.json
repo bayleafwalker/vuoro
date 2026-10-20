@@ -16,9 +16,9 @@
         ],
         "preserved": true,
         "received": [
-          "9437184358927994"
+          "9420492959431994"
         ],
-        "sent": "9437184358927994"
+        "sent": "9420492959431994"
       },
       "expected": "ok",
       "observed": "ok",
@@ -204,6 +204,10 @@
       "observed": "identity",
       "owner_state_unchanged": true,
       "passed": true,
+      "received_comma_counts": [
+        0,
+        0
+      ],
       "received_count": 2
     },
     {
@@ -214,6 +218,10 @@
       "observed": "identity",
       "owner_state_unchanged": true,
       "passed": true,
+      "received_comma_counts": [
+        0,
+        0
+      ],
       "received_count": 2
     },
     {
@@ -224,6 +232,10 @@
       "observed": "identity",
       "owner_state_unchanged": true,
       "passed": true,
+      "received_comma_counts": [
+        0,
+        0
+      ],
       "received_count": 2
     },
     {
@@ -234,6 +246,10 @@
       "observed": "identity",
       "owner_state_unchanged": true,
       "passed": true,
+      "received_comma_counts": [
+        0,
+        0
+      ],
       "received_count": 2
     },
     {
@@ -253,9 +269,9 @@
         ],
         "preserved": true,
         "received": [
-          "9437184358928058"
+          "9420492959432058"
         ],
-        "sent": "9437184358928058"
+        "sent": "9420492959432058"
       },
       "expected": "ok",
       "observed": "ok",
@@ -441,6 +457,10 @@
       "observed": "identity",
       "owner_state_unchanged": true,
       "passed": true,
+      "received_comma_counts": [
+        0,
+        0
+      ],
       "received_count": 2
     },
     {
@@ -451,6 +471,10 @@
       "observed": "identity",
       "owner_state_unchanged": true,
       "passed": true,
+      "received_comma_counts": [
+        0,
+        0
+      ],
       "received_count": 2
     },
     {
@@ -461,6 +485,10 @@
       "observed": "identity",
       "owner_state_unchanged": true,
       "passed": true,
+      "received_comma_counts": [
+        0,
+        0
+      ],
       "received_count": 2
     },
     {
@@ -471,6 +499,10 @@
       "observed": "identity",
       "owner_state_unchanged": true,
       "passed": true,
+      "received_comma_counts": [
+        0,
+        0
+      ],
       "received_count": 2
     },
     {
@@ -490,9 +522,9 @@
         ],
         "preserved": true,
         "received": [
-          "9437184358928122"
+          "9420492959432122"
         ],
-        "sent": "9437184358928122"
+        "sent": "9420492959432122"
       },
       "expected": "ok",
       "observed": "ok",
@@ -678,6 +710,10 @@
       "observed": "identity",
       "owner_state_unchanged": true,
       "passed": true,
+      "received_comma_counts": [
+        0,
+        0
+      ],
       "received_count": 2
     },
     {
@@ -688,6 +724,10 @@
       "observed": "identity",
       "owner_state_unchanged": true,
       "passed": true,
+      "received_comma_counts": [
+        0,
+        0
+      ],
       "received_count": 2
     },
     {
@@ -698,6 +738,10 @@
       "observed": "identity",
       "owner_state_unchanged": true,
       "passed": true,
+      "received_comma_counts": [
+        0,
+        0
+      ],
       "received_count": 2
     },
     {
@@ -708,6 +752,10 @@
       "observed": "identity",
       "owner_state_unchanged": true,
       "passed": true,
+      "received_comma_counts": [
+        0,
+        0
+      ],
       "received_count": 2
     },
     {
@@ -727,9 +775,9 @@
         ],
         "preserved": true,
         "received": [
-          "9437184358928186"
+          "9420492959432186"
         ],
-        "sent": "9437184358928186"
+        "sent": "9420492959432186"
       },
       "expected": "ok",
       "observed": "ok",
@@ -915,6 +963,10 @@
       "observed": "identity",
       "owner_state_unchanged": true,
       "passed": true,
+      "received_comma_counts": [
+        0,
+        0
+      ],
       "received_count": 2
     },
     {
@@ -925,6 +977,10 @@
       "observed": "identity",
       "owner_state_unchanged": true,
       "passed": true,
+      "received_comma_counts": [
+        0,
+        0
+      ],
       "received_count": 2
     },
     {
@@ -935,6 +991,10 @@
       "observed": "identity",
       "owner_state_unchanged": true,
       "passed": true,
+      "received_comma_counts": [
+        0,
+        0
+      ],
       "received_count": 2
     },
     {
@@ -945,6 +1005,10 @@
       "observed": "identity",
       "owner_state_unchanged": true,
       "passed": true,
+      "received_comma_counts": [
+        0,
+        0
+      ],
       "received_count": 2
     },
     {
@@ -958,6 +1022,11 @@
   "dropped_relative_to_loopback": [
     "revocation-after-commit (needs an owner-store write)"
   ],
+  "er010_warnings": [],
+  "failure_kinds": {
+    "expectation": 0,
+    "security": 0
+  },
   "fixture_health": {
     "ready": true
   },
@@ -970,7 +1039,7 @@
       "received": [
         [
           "x-ec00-probe",
-          "e2e0303220c249bfaee8d9fb8aecb948"
+          "0385c08a34724dd69bfd750cb66c051b"
         ],
         [
           "x-ec00-mixed-case",
@@ -1004,7 +1073,7 @@
       "received": [
         [
           "X-EC00-Probe",
-          "eea9719f989944ff8429a8bc93e117e6"
+          "80c28bfe7eb54f36a0961ea3dbd04d90"
         ],
         [
           "X-EC00-Mixed-Case",
@@ -1032,7 +1101,7 @@
         ]
       ],
       "sent": [
-        "X-EC00-Probe: eea9719f989944ff8429a8bc93e117e6",
+        "X-EC00-Probe: 80c28bfe7eb54f36a0961ea3dbd04d90",
         "X-EC00-Mixed-Case: Value-Case",
         "x-ec00-padded:   padded value   ",
         "x_ec00_underscore: underscore",
@@ -1085,71 +1154,71 @@
   "latency": {
     "connect-binary": {
       "missing_identity_refusal": {
-        "max_ms": 41.14,
-        "min_ms": 40.77,
+        "max_ms": 41.98,
+        "min_ms": 40.92,
         "n": 20,
-        "p50_ms": 40.98,
-        "p95_ms": 41.09
+        "p50_ms": 40.99,
+        "p95_ms": 41.1
       },
       "signed_publication": {
-        "max_ms": 42.84,
-        "min_ms": 41.71,
+        "max_ms": 42.88,
+        "min_ms": 41.75,
         "n": 20,
-        "p50_ms": 41.88,
-        "p95_ms": 42.8
+        "p50_ms": 41.87,
+        "p95_ms": 42.85
       }
     },
     "connect-json": {
       "missing_identity_refusal": {
         "max_ms": 41.97,
-        "min_ms": 40.8,
+        "min_ms": 40.91,
         "n": 20,
-        "p50_ms": 41.02,
-        "p95_ms": 41.67
+        "p50_ms": 40.98,
+        "p95_ms": 41.89
       },
       "signed_publication": {
-        "max_ms": 43.75,
-        "min_ms": 41.71,
+        "max_ms": 42.88,
+        "min_ms": 41.81,
         "n": 20,
-        "p50_ms": 41.93,
-        "p95_ms": 42.87
+        "p50_ms": 41.89,
+        "p95_ms": 42.88
       }
     },
     "grpc": {
       "missing_identity_refusal": {
-        "max_ms": 0.32,
+        "max_ms": 0.34,
         "min_ms": 0.25,
         "n": 20,
-        "p50_ms": 0.27,
-        "p95_ms": 0.31
+        "p50_ms": 0.29,
+        "p95_ms": 0.33
       },
       "signed_publication": {
-        "max_ms": 2.83,
-        "min_ms": 0.81,
+        "max_ms": 2.81,
+        "min_ms": 0.84,
         "n": 20,
-        "p50_ms": 0.86,
-        "p95_ms": 1.0
+        "p50_ms": 0.9,
+        "p95_ms": 1.13
       }
     },
     "http-v2": {
       "missing_identity_refusal": {
-        "max_ms": 0.45,
-        "min_ms": 0.34,
+        "max_ms": 0.41,
+        "min_ms": 0.33,
         "n": 20,
         "p50_ms": 0.36,
-        "p95_ms": 0.42
+        "p95_ms": 0.39
       },
       "signed_publication": {
-        "max_ms": 1.02,
+        "max_ms": 1.03,
         "min_ms": 0.91,
         "n": 20,
-        "p50_ms": 0.95,
-        "p95_ms": 0.99
+        "p50_ms": 0.94,
+        "p95_ms": 0.98
       }
     }
   },
   "latency_note": "client-side wall time per request on a reused connection, first request excluded; no cross-target comparison is implied",
-  "run_id": "caee08ca6072",
+  "run_id": "f74a4ee589d0",
   "schema_version": "ec00-ingress-observation/v1",
   "target": {
     "connect_to": null,

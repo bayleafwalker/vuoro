@@ -4,6 +4,7 @@ All identities/keys are disposable fixtures. No hosted credential or auth issuer
 is provided to a candidate, browser, or test log.
 """
 from concurrent.futures import ThreadPoolExecutor
+import contextvars
 from contextlib import ExitStack, contextmanager, closing
 from pathlib import Path
 import os
@@ -16,7 +17,7 @@ import httpx
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from lifecycle_slice_checks import HERE, grpc, v1_pb2, v1_pb2_grpc, OwnerOracle
 from connect_owner_http import DirectConnectServer
-from authenticated_owner import (AuthenticatedCandidateServer, AuthenticatedOwner, IdentityMiddleware,
+from authenticated_owner import (CURRENT, SCOPE, Identity, AuthenticatedCandidateServer, AuthenticatedOwner, IdentityMiddleware,
     FOREIGN, ISSUER, WORKSPACE, fixture_policy, owner_snapshot, seed_fixture_owner, sign_fixture_assertion)
 from connect_browser_checks import node_edge
 from ec00_connect.oa_v1_connect import OwnerOperationsClientSync
@@ -103,10 +104,46 @@ class Transport:
             return {Code.UNAUTHENTICATED: 'identity', Code.PERMISSION_DENIED: 'authority', Code.ABORTED: 'owner'}.get(exc.code, str(exc.code)), None
 
 
+class SharedContextBindingTests(unittest.TestCase):
+    """bound() must reset its own binding: a runtime that reused one context
+    (or one thread's context) across requests would otherwise leak identity."""
+
+    def test_bound_resets_identity_across_requests_in_one_shared_context(self):
+        policy = FixtureIdentity().policy
+        identities = [Identity(actor=f'agent:{s}', environment='disposable-ec00', principal_id=f'{ISSUER}:{s}:0')
+                      for s in ('alice', 'bob', 'alice', 'bob')]
+        shared = contextvars.Context()
+
+        def request(index, identity):
+            try:
+                with policy.bound(identity, str(index), 'shared-context'):
+                    self.assertIs(identity, CURRENT.get())
+                    self.assertEqual(str(index), SCOPE.get().request_id)
+                    if index == 1:
+                        raise RuntimeError('handler failure must still reset')
+            except RuntimeError:
+                pass
+            return CURRENT.get(), SCOPE.get()
+
+        # One context reused for every request, on one reused worker thread.
+        with ThreadPoolExecutor(max_workers=1) as worker:
+            after = [worker.submit(shared.run, request, i, identity).result()
+                     for i, identity in enumerate(identities)]
+        self.assertEqual([(None, None)] * len(identities), after)
+        self.assertEqual(len(identities), len(policy.observations))
+        for record, identity in zip(policy.observations, identities):
+            self.assertTrue(record['entry_clear'], record)
+            self.assertTrue(record['exit_clear'], record)
+            self.assertEqual(identity.principal_id, record['principal'])
+
+
 class AuthenticatedTransportTests(unittest.TestCase):
     def assertNoIdentityCarryOver(self, policy, expected):
         """Server-side records: each request entered with no identity context,
         left none behind, and the owner saw only the principal that request signed.
+
+        Over real transports entry/exit-clear cannot fail on their own, because
+        each runtime isolates per-request contexts; the principal mapping can.
 
         ``expected`` maps the envelope request id to the one principal allowed
         to reach the owner for it.
@@ -147,8 +184,10 @@ class AuthenticatedTransportTests(unittest.TestCase):
                     # revoked owner membership even for a previously committed key.
                     self.assertEqual(('owner', None), transport.publish(identity.headers()))
                     self.assertEqual(committed, snapshot(path))
-                # Sequential requests on reused server workers: none inherits
-                # or leaves behind an identity context.
+                # Each request saw only its own identity. The runtimes give every
+                # request a fresh context (grpcio per RPC, a thread per HTTP
+                # request, a copied context per uvicorn task), so this records
+                # isolation; bound()'s own reset is proven by the shared-context test.
                 self.assertNoIdentityCarryOver(identity.policy, {DEFAULT_RID: f'{ISSUER}:alice:0'})
 
     def test_bad_identity_and_authority_refuse_before_any_owner_effect(self):
@@ -217,7 +256,7 @@ class AuthenticatedTransportTests(unittest.TestCase):
                         self.assertEqual(('ok', '9007199254741501'), transport.publish(identity.headers(request_id='9007199254741501'),
                             rid='9007199254741501', key='duplicate', objective='duplicate headers'))
 
-    def test_concurrent_requests_observe_only_their_own_server_identity_context(self):
+    def test_concurrent_requests_reach_the_owner_only_as_their_own_principal(self):
         for arm in self.cases():
             with self.subTest(arm=arm), tempfile.TemporaryDirectory() as directory:
                 path = Path(directory) / 'owner.sqlite'
@@ -239,10 +278,6 @@ class AuthenticatedTransportTests(unittest.TestCase):
                     self.assertNoIdentityCarryOver(identity.policy,
                         {rid: f'{ISSUER}:{subject}:0' for _, rid, subject in results})
                     self.assertEqual(16, len(identity.policy.owner_observations))
-                    if arm in ('grpc', 'edge-json', 'edge-binary'):
-                        # gRPC's four-thread pool served sixteen requests, so
-                        # entry-clear above was checked on reused worker threads.
-                        self.assertLess(len({r['thread'] for r in identity.policy.observations}), 16)
 
 
 if __name__ == '__main__':

@@ -49,7 +49,8 @@ def redact(name: str, value: str) -> str:
     if name.lower() not in REDACTED:
         return value
     digest = hashlib.sha256(value.encode('latin1', 'replace')).hexdigest()[:16]
-    return f'<redacted sha256:{digest} len:{len(value)}>'
+    # The comma count keeps a proxy-joined pair of assertions detectable.
+    return f'<redacted sha256:{digest} len:{len(value)} commas:{value.count(",")}>'
 
 
 class WireLog:
@@ -123,6 +124,12 @@ def main():
              for name, default in (('http', 8080), ('connect', 8081), ('grpc', 8082))}
     state = Path(os.environ.get('EC00_STATE_DIR', '/state'))
     path = state / 'owner.sqlite'
+    if os.environ.get('EC00_RESET_STATE') == '1':
+        # Deployment mode: the store is disposable, so a container restart in the
+        # same pod (whose emptyDir survives) starts over instead of crash-looping.
+        for stale in state.glob('owner.sqlite*'):
+            stale.unlink()
+            print(json.dumps({'reset_state': stale.name}), flush=True)
     if path.exists():
         raise SystemExit('fresh disposable owner database required; restore must be explicit')
     public_key = load_public_key(Path(os.environ.get('EC00_PUBLIC_KEY_FILE', '/fixture/public.pem')))

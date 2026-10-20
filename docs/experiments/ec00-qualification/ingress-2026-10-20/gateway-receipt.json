@@ -20,7 +20,7 @@
  },
  "dial": {
   "connect_to": "192.168.20.219",
-  "tls": "verified against the host trust bundle; SNI and certificate name = route hostname",
+  "tls": "all verified, SNI and certificate name = route hostname: the gRPC arm and the raw HTTP/1.1 probe verify against the host CA bundle; the HTTP v2 and Connect arms verify through pyqwest's system-store loader",
   "plaintext_loopback": false
  },
  "keys": "fresh client-side Ed25519 pair per run; only the public half mounted; private half deleted after each run",
@@ -39,12 +39,12 @@
   }
  ],
  "observations": [
-  "x-request-id is preserved end to end (the Gateway marks LAN clients x-envoy-internal and does not regenerate it); when absent, the Gateway adds one, plus x-forwarded-for, x-forwarded-proto and x-envoy-internal.",
+  "x-request-id is preserved end to end from these LAN clients (observed). When it is absent the Gateway adds one, plus x-forwarded-for, x-forwarded-proto and x-envoy-internal; x-envoy-internal was seen only on that raw probe without x-request-id. A likely explanation for preservation is that Envoy classes LAN clients as internal and so does not regenerate the header, but that was not observed directly.",
   "Repeated x-vuoro-identity arrives as two separate headers; repeated x-request-id arrives joined into one comma-separated value. Both shapes are refused (identity) with no owner effect on all four arms.",
   "HTTP and Connect routes reach the backend as HTTP/1.1 even when the client negotiates HTTP/2; only the gRPC route (Service appProtocol h2c) reaches it as HTTP/2.",
   "The Gateway translates grpc-web (HTTP/1.1 and HTTP/2) on the gRPC hostname into native gRPC; a signed grpc-web publication reached the fixture and changed owner state (status 200; grpc-status was not surfaced in response headers).",
-  "Raw HTTP/1.1 header names keep case-insensitive matching, padding is trimmed, comma values are kept, duplicates stay separate, and header names containing underscores (x_ec00_underscore) are forwarded unchanged. A backend that maps '_' to '-' (WSGI/CGI) could therefore see a second identity or correlation header; production ingress or backends must reject or drop underscore header names.",
-  "Latency (client wall time, reused connection, n=20, first request excluded): HTTP v2 signed publication p50 9.28 / p95 14.53 ms; gRPC 11.45 / 14.46 ms; Connect JSON 55.81 / 59.97 ms; Connect binary 55.66 / 60.26 ms. The ~45 ms Connect floor is already present over local loopback (uvicorn/HTTP/1.1 path) and is not attributed to the Gateway. No cross-candidate performance claim is made from this sample."
+  "Raw HTTP/1.1 header names keep case-insensitive matching, padding is trimmed, comma values are kept, duplicates stay separate, and header names containing underscores (x_ec00_underscore) are forwarded unchanged. The production verifier (FastAPI/ASGI, gateway_identity.py) matches exact header names and no underscore identity header was sent, so this is not an observed bypass; rejecting or dropping underscore header names at the ingress or backend is a candidate defence-in-depth requirement, relevant to any backend that maps '_' to '-' (WSGI/CGI).",
+  "Latency (client wall time, reused connection, n=20, first request excluded): HTTP v2 signed publication p50 9.28 / p95 14.53 ms; gRPC 11.45 / 14.46 ms; Connect JSON 55.81 / 59.97 ms; Connect binary 55.66 / 60.26 ms. Connect has a ~41 ms floor already present over local loopback (uvicorn/HTTP/1.1 path); over the Gateway, signed Connect adds about 14 ms against about 8-10 ms for HTTP v2 and gRPC. Only the floor is not attributed to the Gateway. No cross-candidate performance claim is made from this sample."
  ],
  "dropped": [
   "revocation-after-commit (needs an owner-store write)"

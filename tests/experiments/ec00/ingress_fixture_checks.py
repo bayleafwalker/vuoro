@@ -14,11 +14,14 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
+import urllib.request
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE / 'ingress'))
 import remote_checks
+import serve_fixture
 
 
 def free_ports(count):
@@ -33,20 +36,26 @@ def free_ports(count):
 
 
 @contextmanager
-def fixture(public_key: Path, state: Path):
+def fixture(public_key: Path, state: Path, *, reset=False):
     http, connect, grpc_port = free_ports(3)
     env = {**os.environ, 'EC00_BIND': '127.0.0.1', 'EC00_HTTP_PORT': str(http),
            'EC00_CONNECT_PORT': str(connect), 'EC00_GRPC_PORT': str(grpc_port),
-           'EC00_STATE_DIR': str(state), 'EC00_PUBLIC_KEY_FILE': str(public_key)}
+           'EC00_STATE_DIR': str(state), 'EC00_PUBLIC_KEY_FILE': str(public_key),
+           **({'EC00_RESET_STATE': '1'} if reset else {})}
     process = subprocess.Popen([sys.executable, str(HERE / 'ingress/serve_fixture.py')], env=env,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     try:
         if not select.select([process.stdout], [], [], 20)[0]:
             raise AssertionError('fixture readiness timed out')
         line = process.stdout.readline()
+        while line and 'reset_state' in line:
+            line = process.stdout.readline()
         if not line:
             raise AssertionError('fixture exited: ' + process.stderr.read()[-2000:])
         assert json.loads(line)['ready']
+        # Keep draining both pipes so later output can never block the fixture.
+        for stream in (process.stdout, process.stderr):
+            threading.Thread(target=stream.read, daemon=True).start()
         yield f'http://127.0.0.1:{http}', f'http://127.0.0.1:{connect}', f'127.0.0.1:{grpc_port}'
     finally:
         process.terminate()
@@ -55,6 +64,8 @@ def fixture(public_key: Path, state: Path):
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait()
+        for stream in (process.stdout, process.stderr):
+            stream.close()
 
 
 class IngressFixtureTests(unittest.TestCase):
@@ -96,6 +107,26 @@ class IngressFixtureTests(unittest.TestCase):
             refused = subprocess.run([sys.executable, str(HERE / 'ingress/serve_fixture.py')], env=env,
                                      capture_output=True, text=True, timeout=30)
             self.assertIn('fresh disposable owner database required', refused.stderr)
+            # Deployment mode wipes the disposable store instead of crash-looping.
+            env['EC00_RESET_STATE'] = '1'
+            (state / 'owner.sqlite-wal').write_bytes(b'')
+            with fixture(keys / 'fixture-public.pem', state, reset=True) as (http, _, _):
+                with urllib.request.urlopen(http + '/_ec00/state', timeout=10) as reply:
+                    fresh = json.load(reply)
+            self.assertEqual(0, fresh['tables']['request'])
+            self.assertFalse((state / 'owner.sqlite-wal').exists())
+
+    def test_repeated_header_arrival_classification(self):
+        first, second = 'eyJ.first.sig', 'eyJ.second.sig'
+        tag = lambda value: serve_fixture.redact('x-vuoro-identity', value)
+        classify = remote_checks.classify_arrival
+        self.assertEqual('repeated', classify('x-vuoro-identity', [first, second], [tag(first), tag(second)])[0])
+        self.assertEqual('single:second', classify('x-vuoro-identity', [first, second], [tag(second)])[0])
+        self.assertEqual('joined', classify('x-vuoro-identity', [first, second], [tag(f'{first}, {second}')])[0])
+        # An unrecognised join spelling is still caught through the tag's comma count.
+        self.assertEqual(('joined', [1]), classify('x-vuoro-identity', [first, second], [tag(f'{first} ,{second}')]))
+        self.assertEqual('joined', classify('x-request-id', ['a', 'b'], ['a, b'])[0])
+        self.assertEqual('none', classify('x-request-id', ['a', 'b'], [])[0])
 
     def test_remote_mode_refuses_plaintext_to_non_loopback(self):
         with self.assertRaises(SystemExit):

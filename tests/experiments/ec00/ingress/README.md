@@ -92,8 +92,20 @@ How it runs:
   over HTTP/1.1 and HTTP/2 against the gRPC hostname.
 - Dropped compared with the loopback suite: revocation after commit, which needs
   an owner-store write that the fixture does not expose.
-- Exit status 1 means a security invariant failed. Ingress behaviour is only
-  recorded.
+- Exit status 1 means some judged case differed from its expectation. Each
+  failure has a `failure_kind`: `security` (a request that should be refused
+  was accepted or changed owner state, a repeated identity header that reached
+  the fixture was not refused, or identity crossed requests) or `expectation`
+  (for example signed publications refused because the ingress rewrote
+  `x-request-id`). The report counts both under `failure_kinds`. Probes of
+  ingress behaviour are only recorded.
+- If the ingress collapses a repeated identity or correlation header into one
+  value (one of the two, or a comma join, detected through the redaction tag's
+  comma count) and the request is then accepted, the report raises it under the
+  top-level `er010_warnings`.
+- The Deployment sets `EC00_RESET_STATE=1`: a container restart inside the same
+  pod (whose `emptyDir` survives) wipes the disposable store and starts fresh
+  instead of crash-looping. Without that variable an existing store is refused.
 
 TLS is verified against the system trust store (`SSL_CERT_FILE` or OpenSSL's
 default bundle). There is no option to skip verification. Plain `http://` and

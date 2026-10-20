@@ -1,5 +1,7 @@
-# Only the Gateway (and kubelet probes from the host) reach the fixture; it has
-# no egress at all.
+# Ingress from the Cilium Gateway's Envoy (entity "ingress"), this node's host
+# (kubelet probes) and "remote-node": any other cluster node's host network
+# namespace, which is broader than probes or the Gateway alone but matches the
+# appservice convention for Gateway-fronted apps. No egress at all.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:

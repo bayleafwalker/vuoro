@@ -903,12 +903,19 @@ Three review advisories from the signed-identity slice are fixed:
   candidate OA protocol has no separate invocation envelope, so the claim covers
   the message's own `request_id`. A new `envelope` case signs a claim that
   matches the header but not the body, and it is refused with no owner effect.
-- **Identity context.** The test-thread `CURRENT.get()` check is gone. Instead,
-  the fixture records the identity context each request sees on the server
-  side: at entry, at owner use, and after reset. Sequential and concurrent tests
-  assert that no request inherits or leaves an identity. In gRPC, four workers
-  serve sixteen requests, so reused threads are covered. The concurrency test's
-  name now claims only this.
+- **Identity context.** The test-thread `CURRENT.get()` check is gone. The
+  fixture records, on the server side, the identity context each request sees
+  at entry, at owner use and after reset. Over the real transports this shows
+  that the runtimes isolate per-request contexts: grpcio runs each RPC in a
+  fresh context, `ThreadingHTTPServer` uses a thread per request and uvicorn
+  copies the context per task. Those entry/exit records therefore cannot fail
+  on their own; what they do check is that the owner saw only the signing
+  principal. (Correction to the first version of this note, which claimed reused
+  gRPC threads proved no carry-over.) That `IdentityPolicy.bound()` resets its
+  own binding is proven separately: a test drives it repeatedly, including a
+  failing handler, inside one shared context on one reused thread, and fails
+  when either reset is removed. The concurrency test is renamed to claim only
+  the principal mapping.
 - **Edge duplicates.** The Node Connect edge counts repeated
   `x-vuoro-identity`/`x-request-id` in `IncomingMessage.rawHeaders` and refuses
   them itself with Connect `unauthenticated` (401). Previously, `Headers.get`
@@ -943,17 +950,20 @@ operator run. The EC-00 gate remains open.
 The fixture image (`sha256:6029277f…7621`) ran once in a disposable
 `ec00-qualification` namespace behind `gateway/internal`. All three routes
 reported `Accepted` and `ResolvedRefs`. The workstation dialled 192.168.20.219
-with verified TLS for each route hostname, and the namespace was deleted
-afterwards. The [gateway receipt](ingress-2026-10-20/gateway-receipt.json) and
+with verified TLS for each route hostname (gRPC and the raw HTTP/1.1 probe
+against the host CA bundle, HTTP v2 and Connect through pyqwest's system-store
+loader), and the namespace was deleted afterwards. The [gateway receipt](ingress-2026-10-20/gateway-receipt.json) and
 [report](ingress-2026-10-20/gateway-report.json) record 108 cases: 100 security
 assertions passed, 8 were observation-only, and there were no invariant failures.
 Revocation after commit is not exercised remotely.
 
 What the Gateway did (ER-010):
 
-- It preserved `x-request-id` from these LAN clients and marked them
-  `x-envoy-internal`; when the header was absent it added one. Clients outside
-  the internal range have not been tested.
+- It preserved `x-request-id` from these LAN clients. When the header was
+  absent it added one, along with `x-envoy-internal`, which appeared only on
+  that probe. A likely explanation is that Envoy treats LAN clients as internal
+  and does not regenerate the header; that was not observed directly. Clients
+  outside the internal range have not been tested.
 - Repeated `x-vuoro-identity` arrived as two headers, while repeated
   `x-request-id` arrived joined into one comma-separated value. Both were
   refused with no owner effect on every arm.
@@ -961,12 +971,16 @@ What the Gateway did (ER-010):
   only the h2c gRPC route stayed HTTP/2.
 - It translated grpc-web on the gRPC hostname into native gRPC, and a signed
   grpc-web publication took effect.
-- It forwarded header names containing underscores unchanged. A backend that
-  maps `_` to `-` could see a second identity or correlation header, so
-  production must reject or drop underscore header names at the ingress or
-  the backend.
+- It forwarded header names containing underscores unchanged. The production
+  verifier (FastAPI/ASGI) matches exact names and no underscore identity header
+  was sent, so this is not an observed bypass. Rejecting or dropping underscore
+  header names at the ingress or backend is a candidate defence-in-depth
+  requirement, since a backend that maps `_` to `-` could see a second identity
+  or correlation header.
 
 Latency over n=20 per case: HTTP v2 and gRPC signed publication p50 about
-9–11 ms (p95 about 14.5 ms); Connect about 56 ms. The Connect floor also
-appears over loopback, so it is not a Gateway cost. These are single-run
+9–11 ms (p95 about 14.5 ms); Connect about 56 ms. Connect has a ~41 ms floor
+that also appears over loopback; over the Gateway, signed Connect adds about
+14 ms against about 8–10 ms for HTTP v2 and gRPC. Only the floor is not a
+Gateway cost. These are single-run
 fixture figures, not a performance comparison. The EC-00 gate remains open.

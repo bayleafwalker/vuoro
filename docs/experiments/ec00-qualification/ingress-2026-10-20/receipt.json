@@ -13,15 +13,15 @@
     },
     {
       "path": "tests/experiments/ec00/ingress/serve_fixture.py",
-      "sha256": "e10332e0fe6249e7432886289f5927c42a64bb420cb36b1d3ba84ed51b3ad8bd"
+      "sha256": "3236a692ed7b6bbf880e606b97d6023088846879781054d252a64566091c43eb"
     },
     {
       "path": "tests/experiments/ec00/ingress/remote_checks.py",
-      "sha256": "b7ba3dc3a8a9594b6130dbd578a577515529fe8bcb030f975057f100c31616d3"
+      "sha256": "15d6ee2d7c38dfbfb3107baf7b19626232cb144d2dcb4057fc4678df6466cee1"
     },
     {
       "path": "tests/experiments/ec00/ingress_fixture_checks.py",
-      "sha256": "5808c14e741277c20d6c481fab71329b279eaf27c3093afbbc7c82a3ecab4b0f"
+      "sha256": "08735d1a4445bc9c63abe281087d2d609318eb8b5670ae7dbc4425dadb635b6b"
     },
     {
       "path": "tests/experiments/ec00/authenticated_owner.py",
@@ -29,7 +29,7 @@
     },
     {
       "path": "tests/experiments/ec00/authenticated_transport_checks.py",
-      "sha256": "135f3f0a8970b969f686f8c7f37a418f6af99603d082845af75e570b3f76c901"
+      "sha256": "80699e46eddad14b95753824af89422d13c28df6b2623a23d4b0d321693fca62"
     },
     {
       "path": "tests/experiments/ec00/candidate_owner_http.py",
@@ -61,7 +61,7 @@
     },
     {
       "path": "tests/experiments/ec00/ingress/k8s/deployment.yaml",
-      "sha256": "3c6c4c12a9bf6b481aec0fa40bdcf42130588a7fdbc9a1b5f0271b966727e7da"
+      "sha256": "c7abb121231bd0d9ca6dd12f8b6ed1616044a97f70de7e4b0670d8febac29369"
     },
     {
       "path": "tests/experiments/ec00/ingress/k8s/service.yaml",
@@ -73,7 +73,7 @@
     },
     {
       "path": "tests/experiments/ec00/ingress/k8s/networkpolicy.cnp.yaml",
-      "sha256": "d9561055b3c5b1a4f53aed718fdcdbe004c9f84c74fff2ddb1b4c737c236d949"
+      "sha256": "103509435b9e0dac2808c42a3557d734c30677e873843ce693c08257e97a160e"
     }
   ],
   "unchanged_service_verifier_sha256": [
@@ -95,8 +95,8 @@
     }
   ],
   "image": {
-    "local_tag": "ec00-ingress-fixture:20261020-local",
-    "local_image_id": "sha256:85800ebc7e826c38704081ea03e47f5aed68be1c294f3bb4d897e838708114ae",
+    "local_tag": "ec00-ingress-fixture:20261020-local-r2",
+    "local_image_id": "sha256:760c5ffac201def68158efc5d8fa6b1c4e3d1b8eb8dd57612fa127f986d2532e",
     "note": "docker containerd image store: the ID is the OCI index digest; the registry digest is whatever docker push reports and is what the Deployment must reference",
     "base_images": [
       "python:3.13.16-slim@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f",
@@ -104,16 +104,18 @@
     ]
   },
   "container": {
-    "flags": "--read-only --tmpfs /state --cap-drop ALL --security-opt no-new-privileges, public key mounted read-only",
+    "flags": "--read-only --tmpfs /state --cap-drop ALL --security-opt no-new-privileges, public key mounted read-only, EC00_RESET_STATE=1 as in the Deployment",
     "key": "fresh disposable Ed25519 keypair from remote_checks.py keygen; private key deleted after the run"
   },
   "local_result": {
     "cases": 108,
     "passed": 108,
-    "invariant_failures": 0
+    "invariant_failures": 0,
+    "er010_warnings": 0
   },
   "logs_sha256": {
-    "local-loopback-report.json": "6415c751fc39e538400968a2327e6a14f788c56e3c8262d47c8e07e7f0aacc7e",
+    "local-loopback-report.json": "b959a44b9fb6d9d19f0091ce170ad40adc3058546fe0a60855a9d5c044de1d7d",
     "container-ready.log": "5660b03679644218698e74348b1b3b03e1ac438cfc637cf5090493c329d19a19"
-  }
+  },
+  "note": "regenerated after the PR #268 review fixes; gateway-receipt.json and gateway-report.json record the earlier 9cf7902 workload image"
 }
