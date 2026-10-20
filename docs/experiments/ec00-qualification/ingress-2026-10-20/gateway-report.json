@@ -1,0 +1,1190 @@
+{
+  "arms": [
+    "http-v2",
+    "connect-json",
+    "connect-binary",
+    "grpc"
+  ],
+  "cases": [
+    {
+      "arm": "http-v2",
+      "case": "signed-publication",
+      "client_http_version": "HTTP/2",
+      "correlation": {
+        "fixture_http_version": [
+          "HTTP/1.1"
+        ],
+        "preserved": true,
+        "received": [
+          "9860180212220994"
+        ],
+        "sent": "9860180212220994"
+      },
+      "expected": "ok",
+      "observed": "ok",
+      "owner_state_unchanged": false,
+      "passed": true,
+      "returned_request_id_matches": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "assertion-replay",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "fresh-assertion-retry",
+      "expected": "ok",
+      "observed": "ok",
+      "owner_state_unchanged": true,
+      "passed": true,
+      "returned_request_id_matches": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "changed-body-same-key",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "missing",
+      "expected": "identity",
+      "ingress_injected": [
+        "x-request-id"
+      ],
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "unsigned-actor",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "signature",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "correlation",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "envelope",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "audience",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "issuer",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "workspace",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "repository",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "expired",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "future",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "actor-disagrees",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "epoch",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "insufficient-authority",
+      "expected": "authority",
+      "observed": "authority",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "owner-refuses-revoked",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "owner-refuses-foreign",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "owner-refuses-observer",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "case": "display-actor-cannot-take-link",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "http-v2",
+      "arrived_as": "repeated",
+      "case": "repeated-x-vuoro-identity-identical",
+      "client_http_version": "HTTP/2",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true,
+      "received_count": 2
+    },
+    {
+      "arm": "http-v2",
+      "arrived_as": "repeated",
+      "case": "repeated-x-vuoro-identity-different",
+      "client_http_version": "HTTP/2",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true,
+      "received_count": 2
+    },
+    {
+      "arm": "http-v2",
+      "arrived_as": "joined",
+      "case": "repeated-x-request-id-identical",
+      "client_http_version": "HTTP/2",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": null,
+      "received_count": 1
+    },
+    {
+      "arm": "http-v2",
+      "arrived_as": "joined",
+      "case": "repeated-x-request-id-different",
+      "client_http_version": "HTTP/2",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": null,
+      "received_count": 1
+    },
+    {
+      "arm": "http-v2",
+      "case": "concurrent-16x8-no-identity-carry-over",
+      "owner_records": 16,
+      "passed": true,
+      "problems": []
+    },
+    {
+      "arm": "connect-json",
+      "case": "signed-publication",
+      "client_http_version": "HTTP/2",
+      "correlation": {
+        "fixture_http_version": [
+          "HTTP/1.1"
+        ],
+        "preserved": true,
+        "received": [
+          "9860180212221058"
+        ],
+        "sent": "9860180212221058"
+      },
+      "expected": "ok",
+      "observed": "ok",
+      "owner_state_unchanged": false,
+      "passed": true,
+      "returned_request_id_matches": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "assertion-replay",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "fresh-assertion-retry",
+      "expected": "ok",
+      "observed": "ok",
+      "owner_state_unchanged": true,
+      "passed": true,
+      "returned_request_id_matches": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "changed-body-same-key",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "missing",
+      "expected": "identity",
+      "ingress_injected": [
+        "x-request-id"
+      ],
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "unsigned-actor",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "signature",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "correlation",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "envelope",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "audience",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "issuer",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "workspace",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "repository",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "expired",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "future",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "actor-disagrees",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "epoch",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "insufficient-authority",
+      "expected": "authority",
+      "observed": "authority",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "owner-refuses-revoked",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "owner-refuses-foreign",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "owner-refuses-observer",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "case": "display-actor-cannot-take-link",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-json",
+      "arrived_as": "repeated",
+      "case": "repeated-x-vuoro-identity-identical",
+      "client_http_version": "HTTP/2",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true,
+      "received_count": 2
+    },
+    {
+      "arm": "connect-json",
+      "arrived_as": "repeated",
+      "case": "repeated-x-vuoro-identity-different",
+      "client_http_version": "HTTP/2",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true,
+      "received_count": 2
+    },
+    {
+      "arm": "connect-json",
+      "arrived_as": "joined",
+      "case": "repeated-x-request-id-identical",
+      "client_http_version": "HTTP/2",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": null,
+      "received_count": 1
+    },
+    {
+      "arm": "connect-json",
+      "arrived_as": "joined",
+      "case": "repeated-x-request-id-different",
+      "client_http_version": "HTTP/2",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": null,
+      "received_count": 1
+    },
+    {
+      "arm": "connect-json",
+      "case": "concurrent-16x8-no-identity-carry-over",
+      "owner_records": 16,
+      "passed": true,
+      "problems": []
+    },
+    {
+      "arm": "connect-binary",
+      "case": "signed-publication",
+      "client_http_version": "HTTP/2",
+      "correlation": {
+        "fixture_http_version": [
+          "HTTP/1.1"
+        ],
+        "preserved": true,
+        "received": [
+          "9860180212221122"
+        ],
+        "sent": "9860180212221122"
+      },
+      "expected": "ok",
+      "observed": "ok",
+      "owner_state_unchanged": false,
+      "passed": true,
+      "returned_request_id_matches": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "assertion-replay",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "fresh-assertion-retry",
+      "expected": "ok",
+      "observed": "ok",
+      "owner_state_unchanged": true,
+      "passed": true,
+      "returned_request_id_matches": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "changed-body-same-key",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "missing",
+      "expected": "identity",
+      "ingress_injected": [
+        "x-request-id"
+      ],
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "unsigned-actor",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "signature",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "correlation",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "envelope",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "audience",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "issuer",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "workspace",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "repository",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "expired",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "future",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "actor-disagrees",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "epoch",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "insufficient-authority",
+      "expected": "authority",
+      "observed": "authority",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "owner-refuses-revoked",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "owner-refuses-foreign",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "owner-refuses-observer",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "case": "display-actor-cannot-take-link",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "connect-binary",
+      "arrived_as": "repeated",
+      "case": "repeated-x-vuoro-identity-identical",
+      "client_http_version": "HTTP/2",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true,
+      "received_count": 2
+    },
+    {
+      "arm": "connect-binary",
+      "arrived_as": "repeated",
+      "case": "repeated-x-vuoro-identity-different",
+      "client_http_version": "HTTP/2",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true,
+      "received_count": 2
+    },
+    {
+      "arm": "connect-binary",
+      "arrived_as": "joined",
+      "case": "repeated-x-request-id-identical",
+      "client_http_version": "HTTP/2",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": null,
+      "received_count": 1
+    },
+    {
+      "arm": "connect-binary",
+      "arrived_as": "joined",
+      "case": "repeated-x-request-id-different",
+      "client_http_version": "HTTP/2",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": null,
+      "received_count": 1
+    },
+    {
+      "arm": "connect-binary",
+      "case": "concurrent-16x8-no-identity-carry-over",
+      "owner_records": 16,
+      "passed": true,
+      "problems": []
+    },
+    {
+      "arm": "grpc",
+      "case": "signed-publication",
+      "client_http_version": "HTTP/2",
+      "correlation": {
+        "fixture_http_version": [
+          "HTTP/2"
+        ],
+        "preserved": true,
+        "received": [
+          "9860180212221186"
+        ],
+        "sent": "9860180212221186"
+      },
+      "expected": "ok",
+      "observed": "ok",
+      "owner_state_unchanged": false,
+      "passed": true,
+      "returned_request_id_matches": true
+    },
+    {
+      "arm": "grpc",
+      "case": "assertion-replay",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "case": "fresh-assertion-retry",
+      "expected": "ok",
+      "observed": "ok",
+      "owner_state_unchanged": true,
+      "passed": true,
+      "returned_request_id_matches": true
+    },
+    {
+      "arm": "grpc",
+      "case": "changed-body-same-key",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "case": "missing",
+      "expected": "identity",
+      "ingress_injected": [
+        "x-request-id"
+      ],
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "case": "unsigned-actor",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "case": "signature",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "case": "correlation",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "case": "envelope",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "case": "audience",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "case": "issuer",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "case": "workspace",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "case": "repository",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "case": "expired",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "case": "future",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "case": "actor-disagrees",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "case": "epoch",
+      "expected": "identity",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "case": "insufficient-authority",
+      "expected": "authority",
+      "observed": "authority",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "case": "owner-refuses-revoked",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "case": "owner-refuses-foreign",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "case": "owner-refuses-observer",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "case": "display-actor-cannot-take-link",
+      "expected": "owner",
+      "observed": "owner",
+      "owner_state_unchanged": true,
+      "passed": true
+    },
+    {
+      "arm": "grpc",
+      "arrived_as": "repeated",
+      "case": "repeated-x-vuoro-identity-identical",
+      "client_http_version": "HTTP/2",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true,
+      "received_count": 2
+    },
+    {
+      "arm": "grpc",
+      "arrived_as": "repeated",
+      "case": "repeated-x-vuoro-identity-different",
+      "client_http_version": "HTTP/2",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": true,
+      "received_count": 2
+    },
+    {
+      "arm": "grpc",
+      "arrived_as": "joined",
+      "case": "repeated-x-request-id-identical",
+      "client_http_version": "HTTP/2",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": null,
+      "received_count": 1
+    },
+    {
+      "arm": "grpc",
+      "arrived_as": "joined",
+      "case": "repeated-x-request-id-different",
+      "client_http_version": "HTTP/2",
+      "observed": "identity",
+      "owner_state_unchanged": true,
+      "passed": null,
+      "received_count": 1
+    },
+    {
+      "arm": "grpc",
+      "case": "concurrent-16x8-no-identity-carry-over",
+      "owner_records": 16,
+      "passed": true,
+      "problems": []
+    }
+  ],
+  "dropped_relative_to_loopback": [
+    "revocation-after-commit (needs an owner-store write)"
+  ],
+  "fixture_health": {
+    "ready": true
+  },
+  "ingress": {
+    "connect_header_spelling": {
+      "client": "HTTP/2",
+      "fixture_http_version": [
+        "HTTP/1.1"
+      ],
+      "received": [
+        [
+          "x-ec00-probe",
+          "9b3c35e148ac4c0dba89f8fbefcc111c"
+        ],
+        [
+          "x-ec00-mixed-case",
+          "Value-Case"
+        ],
+        [
+          "x-ec00-dup",
+          "first"
+        ],
+        [
+          "x-ec00-dup",
+          "second"
+        ]
+      ],
+      "status": 401
+    },
+    "grpc_web_on_grpc_host": {
+      "HTTP/1.1": {
+        "client": "HTTP/1.1",
+        "content_type": [
+          "application/grpc-web+proto"
+        ],
+        "grpc_status": [],
+        "owner_state_changed": true,
+        "reached_fixture": true,
+        "status": 200
+      },
+      "HTTP/2": {
+        "client": "HTTP/2",
+        "content_type": [
+          "application/grpc-web+proto"
+        ],
+        "grpc_status": [],
+        "owner_state_changed": true,
+        "reached_fixture": true,
+        "status": 200
+      }
+    },
+    "http1_header_spelling": {
+      "added_by_path": [
+        "x-envoy-internal",
+        "x-forwarded-for",
+        "x-forwarded-proto",
+        "x-request-id"
+      ],
+      "received": [
+        [
+          "x-ec00-probe",
+          "e7c7ef4e16b842cb922d04b798239849"
+        ],
+        [
+          "x-ec00-mixed-case",
+          "Value-Case"
+        ],
+        [
+          "x-ec00-padded",
+          "padded value"
+        ],
+        [
+          "x_ec00_underscore",
+          "underscore"
+        ],
+        [
+          "x-ec00-dup",
+          "first"
+        ],
+        [
+          "x-ec00-dup",
+          "second"
+        ],
+        [
+          "x-ec00-comma",
+          "a, b"
+        ]
+      ],
+      "sent": [
+        "X-EC00-Probe: e7c7ef4e16b842cb922d04b798239849",
+        "X-EC00-Mixed-Case: Value-Case",
+        "x-ec00-padded:   padded value   ",
+        "x_ec00_underscore: underscore",
+        "X-EC00-Dup: first",
+        "x-ec00-dup: second",
+        "X-EC00-Comma: a, b"
+      ],
+      "status": 401
+    },
+    "http_versions": {
+      "connect:HTTP/1.1": {
+        "client": "HTTP/1.1",
+        "fixture_received": [
+          "HTTP/1.1"
+        ],
+        "status": 401
+      },
+      "connect:HTTP/2": {
+        "client": "HTTP/2",
+        "fixture_received": [
+          "HTTP/1.1"
+        ],
+        "status": 401
+      },
+      "connect:alpn-default": {
+        "client": "HTTP/2",
+        "fixture_received": [
+          "HTTP/1.1"
+        ],
+        "status": 401
+      },
+      "http:HTTP/1.1": {
+        "client": "HTTP/1.1",
+        "fixture_received": [
+          "HTTP/1.1"
+        ],
+        "status": 401
+      },
+      "http:HTTP/2": {
+        "client": "HTTP/2",
+        "fixture_received": [
+          "HTTP/1.1"
+        ],
+        "status": 401
+      },
+      "http:alpn-default": {
+        "client": "HTTP/2",
+        "fixture_received": [
+          "HTTP/1.1"
+        ],
+        "status": 401
+      }
+    }
+  },
+  "invariant_failures": [],
+  "latency": {
+    "connect-binary": {
+      "missing_identity_refusal": {
+        "max_ms": 48.12,
+        "min_ms": 43.78,
+        "n": 20,
+        "p50_ms": 43.95,
+        "p95_ms": 48.05
+      },
+      "signed_publication": {
+        "max_ms": 64.02,
+        "min_ms": 51.75,
+        "n": 20,
+        "p50_ms": 55.66,
+        "p95_ms": 60.26
+      }
+    },
+    "connect-json": {
+      "missing_identity_refusal": {
+        "max_ms": 50.7,
+        "min_ms": 43.91,
+        "n": 20,
+        "p50_ms": 47.68,
+        "p95_ms": 48.39
+      },
+      "signed_publication": {
+        "max_ms": 63.93,
+        "min_ms": 51.55,
+        "n": 20,
+        "p50_ms": 55.81,
+        "p95_ms": 59.97
+      }
+    },
+    "grpc": {
+      "missing_identity_refusal": {
+        "max_ms": 4.76,
+        "min_ms": 1.83,
+        "n": 20,
+        "p50_ms": 2.87,
+        "p95_ms": 3.7
+      },
+      "signed_publication": {
+        "max_ms": 14.51,
+        "min_ms": 7.57,
+        "n": 20,
+        "p50_ms": 11.45,
+        "p95_ms": 14.46
+      }
+    },
+    "http-v2": {
+      "missing_identity_refusal": {
+        "max_ms": 3.85,
+        "min_ms": 2.14,
+        "n": 20,
+        "p50_ms": 2.75,
+        "p95_ms": 3.76
+      },
+      "signed_publication": {
+        "max_ms": 17.25,
+        "min_ms": 7.78,
+        "n": 20,
+        "p50_ms": 9.28,
+        "p95_ms": 14.53
+      }
+    }
+  },
+  "latency_note": "client-side wall time per request on a reused connection, first request excluded; no cross-target comparison is implied",
+  "run_id": "a334c097c658",
+  "schema_version": "ec00-ingress-observation/v1",
+  "target": {
+    "connect_to": "192.168.20.219",
+    "connect_url": "https://ec00-qualification-connect.apps.kotona.app",
+    "grpc_target": "ec00-qualification-grpc.apps.kotona.app:443",
+    "http_url": "https://ec00-qualification.apps.kotona.app",
+    "plaintext_loopback": false
+  }
+}

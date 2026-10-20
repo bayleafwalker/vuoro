@@ -937,3 +937,36 @@ arm shows a fixed ~41 ms on the uvicorn/HTTP/1.1 path, against under 1 ms for
 HTTP v2 and gRPC. That gap is a local artifact and not an ingress measurement.
 TLS, the actual Gateway, Envoy header handling and ER-010 remain open until the
 operator run. The EC-00 gate remains open.
+
+### Actual Gateway run (20 October 2026)
+
+The fixture image (`sha256:6029277f…7621`) ran once in a disposable
+`ec00-qualification` namespace behind `gateway/internal`. All three routes
+reported `Accepted` and `ResolvedRefs`. The workstation dialled 192.168.20.219
+with verified TLS for each route hostname, and the namespace was deleted
+afterwards. The [gateway receipt](ingress-2026-10-20/gateway-receipt.json) and
+[report](ingress-2026-10-20/gateway-report.json) record 108 cases: 100 security
+assertions passed, 8 were observation-only, and there were no invariant failures.
+Revocation after commit is not exercised remotely.
+
+What the Gateway did (ER-010):
+
+- It preserved `x-request-id` from these LAN clients and marked them
+  `x-envoy-internal`; when the header was absent it added one. Clients outside
+  the internal range have not been tested.
+- Repeated `x-vuoro-identity` arrived as two headers, while repeated
+  `x-request-id` arrived joined into one comma-separated value. Both were
+  refused with no owner effect on every arm.
+- HTTP and Connect reached the backend as HTTP/1.1 even over client HTTP/2;
+  only the h2c gRPC route stayed HTTP/2.
+- It translated grpc-web on the gRPC hostname into native gRPC, and a signed
+  grpc-web publication took effect.
+- It forwarded header names containing underscores unchanged. A backend that
+  maps `_` to `-` could see a second identity or correlation header, so
+  production must reject or drop underscore header names at the ingress or
+  the backend.
+
+Latency over n=20 per case: HTTP v2 and gRPC signed publication p50 about
+9–11 ms (p95 about 14.5 ms); Connect about 56 ms. The Connect floor also
+appears over loopback, so it is not a Gateway cost. These are single-run
+fixture figures, not a performance comparison. The EC-00 gate remains open.

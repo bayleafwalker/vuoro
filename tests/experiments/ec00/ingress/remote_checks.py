@@ -9,7 +9,7 @@ ingress does to repeated headers, HTTP versions, grpc-web and header spelling.
   run     signs assertions with that private key and exercises the target.
 
 Transport rules: https:// URLs and TLS gRPC, verified against the system trust
-store (SSL_CERT_FILE or OpenSSL's default bundle); there is no option to skip
+store (SSL_CERT_FILE, the interpreter default, or the host bundle); there is no option to skip
 verification. --connect-to pins the TCP destination (e.g. the Gateway address)
 while SNI, Host/:authority and certificate name checks keep the URL hostname.
 Plain http:// and insecure gRPC are accepted only with --allow-plaintext-loopback
@@ -79,12 +79,19 @@ def token_tag(value: str) -> str:
     return f'<redacted sha256:{hashlib.sha256(value.encode("latin1")).hexdigest()[:16]} len:{len(value)}>'
 
 
-def system_ca_bundle() -> bytes:
+def system_ca_path() -> Path:
     paths = ssl.get_default_verify_paths()
-    for candidate in (os.environ.get('SSL_CERT_FILE'), paths.cafile, paths.openssl_cafile):
+    # Interpreters built outside the host (uv-managed Python on NixOS) report an
+    # OpenSSL default that does not exist there; fall back to the host bundle.
+    for candidate in (os.environ.get('SSL_CERT_FILE'), os.environ.get('NIX_SSL_CERT_FILE'),
+                      paths.cafile, paths.openssl_cafile, '/etc/ssl/certs/ca-certificates.crt'):
         if candidate and Path(candidate).is_file():
-            return Path(candidate).read_bytes()
+            return Path(candidate)
     raise SystemExit('system trust store bundle not found (set SSL_CERT_FILE)')
+
+
+def system_ca_bundle() -> bytes:
+    return system_ca_path().read_bytes()
 
 
 def percentile_summary(samples):
@@ -470,7 +477,7 @@ def raw_http1(target, base, path, header_lines, body):
     address = (target.connect_to or parts.hostname, port)
     sock = socket.create_connection(address, timeout=15)
     if parts.scheme == 'https':
-        context = ssl.create_default_context(cadata=system_ca_bundle().decode())
+        context = ssl.create_default_context(cafile=str(system_ca_path()))
         context.set_alpn_protocols(['http/1.1'])
         sock = context.wrap_socket(sock, server_hostname=parts.hostname)
     request = '\r\n'.join([f'POST {path} HTTP/1.1', f'Host: {parts.netloc}', *header_lines,
