@@ -279,7 +279,10 @@ class Runner:
                      passed=ok, **extra)
         if not ok:
             refused_case = expected != 'ok'
-            entry['failure_kind'] = 'security' if refused_case and (outcome == 'ok' or unchanged is False) else 'expectation'
+            # A bad identity that gets past the verifier is a security event even
+            # when a later layer still refuses the request.
+            security = refused_case and (outcome == 'ok' or unchanged is False or expected == 'identity')
+            entry['failure_kind'] = 'security' if security else 'expectation'
         self.cases.append(entry)
         if not ok:
             self.failures.append(entry)

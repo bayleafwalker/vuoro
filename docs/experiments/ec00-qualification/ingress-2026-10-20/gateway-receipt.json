@@ -36,6 +36,58 @@
    "report_sha256": "90ff5c8f8680b76f582d3d37ba35f7641298ba0b10101c5477446ea260698cc6",
    "stdout": "gateway-stdout.txt",
    "result": "108 cases: 100 security assertions passed, 8 observation-only, 0 invariant failures"
+  },
+  {
+   "run": 3,
+   "fixture_source": "57650bc (reviewed fix commit)",
+   "image": {
+    "reference": "192.168.20.221:5000/ec00-ingress-fixture:20261020-r2",
+    "digest": "sha256:0a926fb638387c567925ba4c20eadd2cd85fbb188ac04cc6da19168998e21ede",
+    "pod_image_id_matched": true,
+    "restarts": 0
+   },
+   "routes": "all three Accepted=True ResolvedRefs=True",
+   "report": "gateway-report-r2.json",
+   "report_sha256": "29aea91553f946501d4545e5821803abef5c8993b5f36a6b2af4f6a641fbf838",
+   "stdout": "gateway-stdout-r2.txt",
+   "result": "108 cases: 100 passed, 8 observation-only; failure_kinds security 0, expectation 0; er010_warnings none; repeated x-vuoro-identity arrived repeated (8/8), repeated x-request-id arrived joined (8/8) and both were refused with no owner effect",
+   "latency_p50_p95_ms": {
+    "http-v2 signed_publication": [
+     8.04,
+     9.79
+    ],
+    "grpc signed_publication": [
+     7.54,
+     9.39
+    ],
+    "connect-json signed_publication": [
+     59.93,
+     64.14
+    ],
+    "connect-binary signed_publication": [
+     55.89,
+     63.96
+    ]
+   },
+   "note": "Reproduces run 2's observations with the reviewed fixture (comma-count tags, ER-010 collapse warnings, store reset on restart); single-run fixture figures, not a performance comparison",
+   "source_sha256": [
+    {
+     "path": "tests/experiments/ec00/ingress/Dockerfile",
+     "sha256": "a88fd15b8a08e45c8cbe86add24f513fddb252b3dc0e8cc8667403909e8b33a5"
+    },
+    {
+     "path": "tests/experiments/ec00/ingress/serve_fixture.py",
+     "sha256": "3236a692ed7b6bbf880e606b97d6023088846879781054d252a64566091c43eb"
+    },
+    {
+     "path": "tests/experiments/ec00/ingress/remote_checks.py",
+     "sha256": "8cd42b0a2769c07fe359af737b3d33592e9dd2f638015efcb280394a4633e5f5"
+    },
+    {
+     "path": "tests/experiments/ec00/authenticated_owner.py",
+     "sha256": "ad5d5c3aa672489107eeecbe415cd136f21e32150ac99c934752cf1f3931ab5f"
+    }
+   ]
   }
  ],
  "observations": [
@@ -51,7 +103,8 @@
  ],
  "teardown": {
   "namespace_deleted": true,
-  "remaining_ec00_routes": 0
+  "remaining_ec00_routes": 0,
+  "runs": "namespace created and deleted for runs 1-2 and again for run 3; no ec00 routes remain"
  },
  "not_qualified": [
   "production gateway/bootstrap or real identity issuance",

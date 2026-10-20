@@ -107,8 +107,10 @@ How it runs:
   pod (whose `emptyDir` survives) wipes the disposable store and starts fresh
   instead of crash-looping. Without that variable an existing store is refused.
 
-TLS is verified against the system trust store (`SSL_CERT_FILE` or OpenSSL's
-default bundle). There is no option to skip verification. Plain `http://` and
+TLS is always verified. gRPC and the raw HTTP/1.1 probe load the host CA bundle
+(`SSL_CERT_FILE`, `NIX_SSL_CERT_FILE`, the interpreter default, then
+`/etc/ssl/certs/ca-certificates.crt`); the HTTP v2 and Connect arms use the
+pyqwest transport's system-store loader. There is no option to skip verification. Plain `http://` and
 insecure gRPC are refused unless `--allow-plaintext-loopback` is given, and even
 then only for loopback hosts.
 
