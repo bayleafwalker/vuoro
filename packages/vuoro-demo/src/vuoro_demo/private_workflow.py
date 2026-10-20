@@ -84,7 +84,7 @@ async def append(caller, run, item, kind, body, ref=None):
 async def register(caller, name, *, predecessor=None):
     args = {
         "harness_id": "vuoro-private-workflow",
-        "harness_build": "0.1.1",
+        "harness_build": version("vuoro-demo"),
         "model_id": "external-private-execution"
         if name == "producer"
         else "deterministic-profile-verifier",
@@ -225,8 +225,8 @@ async def verifier(value):
             "private-verification",
             "private-artifact-verification",
             {
-                "schema": "private-handover-observation/v1",
                 **manifest,
+                "schema": "private-handover-observation/v1",
                 "checks": observed["checks"],
             },
         )
@@ -279,8 +279,8 @@ async def owner_verification(owner, verified, value, evaluation):
         )
     observed = verify(Path(value["source"]).read_bytes(), artifact, manifest)
     expected = {
-        "schema": "private-handover-observation/v1",
         **manifest,
+        "schema": "private-handover-observation/v1",
         "checks": observed["checks"],
     }
     if detail != expected:

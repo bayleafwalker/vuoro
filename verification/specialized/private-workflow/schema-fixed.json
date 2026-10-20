@@ -1,0 +1,1717 @@
+{
+  "schema": "vuoro-private-workflow/v1",
+  "status": "passed",
+  "profile": "maintenance-handover-v1",
+  "scope": "Actual local C0 fixture model execution and released Work/Evidence owner acceptance; no hosted or production qualification.",
+  "versions": {
+    "vuoro-client": "0.1.2",
+    "vuoro-service": "0.1.97",
+    "sprintctl": "0.22.0",
+    "sovite-platform": "0.1.16",
+    "vuoro-adapter-kit": "0.2.2"
+  },
+  "steps": [
+    {
+      "operation": "work.sprint.create",
+      "arguments": {
+        "name": "Private household maintenance handover",
+        "goal": "Source-backed handover; no repairs performed",
+        "status": "active"
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "sprint": {
+          "repo_id": "settlement-demo",
+          "id": 1,
+          "name": "Private household maintenance handover",
+          "goal": "Source-backed handover; no repairs performed",
+          "start_date": null,
+          "end_date": null,
+          "status": "active",
+          "created_at": "2026-10-20T18:36:30.508637Z",
+          "kind": "active_sprint",
+          "aggregate_uuid": "72f591e2-b462-4dd1-93d9-e68160e52f0a"
+        }
+      }
+    },
+    {
+      "operation": "work.item.create",
+      "arguments": {
+        "sprint_id": 1,
+        "track_name": "private-workflow",
+        "title": "Prepare a source-backed maintenance handover",
+        "description": "WF-01 C0 evaluation; owner acceptance requires independently verified private output."
+      },
+      "result": {
+        "item": {
+          "repo_id": "settlement-demo",
+          "id": 1,
+          "track_id": 1,
+          "sprint_id": 1,
+          "title": "Prepare a source-backed maintenance handover",
+          "description": "WF-01 C0 evaluation; owner acceptance requires independently verified private output.",
+          "status": "pending",
+          "assignee": null,
+          "priority": null,
+          "created_at": "2026-10-20T18:36:30.542090Z",
+          "updated_at": "2026-10-20T18:36:30.542090Z",
+          "aggregate_uuid": "7276aa51-d0c3-4b7c-925d-313f7921ab79",
+          "legacy": false,
+          "resolution": null,
+          "terminal_decision_id": null
+        },
+        "track_name": "private-workflow"
+      }
+    },
+    {
+      "operation": "work.read.item",
+      "arguments": {
+        "item_id": 1
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "item": {
+          "repo_id": "settlement-demo",
+          "id": 1,
+          "track_id": 1,
+          "sprint_id": 1,
+          "title": "Prepare a source-backed maintenance handover",
+          "description": "WF-01 C0 evaluation; owner acceptance requires independently verified private output.",
+          "status": "pending",
+          "assignee": null,
+          "priority": null,
+          "created_at": "2026-10-20T18:36:30.542090Z",
+          "updated_at": "2026-10-20T18:36:30.542090Z",
+          "aggregate_uuid": "7276aa51-d0c3-4b7c-925d-313f7921ab79",
+          "legacy": false,
+          "resolution": null,
+          "terminal_decision_id": null,
+          "edit_revision": "item:7276aa51-d0c3-4b7c-925d-313f7921ab79@description:v0@sha256:591e1fcc32a5c826054eecd677ca27e85086b9e2399a8b25309710f8ab08f318",
+          "status_revision": "item:7276aa51-d0c3-4b7c-925d-313f7921ab79@status:pending"
+        },
+        "events": [],
+        "active_reservations": [],
+        "refs": [],
+        "deps": {
+          "blocked_by": [],
+          "blocks": []
+        }
+      }
+    },
+    {
+      "operation": "work.lifecycle.arbitrate",
+      "arguments": {
+        "record": {
+          "origin_stream_id": "ec1f92e4-2bde-4b3d-8a8b-20e0aa2d191a",
+          "origin_seq": 1,
+          "event_id": "5d6a912c-b297-41eb-8c0d-39c6411f6e2f",
+          "schema_version": 1,
+          "record_class": "authority-command",
+          "event_type": "item.transition",
+          "actor": "bayleaf-owner",
+          "runtime_session_id": null,
+          "occurred_at": "2026-10-20T18:36:30.574786+00:00",
+          "basis_revision": "item:7276aa51-d0c3-4b7c-925d-313f7921ab79@status:pending",
+          "correlation_id": null,
+          "causation_id": null,
+          "payload": {
+            "actor": "bayleaf-owner",
+            "artifact_digest": null,
+            "authored_at": "2026-10-20T18:36:30.574786+00:00",
+            "basis_revision": "item:7276aa51-d0c3-4b7c-925d-313f7921ab79@status:pending",
+            "causation_id": null,
+            "correlation_id": null,
+            "event_id": "5d6a912c-b297-41eb-8c0d-39c6411f6e2f",
+            "payload": {
+              "to_status": "active"
+            },
+            "payload_digest": null,
+            "record_class": "authority-command",
+            "record_type": "item.transition",
+            "refs": {
+              "aggregate_id": 1,
+              "aggregate_type": "item",
+              "aggregate_uuid": "7276aa51-d0c3-4b7c-925d-313f7921ab79",
+              "repo_id": "eec0d07c-b844-5215-a2e4-247ca38ec3c2"
+            },
+            "schema_version": "1"
+          },
+          "payload_sha256": "4ec399ab530ca18db52d0be252ca7157c2b3665aadad60caa8bd24d2f947f44c",
+          "created_at": "2026-10-20T18:36:30Z"
+        }
+      },
+      "result": {
+        "request_event_id": "5d6a912c-b297-41eb-8c0d-39c6411f6e2f",
+        "decision_event_id": "25dc1aff-b129-4e66-aeb4-e3a9808a2765",
+        "decision_ingest_offset": 2,
+        "decision_type": "item.transitioned",
+        "outcome": "accepted",
+        "reason_code": null,
+        "reason_detail": null,
+        "effect": {
+          "aggregate_type": "item",
+          "aggregate_uuid": "7276aa51-d0c3-4b7c-925d-313f7921ab79",
+          "item_id": 1,
+          "previous_status": "pending",
+          "status": "active",
+          "revision": "item:7276aa51-d0c3-4b7c-925d-313f7921ab79@status:active"
+        },
+        "duplicate": false
+      }
+    },
+    {
+      "operation": "work.read.item",
+      "arguments": {
+        "item_id": 1
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "item": {
+          "repo_id": "settlement-demo",
+          "id": 1,
+          "track_id": 1,
+          "sprint_id": 1,
+          "title": "Prepare a source-backed maintenance handover",
+          "description": "WF-01 C0 evaluation; owner acceptance requires independently verified private output.",
+          "status": "active",
+          "assignee": null,
+          "priority": null,
+          "created_at": "2026-10-20T18:36:30.542090Z",
+          "updated_at": "2026-10-20T18:36:30.618273Z",
+          "aggregate_uuid": "7276aa51-d0c3-4b7c-925d-313f7921ab79",
+          "legacy": false,
+          "resolution": null,
+          "terminal_decision_id": null,
+          "edit_revision": "item:7276aa51-d0c3-4b7c-925d-313f7921ab79@description:v0@sha256:591e1fcc32a5c826054eecd677ca27e85086b9e2399a8b25309710f8ab08f318",
+          "status_revision": "item:7276aa51-d0c3-4b7c-925d-313f7921ab79@status:active"
+        },
+        "events": [],
+        "active_reservations": [],
+        "refs": [],
+        "deps": {
+          "blocked_by": [],
+          "blocks": []
+        }
+      }
+    },
+    {
+      "operation": "work.run.register-v1",
+      "arguments": {
+        "harness_id": "vuoro-private-workflow",
+        "harness_build": "0.1.2",
+        "model_id": "deterministic-profile-verifier",
+        "recipe_id": "maintenance-handover-v1",
+        "observed_profile": {
+          "instruction_digest": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b",
+          "skill_digests": []
+        },
+        "idempotency_key": "wf01-register-blocked"
+      },
+      "result": {
+        "run": {
+          "run_id": "run_NVE7QHBZSD8FGP72AE6QVQCG1W",
+          "grant_id": null,
+          "model_id": "deterministic-profile-verifier",
+          "claim_ids": [],
+          "client_id": null,
+          "grant_ids": [],
+          "recipe_id": "maintenance-handover-v1",
+          "created_at": "2026-10-20T18:36:30.654980Z",
+          "harness_id": "vuoro-private-workflow",
+          "principal_id": "local:producer:0",
+          "workspace_id": "bayleaf",
+          "harness_build": "0.1.2",
+          "observed_profile": {
+            "skill_digests": [],
+            "instruction_digest": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+          },
+          "predecessor_run_id": null
+        },
+        "repo_id": "settlement-demo"
+      }
+    },
+    {
+      "operation": "sovite.task.request-v1",
+      "refusal": "sovite-unavailable"
+    },
+    {
+      "operation": "sovite.task.status-v1",
+      "arguments": {
+        "work_id": 1,
+        "run_id": "run_VVJA708XRN27V0N9PJB28JC60Q",
+        "grant_id": "maintenance",
+        "receipt": "rcpt_2NVmE4ZDI4YkspE6YzCWAMapwld03GMT",
+        "task_binding": "9221d6b2211e0ec0336f33b5c1a5260ec1207f58ee4983805813382a59eaabba"
+      },
+      "result": {
+        "receipt": "rcpt_2NVmE4ZDI4YkspE6YzCWAMapwld03GMT",
+        "status": "pending",
+        "task_binding": "9221d6b2211e0ec0336f33b5c1a5260ec1207f58ee4983805813382a59eaabba"
+      }
+    },
+    {
+      "operation": "sovite.task.status-v1",
+      "arguments": {
+        "work_id": 1,
+        "run_id": "run_VVJA708XRN27V0N9PJB28JC60Q",
+        "grant_id": "maintenance",
+        "receipt": "rcpt_2NVmE4ZDI4YkspE6YzCWAMapwld03GMT",
+        "task_binding": "9221d6b2211e0ec0336f33b5c1a5260ec1207f58ee4983805813382a59eaabba"
+      },
+      "result": {
+        "receipt": "rcpt_2NVmE4ZDI4YkspE6YzCWAMapwld03GMT",
+        "status": "available",
+        "task_binding": "9221d6b2211e0ec0336f33b5c1a5260ec1207f58ee4983805813382a59eaabba"
+      }
+    },
+    {
+      "operation": "work.run.register-v1",
+      "arguments": {
+        "harness_id": "vuoro-private-workflow",
+        "harness_build": "0.1.2",
+        "model_id": "deterministic-profile-verifier",
+        "recipe_id": "maintenance-handover-v1",
+        "observed_profile": {
+          "instruction_digest": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b",
+          "skill_digests": []
+        },
+        "idempotency_key": "wf01-register-stager"
+      },
+      "result": {
+        "run": {
+          "run_id": "run_JY52HSKC2CZAZXEXMGEZ215HWE",
+          "grant_id": null,
+          "model_id": "deterministic-profile-verifier",
+          "claim_ids": [],
+          "client_id": null,
+          "grant_ids": [],
+          "recipe_id": "maintenance-handover-v1",
+          "created_at": "2026-10-20T18:37:06.363032Z",
+          "harness_id": "vuoro-private-workflow",
+          "principal_id": "local:stager:0",
+          "workspace_id": "bayleaf",
+          "harness_build": "0.1.2",
+          "observed_profile": {
+            "skill_digests": [],
+            "instruction_digest": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+          },
+          "predecessor_run_id": null
+        },
+        "repo_id": "settlement-demo"
+      }
+    },
+    {
+      "operation": "work.read.item",
+      "arguments": {
+        "item_id": 1
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "item": {
+          "repo_id": "settlement-demo",
+          "id": 1,
+          "track_id": 1,
+          "sprint_id": 1,
+          "title": "Prepare a source-backed maintenance handover",
+          "description": "WF-01 C0 evaluation; owner acceptance requires independently verified private output.",
+          "status": "active",
+          "assignee": null,
+          "priority": null,
+          "created_at": "2026-10-20T18:36:30.542090Z",
+          "updated_at": "2026-10-20T18:36:30.618273Z",
+          "aggregate_uuid": "7276aa51-d0c3-4b7c-925d-313f7921ab79",
+          "legacy": false,
+          "resolution": null,
+          "terminal_decision_id": null,
+          "edit_revision": "item:7276aa51-d0c3-4b7c-925d-313f7921ab79@description:v0@sha256:591e1fcc32a5c826054eecd677ca27e85086b9e2399a8b25309710f8ab08f318",
+          "status_revision": "item:7276aa51-d0c3-4b7c-925d-313f7921ab79@status:active"
+        },
+        "events": [],
+        "active_reservations": [],
+        "refs": [],
+        "deps": {
+          "blocked_by": [],
+          "blocks": []
+        }
+      }
+    },
+    {
+      "operation": "work.reservation.reserve-v1",
+      "arguments": {
+        "item_id": 1,
+        "actor": "bayleaf-stager",
+        "session_id": "wf01-staging",
+        "expected_revision": "item:7276aa51-d0c3-4b7c-925d-313f7921ab79@description:v0@sha256:591e1fcc32a5c826054eecd677ca27e85086b9e2399a8b25309710f8ab08f318",
+        "acceptance_contract": {
+          "effect_verification_required": true,
+          "effect_check_revisions": {
+            "private-artifact-integrity": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b",
+            "source-and-handover-contract": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b",
+            "receipt-manifest-binding": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+          },
+          "verification_profile": "checked",
+          "evidence_obligations": [
+            "private-artifact-integrity",
+            "source-and-handover-contract",
+            "receipt-manifest-binding"
+          ]
+        }
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "reservation": {
+          "repo_id": "settlement-demo",
+          "id": 1,
+          "work_item_id": 1,
+          "session_id": "wf01-staging",
+          "actor": "bayleaf-stager",
+          "role": "execution",
+          "state": "active",
+          "created_at": "2026-10-20T18:37:06Z",
+          "last_activity_at": "2026-10-20T18:37:06Z",
+          "released_at": null,
+          "interruption_reason": null,
+          "correlation_ref": null,
+          "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+          "activity_age_seconds": 0,
+          "stale": false,
+          "conflict": false,
+          "conflicting_reservations": [],
+          "conflict_severity": "none",
+          "admission_snapshot": {
+            "id": 1,
+            "role": "execution",
+            "actor": "bayleaf-stager",
+            "stale": false,
+            "state": "active",
+            "repo_id": "settlement-demo",
+            "conflict": false,
+            "created_at": "2026-10-20T18:37:06Z",
+            "session_id": "wf01-staging",
+            "released_at": null,
+            "work_item_id": 1,
+            "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+            "correlation_ref": null,
+            "last_activity_at": "2026-10-20T18:37:06Z",
+            "conflict_severity": "none",
+            "interruption_reason": null,
+            "activity_age_seconds": 0,
+            "conflicting_reservations": []
+          },
+          "replayed": false
+        }
+      }
+    },
+    {
+      "operation": "work.read.release",
+      "arguments": {
+        "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd"
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "release": {
+          "repo_id": "settlement-demo",
+          "id": 1,
+          "work_item_id": 1,
+          "item_revision": "item:7276aa51-d0c3-4b7c-925d-313f7921ab79@description:v0@sha256:591e1fcc32a5c826054eecd677ca27e85086b9e2399a8b25309710f8ab08f318@revise:0",
+          "revise_count": 0,
+          "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+          "acceptance_contract": {
+            "evidence_obligations": [
+              "private-artifact-integrity",
+              "source-and-handover-contract",
+              "receipt-manifest-binding"
+            ],
+            "verification_profile": "checked",
+            "effect_check_revisions": {
+              "receipt-manifest-binding": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b",
+              "private-artifact-integrity": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b",
+              "source-and-handover-contract": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+            },
+            "effect_verification_required": true
+          },
+          "context_refs": [],
+          "created_at": "2026-10-20T18:37:06.385604Z",
+          "actor": "bayleaf-stager"
+        },
+        "commits": []
+      }
+    },
+    {
+      "operation": "work.evidence.ingest",
+      "arguments": {
+        "records": [
+          {
+            "origin_stream_id": "c6e83e98-fb2f-483b-8178-fa2952966ec1",
+            "origin_seq": 1,
+            "event_id": "92de05a4-b137-4236-a408-df0588618055",
+            "schema_version": 1,
+            "record_class": "observation",
+            "event_type": "release.commit-observed",
+            "actor": "bayleaf-stager",
+            "runtime_session_id": null,
+            "occurred_at": "2026-10-20T18:37:06Z",
+            "basis_revision": null,
+            "correlation_id": null,
+            "causation_id": null,
+            "payload": {
+              "commit_sha": "e700198b43a75f1a716f80a0e62d7221ca1c643e",
+              "ref": "refs/heads/main",
+              "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+              "remote_hint": null
+            },
+            "payload_sha256": "d6f7abc75e17d1e371ba02263f2a7c311848966a2d98d41b0a712c2a889172a7",
+            "created_at": "2026-10-20T18:37:06Z"
+          }
+        ]
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "results": [
+          {
+            "kind": "record",
+            "event_id": "92de05a4-b137-4236-a408-df0588618055",
+            "event_type": "release.commit-observed",
+            "ingest_offset": 3,
+            "duplicate": false
+          }
+        ]
+      }
+    },
+    {
+      "operation": "work.evidence.tail-v1",
+      "arguments": {
+        "run_id": "run_JY52HSKC2CZAZXEXMGEZ215HWE"
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "run_id": "run_JY52HSKC2CZAZXEXMGEZ215HWE",
+        "item": null
+      }
+    },
+    {
+      "operation": "work.evidence.append-v1",
+      "arguments": {
+        "run_id": "run_JY52HSKC2CZAZXEXMGEZ215HWE",
+        "item_id": "receipt-manifest",
+        "kind": "sovite-private-artifact-reference",
+        "ref": "workflow:receipt-manifest",
+        "digest": "sha256:f83df14ab58572c7789f5cfd4e0e5ba3ed611e2e582090fb93e951b73e36a5a7",
+        "collector": "maintenance-handover-v1",
+        "validity": {
+          "basis": "indefinite",
+          "valid_from": "2026-10-20T00:00:00+00:00",
+          "valid_until": null,
+          "component_digests": {}
+        },
+        "claims": [
+          {
+            "claim_type": "observation",
+            "subject": "maintenance-handover",
+            "grant_id": null,
+            "freshness": null,
+            "confirms": null,
+            "detail": {
+              "schema": "sovite-private-artifact-manifest/v1",
+              "work_id": 1,
+              "run_id": "run_VVJA708XRN27V0N9PJB28JC60Q",
+              "receipt": "rcpt_2NVmE4ZDI4YkspE6YzCWAMapwld03GMT",
+              "task_binding": "9221d6b2211e0ec0336f33b5c1a5260ec1207f58ee4983805813382a59eaabba",
+              "source_digest": "sha256:ee7c6bc4670731b054494e14487a0232e7e3b2990255fa477026570472ec4e12",
+              "artifact_digest": "sha256:47af1b632dbe3c34a9e6908fdea3e233d0883745c02138797fdbbd63a62582e9",
+              "generation": "sha256:d3e7ff8e9b760feeaa096aef1ef4410da52cb61b2125423e95d2c32d297d564d",
+              "profile": "maintenance-handover-v1",
+              "profile_revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+            }
+          }
+        ],
+        "provenance": {},
+        "chain_seq": 0,
+        "chain_prev_digest": null,
+        "idempotency_key": "evidence-receipt-manifest"
+      },
+      "result": {
+        "item": {
+          "ref": "workflow:receipt-manifest",
+          "kind": "sovite-private-artifact-reference",
+          "claims": [
+            {
+              "detail": {
+                "run_id": "run_VVJA708XRN27V0N9PJB28JC60Q",
+                "schema": "sovite-private-artifact-manifest/v1",
+                "profile": "maintenance-handover-v1",
+                "receipt": "rcpt_2NVmE4ZDI4YkspE6YzCWAMapwld03GMT",
+                "work_id": 1,
+                "generation": "sha256:d3e7ff8e9b760feeaa096aef1ef4410da52cb61b2125423e95d2c32d297d564d",
+                "task_binding": "9221d6b2211e0ec0336f33b5c1a5260ec1207f58ee4983805813382a59eaabba",
+                "source_digest": "sha256:ee7c6bc4670731b054494e14487a0232e7e3b2990255fa477026570472ec4e12",
+                "artifact_digest": "sha256:47af1b632dbe3c34a9e6908fdea3e233d0883745c02138797fdbbd63a62582e9",
+                "profile_revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+              },
+              "subject": "maintenance-handover",
+              "confirms": null,
+              "grant_id": null,
+              "freshness": null,
+              "claim_type": "observation"
+            }
+          ],
+          "digest": "sha256:f83df14ab58572c7789f5cfd4e0e5ba3ed611e2e582090fb93e951b73e36a5a7",
+          "item_id": "receipt-manifest",
+          "validity": {
+            "basis": "indefinite",
+            "valid_from": "2026-10-20T00:00:00+00:00",
+            "valid_until": null,
+            "component_digests": {}
+          },
+          "chain_seq": 0,
+          "collector": "maintenance-handover-v1",
+          "provenance": {},
+          "chain_prev_digest": null
+        },
+        "run_id": "run_JY52HSKC2CZAZXEXMGEZ215HWE",
+        "repo_id": "settlement-demo"
+      }
+    },
+    {
+      "operation": "work.effect.propose-bound-v1",
+      "arguments": {
+        "run_id": "run_JY52HSKC2CZAZXEXMGEZ215HWE",
+        "item_id": 1,
+        "repository": "https://example.invalid/bayleaf-private-workflow",
+        "base_commit": "46a80b5d9c68f44e827ad41a7e19b2a23d2c0b33",
+        "title": "Verified private maintenance handover reference",
+        "rationale": "Bounded receipt and exact source/result hashes; private bytes stay in Sovite.",
+        "unified_diff": "diff --git a/handover-receipt.json b/handover-receipt.json\nindex 0967ef4..7246973 100644\n--- a/handover-receipt.json\n+++ b/handover-receipt.json\n@@ -1 +1,12 @@\n-{}\n+{\n+  \"artifact_digest\": \"sha256:47af1b632dbe3c34a9e6908fdea3e233d0883745c02138797fdbbd63a62582e9\",\n+  \"generation\": \"sha256:d3e7ff8e9b760feeaa096aef1ef4410da52cb61b2125423e95d2c32d297d564d\",\n+  \"profile\": \"maintenance-handover-v1\",\n+  \"profile_revision\": \"sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b\",\n+  \"receipt\": \"rcpt_2NVmE4ZDI4YkspE6YzCWAMapwld03GMT\",\n+  \"run_id\": \"run_VVJA708XRN27V0N9PJB28JC60Q\",\n+  \"schema\": \"sovite-private-artifact-manifest/v1\",\n+  \"source_digest\": \"sha256:ee7c6bc4670731b054494e14487a0232e7e3b2990255fa477026570472ec4e12\",\n+  \"task_binding\": \"9221d6b2211e0ec0336f33b5c1a5260ec1207f58ee4983805813382a59eaabba\",\n+  \"work_id\": 1\n+}\n",
+        "idempotency_key": "wf01-manifest-proposal",
+        "causal_basis": {
+          "expected_revision": "item:7276aa51-d0c3-4b7c-925d-313f7921ab79@description:v0@sha256:591e1fcc32a5c826054eecd677ca27e85086b9e2399a8b25309710f8ab08f318@revise:0",
+          "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+          "reserve_idempotency_key": "wf01-reserve",
+          "commit_sha": "e700198b43a75f1a716f80a0e62d7221ca1c643e",
+          "evidence_tail": {
+            "item_id": "receipt-manifest",
+            "chain_seq": 0,
+            "entry_digest": "sha256:a15adbb6ad2ae9d24631ecc6c0808afc548a8d2bc0f26960c78cfcc907eac4cb"
+          }
+        }
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "intent": {
+          "intent_id": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+          "revision": 1,
+          "canonical_intent_digest": "69cad5ec668e3cb56c4ba4bcb131374079b3ef843880e9003f9d36b47cb9a941",
+          "state": "proposed",
+          "item_id": 1,
+          "run_id": "run_JY52HSKC2CZAZXEXMGEZ215HWE",
+          "proposer_principal": "local:stager:0",
+          "repository": "https://example.invalid/bayleaf-private-workflow",
+          "base_commit": "46a80b5d9c68f44e827ad41a7e19b2a23d2c0b33",
+          "title": "Verified private maintenance handover reference",
+          "rationale": "Bounded receipt and exact source/result hashes; private bytes stay in Sovite.",
+          "unified_diff": "diff --git a/handover-receipt.json b/handover-receipt.json\nindex 0967ef4..7246973 100644\n--- a/handover-receipt.json\n+++ b/handover-receipt.json\n@@ -1 +1,12 @@\n-{}\n+{\n+  \"artifact_digest\": \"sha256:47af1b632dbe3c34a9e6908fdea3e233d0883745c02138797fdbbd63a62582e9\",\n+  \"generation\": \"sha256:d3e7ff8e9b760feeaa096aef1ef4410da52cb61b2125423e95d2c32d297d564d\",\n+  \"profile\": \"maintenance-handover-v1\",\n+  \"profile_revision\": \"sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b\",\n+  \"receipt\": \"rcpt_2NVmE4ZDI4YkspE6YzCWAMapwld03GMT\",\n+  \"run_id\": \"run_VVJA708XRN27V0N9PJB28JC60Q\",\n+  \"schema\": \"sovite-private-artifact-manifest/v1\",\n+  \"source_digest\": \"sha256:ee7c6bc4670731b054494e14487a0232e7e3b2990255fa477026570472ec4e12\",\n+  \"task_binding\": \"9221d6b2211e0ec0336f33b5c1a5260ec1207f58ee4983805813382a59eaabba\",\n+  \"work_id\": 1\n+}\n",
+          "created_at": "2026-10-20T18:37:06.537693Z",
+          "acceptance": null,
+          "rejection": null,
+          "application": null,
+          "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd"
+        },
+        "admission": {
+          "run_binding": {
+            "run_id": "run_JY52HSKC2CZAZXEXMGEZ215HWE",
+            "repo_id": "settlement-demo",
+            "grant_id": null,
+            "client_id": null,
+            "principal_id": "local:stager:0",
+            "workspace_id": "bayleaf"
+          },
+          "causal_basis": {
+            "commit_sha": "e700198b43a75f1a716f80a0e62d7221ca1c643e",
+            "evidence_tail": {
+              "item_id": "receipt-manifest",
+              "chain_seq": 0,
+              "entry_digest": "sha256:a15adbb6ad2ae9d24631ecc6c0808afc548a8d2bc0f26960c78cfcc907eac4cb"
+            },
+            "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+            "expected_revision": "item:7276aa51-d0c3-4b7c-925d-313f7921ab79@description:v0@sha256:591e1fcc32a5c826054eecd677ca27e85086b9e2399a8b25309710f8ab08f318@revise:0",
+            "reserve_idempotency_key": "wf01-reserve"
+          },
+          "reservation_id": 1,
+          "schema_version": "sprintctl-bound-proposal-admission/v1"
+        }
+      }
+    },
+    {
+      "operation": "work.effect.accept-v1",
+      "refusal": "effect-verification-required"
+    },
+    {
+      "operation": "sovite.task.request-v1",
+      "refusal": "sovite-unavailable"
+    },
+    {
+      "operation": "work.effect.accept-v1",
+      "refusal": "authority-required"
+    },
+    {
+      "operation": "work.effect.accept-v1",
+      "refusal": "authority-required"
+    },
+    {
+      "operation": "work.effect.accept-v1",
+      "refusal": "effect-revision-mismatch"
+    },
+    {
+      "operation": "work.run.register-v1",
+      "arguments": {
+        "harness_id": "vuoro-private-workflow",
+        "harness_build": "0.1.2",
+        "model_id": "deterministic-profile-verifier",
+        "recipe_id": "maintenance-handover-v1",
+        "observed_profile": {
+          "instruction_digest": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b",
+          "skill_digests": []
+        },
+        "idempotency_key": "wf01-register-owner",
+        "predecessor_run_id": "run_NN7M5DR1FV9SB1FC5NN3PS9356"
+      },
+      "result": {
+        "run": {
+          "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4",
+          "grant_id": null,
+          "model_id": "deterministic-profile-verifier",
+          "claim_ids": [],
+          "client_id": null,
+          "grant_ids": [],
+          "recipe_id": "maintenance-handover-v1",
+          "created_at": "2026-10-20T18:37:07.396845Z",
+          "harness_id": "vuoro-private-workflow",
+          "principal_id": "local:owner:0",
+          "workspace_id": "bayleaf",
+          "harness_build": "0.1.2",
+          "observed_profile": {
+            "skill_digests": [],
+            "instruction_digest": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+          },
+          "predecessor_run_id": "run_NN7M5DR1FV9SB1FC5NN3PS9356"
+        },
+        "repo_id": "settlement-demo"
+      }
+    },
+    {
+      "operation": "work.run.predecessor-context-v1",
+      "arguments": {
+        "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4"
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4",
+        "predecessor_run_id": "run_NN7M5DR1FV9SB1FC5NN3PS9356",
+        "session_notes": [],
+        "evidence": [
+          {
+            "item_id": "private-verification",
+            "kind": "private-artifact-verification",
+            "ref": "workflow:private-verification",
+            "digest": "sha256:4ada28767035896450d8f443168bd8315901a0bf3c693a1b9026ad5c6ac5b989",
+            "collector": "maintenance-handover-v1",
+            "validity": {
+              "basis": "indefinite",
+              "valid_from": "2026-10-20T00:00:00+00:00",
+              "valid_until": null,
+              "component_digests": {}
+            },
+            "claims": [
+              {
+                "detail": {
+                  "checks": [
+                    {
+                      "name": "private-artifact-integrity",
+                      "status": "passed",
+                      "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                    },
+                    {
+                      "name": "source-and-handover-contract",
+                      "status": "passed",
+                      "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                    },
+                    {
+                      "name": "receipt-manifest-binding",
+                      "status": "passed",
+                      "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                    }
+                  ],
+                  "run_id": "run_VVJA708XRN27V0N9PJB28JC60Q",
+                  "schema": "private-handover-observation/v1",
+                  "profile": "maintenance-handover-v1",
+                  "receipt": "rcpt_2NVmE4ZDI4YkspE6YzCWAMapwld03GMT",
+                  "work_id": 1,
+                  "generation": "sha256:d3e7ff8e9b760feeaa096aef1ef4410da52cb61b2125423e95d2c32d297d564d",
+                  "task_binding": "9221d6b2211e0ec0336f33b5c1a5260ec1207f58ee4983805813382a59eaabba",
+                  "source_digest": "sha256:ee7c6bc4670731b054494e14487a0232e7e3b2990255fa477026570472ec4e12",
+                  "artifact_digest": "sha256:47af1b632dbe3c34a9e6908fdea3e233d0883745c02138797fdbbd63a62582e9",
+                  "profile_revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                },
+                "subject": "maintenance-handover",
+                "confirms": null,
+                "grant_id": null,
+                "freshness": null,
+                "claim_type": "observation"
+              }
+            ],
+            "provenance": {},
+            "chain_seq": 0,
+            "chain_prev_digest": null
+          }
+        ],
+        "next_after_note_id": null,
+        "next_after_chain_seq": null
+      }
+    },
+    {
+      "operation": "work.evidence.tail-v1",
+      "arguments": {
+        "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4"
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4",
+        "item": null
+      }
+    },
+    {
+      "operation": "work.evidence.append-v1",
+      "arguments": {
+        "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4",
+        "item_id": "independent-verification-binding",
+        "kind": "private-acceptance-basis",
+        "ref": "workflow:independent-verification-binding",
+        "digest": "sha256:fb120c22f7b53e181263ec75b00047021e039fceb2464ad513de05c55f22b75d",
+        "collector": "maintenance-handover-v1",
+        "validity": {
+          "basis": "indefinite",
+          "valid_from": "2026-10-20T00:00:00+00:00",
+          "valid_until": null,
+          "component_digests": {}
+        },
+        "claims": [
+          {
+            "claim_type": "observation",
+            "subject": "maintenance-handover",
+            "grant_id": null,
+            "freshness": null,
+            "confirms": null,
+            "detail": {
+              "schema": "private-acceptance-basis/v1",
+              "verifier_run": "run_NN7M5DR1FV9SB1FC5NN3PS9356",
+              "verifier_evidence_digest": "sha256:4ada28767035896450d8f443168bd8315901a0bf3c693a1b9026ad5c6ac5b989",
+              "manifest_digest": "sha256:f83df14ab58572c7789f5cfd4e0e5ba3ed611e2e582090fb93e951b73e36a5a7",
+              "profile_revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+            }
+          }
+        ],
+        "provenance": {},
+        "chain_seq": 0,
+        "chain_prev_digest": null,
+        "idempotency_key": "evidence-independent-verification-binding"
+      },
+      "result": {
+        "item": {
+          "ref": "workflow:independent-verification-binding",
+          "kind": "private-acceptance-basis",
+          "claims": [
+            {
+              "detail": {
+                "schema": "private-acceptance-basis/v1",
+                "verifier_run": "run_NN7M5DR1FV9SB1FC5NN3PS9356",
+                "manifest_digest": "sha256:f83df14ab58572c7789f5cfd4e0e5ba3ed611e2e582090fb93e951b73e36a5a7",
+                "profile_revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b",
+                "verifier_evidence_digest": "sha256:4ada28767035896450d8f443168bd8315901a0bf3c693a1b9026ad5c6ac5b989"
+              },
+              "subject": "maintenance-handover",
+              "confirms": null,
+              "grant_id": null,
+              "freshness": null,
+              "claim_type": "observation"
+            }
+          ],
+          "digest": "sha256:fb120c22f7b53e181263ec75b00047021e039fceb2464ad513de05c55f22b75d",
+          "item_id": "independent-verification-binding",
+          "validity": {
+            "basis": "indefinite",
+            "valid_from": "2026-10-20T00:00:00+00:00",
+            "valid_until": null,
+            "component_digests": {}
+          },
+          "chain_seq": 0,
+          "collector": "maintenance-handover-v1",
+          "provenance": {},
+          "chain_prev_digest": null
+        },
+        "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4",
+        "repo_id": "settlement-demo"
+      }
+    },
+    {
+      "operation": "work.evidence.tail-v1",
+      "arguments": {
+        "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4"
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4",
+        "item": {
+          "item_id": "independent-verification-binding",
+          "kind": "private-acceptance-basis",
+          "ref": "workflow:independent-verification-binding",
+          "digest": "sha256:fb120c22f7b53e181263ec75b00047021e039fceb2464ad513de05c55f22b75d",
+          "collector": "maintenance-handover-v1",
+          "validity": {
+            "basis": "indefinite",
+            "valid_from": "2026-10-20T00:00:00+00:00",
+            "valid_until": null,
+            "component_digests": {}
+          },
+          "claims": [
+            {
+              "detail": {
+                "schema": "private-acceptance-basis/v1",
+                "verifier_run": "run_NN7M5DR1FV9SB1FC5NN3PS9356",
+                "manifest_digest": "sha256:f83df14ab58572c7789f5cfd4e0e5ba3ed611e2e582090fb93e951b73e36a5a7",
+                "profile_revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b",
+                "verifier_evidence_digest": "sha256:4ada28767035896450d8f443168bd8315901a0bf3c693a1b9026ad5c6ac5b989"
+              },
+              "subject": "maintenance-handover",
+              "confirms": null,
+              "grant_id": null,
+              "freshness": null,
+              "claim_type": "observation"
+            }
+          ],
+          "provenance": {},
+          "chain_seq": 0,
+          "chain_prev_digest": null
+        }
+      }
+    },
+    {
+      "operation": "work.evidence.append-v1",
+      "arguments": {
+        "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4",
+        "item_id": "wrong-manifest-digest",
+        "kind": "protected-artifact-verification",
+        "ref": "workflow:wrong-manifest-digest",
+        "digest": "sha256:96245dfd0fd785a6afa5ab42278528c1208308ef0aeb4023fd5f7d10ff72326b",
+        "collector": "maintenance-handover-v1",
+        "validity": {
+          "basis": "indefinite",
+          "valid_from": "2026-10-20T00:00:00+00:00",
+          "valid_until": null,
+          "component_digests": {}
+        },
+        "claims": [
+          {
+            "claim_type": "observation",
+            "subject": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+            "grant_id": null,
+            "freshness": null,
+            "confirms": null,
+            "detail": {
+              "schema": "sprintctl-protected-artifact-verification/v1",
+              "intent_id": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+              "intent_revision": 1,
+              "canonical_intent_digest": "69cad5ec668e3cb56c4ba4bcb131374079b3ef843880e9003f9d36b47cb9a941",
+              "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+              "artifact": {
+                "domain": "utf8-unified-diff/v1",
+                "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+              },
+              "checks": [
+                {
+                  "name": "private-artifact-integrity",
+                  "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b",
+                  "status": "passed"
+                },
+                {
+                  "name": "source-and-handover-contract",
+                  "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b",
+                  "status": "passed"
+                },
+                {
+                  "name": "receipt-manifest-binding",
+                  "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b",
+                  "status": "passed"
+                }
+              ]
+            }
+          }
+        ],
+        "provenance": {},
+        "chain_seq": 1,
+        "chain_prev_digest": "sha256:2cd11005c73c0a698be4a912d08b943f556cced453c5d5e95d5fe24ef0fe1ec0",
+        "idempotency_key": "evidence-wrong-manifest-digest"
+      },
+      "result": {
+        "item": {
+          "ref": "workflow:wrong-manifest-digest",
+          "kind": "protected-artifact-verification",
+          "claims": [
+            {
+              "detail": {
+                "checks": [
+                  {
+                    "name": "private-artifact-integrity",
+                    "status": "passed",
+                    "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                  },
+                  {
+                    "name": "source-and-handover-contract",
+                    "status": "passed",
+                    "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                  },
+                  {
+                    "name": "receipt-manifest-binding",
+                    "status": "passed",
+                    "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                  }
+                ],
+                "schema": "sprintctl-protected-artifact-verification/v1",
+                "artifact": {
+                  "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+                  "domain": "utf8-unified-diff/v1"
+                },
+                "intent_id": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+                "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+                "intent_revision": 1,
+                "canonical_intent_digest": "69cad5ec668e3cb56c4ba4bcb131374079b3ef843880e9003f9d36b47cb9a941"
+              },
+              "subject": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+              "confirms": null,
+              "grant_id": null,
+              "freshness": null,
+              "claim_type": "observation"
+            }
+          ],
+          "digest": "sha256:96245dfd0fd785a6afa5ab42278528c1208308ef0aeb4023fd5f7d10ff72326b",
+          "item_id": "wrong-manifest-digest",
+          "validity": {
+            "basis": "indefinite",
+            "valid_from": "2026-10-20T00:00:00+00:00",
+            "valid_until": null,
+            "component_digests": {}
+          },
+          "chain_seq": 1,
+          "collector": "maintenance-handover-v1",
+          "provenance": {},
+          "chain_prev_digest": "sha256:2cd11005c73c0a698be4a912d08b943f556cced453c5d5e95d5fe24ef0fe1ec0"
+        },
+        "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4",
+        "repo_id": "settlement-demo"
+      }
+    },
+    {
+      "operation": "work.evidence.tail-v1",
+      "arguments": {
+        "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4"
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4",
+        "item": {
+          "item_id": "wrong-manifest-digest",
+          "kind": "protected-artifact-verification",
+          "ref": "workflow:wrong-manifest-digest",
+          "digest": "sha256:96245dfd0fd785a6afa5ab42278528c1208308ef0aeb4023fd5f7d10ff72326b",
+          "collector": "maintenance-handover-v1",
+          "validity": {
+            "basis": "indefinite",
+            "valid_from": "2026-10-20T00:00:00+00:00",
+            "valid_until": null,
+            "component_digests": {}
+          },
+          "claims": [
+            {
+              "detail": {
+                "checks": [
+                  {
+                    "name": "private-artifact-integrity",
+                    "status": "passed",
+                    "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                  },
+                  {
+                    "name": "source-and-handover-contract",
+                    "status": "passed",
+                    "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                  },
+                  {
+                    "name": "receipt-manifest-binding",
+                    "status": "passed",
+                    "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                  }
+                ],
+                "schema": "sprintctl-protected-artifact-verification/v1",
+                "artifact": {
+                  "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+                  "domain": "utf8-unified-diff/v1"
+                },
+                "intent_id": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+                "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+                "intent_revision": 1,
+                "canonical_intent_digest": "69cad5ec668e3cb56c4ba4bcb131374079b3ef843880e9003f9d36b47cb9a941"
+              },
+              "subject": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+              "confirms": null,
+              "grant_id": null,
+              "freshness": null,
+              "claim_type": "observation"
+            }
+          ],
+          "provenance": {},
+          "chain_seq": 1,
+          "chain_prev_digest": "sha256:2cd11005c73c0a698be4a912d08b943f556cced453c5d5e95d5fe24ef0fe1ec0"
+        }
+      }
+    },
+    {
+      "operation": "work.evidence.append-v1",
+      "arguments": {
+        "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4",
+        "item_id": "missing-profile-check",
+        "kind": "protected-artifact-verification",
+        "ref": "workflow:missing-profile-check",
+        "digest": "sha256:061dd15012be8c8def8749042b6f2e4d1cbcd4af37f7208056833f27488c68f2",
+        "collector": "maintenance-handover-v1",
+        "validity": {
+          "basis": "indefinite",
+          "valid_from": "2026-10-20T00:00:00+00:00",
+          "valid_until": null,
+          "component_digests": {}
+        },
+        "claims": [
+          {
+            "claim_type": "observation",
+            "subject": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+            "grant_id": null,
+            "freshness": null,
+            "confirms": null,
+            "detail": {
+              "schema": "sprintctl-protected-artifact-verification/v1",
+              "intent_id": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+              "intent_revision": 1,
+              "canonical_intent_digest": "69cad5ec668e3cb56c4ba4bcb131374079b3ef843880e9003f9d36b47cb9a941",
+              "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+              "artifact": {
+                "domain": "utf8-unified-diff/v1",
+                "digest": "sha256:533e184f35d4ab48e392994ad5c272be4d9834677beee2ad20b64636717f86f3"
+              },
+              "checks": [
+                {
+                  "name": "private-artifact-integrity",
+                  "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b",
+                  "status": "passed"
+                },
+                {
+                  "name": "source-and-handover-contract",
+                  "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b",
+                  "status": "passed"
+                }
+              ]
+            }
+          }
+        ],
+        "provenance": {},
+        "chain_seq": 2,
+        "chain_prev_digest": "sha256:aef9ce9a3528d4524577a991bebfa280d69d04bdfbe04c9e9f89290b134ec7ed",
+        "idempotency_key": "evidence-missing-profile-check"
+      },
+      "result": {
+        "item": {
+          "ref": "workflow:missing-profile-check",
+          "kind": "protected-artifact-verification",
+          "claims": [
+            {
+              "detail": {
+                "checks": [
+                  {
+                    "name": "private-artifact-integrity",
+                    "status": "passed",
+                    "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                  },
+                  {
+                    "name": "source-and-handover-contract",
+                    "status": "passed",
+                    "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                  }
+                ],
+                "schema": "sprintctl-protected-artifact-verification/v1",
+                "artifact": {
+                  "digest": "sha256:533e184f35d4ab48e392994ad5c272be4d9834677beee2ad20b64636717f86f3",
+                  "domain": "utf8-unified-diff/v1"
+                },
+                "intent_id": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+                "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+                "intent_revision": 1,
+                "canonical_intent_digest": "69cad5ec668e3cb56c4ba4bcb131374079b3ef843880e9003f9d36b47cb9a941"
+              },
+              "subject": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+              "confirms": null,
+              "grant_id": null,
+              "freshness": null,
+              "claim_type": "observation"
+            }
+          ],
+          "digest": "sha256:061dd15012be8c8def8749042b6f2e4d1cbcd4af37f7208056833f27488c68f2",
+          "item_id": "missing-profile-check",
+          "validity": {
+            "basis": "indefinite",
+            "valid_from": "2026-10-20T00:00:00+00:00",
+            "valid_until": null,
+            "component_digests": {}
+          },
+          "chain_seq": 2,
+          "collector": "maintenance-handover-v1",
+          "provenance": {},
+          "chain_prev_digest": "sha256:aef9ce9a3528d4524577a991bebfa280d69d04bdfbe04c9e9f89290b134ec7ed"
+        },
+        "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4",
+        "repo_id": "settlement-demo"
+      }
+    },
+    {
+      "operation": "work.evidence.tail-v1",
+      "arguments": {
+        "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4"
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4",
+        "item": {
+          "item_id": "missing-profile-check",
+          "kind": "protected-artifact-verification",
+          "ref": "workflow:missing-profile-check",
+          "digest": "sha256:061dd15012be8c8def8749042b6f2e4d1cbcd4af37f7208056833f27488c68f2",
+          "collector": "maintenance-handover-v1",
+          "validity": {
+            "basis": "indefinite",
+            "valid_from": "2026-10-20T00:00:00+00:00",
+            "valid_until": null,
+            "component_digests": {}
+          },
+          "claims": [
+            {
+              "detail": {
+                "checks": [
+                  {
+                    "name": "private-artifact-integrity",
+                    "status": "passed",
+                    "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                  },
+                  {
+                    "name": "source-and-handover-contract",
+                    "status": "passed",
+                    "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                  }
+                ],
+                "schema": "sprintctl-protected-artifact-verification/v1",
+                "artifact": {
+                  "digest": "sha256:533e184f35d4ab48e392994ad5c272be4d9834677beee2ad20b64636717f86f3",
+                  "domain": "utf8-unified-diff/v1"
+                },
+                "intent_id": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+                "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+                "intent_revision": 1,
+                "canonical_intent_digest": "69cad5ec668e3cb56c4ba4bcb131374079b3ef843880e9003f9d36b47cb9a941"
+              },
+              "subject": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+              "confirms": null,
+              "grant_id": null,
+              "freshness": null,
+              "claim_type": "observation"
+            }
+          ],
+          "provenance": {},
+          "chain_seq": 2,
+          "chain_prev_digest": "sha256:aef9ce9a3528d4524577a991bebfa280d69d04bdfbe04c9e9f89290b134ec7ed"
+        }
+      }
+    },
+    {
+      "operation": "work.evidence.append-v1",
+      "arguments": {
+        "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4",
+        "item_id": "handover-proof",
+        "kind": "protected-artifact-verification",
+        "ref": "workflow:handover-proof",
+        "digest": "sha256:8aca995083df5d49de548ed56f38ddb983815af70473f20bb38ac2286e8a0619",
+        "collector": "maintenance-handover-v1",
+        "validity": {
+          "basis": "indefinite",
+          "valid_from": "2026-10-20T00:00:00+00:00",
+          "valid_until": null,
+          "component_digests": {}
+        },
+        "claims": [
+          {
+            "claim_type": "observation",
+            "subject": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+            "grant_id": null,
+            "freshness": null,
+            "confirms": null,
+            "detail": {
+              "schema": "sprintctl-protected-artifact-verification/v1",
+              "intent_id": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+              "intent_revision": 1,
+              "canonical_intent_digest": "69cad5ec668e3cb56c4ba4bcb131374079b3ef843880e9003f9d36b47cb9a941",
+              "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+              "artifact": {
+                "domain": "utf8-unified-diff/v1",
+                "digest": "sha256:533e184f35d4ab48e392994ad5c272be4d9834677beee2ad20b64636717f86f3"
+              },
+              "checks": [
+                {
+                  "name": "private-artifact-integrity",
+                  "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b",
+                  "status": "passed"
+                },
+                {
+                  "name": "source-and-handover-contract",
+                  "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b",
+                  "status": "passed"
+                },
+                {
+                  "name": "receipt-manifest-binding",
+                  "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b",
+                  "status": "passed"
+                }
+              ]
+            }
+          }
+        ],
+        "provenance": {},
+        "chain_seq": 3,
+        "chain_prev_digest": "sha256:2c65b14ae7841593e328cdd9f640d9827c8a1496e12648db9a6dc37b4cc72e39",
+        "idempotency_key": "evidence-handover-proof"
+      },
+      "result": {
+        "item": {
+          "ref": "workflow:handover-proof",
+          "kind": "protected-artifact-verification",
+          "claims": [
+            {
+              "detail": {
+                "checks": [
+                  {
+                    "name": "private-artifact-integrity",
+                    "status": "passed",
+                    "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                  },
+                  {
+                    "name": "source-and-handover-contract",
+                    "status": "passed",
+                    "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                  },
+                  {
+                    "name": "receipt-manifest-binding",
+                    "status": "passed",
+                    "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                  }
+                ],
+                "schema": "sprintctl-protected-artifact-verification/v1",
+                "artifact": {
+                  "digest": "sha256:533e184f35d4ab48e392994ad5c272be4d9834677beee2ad20b64636717f86f3",
+                  "domain": "utf8-unified-diff/v1"
+                },
+                "intent_id": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+                "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+                "intent_revision": 1,
+                "canonical_intent_digest": "69cad5ec668e3cb56c4ba4bcb131374079b3ef843880e9003f9d36b47cb9a941"
+              },
+              "subject": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+              "confirms": null,
+              "grant_id": null,
+              "freshness": null,
+              "claim_type": "observation"
+            }
+          ],
+          "digest": "sha256:8aca995083df5d49de548ed56f38ddb983815af70473f20bb38ac2286e8a0619",
+          "item_id": "handover-proof",
+          "validity": {
+            "basis": "indefinite",
+            "valid_from": "2026-10-20T00:00:00+00:00",
+            "valid_until": null,
+            "component_digests": {}
+          },
+          "chain_seq": 3,
+          "collector": "maintenance-handover-v1",
+          "provenance": {},
+          "chain_prev_digest": "sha256:2c65b14ae7841593e328cdd9f640d9827c8a1496e12648db9a6dc37b4cc72e39"
+        },
+        "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4",
+        "repo_id": "settlement-demo"
+      }
+    },
+    {
+      "operation": "work.effect.accept-v1",
+      "refusal": "effect-verification-refused"
+    },
+    {
+      "operation": "work.effect.accept-v1",
+      "refusal": "effect-verification-refused"
+    },
+    {
+      "operation": "work.read.item-decisions",
+      "arguments": {
+        "item_id": 1
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "item_id": 1,
+        "status": "active",
+        "resolution": null,
+        "terminal_decision_id": null,
+        "decisions": []
+      }
+    },
+    {
+      "operation": "work.effect.accept-v1",
+      "refusal": "effect-verification-refused"
+    },
+    {
+      "operation": "work.read.item-decisions",
+      "arguments": {
+        "item_id": 1
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "item_id": 1,
+        "status": "active",
+        "resolution": null,
+        "terminal_decision_id": null,
+        "decisions": []
+      }
+    },
+    {
+      "operation": "work.effect.accept-v1",
+      "arguments": {
+        "intent_id": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+        "revision": 1,
+        "canonical_intent_digest": "69cad5ec668e3cb56c4ba4bcb131374079b3ef843880e9003f9d36b47cb9a941",
+        "verification_ref": {
+          "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4",
+          "item_id": "handover-proof"
+        }
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "intent": {
+          "intent_id": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+          "revision": 1,
+          "canonical_intent_digest": "69cad5ec668e3cb56c4ba4bcb131374079b3ef843880e9003f9d36b47cb9a941",
+          "state": "accepted",
+          "item_id": 1,
+          "run_id": "run_JY52HSKC2CZAZXEXMGEZ215HWE",
+          "proposer_principal": "local:stager:0",
+          "repository": "https://example.invalid/bayleaf-private-workflow",
+          "base_commit": "46a80b5d9c68f44e827ad41a7e19b2a23d2c0b33",
+          "title": "Verified private maintenance handover reference",
+          "rationale": "Bounded receipt and exact source/result hashes; private bytes stay in Sovite.",
+          "unified_diff": "diff --git a/handover-receipt.json b/handover-receipt.json\nindex 0967ef4..7246973 100644\n--- a/handover-receipt.json\n+++ b/handover-receipt.json\n@@ -1 +1,12 @@\n-{}\n+{\n+  \"artifact_digest\": \"sha256:47af1b632dbe3c34a9e6908fdea3e233d0883745c02138797fdbbd63a62582e9\",\n+  \"generation\": \"sha256:d3e7ff8e9b760feeaa096aef1ef4410da52cb61b2125423e95d2c32d297d564d\",\n+  \"profile\": \"maintenance-handover-v1\",\n+  \"profile_revision\": \"sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b\",\n+  \"receipt\": \"rcpt_2NVmE4ZDI4YkspE6YzCWAMapwld03GMT\",\n+  \"run_id\": \"run_VVJA708XRN27V0N9PJB28JC60Q\",\n+  \"schema\": \"sovite-private-artifact-manifest/v1\",\n+  \"source_digest\": \"sha256:ee7c6bc4670731b054494e14487a0232e7e3b2990255fa477026570472ec4e12\",\n+  \"task_binding\": \"9221d6b2211e0ec0336f33b5c1a5260ec1207f58ee4983805813382a59eaabba\",\n+  \"work_id\": 1\n+}\n",
+          "created_at": "2026-10-20T18:37:06.537693Z",
+          "acceptance": {
+            "intent_id": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+            "intent_revision": 1,
+            "canonical_intent_digest": "69cad5ec668e3cb56c4ba4bcb131374079b3ef843880e9003f9d36b47cb9a941",
+            "acceptor_principal": "local:owner:0",
+            "acceptor_policy_version": null,
+            "accepted_at": "2026-10-20T18:37:07.639452Z",
+            "verification": {
+              "run_id": "run_SC9HZH15EP260QKGRX8Z4KR1G4",
+              "item_id": "handover-proof",
+              "receipt": {
+                "checks": [
+                  {
+                    "name": "private-artifact-integrity",
+                    "status": "passed",
+                    "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                  },
+                  {
+                    "name": "source-and-handover-contract",
+                    "status": "passed",
+                    "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                  },
+                  {
+                    "name": "receipt-manifest-binding",
+                    "status": "passed",
+                    "revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+                  }
+                ],
+                "schema": "sprintctl-protected-artifact-verification/v1",
+                "artifact": {
+                  "digest": "sha256:533e184f35d4ab48e392994ad5c272be4d9834677beee2ad20b64636717f86f3",
+                  "domain": "utf8-unified-diff/v1"
+                },
+                "intent_id": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+                "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+                "intent_revision": 1,
+                "canonical_intent_digest": "69cad5ec668e3cb56c4ba4bcb131374079b3ef843880e9003f9d36b47cb9a941"
+              },
+              "grant_id": null,
+              "client_id": null,
+              "entry_digest": "sha256:f15d5d9e59ee7f9b1a105667fea7fe07b7d7da44f76d1040eeb77ba781308e61",
+              "workspace_id": "bayleaf",
+              "evidence_digest": "sha256:8aca995083df5d49de548ed56f38ddb983815af70473f20bb38ac2286e8a0619",
+              "verifier_principal": "local:owner:0"
+            }
+          },
+          "rejection": null,
+          "application": null,
+          "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd"
+        }
+      }
+    },
+    {
+      "operation": "work.read.item",
+      "arguments": {
+        "item_id": 1
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "item": {
+          "repo_id": "settlement-demo",
+          "id": 1,
+          "track_id": 1,
+          "sprint_id": 1,
+          "title": "Prepare a source-backed maintenance handover",
+          "description": "WF-01 C0 evaluation; owner acceptance requires independently verified private output.",
+          "status": "active",
+          "assignee": null,
+          "priority": null,
+          "created_at": "2026-10-20T18:36:30.542090Z",
+          "updated_at": "2026-10-20T18:36:30.618273Z",
+          "aggregate_uuid": "7276aa51-d0c3-4b7c-925d-313f7921ab79",
+          "legacy": false,
+          "resolution": null,
+          "terminal_decision_id": null,
+          "edit_revision": "item:7276aa51-d0c3-4b7c-925d-313f7921ab79@description:v0@sha256:591e1fcc32a5c826054eecd677ca27e85086b9e2399a8b25309710f8ab08f318",
+          "status_revision": "item:7276aa51-d0c3-4b7c-925d-313f7921ab79@status:active"
+        },
+        "events": [
+          {
+            "repo_id": "settlement-demo",
+            "id": 1,
+            "sprint_id": 1,
+            "work_item_id": 1,
+            "source_type": "system",
+            "actor": "bayleaf-stager",
+            "event_type": "reservation.reserved",
+            "payload": "{\"role\": \"execution\", \"session_id\": \"wf01-staging\", \"release_digest\": \"43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd\", \"reservation_id\": 1, \"correlation_ref\": null, \"interrupt_existing\": false, \"conflicting_reservation_ids\": []}",
+            "created_at": "2026-10-20T18:37:06.385604Z"
+          }
+        ],
+        "active_reservations": [
+          {
+            "repo_id": "settlement-demo",
+            "id": 1,
+            "work_item_id": 1,
+            "session_id": "wf01-staging",
+            "actor": "bayleaf-stager",
+            "role": "execution",
+            "state": "active",
+            "created_at": "2026-10-20T21:37:06+03:00",
+            "last_activity_at": "2026-10-20T21:37:06+03:00",
+            "released_at": null,
+            "interruption_reason": null,
+            "correlation_ref": null,
+            "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+            "activity_age_seconds": 1,
+            "stale": false
+          }
+        ],
+        "refs": [],
+        "deps": {
+          "blocked_by": [],
+          "blocks": []
+        }
+      }
+    },
+    {
+      "operation": "work.decision.record",
+      "refusal": "authority-required"
+    },
+    {
+      "operation": "work.decision.record",
+      "arguments": {
+        "item_id": 1,
+        "kind": "accept",
+        "rationale": "maintenance-handover-v1: independent verifier read exact private bytes, checked all M1\u2013M3 facts, uncertainty and proposed actions; protected manifest accepted. No repairs performed.",
+        "evidence_digests": [
+          "4ada28767035896450d8f443168bd8315901a0bf3c693a1b9026ad5c6ac5b989"
+        ],
+        "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd"
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "item_id": 1,
+        "decision": {
+          "repo_id": "settlement-demo",
+          "id": 1,
+          "kind": "accept",
+          "work_item_id": 1,
+          "sprint_id": null,
+          "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+          "evidence_digests": [
+            "4ada28767035896450d8f443168bd8315901a0bf3c693a1b9026ad5c6ac5b989"
+          ],
+          "rationale": "maintenance-handover-v1: independent verifier read exact private bytes, checked all M1\u2013M3 facts, uncertainty and proposed actions; protected manifest accepted. No repairs performed.",
+          "actor": "bayleaf-owner",
+          "superseded_by_item_id": null,
+          "legacy_source": null,
+          "created_at": "2026-10-20T18:37:07.669175Z"
+        },
+        "status": "done",
+        "resolution": "accepted",
+        "terminal_decision_id": 1,
+        "replayed": false
+      }
+    },
+    {
+      "operation": "work.decision.record",
+      "arguments": {
+        "item_id": 1,
+        "kind": "accept",
+        "rationale": "maintenance-handover-v1: independent verifier read exact private bytes, checked all M1\u2013M3 facts, uncertainty and proposed actions; protected manifest accepted. No repairs performed.",
+        "evidence_digests": [
+          "4ada28767035896450d8f443168bd8315901a0bf3c693a1b9026ad5c6ac5b989"
+        ],
+        "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd"
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "item_id": 1,
+        "decision": {
+          "repo_id": "settlement-demo",
+          "id": 1,
+          "kind": "accept",
+          "work_item_id": 1,
+          "sprint_id": null,
+          "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+          "evidence_digests": [
+            "4ada28767035896450d8f443168bd8315901a0bf3c693a1b9026ad5c6ac5b989"
+          ],
+          "rationale": "maintenance-handover-v1: independent verifier read exact private bytes, checked all M1\u2013M3 facts, uncertainty and proposed actions; protected manifest accepted. No repairs performed.",
+          "actor": "bayleaf-owner",
+          "superseded_by_item_id": null,
+          "legacy_source": null,
+          "created_at": "2026-10-20T18:37:07.669175Z"
+        },
+        "status": "done",
+        "resolution": "accepted",
+        "terminal_decision_id": 1,
+        "replayed": true
+      }
+    },
+    {
+      "operation": "work.read.item-decisions",
+      "arguments": {
+        "item_id": 1
+      },
+      "result": {
+        "repo_id": "settlement-demo",
+        "item_id": 1,
+        "status": "done",
+        "resolution": "accepted",
+        "terminal_decision_id": 1,
+        "decisions": [
+          {
+            "repo_id": "settlement-demo",
+            "id": 1,
+            "kind": "accept",
+            "work_item_id": 1,
+            "sprint_id": null,
+            "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+            "evidence_digests": [
+              "4ada28767035896450d8f443168bd8315901a0bf3c693a1b9026ad5c6ac5b989"
+            ],
+            "rationale": "maintenance-handover-v1: independent verifier read exact private bytes, checked all M1\u2013M3 facts, uncertainty and proposed actions; protected manifest accepted. No repairs performed.",
+            "actor": "bayleaf-owner",
+            "superseded_by_item_id": null,
+            "legacy_source": null,
+            "created_at": "2026-10-20T18:37:07.669175Z"
+          }
+        ]
+      }
+    }
+  ],
+  "setup": {
+    "principal_id": "ee4862904f134219b4d10ec9da9b7aae",
+    "draft_id": "5716d696ef8944628216e6ac2255f280",
+    "generation": "sha256:d3e7ff8e9b760feeaa096aef1ef4410da52cb61b2125423e95d2c32d297d564d",
+    "agent_activation_refused": true,
+    "setup_principal_revoked": true
+  },
+  "result": {
+    "work_id": 1,
+    "sprint_id": 1,
+    "producer_run": "run_VVJA708XRN27V0N9PJB28JC60Q",
+    "verifier_run": "run_NN7M5DR1FV9SB1FC5NN3PS9356",
+    "acceptor_run": "run_SC9HZH15EP260QKGRX8Z4KR1G4",
+    "receipt": "rcpt_2NVmE4ZDI4YkspE6YzCWAMapwld03GMT",
+    "manifest": {
+      "schema": "sovite-private-artifact-manifest/v1",
+      "work_id": 1,
+      "run_id": "run_VVJA708XRN27V0N9PJB28JC60Q",
+      "receipt": "rcpt_2NVmE4ZDI4YkspE6YzCWAMapwld03GMT",
+      "task_binding": "9221d6b2211e0ec0336f33b5c1a5260ec1207f58ee4983805813382a59eaabba",
+      "source_digest": "sha256:ee7c6bc4670731b054494e14487a0232e7e3b2990255fa477026570472ec4e12",
+      "artifact_digest": "sha256:47af1b632dbe3c34a9e6908fdea3e233d0883745c02138797fdbbd63a62582e9",
+      "generation": "sha256:d3e7ff8e9b760feeaa096aef1ef4410da52cb61b2125423e95d2c32d297d564d",
+      "profile": "maintenance-handover-v1",
+      "profile_revision": "sha256:fd6ece64c8e4c585a29f9b9eee51bfdf6146fb310e79b457e36e6d90c5435c8b"
+    },
+    "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+    "manifest_commit": "e700198b43a75f1a716f80a0e62d7221ca1c643e",
+    "intent_id": "intent_6BF3HF4MVZ6367ZJP7YS27XNMV",
+    "verification_evidence_digest": "sha256:4ada28767035896450d8f443168bd8315901a0bf3c693a1b9026ad5c6ac5b989",
+    "decision": {
+      "repo_id": "settlement-demo",
+      "id": 1,
+      "kind": "accept",
+      "work_item_id": 1,
+      "sprint_id": null,
+      "release_digest": "43f488c1cd65700b190936da85d76db89752d7a81a5888a1f4bcb947538888dd",
+      "evidence_digests": [
+        "4ada28767035896450d8f443168bd8315901a0bf3c693a1b9026ad5c6ac5b989"
+      ],
+      "rationale": "maintenance-handover-v1: independent verifier read exact private bytes, checked all M1\u2013M3 facts, uncertainty and proposed actions; protected manifest accepted. No repairs performed.",
+      "actor": "bayleaf-owner",
+      "superseded_by_item_id": null,
+      "legacy_source": null,
+      "created_at": "2026-10-20T18:37:07.669175Z"
+    },
+    "status": "done",
+    "qualification_id": "46af30d1c2284f5b9a44cb3ca3a4a109",
+    "model": "qwen3:4b-instruct-2507-q4_K_M",
+    "model_digest": "sha256:0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0",
+    "model_attempts": 1,
+    "checks": {
+      "unqualified_dispatch_refused": true,
+      "task_retry_same_receipt": true,
+      "native_catalog_receipt_status_read": true,
+      "producer_process_interrupted": true,
+      "durable_predecessor_context_read": true,
+      "private_caller_read_refused": true,
+      "missing_source_verification_refused": true,
+      "wrong_private_digest_refused": true,
+      "wrong_manifest_digest_refused": true,
+      "missing_profile_check_refused": true,
+      "superseded_source_request_refused": true,
+      "foreign_verification_identity_refused": true,
+      "owner_reread_private_bytes": true,
+      "producer_and_verifier_self_acceptance_refused": true,
+      "acceptance_retry_one_decision": true,
+      "no_source_or_private_result_body_in_coordination": true
+    }
+  },
+  "elapsed_seconds": 43.171,
+  "fixture_cleanup": "complete"
+}
