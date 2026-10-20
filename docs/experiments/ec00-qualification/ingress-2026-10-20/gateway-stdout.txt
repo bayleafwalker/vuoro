@@ -1,0 +1,72 @@
+{
+  "cases": 108,
+  "passed": 100,
+  "observations_only": 8,
+  "invariant_failures": 0,
+  "latency": {
+    "http-v2": {
+      "signed_publication": {
+        "n": 20,
+        "p50_ms": 9.28,
+        "p95_ms": 14.53,
+        "min_ms": 7.78,
+        "max_ms": 17.25
+      },
+      "missing_identity_refusal": {
+        "n": 20,
+        "p50_ms": 2.75,
+        "p95_ms": 3.76,
+        "min_ms": 2.14,
+        "max_ms": 3.85
+      }
+    },
+    "connect-json": {
+      "signed_publication": {
+        "n": 20,
+        "p50_ms": 55.81,
+        "p95_ms": 59.97,
+        "min_ms": 51.55,
+        "max_ms": 63.93
+      },
+      "missing_identity_refusal": {
+        "n": 20,
+        "p50_ms": 47.68,
+        "p95_ms": 48.39,
+        "min_ms": 43.91,
+        "max_ms": 50.7
+      }
+    },
+    "connect-binary": {
+      "signed_publication": {
+        "n": 20,
+        "p50_ms": 55.66,
+        "p95_ms": 60.26,
+        "min_ms": 51.75,
+        "max_ms": 64.02
+      },
+      "missing_identity_refusal": {
+        "n": 20,
+        "p50_ms": 43.95,
+        "p95_ms": 48.05,
+        "min_ms": 43.78,
+        "max_ms": 48.12
+      }
+    },
+    "grpc": {
+      "signed_publication": {
+        "n": 20,
+        "p50_ms": 11.45,
+        "p95_ms": 14.46,
+        "min_ms": 7.57,
+        "max_ms": 14.51
+      },
+      "missing_identity_refusal": {
+        "n": 20,
+        "p50_ms": 2.87,
+        "p95_ms": 3.7,
+        "min_ms": 1.83,
+        "max_ms": 4.76
+      }
+    }
+  }
+}

@@ -1,0 +1,1 @@
+{"ready": true, "ports": {"http": 8080, "connect": 8081, "grpc": 8082}, "identity": "fixture-public-key-only", "store": "disposable-sqlite"}

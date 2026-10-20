@@ -1,0 +1,116 @@
+{
+ "schema_version": "ec00-ingress-gateway-run/v1",
+ "date": "2026-10-20",
+ "scope": "one isolated run of the ec00 ingress fixture behind the actual Cilium Gateway gateway/internal (listener https, wildcard apps TLS) with verified TLS from the workstation; namespace created and deleted for the run",
+ "source": {
+  "branch": "feat/ec00-ingress-qualification-2734",
+  "base_commit": "3b9b0f7",
+  "note": "remote_checks.py trust-store fix in the same commit as this receipt; the workload image is unaffected by it"
+ },
+ "image": {
+  "reference": "192.168.20.221:5000/ec00-ingress-fixture:20261020",
+  "digest": "sha256:6029277f72b8136db91240fc31eea97f5feac6fa180c2b9bc80abba637667621",
+  "pod_image_id_matched": true,
+  "restarts": 0
+ },
+ "routes": {
+  "HTTPRoute/ec00-qualification-http": "Accepted=True ResolvedRefs=True",
+  "HTTPRoute/ec00-qualification-connect": "Accepted=True ResolvedRefs=True",
+  "GRPCRoute/ec00-qualification-grpc": "Accepted=True ResolvedRefs=True"
+ },
+ "dial": {
+  "connect_to": "192.168.20.219",
+  "tls": "all verified, SNI and certificate name = route hostname: the gRPC arm and the raw HTTP/1.1 probe verify against the host CA bundle; the HTTP v2 and Connect arms verify through pyqwest's system-store loader",
+  "plaintext_loopback": false
+ },
+ "keys": "fresh client-side Ed25519 pair per run; only the public half mounted; private half deleted after each run",
+ "runs": [
+  {
+   "run": 1,
+   "result": "108 cases, 0 invariant failures; superseded: the raw HTTP/1.1 header probe failed client-side (cadata TypeError on a non-ASCII host CA bundle), fixed before run 2",
+   "retained": false
+  },
+  {
+   "run": 2,
+   "report": "gateway-report.json",
+   "report_sha256": "90ff5c8f8680b76f582d3d37ba35f7641298ba0b10101c5477446ea260698cc6",
+   "stdout": "gateway-stdout.txt",
+   "result": "108 cases: 100 security assertions passed, 8 observation-only, 0 invariant failures"
+  },
+  {
+   "run": 3,
+   "fixture_source": "57650bc (reviewed fix commit)",
+   "image": {
+    "reference": "192.168.20.221:5000/ec00-ingress-fixture:20261020-r2",
+    "digest": "sha256:0a926fb638387c567925ba4c20eadd2cd85fbb188ac04cc6da19168998e21ede",
+    "pod_image_id_matched": true,
+    "restarts": 0
+   },
+   "routes": "all three Accepted=True ResolvedRefs=True",
+   "report": "gateway-report-r2.json",
+   "report_sha256": "29aea91553f946501d4545e5821803abef5c8993b5f36a6b2af4f6a641fbf838",
+   "stdout": "gateway-stdout-r2.txt",
+   "result": "108 cases: 100 passed, 8 observation-only; failure_kinds security 0, expectation 0; er010_warnings none; repeated x-vuoro-identity arrived repeated (8/8), repeated x-request-id arrived joined (8/8) and both were refused with no owner effect",
+   "latency_p50_p95_ms": {
+    "http-v2 signed_publication": [
+     8.04,
+     9.79
+    ],
+    "grpc signed_publication": [
+     7.54,
+     9.39
+    ],
+    "connect-json signed_publication": [
+     59.93,
+     64.14
+    ],
+    "connect-binary signed_publication": [
+     55.89,
+     63.96
+    ]
+   },
+   "note": "Reproduces run 2's observations with the reviewed fixture (comma-count tags, ER-010 collapse warnings, store reset on restart); single-run fixture figures, not a performance comparison",
+   "source_sha256": [
+    {
+     "path": "tests/experiments/ec00/ingress/Dockerfile",
+     "sha256": "a88fd15b8a08e45c8cbe86add24f513fddb252b3dc0e8cc8667403909e8b33a5"
+    },
+    {
+     "path": "tests/experiments/ec00/ingress/serve_fixture.py",
+     "sha256": "3236a692ed7b6bbf880e606b97d6023088846879781054d252a64566091c43eb"
+    },
+    {
+     "path": "tests/experiments/ec00/ingress/remote_checks.py",
+     "sha256": "8cd42b0a2769c07fe359af737b3d33592e9dd2f638015efcb280394a4633e5f5"
+    },
+    {
+     "path": "tests/experiments/ec00/authenticated_owner.py",
+     "sha256": "ad5d5c3aa672489107eeecbe415cd136f21e32150ac99c934752cf1f3931ab5f"
+    }
+   ]
+  }
+ ],
+ "observations": [
+  "x-request-id is preserved end to end from these LAN clients (observed). When it is absent the Gateway adds one, plus x-forwarded-for, x-forwarded-proto and x-envoy-internal; x-envoy-internal was seen only on that raw probe without x-request-id. A likely explanation for preservation is that Envoy classes LAN clients as internal and so does not regenerate the header, but that was not observed directly.",
+  "Repeated x-vuoro-identity arrives as two separate headers; repeated x-request-id arrives joined into one comma-separated value. Both shapes are refused (identity) with no owner effect on all four arms.",
+  "HTTP and Connect routes reach the backend as HTTP/1.1 even when the client negotiates HTTP/2; only the gRPC route (Service appProtocol h2c) reaches it as HTTP/2.",
+  "The Gateway translates grpc-web (HTTP/1.1 and HTTP/2) on the gRPC hostname into native gRPC; a signed grpc-web publication reached the fixture and changed owner state (status 200; grpc-status was not surfaced in response headers).",
+  "Raw HTTP/1.1 header names keep case-insensitive matching, padding is trimmed, comma values are kept, duplicates stay separate, and header names containing underscores (x_ec00_underscore) are forwarded unchanged. The production verifier (FastAPI/ASGI, gateway_identity.py) matches exact header names and no underscore identity header was sent, so this is not an observed bypass; rejecting or dropping underscore header names at the ingress or backend is a candidate defence-in-depth requirement, relevant to any backend that maps '_' to '-' (WSGI/CGI).",
+  "Latency (client wall time, reused connection, n=20, first request excluded): HTTP v2 signed publication p50 9.28 / p95 14.53 ms; gRPC 11.45 / 14.46 ms; Connect JSON 55.81 / 59.97 ms; Connect binary 55.66 / 60.26 ms. Connect has a ~41 ms floor already present over local loopback (uvicorn/HTTP/1.1 path); over the Gateway, signed Connect adds about 14 ms against about 8-10 ms for HTTP v2 and gRPC. Only the floor is not attributed to the Gateway. No cross-candidate performance claim is made from this sample."
+ ],
+ "dropped": [
+  "revocation-after-commit (needs an owner-store write)"
+ ],
+ "teardown": {
+  "namespace_deleted": true,
+  "remaining_ec00_routes": 0,
+  "runs": "namespace created and deleted for runs 1-2 and again for run 3; no ec00 routes remain"
+ },
+ "not_qualified": [
+  "production gateway/bootstrap or real identity issuance",
+  "streaming/backpressure",
+  "representative workload or performance population",
+  "external (non-LAN) client treatment by Envoy, e.g. x-request-id regeneration for non-internal clients",
+  "architecture selection; the EC-00 gate remains open"
+ ]
+}

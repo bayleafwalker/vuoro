@@ -4,6 +4,7 @@ All identities/keys are disposable fixtures. No hosted credential or auth issuer
 is provided to a candidate, browser, or test log.
 """
 from concurrent.futures import ThreadPoolExecutor
+import contextvars
 from contextlib import ExitStack, contextmanager, closing
 from pathlib import Path
 import os
@@ -11,15 +12,13 @@ import sqlite3
 import tempfile
 import time
 import unittest
-import uuid
 
 import httpx
-import jwt
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from lifecycle_slice_checks import HERE, grpc, v1_pb2, v1_pb2_grpc, OwnerOracle
 from connect_owner_http import DirectConnectServer
-from authenticated_owner import (AuthenticatedCandidateServer, AuthenticatedOwner,
-    GatewayAssertionIdentityResolver, IdentityPolicy, IdentityMiddleware, CURRENT)
+from authenticated_owner import (CURRENT, SCOPE, Identity, AuthenticatedCandidateServer, AuthenticatedOwner, IdentityMiddleware,
+    FOREIGN, ISSUER, WORKSPACE, fixture_policy, owner_snapshot, seed_fixture_owner, sign_fixture_assertion)
 from connect_browser_checks import node_edge
 from ec00_connect.oa_v1_connect import OwnerOperationsClientSync
 from connectrpc.compat import google_protobuf_binary_codec, google_protobuf_json_codec
@@ -29,44 +28,31 @@ from ec00_oa_v2_python_client.client import Client
 from ec00_oa_v2_python_client.api.default import publish
 from ec00_oa_v2_python_client.models import PublishRequest
 
-WORKSPACE = '01ARZ3NDEKTSV4RRFFQ69G5FAV'
-FOREIGN = '01ARZ3NDEKTSV4RRFFQ69G5FAW'
-ISSUER = 'ec00-fixture'
 ARMS = ('http-v2', 'grpc', 'python-json', 'python-binary', 'edge-json', 'edge-binary')
+DEFAULT_RID = '9007199254741201'
+EDGE_DUPLICATE_REFUSAL = 'duplicate identity or correlation header refused'
 
 
-def snapshot(path):
-    with closing(sqlite3.connect(path)) as db:
-        return {table: db.execute(f'SELECT * FROM {table} ORDER BY 1,2').fetchall()
-                for table in ('request', 'dependent', 'event', 'idem', 'signed_artifact')}
+snapshot = owner_snapshot
 
 
 class FixtureIdentity:
     def __init__(self):
         self.key = Ed25519PrivateKey.generate()
-        self.policy = IdentityPolicy(GatewayAssertionIdentityResolver(self.key.public_key(),
-            issuer=ISSUER, audience='ec00-owner', environment='disposable-ec00',
-            expected_workspace_id=WORKSPACE, allowed_repo_ids=frozenset({'fixture'}), key_id='fixture'))
+        self.policy = fixture_policy(self.key.public_key())
 
-    def headers(self, subject='alice', *, claims=None, key=None):
-        now = int(time.time())
-        correlation = str(uuid.uuid4())
-        body = dict(actor='agent:' + subject, sub='agent:' + subject, subject=subject,
-            principal_epoch=0, iss=ISSUER, aud='ec00-owner', workspace_id=WORKSPACE,
-            repo_ids=['fixture'], authorities=['fixture:owner-read', 'fixture:owner-write'],
-            request_id=correlation, jti=str(uuid.uuid4()), iat=now, nbf=now, exp=now + 30)
-        body.update(claims or {})
-        assertion = jwt.encode(body, key or self.key, algorithm='EdDSA', headers={'kid': 'fixture'})
-        return {'x-vuoro-identity': assertion, 'x-request-id': correlation}
+    def headers(self, subject='alice', *, request_id=DEFAULT_RID, claims=None, key=None):
+        """Sign an assertion whose request_id covers the OA request id in the body.
+
+        The candidate protocol has no separate invocation envelope, so the owner
+        binds the claim to the parsed message's request_id (see
+        authenticated_owner.message_request_id), as production binds it to the
+        parsed invocation envelope.
+        """
+        return sign_fixture_assertion(key or self.key, subject, request_id=request_id, claims=claims)
 
     def initialize(self, path):
-        subjects = [('alice', WORKSPACE, 'requester', True), ('bob', WORKSPACE, 'requester', True),
-                    ('foreign', FOREIGN, 'requester', True), ('revoked', WORKSPACE, 'requester', False),
-                    ('observer', WORKSPACE, 'verifier', True)]
-        OwnerOracle.initialize(path, [dict(principal_id=f'{ISSUER}:{s}:0', workspace_id=w,
-            role=r, active=a) for s,w,r,a in subjects], links=[dict(link_id='work-' + s,
-            workspace_id=w, owner_principal=f'{ISSUER}:{s}:0', repo_id='fixture', run_ref='fixture')
-            for s,w,r,a in subjects])
+        seed_fixture_owner(path)
 
 
 @contextmanager
@@ -95,7 +81,7 @@ class Transport:
     def __init__(self, arm, url, client):
         self.arm, self.url, self.client = arm, url, client
 
-    def publish(self, headers, *, rid='9007199254741201', subject='alice', key='publish', objective='auth fixture'):
+    def publish(self, headers, *, rid=DEFAULT_RID, subject='alice', key='publish', objective='auth fixture'):
         headers = {**headers, 'idempotency-key': key}
         if self.arm == 'http-v2':
             with Client(base_url=self.url, headers=headers) as client:
@@ -118,7 +104,60 @@ class Transport:
             return {Code.UNAUTHENTICATED: 'identity', Code.PERMISSION_DENIED: 'authority', Code.ABORTED: 'owner'}.get(exc.code, str(exc.code)), None
 
 
+class SharedContextBindingTests(unittest.TestCase):
+    """bound() must reset its own binding: a runtime that reused one context
+    (or one thread's context) across requests would otherwise leak identity."""
+
+    def test_bound_resets_identity_across_requests_in_one_shared_context(self):
+        policy = FixtureIdentity().policy
+        identities = [Identity(actor=f'agent:{s}', environment='disposable-ec00', principal_id=f'{ISSUER}:{s}:0')
+                      for s in ('alice', 'bob', 'alice', 'bob')]
+        shared = contextvars.Context()
+
+        def request(index, identity):
+            try:
+                with policy.bound(identity, str(index), 'shared-context'):
+                    self.assertIs(identity, CURRENT.get())
+                    self.assertEqual(str(index), SCOPE.get().request_id)
+                    if index == 1:
+                        raise RuntimeError('handler failure must still reset')
+            except RuntimeError:
+                pass
+            return CURRENT.get(), SCOPE.get()
+
+        # One context reused for every request, on one reused worker thread.
+        with ThreadPoolExecutor(max_workers=1) as worker:
+            after = [worker.submit(shared.run, request, i, identity).result()
+                     for i, identity in enumerate(identities)]
+        self.assertEqual([(None, None)] * len(identities), after)
+        self.assertEqual(len(identities), len(policy.observations))
+        for record, identity in zip(policy.observations, identities):
+            self.assertTrue(record['entry_clear'], record)
+            self.assertTrue(record['exit_clear'], record)
+            self.assertEqual(identity.principal_id, record['principal'])
+
+
 class AuthenticatedTransportTests(unittest.TestCase):
+    def assertNoIdentityCarryOver(self, policy, expected):
+        """Server-side records: each request entered with no identity context,
+        left none behind, and the owner saw only the principal that request signed.
+
+        Over real transports entry/exit-clear cannot fail on their own, because
+        each runtime isolates per-request contexts; the principal mapping can.
+
+        ``expected`` maps the envelope request id to the one principal allowed
+        to reach the owner for it.
+        """
+        observations, owners = list(policy.observations), list(policy.owner_observations)
+        self.assertTrue(observations)
+        for record in observations:
+            self.assertTrue(record['entry_clear'], record)
+            self.assertTrue(record['exit_clear'], record)
+            self.assertEqual(expected[record['request_id']], record['principal'], record)
+        self.assertTrue(owners)
+        for record in owners:
+            self.assertEqual(expected[record['request_id']], record['principal'], record)
+
     def cases(self):
         self.assertTrue(os.environ.get('EC00_NODE'), 'all six arms require the pinned Node toolchain')
         return ARMS
@@ -145,7 +184,11 @@ class AuthenticatedTransportTests(unittest.TestCase):
                     # revoked owner membership even for a previously committed key.
                     self.assertEqual(('owner', None), transport.publish(identity.headers()))
                     self.assertEqual(committed, snapshot(path))
-                self.assertIsNone(CURRENT.get())
+                # Each request saw only its own identity. The runtimes give every
+                # request a fresh context (grpcio per RPC, a thread per HTTP
+                # request, a copied context per uvicorn task), so this records
+                # isolation; bound()'s own reset is proven by the shared-context test.
+                self.assertNoIdentityCarryOver(identity.policy, {DEFAULT_RID: f'{ISSUER}:alice:0'})
 
     def test_bad_identity_and_authority_refuse_before_any_owner_effect(self):
         for arm in self.cases():
@@ -161,7 +204,9 @@ class AuthenticatedTransportTests(unittest.TestCase):
                         ('actor-disagrees', {'actor':'agent:bob'}), ('epoch', {'principal_epoch':-1})]
                     bad = [('missing', {}), ('unsigned-actor', {'x-actor':'agent:alice', 'x-workspace-id':WORKSPACE}),
                            ('signature', identity.headers(key=Ed25519PrivateKey.generate())),
-                           ('correlation', {**identity.headers(), 'x-request-id':'different'})]
+                           ('correlation', {**identity.headers(), 'x-request-id':'different'}),
+                           # Header and claim agree, but neither covers the body's request id.
+                           ('envelope', identity.headers(request_id='9007199254749999'))]
                     bad.extend((name, identity.headers(claims=change)) for name,change in mutations)
                     for name,headers in bad:
                         with self.subTest(case=name):
@@ -183,9 +228,10 @@ class AuthenticatedTransportTests(unittest.TestCase):
                     path = Path(directory) / 'owner.sqlite'
                     identity = FixtureIdentity(); identity.initialize(path)
                     with endpoint(path, identity, arm) as transport:
-                        headers = identity.headers()
+                        headers = identity.headers(request_id='9007199254741501')
                         pairs = [*headers.items(), (duplicate, headers[duplicate]), ('idempotency-key','duplicate')]
                         before = snapshot(path)
+                        resolutions = identity.policy.resolutions
                         if arm == 'grpc':
                             with self.assertRaises(grpc.RpcError) as caught:
                                 transport.client.Publish(v1_pb2.PublishRequest(request_id='9007199254741501',
@@ -198,11 +244,19 @@ class AuthenticatedTransportTests(unittest.TestCase):
                             response = httpx.post(transport.url + route, json=body,
                                 headers=[*pairs, ('connect-protocol-version','1')], timeout=5)
                             self.assertEqual(401, response.status_code)
+                            if arm.startswith('edge'):
+                                # The edge's own raw-header duplicate check refused
+                                # it: no upstream identity resolution was attempted.
+                                self.assertEqual('duplicate-header', response.headers.get('x-ec00-edge-refusal'))
+                                self.assertEqual({'code': 'unauthenticated', 'message': EDGE_DUPLICATE_REFUSAL}, response.json())
+                                self.assertEqual(resolutions, identity.policy.resolutions)
+                            else:
+                                self.assertEqual(resolutions + 1, identity.policy.resolutions)
                         self.assertEqual(before, snapshot(path))
-                        self.assertEqual(('ok', '9007199254741501'), transport.publish(identity.headers(),
+                        self.assertEqual(('ok', '9007199254741501'), transport.publish(identity.headers(request_id='9007199254741501'),
                             rid='9007199254741501', key='duplicate', objective='duplicate headers'))
 
-    def test_concurrent_request_identity_never_crosses_thread_or_async_boundaries(self):
+    def test_concurrent_requests_reach_the_owner_only_as_their_own_principal(self):
         for arm in self.cases():
             with self.subTest(arm=arm), tempfile.TemporaryDirectory() as directory:
                 path = Path(directory) / 'owner.sqlite'
@@ -211,7 +265,7 @@ class AuthenticatedTransportTests(unittest.TestCase):
                     def call(index):
                         subject = 'alice' if index % 2 == 0 else 'bob'
                         rid = str(9007199254741300 + index)
-                        result = transport.publish(identity.headers(subject), subject=subject, rid=rid, key='shared-key-' + str(index//2))
+                        result = transport.publish(identity.headers(subject, request_id=rid), subject=subject, rid=rid, key='shared-key-' + str(index//2))
                         return result, rid, subject
                     with ThreadPoolExecutor(max_workers=8) as pool:
                         results = list(pool.map(call, range(16)))
@@ -221,6 +275,9 @@ class AuthenticatedTransportTests(unittest.TestCase):
                         self.assertEqual(('ok', rid), result)
                         self.assertIn((rid, 'work-' + subject, 1, 0), state['dependent'])
                         self.assertTrue(any(row[1] == f'{ISSUER}:{subject}:0' and rid in row[5] for row in state['idem']))
+                    self.assertNoIdentityCarryOver(identity.policy,
+                        {rid: f'{ISSUER}:{subject}:0' for _, rid, subject in results})
+                    self.assertEqual(16, len(identity.policy.owner_observations))
 
 
 if __name__ == '__main__':

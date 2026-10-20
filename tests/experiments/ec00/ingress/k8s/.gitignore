@@ -1,0 +1,2 @@
+# Fixture key material is never committed.
+*.pem

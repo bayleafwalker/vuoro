@@ -891,3 +891,101 @@ dependency parity. Keys and credentials are disposable, and no assertion is
 included in receipts. These are bounded loopback examples. They do not qualify
 production gateway/bootstrap, TLS, actual ingress, full authenticated lifecycle,
 performance or an architecture choice. The EC-00 gate remains open.
+
+## Review follow-ups and ingress fixture preparation (20 October 2026)
+
+Three review advisories from the signed-identity slice are fixed:
+
+- **Envelope binding.** The fixture owner now takes the verifier's invocation
+  request id from the parsed body, as production does from the parsed envelope.
+  It is read from the HTTP v2 JSON, Connect JSON or binary, and the native gRPC
+  message. Before this, the fixture copied the `x-request-id` header. The
+  candidate OA protocol has no separate invocation envelope, so the claim covers
+  the message's own `request_id`. A new `envelope` case signs a claim that
+  matches the header but not the body, and it is refused with no owner effect.
+- **Identity context.** The test-thread `CURRENT.get()` check is gone. The
+  fixture records, on the server side, the identity context each request sees
+  at entry, at owner use and after reset. Over the real transports this shows
+  that the runtimes isolate per-request contexts: grpcio runs each RPC in a
+  fresh context, `ThreadingHTTPServer` uses a thread per request and uvicorn
+  copies the context per task. Those entry/exit records therefore cannot fail
+  on their own; what they do check is that the owner saw only the signing
+  principal. (Correction to the first version of this note, which claimed reused
+  gRPC threads proved no carry-over.) That `IdentityPolicy.bound()` resets its
+  own binding is proven separately: a test drives it repeatedly, including a
+  failing handler, inside one shared context on one reused thread, and fails
+  when either reset is removed. The concurrency test is renamed to claim only
+  the principal mapping.
+- **Edge duplicates.** The Node Connect edge counts repeated
+  `x-vuoro-identity`/`x-request-id` in `IncomingMessage.rawHeaders` and refuses
+  them itself with Connect `unauthenticated` (401). Previously, `Headers.get`
+  joined the values into a malformed token. The test asserts the edge's refusal
+  marker and that no owner identity resolution took place.
+
+[`tests/experiments/ec00/ingress/`](../../../tests/experiments/ec00/ingress/README.md)
+now holds reviewable source for the isolated ingress workload:
+
+- a locked image build;
+- `serve_fixture.py`, which trusts only a mounted public key and serves a
+  read-only `/_ec00/` readback;
+- Kustomize resources for namespace `ec00-qualification`, attached to the
+  Cilium Gateway `gateway/internal` listener `https`. HTTP and Connect get their
+  own hostnames, and gRPC gets a separate hostname because of the Gateway API
+  rule on HTTPRoute/GRPCRoute hostname conflicts;
+- `remote_checks.py`, which generates a client-side key per run, verifies TLS
+  against the system store, and records header, HTTP-version and grpc-web
+  handling.
+
+That README lists the operator build, push, apply, run and teardown commands.
+The [local receipt](ingress-2026-10-20/receipt.json) covers only the built
+image validated over plain loopback, with all 108 remote-mode cases and no
+invariant failures. Its latency figures describe that local pair: the Connect
+arm shows a fixed ~41 ms on the uvicorn/HTTP/1.1 path, against under 1 ms for
+HTTP v2 and gRPC. That gap is a local artifact and not an ingress measurement.
+TLS, the actual Gateway, Envoy header handling and ER-010 remain open until the
+operator run. The EC-00 gate remains open.
+
+### Actual Gateway run (20 October 2026)
+
+The fixture image (`sha256:6029277f…7621`) ran once in a disposable
+`ec00-qualification` namespace behind `gateway/internal`. All three routes
+reported `Accepted` and `ResolvedRefs`. The workstation dialled 192.168.20.219
+with verified TLS for each route hostname (gRPC and the raw HTTP/1.1 probe
+against the host CA bundle, HTTP v2 and Connect through pyqwest's system-store
+loader), and the namespace was deleted afterwards. The [gateway receipt](ingress-2026-10-20/gateway-receipt.json) and
+[report](ingress-2026-10-20/gateway-report.json) record 108 cases: 100 security
+assertions passed, 8 were observation-only, and there were no invariant failures.
+Revocation after commit is not exercised remotely.
+
+What the Gateway did (ER-010):
+
+- It preserved `x-request-id` from these LAN clients. When the header was
+  absent it added one, along with `x-envoy-internal`, which appeared only on
+  that probe. A likely explanation is that Envoy treats LAN clients as internal
+  and does not regenerate the header; that was not observed directly. Clients
+  outside the internal range have not been tested.
+- Repeated `x-vuoro-identity` arrived as two headers, while repeated
+  `x-request-id` arrived joined into one comma-separated value. Both were
+  refused with no owner effect on every arm.
+- HTTP and Connect reached the backend as HTTP/1.1 even over client HTTP/2;
+  only the h2c gRPC route stayed HTTP/2.
+- It translated grpc-web on the gRPC hostname into native gRPC, and a signed
+  grpc-web publication took effect.
+- It forwarded header names containing underscores unchanged. The production
+  verifier (FastAPI/ASGI) matches exact names and no underscore identity header
+  was sent, so this is not an observed bypass. Rejecting or dropping underscore
+  header names at the ingress or backend is a candidate defence-in-depth
+  requirement, since a backend that maps `_` to `-` could see a second identity
+  or correlation header.
+
+Latency over n=20 per case: HTTP v2 and gRPC signed publication p50 about
+9–11 ms (p95 about 14.5 ms); Connect about 56 ms. Connect has a ~41 ms floor
+that also appears over loopback; over the Gateway, signed Connect adds about
+14 ms against about 8–10 ms for HTTP v2 and gRPC. Only the floor is not a
+Gateway cost. These are single-run
+fixture figures, not a performance comparison. A second deployment of the reviewed fixture (`sha256:0a926fb6…1ede`, run 3 in the receipt,
+[report](ingress-2026-10-20/gateway-report-r2.json)) reproduced the header, version and
+grpc-web observations; its latency figures differ (see the receipt):
+108 cases, no security or expectation failures, no ER-010 collapse warnings,
+repeated identity headers kept separate and repeated `x-request-id` joined, all
+refused without effect. The EC-00 gate remains open.

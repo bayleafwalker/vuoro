@@ -1,0 +1,22 @@
+# Ingress from the Cilium Gateway's Envoy (entity "ingress"), this node's host
+# (kubelet probes) and "remote-node": any other cluster node's host network
+# namespace, which is broader than probes or the Gateway alone but matches the
+# appservice convention for Gateway-fronted apps. No egress at all.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: ec00-ingress-fixture
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: ec00-ingress-fixture
+  enableDefaultDeny:
+    ingress: true
+    egress: true
+  ingress:
+    - fromEntities: [ingress, host, remote-node]
+      toPorts:
+        - ports:
+            - {port: "8080", protocol: TCP}
+            - {port: "8081", protocol: TCP}
+            - {port: "8082", protocol: TCP}
