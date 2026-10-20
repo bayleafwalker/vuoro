@@ -984,7 +984,8 @@ that also appears over loopback; over the Gateway, signed Connect adds about
 14 ms against about 8–10 ms for HTTP v2 and gRPC. Only the floor is not a
 Gateway cost. These are single-run
 fixture figures, not a performance comparison. A second deployment of the reviewed fixture (`sha256:0a926fb6…1ede`, run 3 in the receipt,
-[report](ingress-2026-10-20/gateway-report-r2.json)) reproduced these observations:
+[report](ingress-2026-10-20/gateway-report-r2.json)) reproduced the header, version and
+grpc-web observations; its latency figures differ (see the receipt):
 108 cases, no security or expectation failures, no ER-010 collapse warnings,
 repeated identity headers kept separate and repeated `x-request-id` joined, all
 refused without effect. The EC-00 gate remains open.
