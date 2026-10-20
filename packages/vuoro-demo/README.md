@@ -148,3 +148,10 @@ producer access and producer/verifier acceptance. A retried owner decision must
 leave exactly one acceptance. This local bearer-identity scenario proves neither
 OAuth/agent identity federation, OS-level isolation, hosted qualification, nor a
 live vuoro.cloud deployment.
+
+The independent verification observation is labeled
+`private-handover-observation/v1`; its referenced manifest remains
+`sovite-private-artifact-manifest/v1`. Consumer 0.1.2 corrects an overwritten
+observation label from 0.1.1 and records the actual installed harness version.
+The [follow-up native proof](../../verification/specialized/private-workflow/schema-fixed.json)
+repeats the complete real execution and owner acceptance with those labels.
