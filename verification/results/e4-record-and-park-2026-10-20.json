@@ -80,6 +80,7 @@
     "Before repair, full workspace failed two stale reference-distribution version assertions; focused correction9passed and final full rerun3058passed.",
     "Before updating the released owner validator, the old103-operation expectation failed against the actual106-operation owner.",
     "Owner source independently proves two-connection acquisition history fencing and transaction preservation; consumer adds no owner state machine, scheduler or model selection.",
-    "implementation_sha binds source/context; this packet is an evidence-only follow-up."
+    "implementation_sha binds source/context; this packet is an evidence-only follow-up.",
+    "Required settlement CI ran the separately provisioned schema21 upgrade and correctly failed its stale126-operation expectation against the measured129-operation composition. The shared schema22/schema27 expected count and fingerprint were corrected; those actual migration histories remain gated on CI."
   ]
 }
