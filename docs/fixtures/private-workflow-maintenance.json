@@ -1,0 +1,40 @@
+{
+  "schema": "vuoro.wf01-source-fixture/v1",
+  "classification": "C0",
+  "synthetic": true,
+  "owner": "bayleaf",
+  "objective": "Prepare a source-backed maintenance handover; do not perform or claim repairs.",
+  "snippets": [
+    {
+      "id": "M1",
+      "text": "Kitchen tap: five drops counted during one minute after closing. No inspection of seals or pipes has been performed."
+    },
+    {
+      "id": "M2",
+      "text": "Hallway light: flickered twice on Monday evening. No electrical measurements or electrician assessment are available."
+    },
+    {
+      "id": "M3",
+      "text": "Bathroom extractor: the filter was cleaned on Sunday. There is no before-and-after airflow measurement."
+    }
+  ],
+  "acceptance": {
+    "source_coverage": [
+      "M1",
+      "M2",
+      "M3"
+    ],
+    "required": [
+      "Separate observed facts from hypotheses and proposed checks",
+      "Preserve the counts and uncertainty in the source snippets",
+      "Include suggested next steps with an unassigned owner unless one is actually supplied",
+      "State that no repair or outcome has been verified"
+    ],
+    "forbidden": [
+      "Claiming a proven leak cause",
+      "Diagnosing an electrical fault as established fact",
+      "Claiming airflow improved after cleaning",
+      "Inventing a person, deadline, cost or completed repair"
+    ]
+  }
+}
