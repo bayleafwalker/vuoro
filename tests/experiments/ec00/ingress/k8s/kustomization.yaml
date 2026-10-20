@@ -1,0 +1,25 @@
+# Disposable EC-00 ingress qualification. Apply only with the commands in
+# ../README.md: the fixture PUBLIC key file must first be copied here as
+# fixture-public.pem (git-ignored) and the image digest filled in below.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ec00-qualification
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: ec00-qualification
+resources:
+  - namespace.yaml
+  - deployment.yaml
+  - service.yaml
+  - routes.yaml
+  - networkpolicy.cnp.yaml
+configMapGenerator:
+  # Hash-suffixed: a new key produces a new ConfigMap name and a fresh rollout
+  # (and therefore a fresh disposable owner store).
+  - name: ec00-fixture-public-key
+    files:
+      - public.pem=fixture-public.pem
+images:
+  - name: ec00-ingress-fixture
+    newName: 192.168.20.221:5000/ec00-ingress-fixture
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000  # set from the pushed image

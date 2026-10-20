@@ -1,0 +1,20 @@
+# Only the Gateway (and kubelet probes from the host) reach the fixture; it has
+# no egress at all.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: ec00-ingress-fixture
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: ec00-ingress-fixture
+  enableDefaultDeny:
+    ingress: true
+    egress: true
+  ingress:
+    - fromEntities: [ingress, host, remote-node]
+      toPorts:
+        - ports:
+            - {port: "8080", protocol: TCP}
+            - {port: "8081", protocol: TCP}
+            - {port: "8082", protocol: TCP}

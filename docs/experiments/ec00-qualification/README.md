@@ -891,3 +891,49 @@ dependency parity. Keys and credentials are disposable, and no assertion is
 included in receipts. These are bounded loopback examples. They do not qualify
 production gateway/bootstrap, TLS, actual ingress, full authenticated lifecycle,
 performance or an architecture choice. The EC-00 gate remains open.
+
+## Review follow-ups and ingress fixture preparation (20 October 2026)
+
+Three review advisories from the signed-identity slice are fixed:
+
+- **Envelope binding.** The fixture owner now takes the verifier's invocation
+  request id from the parsed body, as production does from the parsed envelope.
+  It is read from the HTTP v2 JSON, Connect JSON or binary, and the native gRPC
+  message. Before this, the fixture copied the `x-request-id` header. The
+  candidate OA protocol has no separate invocation envelope, so the claim covers
+  the message's own `request_id`. A new `envelope` case signs a claim that
+  matches the header but not the body, and it is refused with no owner effect.
+- **Identity context.** The test-thread `CURRENT.get()` check is gone. Instead,
+  the fixture records the identity context each request sees on the server
+  side: at entry, at owner use, and after reset. Sequential and concurrent tests
+  assert that no request inherits or leaves an identity. In gRPC, four workers
+  serve sixteen requests, so reused threads are covered. The concurrency test's
+  name now claims only this.
+- **Edge duplicates.** The Node Connect edge counts repeated
+  `x-vuoro-identity`/`x-request-id` in `IncomingMessage.rawHeaders` and refuses
+  them itself with Connect `unauthenticated` (401). Previously, `Headers.get`
+  joined the values into a malformed token. The test asserts the edge's refusal
+  marker and that no owner identity resolution took place.
+
+[`tests/experiments/ec00/ingress/`](../../../tests/experiments/ec00/ingress/README.md)
+now holds reviewable source for the isolated ingress workload:
+
+- a locked image build;
+- `serve_fixture.py`, which trusts only a mounted public key and serves a
+  read-only `/_ec00/` readback;
+- Kustomize resources for namespace `ec00-qualification`, attached to the
+  Cilium Gateway `gateway/internal` listener `https`. HTTP and Connect get their
+  own hostnames, and gRPC gets a separate hostname because of the Gateway API
+  rule on HTTPRoute/GRPCRoute hostname conflicts;
+- `remote_checks.py`, which generates a client-side key per run, verifies TLS
+  against the system store, and records header, HTTP-version and grpc-web
+  handling.
+
+That README lists the operator build, push, apply, run and teardown commands.
+The [local receipt](ingress-2026-10-20/receipt.json) covers only the built
+image validated over plain loopback, with all 108 remote-mode cases and no
+invariant failures. Its latency figures describe that local pair: the Connect
+arm shows a fixed ~41 ms on the uvicorn/HTTP/1.1 path, against under 1 ms for
+HTTP v2 and gRPC. That gap is a local artifact and not an ingress measurement.
+TLS, the actual Gateway, Envoy header handling and ER-010 remain open until the
+operator run. The EC-00 gate remains open.

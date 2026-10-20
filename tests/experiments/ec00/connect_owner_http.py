@@ -7,9 +7,9 @@ import sys
 import threading
 import uvicorn
 
-from lifecycle_slice_checks import HERE, grpc
 from candidate_owner_http import _Server, _GrpcOwner
 from owner_oracle import Conflict, ResponseLost
+HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE / 'generated/connect-python'))
 from ec00_connect.oa_v1_connect import OwnerOperationsASGIApplication
 from connectrpc.code import Code

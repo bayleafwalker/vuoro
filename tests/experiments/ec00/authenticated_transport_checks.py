@@ -11,15 +11,13 @@ import sqlite3
 import tempfile
 import time
 import unittest
-import uuid
 
 import httpx
-import jwt
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from lifecycle_slice_checks import HERE, grpc, v1_pb2, v1_pb2_grpc, OwnerOracle
 from connect_owner_http import DirectConnectServer
-from authenticated_owner import (AuthenticatedCandidateServer, AuthenticatedOwner,
-    GatewayAssertionIdentityResolver, IdentityPolicy, IdentityMiddleware)
+from authenticated_owner import (AuthenticatedCandidateServer, AuthenticatedOwner, IdentityMiddleware,
+    FOREIGN, ISSUER, WORKSPACE, fixture_policy, owner_snapshot, seed_fixture_owner, sign_fixture_assertion)
 from connect_browser_checks import node_edge
 from ec00_connect.oa_v1_connect import OwnerOperationsClientSync
 from connectrpc.compat import google_protobuf_binary_codec, google_protobuf_json_codec
@@ -29,26 +27,18 @@ from ec00_oa_v2_python_client.client import Client
 from ec00_oa_v2_python_client.api.default import publish
 from ec00_oa_v2_python_client.models import PublishRequest
 
-WORKSPACE = '01ARZ3NDEKTSV4RRFFQ69G5FAV'
-FOREIGN = '01ARZ3NDEKTSV4RRFFQ69G5FAW'
-ISSUER = 'ec00-fixture'
 ARMS = ('http-v2', 'grpc', 'python-json', 'python-binary', 'edge-json', 'edge-binary')
 DEFAULT_RID = '9007199254741201'
 EDGE_DUPLICATE_REFUSAL = 'duplicate identity or correlation header refused'
 
 
-def snapshot(path):
-    with closing(sqlite3.connect(path)) as db:
-        return {table: db.execute(f'SELECT * FROM {table} ORDER BY 1,2').fetchall()
-                for table in ('request', 'dependent', 'event', 'idem', 'signed_artifact')}
+snapshot = owner_snapshot
 
 
 class FixtureIdentity:
     def __init__(self):
         self.key = Ed25519PrivateKey.generate()
-        self.policy = IdentityPolicy(GatewayAssertionIdentityResolver(self.key.public_key(),
-            issuer=ISSUER, audience='ec00-owner', environment='disposable-ec00',
-            expected_workspace_id=WORKSPACE, allowed_repo_ids=frozenset({'fixture'}), key_id='fixture'))
+        self.policy = fixture_policy(self.key.public_key())
 
     def headers(self, subject='alice', *, request_id=DEFAULT_RID, claims=None, key=None):
         """Sign an assertion whose request_id covers the OA request id in the body.
@@ -58,24 +48,10 @@ class FixtureIdentity:
         authenticated_owner.message_request_id), as production binds it to the
         parsed invocation envelope.
         """
-        now = int(time.time())
-        correlation = request_id
-        body = dict(actor='agent:' + subject, sub='agent:' + subject, subject=subject,
-            principal_epoch=0, iss=ISSUER, aud='ec00-owner', workspace_id=WORKSPACE,
-            repo_ids=['fixture'], authorities=['fixture:owner-read', 'fixture:owner-write'],
-            request_id=correlation, jti=str(uuid.uuid4()), iat=now, nbf=now, exp=now + 30)
-        body.update(claims or {})
-        assertion = jwt.encode(body, key or self.key, algorithm='EdDSA', headers={'kid': 'fixture'})
-        return {'x-vuoro-identity': assertion, 'x-request-id': correlation}
+        return sign_fixture_assertion(key or self.key, subject, request_id=request_id, claims=claims)
 
     def initialize(self, path):
-        subjects = [('alice', WORKSPACE, 'requester', True), ('bob', WORKSPACE, 'requester', True),
-                    ('foreign', FOREIGN, 'requester', True), ('revoked', WORKSPACE, 'requester', False),
-                    ('observer', WORKSPACE, 'verifier', True)]
-        OwnerOracle.initialize(path, [dict(principal_id=f'{ISSUER}:{s}:0', workspace_id=w,
-            role=r, active=a) for s,w,r,a in subjects], links=[dict(link_id='work-' + s,
-            workspace_id=w, owner_principal=f'{ISSUER}:{s}:0', repo_id='fixture', run_ref='fixture')
-            for s,w,r,a in subjects])
+        seed_fixture_owner(path)
 
 
 @contextmanager

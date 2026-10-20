@@ -34,6 +34,19 @@ WRITE_RPCS = frozenset({'Publish', 'Revise', 'WithdrawDependent', 'ReportPerform
                         'Verify', 'DecideArtifact', 'Resolve', 'AcknowledgeContinuation'})
 
 
+# Disposable fixture identity parameters, shared by the loopback checks, the
+# ingress workload and its remote-mode client.
+ISSUER = 'ec00-fixture'
+AUDIENCE = 'ec00-owner'
+ENVIRONMENT = 'disposable-ec00'
+KEY_ID = 'fixture'
+REPO_ID = 'fixture'
+WORKSPACE = '01ARZ3NDEKTSV4RRFFQ69G5FAV'
+FOREIGN = '01ARZ3NDEKTSV4RRFFQ69G5FAW'
+FIXTURE_SUBJECTS = (('alice', WORKSPACE, 'requester', True), ('bob', WORKSPACE, 'requester', True),
+                    ('foreign', FOREIGN, 'requester', True), ('revoked', WORKSPACE, 'requester', False),
+                    ('observer', WORKSPACE, 'verifier', True))
+
 _SERVICE = v1_pb2.DESCRIPTOR.services_by_name['OwnerOperations']
 _REQUEST_PATH = re.compile(r'/v[12]/requests/([^/]+)')
 _BODY_LIMIT = 1024 * 1024
@@ -41,6 +54,56 @@ _BODY_LIMIT = 1024 * 1024
 
 class AuthorityRefused(PermissionError):
     pass
+
+
+def fixture_principal(subject: str) -> str:
+    return f'{ISSUER}:{subject}:0'
+
+
+def seed_fixture_owner(path):
+    """Create the disposable owner store with the fixture principals and links."""
+    OwnerOracle.initialize(path, [dict(principal_id=fixture_principal(s), workspace_id=w,
+        role=r, active=a) for s, w, r, a in FIXTURE_SUBJECTS], links=[dict(link_id='work-' + s,
+        workspace_id=w, owner_principal=fixture_principal(s), repo_id=REPO_ID, run_ref='fixture')
+        for s, w, r, a in FIXTURE_SUBJECTS])
+
+
+def sign_fixture_assertion(key, subject='alice', *, request_id: str, claims=None, lifetime=30):
+    """A disposable Ed25519 gateway assertion and its matching correlation header.
+
+    ``request_id`` must equal the request id the body carries (see
+    message_request_id). Only fixture keys are ever passed here.
+    """
+    import time
+    import uuid
+    import jwt
+    now = int(time.time())
+    body = dict(actor='agent:' + subject, sub='agent:' + subject, subject=subject,
+        principal_epoch=0, iss=ISSUER, aud=AUDIENCE, workspace_id=WORKSPACE,
+        repo_ids=[REPO_ID], authorities=['fixture:owner-read', 'fixture:owner-write'],
+        request_id=request_id, jti=str(uuid.uuid4()), iat=now, nbf=now, exp=now + lifetime)
+    body.update(claims or {})
+    assertion = jwt.encode(body, key, algorithm='EdDSA', headers={'kid': KEY_ID})
+    return {'x-vuoro-identity': assertion, 'x-request-id': request_id}
+
+
+OWNER_TABLES = ('request', 'dependent', 'event', 'idem', 'signed_artifact')
+
+
+def owner_snapshot(path):
+    """All owner effect rows, for absence-of-effect comparisons."""
+    import sqlite3
+    from contextlib import closing
+    with closing(sqlite3.connect(path)) as db:
+        return {table: db.execute(f'SELECT * FROM {table} ORDER BY 1,2').fetchall()
+                for table in OWNER_TABLES}
+
+
+def fixture_policy(public_key) -> 'IdentityPolicy':
+    """The unchanged service verifier, trusting only ``public_key``."""
+    return IdentityPolicy(GatewayAssertionIdentityResolver(public_key, issuer=ISSUER,
+        audience=AUDIENCE, environment=ENVIRONMENT, expected_workspace_id=WORKSPACE,
+        allowed_repo_ids=frozenset({REPO_ID}), key_id=KEY_ID))
 
 
 @dataclass(frozen=True)
@@ -104,6 +167,13 @@ class IdentityPolicy:
         self.resolutions = 0
         self.observations: list[dict] = []
         self.owner_observations: list[dict] = []
+        # Optional sink for what each transport received (the ingress workload
+        # sets one to report header handling); None in the loopback checks.
+        self.wire_recorder = None
+
+    def wire(self, transport: str, headers, http_version: str | None):
+        if self.wire_recorder is not None:
+            self.wire_recorder(transport, [(str(k), str(v)) for k, v in headers], http_version)
 
     def resolve(self, headers, *, read: bool, envelope_request_id: str | None) -> Identity:
         with self._lock:
@@ -176,6 +246,7 @@ class AuthenticatedHandler(_VersionedHandler):
         return self.rfile.read(size) if size else b''
 
     def _authenticated(self, handler, *, read=False):
+        self.server.policy.wire('http', self.headers.items(), self.request_version)
         body = self._buffered_body()
         try:
             envelope = None if body is None else http_request_id(self.path, body)
@@ -218,6 +289,7 @@ class IdentityInterceptor(grpc.ServerInterceptor):
             raise ValueError('streaming is outside this unary qualification')
 
         def invoke(request, context):
+            self.policy.wire('grpc', context.invocation_metadata(), 'HTTP/2')
             envelope = message_request_id(request)
             try:
                 identity = self.policy.rpc(context.invocation_metadata(), details.method.rsplit('/', 1)[-1], envelope)
@@ -241,6 +313,7 @@ class IdentityMiddleware:
             await self.app(scope, receive, send)
             return
         headers = [(k.decode('ascii'), v.decode('latin1')) for k, v in scope['headers']]
+        self.policy.wire('connect-python', headers, 'HTTP/' + scope.get('http_version', '?'))
         body, size = [], 0
         while True:
             message = await receive()

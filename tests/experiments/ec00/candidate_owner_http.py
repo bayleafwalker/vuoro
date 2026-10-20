@@ -8,9 +8,16 @@ import base64
 from pathlib import Path
 import re
 import sqlite3
+import sys
 import threading
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
+
+# Self-contained generated-protobuf import path, so a serving workload need not
+# import the test modules (and their generated OpenAPI clients) to get it.
+_GENERATED_PROTOBUF = str(Path(__file__).resolve().parent / "generated/protobuf/python")
+if _GENERATED_PROTOBUF not in sys.path:
+    sys.path.insert(0, _GENERATED_PROTOBUF)
 
 from owner_oracle import Conflict, OwnerOracle, ResponseLost, material_digest
 from artifact_semantics import make_signed_artifact

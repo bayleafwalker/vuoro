@@ -1,0 +1,12 @@
+# Allow-list build context for the EC-00 ingress fixture image.
+*
+!packages/vuoro-service/src/vuoro_service/
+!tests/experiments/ec00/*.py
+!tests/experiments/ec00/generated/protobuf/python/
+!tests/experiments/ec00/generated/connect-python/
+!tests/experiments/ec00/ingress/serve_fixture.py
+!tests/experiments/ec00/candidates/pyproject.toml
+!tests/experiments/ec00/candidates/uv.lock
+**/__pycache__
+**/*.pem
+**/*.key
