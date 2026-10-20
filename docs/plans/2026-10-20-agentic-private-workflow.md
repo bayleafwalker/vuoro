@@ -14,6 +14,28 @@ Vuoro, Sovite and Vuoro Cloud, including agent identities and agent-led setup.
 This plan refines the existing product delivery plan B/D and Cloud CL-K06. It does
 not replace their owners, waive hosted rollout stops, or authorize production mutation.
 
+## Verified local result, 20 October 2026
+
+The real local C0 WF-01 now passes against the released Sovite Python 0.1.16
+owner wheel, Vuoro client 0.1.2/service 0.1.97, Sprintctl 0.22.0 and adapter kit
+0.2.2. The installed optional consumer completed setup, blocked dispatch, explicit
+development authorization, one actual model attempt, producer termination,
+durable receipt recovery, independent source/private-byte verification, acceptor
+countersignature and exactly one native Work acceptance in **38.656 seconds**.
+See the [complete bounded transcript](../../verification/specialized/private-workflow/accepted.json),
+[verification result](../../verification/results/private-workflow-2026-10-20.json)
+and [reproduction instructions](../../packages/vuoro-demo/README.md#real-private-handover-workflow).
+
+S-AI-02 and V-AI-01/02 are verified for this local C0 extraction contract. This
+closes the first read-only local WF-01 acceptance; S-AI-03, hosted C-AI-01/02,
+Cloud UI integration C-AI-03, restore and protected-operation gates stay open.
+The setup agent, verifier and accepting owner are separately authenticated
+scripted clients in separate evaluation roles/processes, not human review,
+federated agent identities or OS-level tenant isolation. Source/results never
+enter the bounded coordination transcript. The named profile is restricted to
+one pinned source fixture and approved uncertainty/action statements; it makes
+no general semantic-truth or maintenance-diagnosis claim.
+
 ## First workflow and measured outcome
 
 WF-01: prepare a household-service maintenance handover from a public fixture of
@@ -135,6 +157,37 @@ Sovite now has source implementation for S-AI-01: migration 4, opt-in installati
 identity, operator-minted bounded principals, owned proposals and operator-only
 activation. Its test uses the real policy/database/worker/storage code with a
 **deterministic** adapter, including blocked dispatch and retry. It establishes
-that slice only. No released Sovite owner adapter is currently composed for this
-new flow, no real-model WF-01 acceptance is recorded, and no hosted capability is
-enabled by these changes. The next gate is S-AI-02 and V-AI-01, not a broader demo.
+that slice only. That initial slice did not compose a released owner adapter or record real-model
+acceptance. The verified local result above supersedes that initial status; it
+does not enable a hosted capability or close broader product gates.
+
+### Execution history and remaining product work
+
+The original two Thinking-2507 attempts produced planning narratives; neither
+was accepted. Investigation identified the cached `qwen3:4b` alias as thinking
+only, and reproduced a separate truncated-output publication bug. Sovite 0.1.16
+fails closed on explicit truncation/filtering. The selected instruction model is
+`qwen3:4b-instruct-2507-q4_K_M`, digest
+`0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0`.
+
+This implementation session retained four development executions: one refused
+before inference for missing lifecycle authority, two completed inference but
+exposed incorrect consumer use of existing owner acceptance/lifecycle semantics,
+and the fourth passed. The first installed-wheel execution also reached native
+owner acceptance but its report stayed incomplete because a consumer assertion
+compared the intentionally different replay flag; that assertion was corrected.
+The second installed-wheel execution is the canonical 38.656-second passed
+transcript. Six SIGTERM/SIGINT fault executions across three test runs are separate cancellation tests,
+not successful workflow completions. Their private state/transcripts are retained
+locally; no failed execution is relabeled as a pass.
+
+Human interventions during the final scripted run: zero. Owner-role actions
+were scripted evaluation actions using dedicated local credentials; this is not
+an invited-user usability result or unattended production activation. Monetary
+cost and energy were not measured. The model had one admitted attempt in the
+final run; idempotent submission/recovery did not create another task.
+
+Next product step: Cloud's disabled capability and Work/Evidence projection
+must consume these bounded links under per-workspace live authority, then expose
+authorized source snippets through separate artifact access. The browser demo
+remains synthetic. No hosted route or existing live task was modified here.

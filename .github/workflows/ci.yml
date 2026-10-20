@@ -145,7 +145,8 @@ jobs:
         run: |
           set -euo pipefail
           uv venv --python 3.12 /tmp/vuoro-demo-conformance
-          uv pip install --no-config --python /tmp/vuoro-demo-conformance/bin/python dist/vuoro-demo/*.whl 'pytest>=8,<10'
+          wheels=(dist/vuoro-demo/*.whl)
+          uv pip install --no-config --python /tmp/vuoro-demo-conformance/bin/python "${wheels[0]}[private]" 'pytest>=8,<10'
           uv pip check --python /tmp/vuoro-demo-conformance/bin/python
           VUORO_DEMO_TEST_PG_BIN=/usr/lib/postgresql/16/bin \
             /tmp/vuoro-demo-conformance/bin/python -m pytest packages/vuoro-demo/tests -q

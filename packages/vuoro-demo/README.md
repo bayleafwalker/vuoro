@@ -3,7 +3,7 @@
 This optional distribution is a conformance consumer. It is not installed in
 the production service image, and adds no owner API, runner, state store or
 client transport behavior. Install the wheel in a fresh Python 3.12 environment;
-its metadata binds released client 0.1.2, service 0.1.92 and Sprintctl 0.18.0
+its metadata binds released client 0.1.2, service 0.1.97 and Sprintctl 0.22.0
 artifacts by URL and SHA256. PostgreSQL 16 tools and Git must be installed.
 
 Run as a **non-root Unix user**. From this checkout, install the optional
@@ -99,3 +99,52 @@ This proves client/process interruption and existing owner settlement on a
 disposable database. It does not prove database crash durability, hosted access,
 external patch execution or production rollout. Run standalone tests with the
 demo installed: `python -m pytest packages/vuoro-demo/tests`.
+
+## Real private handover workflow
+
+`vuoro private-workflow` is an additional local conformance consumer, distinct
+from the scripted `demo` and browser walkthrough. Install this package with its
+`private` extra for the immutable Sovite owner wheel. Start your own loopback
+Ollama service and explicitly install/select an instruction model. The command
+never pulls a model, accepts a production database, or enables hosted setup.
+
+```sh
+vuoro private-workflow --pg-bin /path/to/postgresql16/bin \
+  --model-endpoint http://127.0.0.1:11531 \
+  --model qwen3:4b-instruct-2507-q4_K_M \
+  --model-digest 0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0 \
+  --source /path/to/private-workflow-maintenance.json \
+  --state-dir /private/new-workflow-state --receipt /private/new-proof.json
+```
+
+Use the public C0 fixture at `docs/fixtures/private-workflow-maintenance.json`.
+Both destinations must be new. Private state is retained with mode 0700; the
+receipt is created with mode 0600. The operator must retain or remove that state
+explicitly. Services stop on completion, failure, SIGTERM and SIGINT; SIGKILL
+cannot guarantee cleanup. Never upload private state: it includes local keys,
+source/result artifacts and owned database state.
+
+A scoped setup identity proposes a model and agent. Only the owner activates
+that draft; the setup identity is then revoked. An initially unqualified task
+is refused before inference. After explicit **development-only** authorization,
+a producer submits the real task, saves a bounded receipt link in Work evidence,
+and is killed. Execution continues in Sovite. A new verifier recovers the saved
+link, separately reads source and private output, and appends its observation.
+
+This deliberately narrow profile checks exact M1–M3 source text, three approved
+uncertainty/action statements, unassigned owners and no verified outcomes.
+Free-form prose is refused rather than classified with keyword heuristics.
+These checks qualify only this extraction contract; they do not establish general
+reasoning quality, a real maintenance diagnosis, completed repairs or safety.
+The owner recovers that observation and rereads the exact private bytes before
+authoring its own protected receipt, as required by Sprintctl's accepting identity
+binding. Artifact acceptance and the final Work decision remain separate.
+
+Only opaque receipts, configuration/profile identifiers and content hashes enter
+Work/Evidence. The proposed Git patch contains a metadata manifest, never raw
+source/output, private storage addresses or credentials. The command exercises
+refusal of missing source, altered private/patch hashes, incomplete checks, stale
+producer access and producer/verifier acceptance. A retried owner decision must
+leave exactly one acceptance. This local bearer-identity scenario proves neither
+OAuth/agent identity federation, OS-level isolation, hosted qualification, nor a
+live vuoro.cloud deployment.

@@ -19,7 +19,7 @@ def command(arguments: list[str], root: Path):
 
 
 @contextmanager
-def fixture(root: Path, pg_bin: Path | None, *, state: dict):
+def fixture(root: Path, pg_bin: Path | None, *, state: dict, configure=None):
     state["cleanup"] = "not-started"
     tools = postgres_tools(pg_bin)
     from sprintctl import pg
@@ -73,7 +73,8 @@ def fixture(root: Path, pg_bin: Path | None, *, state: dict):
         else:
             raise AssertionError("runtime unexpectedly has DDL authority")
         registry = CatalogRegistry()
-        register_work_catalog(registry, WorkApplication.postgres(store))
+        application = WorkApplication.postgres(store)
+        register_work_catalog(registry, application)
         authorities = frozenset({"work:read", "work:write", "work:claim", "work:evidence", "work:batch",
             "work:sprint", "work:lifecycle"})
         tokens = {name: secrets.token_urlsafe(32) for name in ("A", "B", "verifier")}
@@ -82,6 +83,8 @@ def fixture(root: Path, pg_bin: Path | None, *, state: dict):
                 if name == "verifier" else {"work.effect.propose", "work.effect.get"}),
             repo_ids=frozenset({REPO}), workspace_id="demo",
             principal_id="demo:" + name + ":0") for name, token in tokens.items()}
+        if configure is not None:
+            configure(registry, application, identities, tokens)
         app = create_app(settings=ServiceSettings(environment_name=ENVIRONMENT,
             environment_class="development", compatibility_state="compatible"),
             registry=registry, identity_resolver=StaticBearerIdentityResolver(identities))

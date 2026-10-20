@@ -21,6 +21,9 @@ class DemoInterrupted(Exception):
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] == "private-workflow":
+        from .private_workflow import main as private_main
+        return private_main(argv[1:])
     if argv == ["_worker"]:
         from .scenario import worker
         value = json.load(sys.stdin)
@@ -28,6 +31,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     parser = argparse.ArgumentParser(prog="vuoro")
     sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("private-workflow", help="Run an owned local Sovite task through Work and Evidence acceptance (install private extra)")
     doctor = sub.add_parser("doctor", help="Check disposable-demo prerequisites without starting it")
     doctor.add_argument("--pg-bin", type=Path)
     doctor.add_argument("--json", action="store_true", help="Emit vuoro-demo-preflight/v1 JSON")
