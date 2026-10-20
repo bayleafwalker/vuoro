@@ -1,0 +1,86 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.e4-record-and-park",
+  "contract_ref": {
+    "doc_id": "vuoro-e4-rate-limit-record-and-park",
+    "revision": "sha256:7049793f972140ee6cf2eb4d8cb79b10702c69036c30b2adb671c27d39354355"
+  },
+  "implementation_sha": "679e1b5463e6be393489a5ac40732303a1fd12b6",
+  "depth": 2,
+  "environment": {
+    "backend": "built service0.1.97/edge0.1.8 wheels and immutable published Sprintctl0.22.0/Auditctl0.1.9/Workspace0.1.0 closure; disposable PostgreSQL16",
+    "isolation": "loopback disposable clusters; no production state; full source workspace separately",
+    "tool_versions": {
+      "python": "3.12.14",
+      "postgresql": "16.15",
+      "pytest": "8.4.2"
+    }
+  },
+  "execution": {
+    "seed": null,
+    "histories": 4,
+    "bounds": {
+      "e4_edge_cases_passed": 26,
+      "e4_published_composition_passed": 4,
+      "full_provider_conformance_passed": 136,
+      "full_provider_conformance_skipped": 3,
+      "source_workspace_passed": 3058,
+      "source_workspace_skipped": 146,
+      "boundary_cases_passed": 9,
+      "work_catalogue_operations": 106,
+      "composed_catalogue_operations": 129
+    },
+    "faults_exercised": [
+      "foreign run or repository",
+      "missing exact sequence",
+      "wrong kind or allowed warning",
+      "malformed bounded context",
+      "old owner catalogue",
+      "missing read or evidence authority",
+      "reclaim append refusal",
+      "later release from earlier-started owner transaction"
+    ]
+  },
+  "claims": [
+    {
+      "property": "Exact older denial citation survives evidence-tail advancement; owner parks/refuses until a separate explicit release; same/different declared-family reclaims append once on replay after another entry",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/tests/conformance/test_rate_limit_parking.py"
+      ]
+    },
+    {
+      "property": "Malformed/foreign/wrong-kind/warning evidence cannot reach report owner; old capability and absent caller scopes cannot undo a successful claim; unknown families stay unknown",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-mcp-edge/tests/test_rate_limit_parking.py"
+      ]
+    },
+    {
+      "property": "Published Sprintctl0.22.0 wheel SHA256 2783651fc835e3e6123a14e3b1ca7587f9920db3c76c79c6ac7fdf5869cb2ca3 is GitHub-attested to owner206e396c7ba36f1f6922cb445471b4182a725f4b; installed work metadata d92bd523b70fd848bc7bbbd65a7f9f90fc672e1d71412fbdaaac129bca5602e8 and composed catalogue127fed8e9a23acb01fcd4a64fa4a3a1380701e8985e6d95e79aea8cb21abdb7d matched",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/composition/adapter-pins.json",
+        "scripts/validate_released_work_adapter.py",
+        "scripts/validate_released_catalog_composition.py"
+      ]
+    },
+    {
+      "property": "Production consumer rollout and live native harness denial/reclaim acceptance",
+      "result": "unknown",
+      "evidence": [
+        "docs/plans/2026-10-10-e4-rate-limit-record-and-park.md"
+      ]
+    }
+  ],
+  "counterexamples": [],
+  "notes": [
+    "Full source workspace skips optional unconfigured owner/migration/browser fixtures; new four E4 published-owner histories ran separately with zero skips.",
+    "The complete provider run skips three separately provisioned owner-source/schema22/schema27 fixtures; it passed136 cases including all four new E4 histories.",
+    "Before repair, full workspace failed two stale reference-distribution version assertions; focused correction9passed and final full rerun3058passed.",
+    "Before updating the released owner validator, the old103-operation expectation failed against the actual106-operation owner.",
+    "Owner source independently proves two-connection acquisition history fencing and transaction preservation; consumer adds no owner state machine, scheduler or model selection.",
+    "implementation_sha binds source/context; this packet is an evidence-only follow-up.",
+    "Required settlement CI ran the separately provisioned schema21 upgrade and correctly failed its stale126-operation expectation against the measured129-operation composition. The shared schema22/schema27 expected count and fingerprint were corrected; those actual migration histories remain gated on CI."
+  ]
+}

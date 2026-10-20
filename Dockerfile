@@ -45,7 +45,7 @@ COPY packages/vuoro-evidence ./packages/vuoro-evidence
 # 3. The owner and shared wheels, from the hash-verified composition lock, as
 #    in CI. The shared adapter-kit is the one lock entry, not whichever
 #    release each owner's metadata names (auditctl 0.1.9 names kit 0.2.0;
-#    Sprintctl 0.20.0 names kit 0.2.2). The knowledge owner
+#    Sprintctl 0.22.0 names kit 0.2.2). The knowledge owner
 #    (vuoro-workspace 0.1.0) ships its `vuoro-workspace migrate` operator
 #    entrypoint in the same wheel.
 # `pip check` then proves the closure is complete. The attestation below

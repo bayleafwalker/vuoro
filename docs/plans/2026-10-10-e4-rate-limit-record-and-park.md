@@ -187,7 +187,7 @@ filter `parked=refillable` on `list_ready_work`'s sibling read is optional):
 {
   "parked": {
     "event_id": 4711,
-    "reason_ref": "vuoro-evidence:run-…/sha256:…",
+    "reason_ref": "vuoro-evidence:run_…/seq/0",
     "parked_at": "2026-10-10T12:00:00Z",
     "rate_limit": {"limit_scope": "family", "model_family": "claude-opus",
                    "resets_at": "2026-10-10T17:00:00Z"},
@@ -235,7 +235,7 @@ trigger fires, the edge appends to the claiming run's chain:
 |---|---|
 | `kind` | `parked_reclaim` |
 | `claims[]` | `{claim_type: "observation", subject: "item:<item_id>"}` |
-| `provenance.observation` | `{schema: "vuoro-parked-reclaim/v1", parked_event_id, parked_reason_ref, predecessor_run_id, predecessor_model_id, predecessor_model_family, model_id, model_family, same_family: bool}` |
+| `provenance.observation` | `{schema: "vuoro-parked-reclaim/v1", parked_event_id, parked_reason_ref, predecessor_run_id, predecessor_model_id, predecessor_model_family, model_id, model_family, same_family: bool or null}` |
 | `idempotency_key` | `parked-reclaim:<lease_id>` |
 
 If the append fails, the claim still stands and the failure is returned as a
@@ -295,6 +295,42 @@ The falsifiable bet from the edge plan (:336) stands: if parked claims
 routinely sit long enough to matter, the answer is spend, not prediction.
 The `refillable` read and the parked-age of each `work.parked` give that
 measurement directly.
+
+### 2026-10-20 implementation amendment (agentops#2826)
+
+The tail alone cannot resolve an older cited entry. The owner now provides
+the additive, read-only `work.evidence.entry-v1` operation, requiring the
+same full caller/run binding and `work:evidence`. The edge requires this
+catalogue capability for evidence refs and never substitutes the tail.
+Only a recorded rejected denial justifies an evidence-referenced park.
+
+The general item history does not authorize reading a predecessor's private
+chain under the successor's identity. Instead, the owner publishes
+`work.lease.parking-context-v1` (`work:read`), accepting only an item and
+optional lease ID. It derives the current park and exact park/release pair
+before that lease began, joins the work's cited report and immutable model
+declarations, and publishes only seven validated denial scalars. The lease
+acquisition event ID fixes the history cutoff; event timestamps are audit
+data because PostgreSQL timestamps them at transaction start. The rate
+projection is null for malformed/digest-mismatched/warning/foreign evidence.
+The predecessor's refs, claims, collector, arbitrary provenance and remaining
+chain stay private. This bounded publication follows the explicit parking
+citation; it does not widen private evidence reads.
+
+`describe_work` adds `parked` when the owner advertises this read capability.
+`refillable` uses the returned owner clock, the recorded reset or 24-hour
+park age, and is false when the denial cannot be verified. No release is
+performed. An older owner keeps its existing public-work description.
+
+Successful claims try to append the reclaim observation only with the
+caller's existing `work:read` and `work:evidence` scopes and the new owner
+capability. Missing authority/capability or append failure returns a warning
+and preserves the claim. The lease's stable acquisition time and ID bind
+the observation, so a resumed claim replays the same append even when later
+entries have advanced the tail. No credential, scope or model is substituted.
+An unclassified family is recorded; `same_family` is null if either family
+is unclassified. Sharing the unknown label is not evidence of sharing a
+model family.
 
 ## 6. Migration
 

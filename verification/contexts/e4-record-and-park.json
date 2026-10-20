@@ -1,0 +1,102 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.e4-record-and-park",
+  "owner_repo": "vuoro",
+  "subject": "Exact denial validation, owner parking and observational reclaim with published Sprintctl0.22.0",
+  "contract_ref": {
+    "doc_id": "vuoro-e4-rate-limit-record-and-park",
+    "revision": "sha256:7049793f972140ee6cf2eb4d8cb79b10702c69036c30b2adb671c27d39354355"
+  },
+  "source_of_truth": "Sprintctl immutable run/evidence and item-serialized lease/report/event history",
+  "depth": 2,
+  "backends": [
+    "published Sprintctl0.22.0 wheel",
+    "disposable PostgreSQL16",
+    "real edge HTTP transport"
+  ],
+  "actors": [
+    "reporting run owner",
+    "successor with a different principal",
+    "work-only reader",
+    "older concurrent owner transaction"
+  ],
+  "operations": [
+    {
+      "name": "append denial and a later evidence entry"
+    },
+    {
+      "name": "park using exact earlier evidence"
+    },
+    {
+      "name": "refuse parked claim"
+    },
+    {
+      "name": "explicit release to pending"
+    },
+    {
+      "name": "successor claim and observed reclaim"
+    },
+    {
+      "name": "replay claim after another evidence append"
+    },
+    {
+      "name": "derive reset projection from owner clock"
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "owner-only transitions, exact evidence ownership and immutable per-lease provenance"
+  },
+  "assumptions": {
+    "isolation": "owner READ COMMITTED, disposable loopback PostgreSQL",
+    "clock": "owner evaluated_at and acquisition events; no edge clock or timers",
+    "authority": "same forwarded caller; no added credential or delegated surface"
+  },
+  "bounds": {
+    "edge_unit_cases": 26,
+    "owner_exact_read_cases": 7,
+    "owner_parking_cases": 14,
+    "real_edge_owner_histories": 4,
+    "owner_concurrent_connections": 2
+  },
+  "invariants": [
+    "Only exact own-run rejected rate-limit evidence may justify a rate-limit report",
+    "No park, release, retry, schedule or model choice is invented by the edge",
+    "Bounded read never exposes private predecessor evidence or caller authority",
+    "Successful owner claim survives observational failures",
+    "Reclaim append is idempotent after the evidence tail advances",
+    "Unclassified model families produce unknown same_family, never an invented match",
+    "Owner acquisition event fences previous release history independently of transaction-start timestamps"
+  ],
+  "faults": [
+    "foreign run or repository",
+    "missing exact sequence",
+    "wrong kind or allowed warning",
+    "malformed bounded context",
+    "old owner catalogue",
+    "missing read or evidence authority",
+    "reclaim append refusal",
+    "later release from earlier-started owner transaction"
+  ],
+  "oracles": [
+    "test_rate_limit_parking.py exact forwarded envelopes and owner-call absence",
+    "test_rate_limit_parking.py four actual published-owner edge histories over disposable PostgreSQL",
+    "actual owner PG exact reads and two-connection parking-history tests",
+    "published wheel SHA256 and GitHub attestation",
+    "installed catalogue count and fingerprint"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-mcp-edge/src/vuoro_mcp_edge/claim_tools.py",
+    "packages/vuoro-mcp-edge/src/vuoro_mcp_edge/record_tools.py",
+    "packages/vuoro-mcp-edge/src/vuoro_mcp_edge/parking.py",
+    "packages/vuoro-mcp-edge/src/vuoro_mcp_edge/rate_limit_records.py",
+    "packages/vuoro-mcp-edge/tests/test_rate_limit_parking.py",
+    "packages/vuoro-service/composition/adapter-pins.json",
+    "scripts/validate_released_catalog_composition.py",
+    "packages/vuoro-service/tests/conformance/test_rate_limit_parking.py"
+  ],
+  "expansions": [
+    "semantic-doc",
+    "fault-scenario"
+  ]
+}

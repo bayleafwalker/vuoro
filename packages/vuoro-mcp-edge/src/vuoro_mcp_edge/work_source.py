@@ -37,6 +37,8 @@ from .contract import (
     validate_list_result,
 )
 from .errors import WorkSourceUnavailable
+from .parking import OPERATION as PARKING_OPERATION, current_projection, validate_context
+from .toolsets import ToolFailure
 
 if TYPE_CHECKING:
     from vuoro_service.identity import Identity
@@ -125,7 +127,16 @@ class ShellWorkSource:
         """`work.public.item-v1`: one item, validated.  Not-found is an error."""
 
         result = await self._invoke(OPERATION_ITEM, {"work_id": work_id}, identity)
-        return validate_item_result(result, work_id=work_id)
+        description = validate_item_result(result, work_id=work_id)
+        if PARKING_OPERATION in self._read_operations:
+            try:
+                facts = validate_context(await self._invoke(
+                    PARKING_OPERATION, {"item_id": work_id}, identity, require_read=True
+                ), repo_id=identity.repo_id, item_id=work_id)
+                description["parked"] = current_projection(facts)
+            except ToolFailure as failure:
+                raise WorkSourceUnavailable(failure.code, failure.message) from failure
+        return description
 
     # -- transport -----------------------------------------------------------
 

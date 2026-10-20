@@ -33,8 +33,8 @@ from .test_bound_proposal_http import assert_installed_composition
 
 pytestmark = pytest.mark.essential_safety
 
-CATALOG_REVISION = '37292f51f8cbc643e34c57cd122dcb584e97bca3ca001adaa1fc430b14d02ebc'
-CATALOG_TOTAL = 126
+CATALOG_REVISION = '127fed8e9a23acb01fcd4a64fa4a3a1380701e8985e6d95e79aea8cb21abdb7d'
+CATALOG_TOTAL = 129
 INBOX_OPERATIONS = ('work.agent.register-v1', 'work.agent.observe-v1', 'work.agent.retire-v1',
                     'work.agent.list-v1', 'work.agent.describe-v1', 'work.message.send-v1',
                     'work.message.read-v1', 'work.message.status-v1', 'work.message.receipt-v1',
@@ -316,7 +316,7 @@ def test_actual_schema25_refusal_explicit27_cli_migration_and_runtime_ddl_denial
         response = client.get('/api/meta/v1/handshake', headers={'X-Vuoro-Client-Protocol': '1'})
         assert response.status_code == 200, response.json()
         handshake = response.json()
-        assert handshake['service_version'] == '0.1.96' and handshake['compatibility']['state'] == 'compatible'
+        assert handshake['service_version'] == '0.1.97' and handshake['compatibility']['state'] == 'compatible'
         assert all(x['state'] == 'compatible' for x in handshake['compatibility']['domains'].values())
         catalog = client.get('/api/catalog/v1', headers={'X-Vuoro-Client-Protocol': '1'}).json()
         assert len(catalog['operations']) == CATALOG_TOTAL
