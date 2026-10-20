@@ -1,0 +1,114 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.private-workflow-v1",
+  "owner_repo": "vuoro",
+  "subject": "C0 private task receipt \u2192 independently read artifact \u2192 owner Work/Evidence acceptance",
+  "contract_ref": {
+    "doc_id": "vuoro-agentic-private-workflow-2026-10-20",
+    "revision": "sha256:42eabea3cae52b3d456c4fd5c73ad11751460cae51ed16b15caf3616bef570b8"
+  },
+  "source_of_truth": "Sovite task/private artifact owner and released Sprintctl Work, run/evidence, artifact intent and decision authorities; consumer owns no domain state machine",
+  "depth": 2,
+  "backends": [
+    "Sovite SQLite private fixture",
+    "released Sprintctl PostgreSQL 16.15 owner"
+  ],
+  "actors": [
+    "bounded setup agent",
+    "operator",
+    "task producer",
+    "stager",
+    "independent verifier",
+    "accepting owner"
+  ],
+  "initial_state": [
+    "New owned local state; pinned public C0 fixture; explicit loopback instruction model",
+    "No hosted capability or production qualification"
+  ],
+  "operations": [
+    {
+      "name": "draft/create/activate/revoke",
+      "actors": "*"
+    },
+    {
+      "name": "private task request/retry/status",
+      "actors": "*"
+    },
+    {
+      "name": "durable evidence append and predecessor recovery",
+      "actors": "*"
+    },
+    {
+      "name": "authorized source/private artifact read",
+      "actors": "*"
+    },
+    {
+      "name": "source contract verification",
+      "actors": "*"
+    },
+    {
+      "name": "bound manifest proposal and acceptor receipt",
+      "actors": "*"
+    },
+    {
+      "name": "artifact acceptance then Work decision/replay",
+      "actors": "*"
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "private receipt correlation, evidence and acceptance"
+  },
+  "assumptions": {
+    "isolation": "Separate evaluation bearer identities/processes under one Unix user, not an OS tenant isolation boundary",
+    "clock": "Real wall clock; one-day explicit development authorization",
+    "fairness": "A reachable local model completes within the grant timeout; no distributed liveness claim"
+  },
+  "bounds": {
+    "work_items": 1,
+    "final_model_attempts": 1,
+    "source_snippets": 3,
+    "consumer_tests": 53,
+    "hosted": false
+  },
+  "invariants": [
+    "Only the configured current authenticated Work attempt invokes its dedicated local Sovite capability",
+    "Interrupted producer recovers via durable receipt without replaying another task",
+    "Exact source/result bytes satisfy the pinned bounded handover contract before protected receipt acceptance",
+    "Independent verifier observation remains distinct from the acceptor-owned protected receipt and final Work decision",
+    "No source snippet, private result body, storage address or credential crosses Work/Evidence",
+    "Decision retry returns same persisted decision and creates one acceptance",
+    "Normal cancellation stops the owned services and cannot report passed"
+  ],
+  "faults": [
+    "agent activation refusal and revoked setup principal",
+    "unqualified dispatch then explicit development-only authorization",
+    "producer SIGKILL after durable receipt, before task reconciliation",
+    "same task submission key returns same receipt",
+    "missing authorized source",
+    "wrong private artifact digest",
+    "wrong metadata patch digest",
+    "missing frozen profile check",
+    "superseded producer request",
+    "producer/verifier acceptance attempts",
+    "foreign accepting identity receipt",
+    "owner revision mismatch",
+    "owner decision replay",
+    "SIGTERM and SIGINT after dispatch; API, worker and PostgreSQL exit",
+    "invented cause with uncertainty keyword and unrelated source fixture"
+  ],
+  "oracles": [
+    "Actual native HTTP refusal/results and final one-decision Work projection",
+    "verification/specialized/private-workflow/accepted.json",
+    "Independent source/private artifact reads and exact profile/hash checks",
+    "Real subprocess cancellation and PID termination checks"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-demo/src/vuoro_demo/private_workflow.py:configure_capability",
+    "packages/vuoro-demo/src/vuoro_demo/private_workflow.py:producer",
+    "packages/vuoro-demo/src/vuoro_demo/private_workflow.py:verifier",
+    "packages/vuoro-demo/src/vuoro_demo/private_workflow.py:owner_verification",
+    "packages/vuoro-demo/src/vuoro_demo/private_workflow.py:execute",
+    "packages/vuoro-demo/src/vuoro_demo/private_profile.py:verify"
+  ]
+}

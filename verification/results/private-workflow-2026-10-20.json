@@ -1,0 +1,146 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.private-workflow-v1",
+  "contract_ref": {
+    "doc_id": "vuoro-agentic-private-workflow-2026-10-20",
+    "revision": "sha256:42eabea3cae52b3d456c4fd5c73ad11751460cae51ed16b15caf3616bef570b8"
+  },
+  "implementation_sha": "2a76bd79560c198e5b12555c40be952ad7b52c67",
+  "depth": 2,
+  "environment": {
+    "backend": "Owned PostgreSQL16.15 + Sovite SQLite + actual Ollama CPU model",
+    "isolation": "Local disposable fixture; private state retained outside source checkout, API/worker children lack signing key environment",
+    "tool_versions": {
+      "python": "3.12.14",
+      "pytest": "8.4.2",
+      "postgresql": "16.15",
+      "ollama": "0.40.6",
+      "vuoro-client": "0.1.2",
+      "vuoro-service": "0.1.97",
+      "sprintctl": "0.22.0",
+      "sovite-platform": "0.1.16",
+      "vuoro-adapter-kit": "0.2.2"
+    }
+  },
+  "execution": {
+    "histories": 1,
+    "bounds": {
+      "source_class": "C0",
+      "source_snippets": 3,
+      "model_attempts": 1,
+      "elapsed_seconds": "38.656",
+      "consumer_tests_passed": 53,
+      "consumer_tests_skipped": 0,
+      "profile_falsifiers": 14,
+      "cancellation_runs_in_session": 6,
+      "hosted": false
+    },
+    "faults_exercised": [
+      "agent activation refusal and revoked setup principal",
+      "unqualified dispatch then explicit development-only authorization",
+      "producer SIGKILL after durable receipt, before task reconciliation",
+      "same task submission key returns same receipt",
+      "missing authorized source",
+      "wrong private artifact digest",
+      "wrong metadata patch digest",
+      "missing frozen profile check",
+      "superseded producer request",
+      "producer/verifier acceptance attempts",
+      "foreign accepting identity receipt",
+      "owner revision mismatch",
+      "owner decision replay",
+      "SIGTERM and SIGINT after dispatch; API, worker and PostgreSQL exit",
+      "invented cause with uncertainty keyword and unrelated source fixture"
+    ]
+  },
+  "claims": [
+    {
+      "property": "Only the configured current authenticated Work attempt invokes its dedicated local Sovite capability",
+      "result": "example-tested",
+      "evidence": [
+        "verification/specialized/private-workflow/accepted.json",
+        "packages/vuoro-demo/tests/test_private_profile.py",
+        "packages/vuoro-demo/tests/test_private_workflow.py"
+      ]
+    },
+    {
+      "property": "Interrupted producer recovers via durable receipt without replaying another task",
+      "result": "example-tested",
+      "evidence": [
+        "verification/specialized/private-workflow/accepted.json",
+        "packages/vuoro-demo/tests/test_private_profile.py",
+        "packages/vuoro-demo/tests/test_private_workflow.py"
+      ]
+    },
+    {
+      "property": "Exact source/result bytes satisfy the pinned bounded handover contract before protected receipt acceptance",
+      "result": "example-tested",
+      "evidence": [
+        "verification/specialized/private-workflow/accepted.json",
+        "packages/vuoro-demo/tests/test_private_profile.py",
+        "packages/vuoro-demo/tests/test_private_workflow.py"
+      ]
+    },
+    {
+      "property": "Independent verifier observation remains distinct from the acceptor-owned protected receipt and final Work decision",
+      "result": "example-tested",
+      "evidence": [
+        "verification/specialized/private-workflow/accepted.json",
+        "packages/vuoro-demo/tests/test_private_profile.py",
+        "packages/vuoro-demo/tests/test_private_workflow.py"
+      ]
+    },
+    {
+      "property": "No source snippet, private result body, storage address or credential crosses Work/Evidence",
+      "result": "example-tested",
+      "evidence": [
+        "verification/specialized/private-workflow/accepted.json",
+        "packages/vuoro-demo/tests/test_private_profile.py",
+        "packages/vuoro-demo/tests/test_private_workflow.py"
+      ]
+    },
+    {
+      "property": "Decision retry returns same persisted decision and creates one acceptance",
+      "result": "example-tested",
+      "evidence": [
+        "verification/specialized/private-workflow/accepted.json",
+        "packages/vuoro-demo/tests/test_private_profile.py",
+        "packages/vuoro-demo/tests/test_private_workflow.py"
+      ]
+    },
+    {
+      "property": "Normal cancellation stops the owned services and cannot report passed",
+      "result": "example-tested",
+      "evidence": [
+        "verification/specialized/private-workflow/accepted.json",
+        "packages/vuoro-demo/tests/test_private_profile.py",
+        "packages/vuoro-demo/tests/test_private_workflow.py"
+      ]
+    }
+  ],
+  "counterexamples": [
+    {
+      "summary": "Two earlier thinking-only runs were incomplete planning narratives and were not accepted."
+    },
+    {
+      "summary": "Development runs exposed missing lifecycle authority, foreign receipt identity and pending-item acceptance refusal. Consumers were corrected without owner bypasses."
+    },
+    {
+      "summary": "Keyword-based verification accepted invented causes; exact source-specific statements and pinned fixture reject both that case and unrelated source reuse."
+    },
+    {
+      "summary": "First wheel execution accepted Work but report remained incomplete because replay flag differs by design. Stable decision comparison fixed; second wheel execution is the preserved passed transcript."
+    }
+  ],
+  "notes": [
+    "Full receipt SHA256 318a7f6ea165e5beaba58e2629c747de1c613f715de1f8b99e9b9e123d314804",
+    "Tested Sovite wheel SHA256 8db91f47d7f3a2f6c450638863373ba30eb1c79d71e0bd1ce410de112997f503 matches independent download from https://github.com/bayleafwalker/sovite/releases/tag/v0.1.16",
+    "Sovite merged PR3 at 1bd42dbcd0745f3a46fc63c23e1991a05abb9f29; its 903-test local PostgreSQL/SQLite run and CI passed.",
+    "Installed wheels, no editable owner dependency, used by the final CLI and spawned processes.",
+    "Final run used one real model task; same-key retry reused receipt. Earlier development histories, wheel-report failure and six cancellation histories retained separately.",
+    "Accepting owner rereads bytes and countersigns after independent verifier observation; current Sprintctl binds its protected receipt to the acceptor. No generalized independent-verifier receipt protocol is claimed.",
+    "Private state contains keys and raw C0 output and is not committed; coordination transcript has only bounded metadata.",
+    "Independent findings-first review completed, all targeted findings closed.",
+    "No human intervention in final scripted run; human review, provider federation, hosted two-workspace qualification, restore, protected-operation gates and monetary/energy cost remain unmeasured/unclosed."
+  ]
+}
