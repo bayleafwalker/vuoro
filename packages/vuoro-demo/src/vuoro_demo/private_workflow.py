@@ -838,7 +838,10 @@ async def execute(endpoint, tokens, root, source, evaluation, setup, holder, ste
             },
             key="wf01-accept",
         )
-        if repeated != decision:
+        if (
+            repeated["decision"] != decision["decision"]
+            or repeated.get("replayed") is not True
+        ):
             raise RuntimeError("Owner decision retry changed the result")
         decisions = (await owner.call("work.read.item-decisions", {"item_id": item}))[
             "decisions"
