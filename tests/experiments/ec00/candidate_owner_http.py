@@ -22,12 +22,13 @@ import grpc
 class _Server(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, path: Path, principal_id: str, fault_plan: set[tuple[str, str]] | None = None):
+    def __init__(self, path: Path, principal_id: str, fault_plan: set[tuple[str, str]] | None = None,
+                 address: tuple[str, int] = ("127.0.0.1", 0)):
         self.db_path = path
         self.principal_id = principal_id
         self.fault_plan = set(fault_plan or ())
         self.fault_consumed: set[tuple[str, str]] = set()
-        super().__init__(("127.0.0.1", 0), _Handler)
+        super().__init__(address, _Handler)
 
     def owner_call(self, operation: str, *args: Any, **kwargs: Any) -> dict[str, Any]:
         once_operation = {

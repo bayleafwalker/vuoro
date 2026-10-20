@@ -41,7 +41,7 @@ class _Context:
 class DirectConnectServer:
     """One Python process, no gRPC forwarding hop and no additional owner store."""
     def __init__(self, path, principal_id='requester-a', fault_plan=None, *,
-                 owner_factory=_Server, middleware=None):
+                 owner_factory=_Server, middleware=None, address=('127.0.0.1', 0)):
         self.owner = owner_factory(path, principal_id, fault_plan)
         projection = _GrpcOwner(SimpleNamespace(httpd=self.owner))
         def method(rpc):
@@ -59,7 +59,8 @@ class DirectConnectServer:
             return invoke
         service = type('DirectOwnerProjection', (), {name: method(rpc) for name, rpc in METHODS.items()})()
         self.socket = socket.socket()
-        self.socket.bind(('127.0.0.1', 0))
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket.bind(address)
         self.socket.listen(64)
         application = OwnerOperationsASGIApplication(service)
         if middleware is not None:

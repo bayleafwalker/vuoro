@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { createInterface } from "node:readline";
 import process from "node:process";
 import type { HandlerContext } from "@connectrpc/connect";
@@ -51,13 +52,46 @@ for (const method of OwnerOperations.methods) {
   };
 }
 
-const server = createServer(
-  connectNodeAdapter({
-    routes(router) {
-      router.service(OwnerOperations, implementation as never);
-    },
-  }),
-);
+// Fetch-style `Headers.get` joins repeated fields with ", ", which would turn two
+// assertions into one malformed value. Repeated identity or correlation fields
+// are ambiguous, so they are counted in the raw header list and refused here,
+// before any upstream call, with the same unauthenticated outcome as the owner.
+const SINGLE_VALUED = new Set(["x-vuoro-identity", "x-request-id"]);
+const DUPLICATE_REFUSAL = "duplicate identity or correlation header refused";
+
+function repeatedSingleValued(rawHeaders: string[]): string | undefined {
+  const seen = new Set<string>();
+  for (let index = 0; index < rawHeaders.length; index += 2) {
+    const name = rawHeaders[index]!.toLowerCase();
+    if (!SINGLE_VALUED.has(name)) continue;
+    if (seen.has(name)) return name;
+    seen.add(name);
+  }
+  return undefined;
+}
+
+const adapter = connectNodeAdapter({
+  routes(router) {
+    router.service(OwnerOperations, implementation as never);
+  },
+});
+
+const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+  const repeated = repeatedSingleValued(request.rawHeaders);
+  if (repeated === undefined) {
+    adapter(request, response);
+    return;
+  }
+  // Connect unary error shape: HTTP 401 with a JSON {code, message} body.
+  const body = JSON.stringify({ code: "unauthenticated", message: DUPLICATE_REFUSAL });
+  request.resume();
+  response.writeHead(401, {
+    "content-type": "application/json",
+    "content-length": Buffer.byteLength(body),
+    "x-ec00-edge-refusal": "duplicate-header",
+  });
+  response.end(body);
+});
 
 server.listen(0, "127.0.0.1", () => {
   const address = server.address();
