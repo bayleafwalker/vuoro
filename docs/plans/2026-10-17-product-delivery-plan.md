@@ -14,6 +14,11 @@ related: [vuoro-knowledge-workspace-phase0, vuoro-knowledge-workspace-roadmap]
 
 This plan participates in the cross-estate dependency map at [AgentOps estate evolution plan](https://github.com/bayleafwalker/agentops/blob/main/docs/plans/agentops/2026-10-17-estate-evolution-plan.md). It records product work and acceptance, not Sprintctl work-item state.
 
+The concrete setup/identity/workflow implementation sequence is in the
+[agent-led private workflow plan](2026-10-20-agentic-private-workflow.md). Its first
+read-only artifact workflow starts delivery without closing the protected-operation
+gate in B.
+
 ## Product outcome
 
 Carry a human objective across agents, sessions, providers and environments through an operation that the responsible authority accepts, retaining the work identity, authority, evidence, knowledge and recovery information needed to explain and continue it. The operating outcome is reliable household services with declining operator effort. Vuoro supplies the portable contracts and operated workflow; domain products own their domain experience and truth.
