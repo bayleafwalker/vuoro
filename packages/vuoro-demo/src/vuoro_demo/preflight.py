@@ -12,8 +12,8 @@ import sys
 
 QUALIFIED_VERSIONS = {
     "vuoro-client": "0.1.2",
-    "vuoro-service": "0.1.92",
-    "sprintctl": "0.18.0",
+    "vuoro-service": "0.1.97",
+    "sprintctl": "0.22.0",
 }
 
 

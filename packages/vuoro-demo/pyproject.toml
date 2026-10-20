@@ -4,13 +4,18 @@ build-backend = "hatchling.build"
 
 [project]
 name = "vuoro-demo"
-version = "0.1.0"
+version = "0.1.1"
 description = "Optional disposable native-client settlement conformance demonstration"
 requires-python = ">=3.12"
 dependencies = [
   "vuoro-client @ https://github.com/bayleafwalker/vuoro/releases/download/vuoro-client-v0.1.2/vuoro_client-0.1.2-py3-none-any.whl#sha256=7a4f32d4e2531a1abc99f5dc017fb8f6f22c4a1ef191079b98808be897081660",
-  "vuoro-service @ https://github.com/bayleafwalker/vuoro/releases/download/vuoro-service-v0.1.92/vuoro_service-0.1.92-py3-none-any.whl#sha256=e700596f5e3cf3eda4cec34ec4c4149ca0a9adf1f364404214f53d10b7c154ec",
-  "sprintctl[remote] @ https://github.com/bayleafwalker/sprintctl/releases/download/v0.18.0/sprintctl-0.18.0-py3-none-any.whl#sha256=3fcbdaa5b56d18fe8a5b744195b143f2bd57fe221123ba1d567a8c4b198e2850",
+  "vuoro-service @ https://github.com/bayleafwalker/vuoro/releases/download/vuoro-service-v0.1.97/vuoro_service-0.1.97-py3-none-any.whl#sha256=38b08a352617d88592dbc93da0f91afc1d5f5f230729761ca7e041de9fb32a56",
+  "sprintctl[remote] @ https://github.com/bayleafwalker/sprintctl/releases/download/v0.22.0/sprintctl-0.22.0-py3-none-any.whl#sha256=2783651fc835e3e6123a14e3b1ca7587f9920db3c76c79c6ac7fdf5869cb2ca3",
+]
+
+[project.optional-dependencies]
+private = [
+  "sovite-platform @ https://github.com/bayleafwalker/sovite/releases/download/v0.1.16/sovite_platform-0.1.16-py3-none-any.whl#sha256=8db91f47d7f3a2f6c450638863373ba30eb1c79d71e0bd1ce410de112997f503",
 ]
 
 [project.scripts]
