@@ -1,0 +1,17 @@
+{
+  "schema_version": "vuoro-case-set/v1",
+  "name": "synthetic-comparison-fixture",
+  "version": 1,
+  "description": "Synthetic cases for the comparison contract tests. Not drawn from real work.",
+  "cases": [
+    {"case_id": "c1", "workload": "docs", "source_ref": "fixture:c1", "observed_on": "2026-09-03",
+     "criteria": {"kind": "pass_fail", "statement": "Owner accepts the edited page."}},
+    {"case_id": "c2", "workload": "docs", "source_ref": "fixture:c2", "observed_on": "2026-09-14",
+     "criteria": {"kind": "pass_fail", "statement": "Owner accepts the edited page."}},
+    {"case_id": "c3", "workload": "code", "source_ref": "fixture:c3", "observed_on": "2026-10-02",
+     "criteria": {"kind": "scored", "statement": "Targeted tests pass.", "max_score": 10, "pass_score": 8}},
+    {"case_id": "c4", "workload": "code", "source_ref": "fixture:c4",
+     "criteria": {"kind": "pass_fail", "statement": "Owner accepts the change."}}
+  ],
+  "limitations": ["Synthetic fixture; selection is not representative of any real workload."]
+}
