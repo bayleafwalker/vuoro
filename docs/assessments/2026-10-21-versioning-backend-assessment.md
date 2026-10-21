@@ -11,21 +11,41 @@ related: [vuoro-knowledge-workspace-phase0, vuoro-knowledge-resolution, vuoro-ac
 # Versioning backend for knowledge and agent definitions
 
 Status: draft proposal, 2026-10-21, assessed against Vuoro at the head of
-`claude/ecstatic-albattani-ahk3vi`. Input: an external proposal to build a
-gitoxide-based versioning backend that would "branch, compare, review, publish
-and reconstruct the knowledge and definitions an agent operates with". This
-record assesses it, strengthens it, submits it to an adversarial review, and
-rebuilds it as the strongest concept that fits this estate. Nothing here is
-ratified, changes a component disposition, or authorizes a migration.
+`claude/ecstatic-albattani-ahk3vi`. Originating question from the owner: "A
+new back end implementation of git using existing opensource projects as a
+fork, to implement knowledge and agentic ecosystem versioning in
+vuoro.cloud." Input: an external proposal answering it with a gitoxide-based
+backend that would "branch, compare, review, publish and reconstruct the
+knowledge and definitions an agent operates with". The owner clarified that
+the intent is for Vuoro to *offer* such a backend to tools like Sovite for
+their own revisioned state, not to own or replace those tools.
 
-**Recommendation.** Build the capability, not the engine. Vuoro versions
-*compositions*: each component keeps its own authority (Git for repository
-documentation, PostgreSQL for workspace collections, Sovite for agent and model
-definitions), and Vuoro adds collection-level publications, candidate
-selections, derived conflicts, typed diff, a context field on the run
-manifest, and Git-readable export. No Git-authoritative store, no merge
-engine, no new owner for agent definitions. Four increments, each behind its
-own risk surface.
+This record assesses the proposal, strengthens it, submits it to two
+adversarial reviews (one against the first rebuild, one against the clarified
+"backend offered to owners" reading), and rebuilds it as the strongest concept
+that fits this estate. Nothing here is ratified, changes a component
+disposition, or authorizes a migration.
+
+**Recommendation.** Build the capability and the reference, not the engine or
+the fork. Three things survive both reviews:
+
+1. A **uniform revision reference** (`RevisionRef`) in `vuoro-evidence`, so a
+   Sovite generation, a workspace publication and a repository document
+   revision are cited the same way on the run manifest and compared the same
+   way in experiment records. This is the part of "ecosystem versioning" no
+   supplier ships.
+2. **Collection-level publications and candidate selections** in the
+   PostgreSQL workspace store, with derived conflicts, typed diff and a
+   Git-readable export rendering (§4).
+3. A **Git source-resolution kit** generalized from `vuoro-knowledge`, which an
+   owner like Sovite can embed to bind a definition generation to the exact
+   Git objects of files people author in repositories (§7). This is the
+   Git-based backend for Sovite that holds up: Git is the authority where
+   people author with review; Sovite stays the authority for state.
+
+Not recommended: a Vuoro-run Git object database per installation as the
+content store behind owners' PostgreSQL state, and any fork of gitoxide,
+dulwich, libgit2, Jujutsu or Dolt. §8 records why and what would reopen it.
 
 ## 1. Optimistic assessment
 
@@ -73,15 +93,19 @@ problem it warns about itself. Nothing in its capability list needs Git to be
 the authority. Git's unique contribution is a portable, tool-readable
 serialization, which is an export concern (roadmap Phase 4).
 
-**Agent and environment definitions as Vuoro-versioned objects.** The private
-workflow plan assigns configuration, admission, execution and receipts to
+**Agent and environment definitions as Vuoro-versioned objects.** The
+proposal's object table lists agent and environment definitions as things the
+backend versions. Read as ownership, that collides with the private workflow
+plan, which assigns configuration, admission, execution and receipts to
 Sovite, with owned drafts, owner-only activation and qualification tied to the
-exact revision. The direction says `RecipeRevision` and `AgentProfileRevision`
-name comparison inputs and never compile or enforce. Vuoro therefore records
-references to Sovite revisions and never owns them. The proposal's merge
-example (one agent switches to a remote model, another widens data
-classification, the text merges, the policy breaks) is Sovite's admission
-problem, not a Vuoro merge rule.
+exact revision, and with the direction's rule that `RecipeRevision` and
+`AgentProfileRevision` name comparison inputs and never compile or enforce.
+The owner clarified that the intent is to offer a backend Sovite could adopt,
+which removes the ownership collision and turns the question into whether
+Sovite would be better off with a Git object store behind its state. §7 and
+§8 answer that. Either way the proposal's merge example (one agent switches
+to a remote model, another widens data classification, the text merges, the
+policy breaks) is Sovite's admission problem, not a Vuoro merge rule.
 
 **Three-way merge as a default stage.** Phase 0: "do not silently merge
 semantic changes". The first increment surfaces overlap and requires a
@@ -291,7 +315,125 @@ Acceptance scenario for V1 through V3 together:
 > remapped members and the purged member recorded as `missing`. No run's
 > evidence, receipt or acceptance changed.
 
-## 6. Decisions needed from the owner
+## 7. The clarified reading: a Git-based backend offered to owners
+
+### 7.1 The concept as reviewed
+
+Following the kit pattern (`vuoro-schema-runtime`, `vuoro-adapter-kit`: pure
+contract layers owners embed; owners keep runners, drivers, roles and
+migrations), the concept was a `vuoro-revision-kit` in two layers: a pure
+contract layer (typed object envelope, stable IDs, canonical serialization,
+snapshot manifest, revision reference shape, export format) and a Git storage
+adapter holding immutable content and tree snapshots in one repository per
+owner installation inside that owner's trust boundary. The owner's database
+would own every mutable pointer and state; Git would hold only immutable
+content addressed by digest; Git refs would be a rebuildable convenience.
+Sovite would get generations as tree hashes, the workspace could move
+Markdown bytes out of PostgreSQL, and `vuoro-evidence` would get one
+reference shape for every arm.
+
+### 7.2 Second adversarial review
+
+| # | Finding | Severity | Disposition |
+| --- | --- | --- | --- |
+| 1 | "Refs are not an authority" makes every stored object unreachable: `git gc` prunes unreferenced loose objects after two weeks and `gc --auto` fires from ordinary porcelain; clone, bundle and fsck carry only ref-reachable objects. Either refs become a third mutable store that must track the owner's rows exactly, or none of the promised Git tooling works. | blocking | Accepted. A Git substrate would need refs as a rebuildable projection of owner retention rows, with its own reconcile. That is not cheaper than rows. |
+| 2 | Purge is incompatible with tree-hash identity. Removing a blob either rewrites history (every descendant OID changes; every pointer, qualification binding, receipt and run manifest that cited the old hash dangles) or leaves a tree naming a missing object (fsck, clone and cat-file fail). The PostgreSQL design keeps `content_sha256` after bytes are purged. | blocking | Accepted. Identity would have to be a kit-computed SHA-256 manifest, not the Git OID, at which point Git contributes nothing to identity (finding 4). |
+| 3 | The workspace cannot move Markdown out of PostgreSQL: full-text search is a stored generated `tsvector` over `body_md` with the access filter in the same query. Git would hold a redundant copy or need a second index with its own filter. | blocking for the workspace use | Accepted. The workspace is struck from the adopters list. |
+| 4 | A pure no-I/O contract layer computing a root digest and "Git supplies the tree hash" contradict each other: Git OIDs are SHA-1 over Git's own encoding and never equal the estate's `sha256:` digests. Every object would carry two identifiers, the ambiguity `RunManifest` exists to remove. | significant | Accepted. One reference digest, SHA-256 over a canonical manifest. |
+| 5 | Ancestry and merge-base need commit objects whose parent pointers duplicate `parent_revision_id` and Sovite's base generation, with no transaction spanning both. Diff between two snapshots is a set difference over two `(path, digest)` maps, one query in PostgreSQL. | significant | Accepted. Removed from the value list. |
+| 6 | The workspace reconcile pattern does not transfer: Git objects are flat and unnamespaced, so an orphan blob cannot be attributed to a workspace or installation without a whole-repository scan, and the grace-period delete fights Git's own prune. | significant | Accepted. |
+| 7 | Custody is misstated for the hosted model: per-workspace Sovite under C-AI-01 is Cloud-operated infrastructure. The plan's promise is that private bytes never enter Cloud coordination records, not that Cloud never hosts the installation. A repository per hosted installation needs a volume per tenant with UID and `safe.directory` handling. | significant | Accepted. Custody must be stated per deployment; "offering a backend" in hosted mode puts the repository in Cloud-operated storage. |
+| 8 | A third store on a persistent volume, below the durability of the S3 object store, with the paired-recovery fence not extended to it. A snapshot during `git repack` can capture a half-written pack. | significant | Accepted. |
+| 9 | Git has no per-object visibility; Sovite has per-principal draft ownership and the workspace hides drafts from readers. The kit would have to mediate every read through the owner's rows and never hand out a clone, which removes the remaining reason to use Git. | significant | Accepted. |
+| 10 | The uniform revision reference is a real need (direction: "a recorded revision or an exact reference to the supplier's revision") but it is a field tuple on `RunManifest` and a `revision_kind` extension, independent of where bytes live. | significant | Accepted and adopted as the first deliverable (§7.3). |
+| 11 | The fork fails the hard test: name the upstream function whose behaviour must change, show configuration, wrapping or a separate repository cannot meet it, and show upstream will not accept it. Per-object ACL (never expose the repo), purge (`git filter-repo` exists; the problem is digest invalidation, which no fork fixes), tenancy (separate repositories) and SHA-256 OIDs (`--object-format=sha256`) all fail it. `beads-comparison` is on hold for exactly the missing fork-cost analysis. | significant | Accepted. No fork. The test is recorded in §8. |
+| 12 | At this estate's scale (revisions capped at one million characters, artifacts outside Git, a pilot of three runtimes and two tasks, one generation per installation in WF-01) rows with `content_sha256`, `parent_revision_id` and a jsonb `{path: digest}` manifest hashed by the existing canonical JSON give the same root digest, deduplication and diff, inside the same transaction as the pointer CAS. | significant | Accepted. |
+| 13 | This is a build row, not provision-with-adapter, and Sovite has not asked for it. Sovite already exposes `generation`; asking it to expose a SHA-256 digest costs nothing. `recipe-revision` is retired, so "Sprintctl for recipes" names no consumer. | significant | Accepted. |
+| 14 | CAS semantics and an export bundle do not belong in a pure layer; the direction's export promise (relationships, versions, decisions, artifacts) cannot be met by a packfile because decisions and relations live in PostgreSQL. | minor | Accepted. Export stays `vuoro-workspace-export` plus the Git rendering of §4.6. |
+| 15 | Every Python option is a coordinator-only lock change: `git` CLI subprocess per object, `dulwich` (pure Python, small maintainer base), `pygit2` (libgit2 binary wheels, attestation), or a Rust service. | minor | Recorded for §8. |
+| 16 | The served workspace adapter runs in-process in vuoro-service, so a workspace repository would need a writable volume and `git` write access inside the service pod. | minor | Moot once the workspace is struck. |
+| 17 | Factual slips: no publication object exists yet; `recipe-revision` is retired; the pointer-in-PostgreSQL, content-in-Git split is the second writable content store that Phase 0 gates behind a separate migration decision. | minor | Corrected here. |
+| 18 | Unpublished branches for experimentation were the one gix idea that distinguished Git from rows; the first rebuild replaced them with candidate selections in PostgreSQL (§4.1), which the brief omitted. | minor | Candidate selections stand. |
+
+Verified before accepting: the image installs `git` and the lock has no
+`dulwich`, `pygit2` or `GitPython`; the two kits are pure contract layers;
+Phase 0 §2 gates a Git-authoritative move behind a separate decision; the
+composition document demands paired recovery with a writer fence; the
+workspace reconcile is keyed by object key under a per-workspace prefix;
+`ExperimentRecord` compares `revision_ref` as a string per kind; Sovite is
+composed only as a released wheel in the demo package.
+
+### 7.3 The rebuilt concept under the clarified intent
+
+> Vuoro offers the ecosystem three things for versioning: one reference shape
+> for every revision, a Git source-resolution kit for definitions people
+> author in repositories, and publications over workspace-authored content.
+> Each owner keeps its own store. Git is the backend wherever people author
+> with review; PostgreSQL is the backend wherever a service authors state.
+
+**A. `RevisionRef` in `vuoro-evidence`** (build; smallest increment). A frozen
+dataclass `(owner, collection, object_id, revision_digest, snapshot_digest,
+receipt_ref)` plus a `revision_kind` extension, carried on `RunManifest` as
+`definition_refs` and `knowledge_selection` under `composition_digest()`. A
+Sovite generation without a digest is carried as `generation` with
+`revision_digest` absent, and comparison treats it as a weaker arm. The one
+ask to Sovite: expose a SHA-256 digest beside `generation` and return it in
+the receipt. This is the whole of the "uniform ecosystem versioning"
+requirement.
+
+**B. Git source-resolution kit for authored definitions** (build, from
+existing code). `vuoro-knowledge` already resolves repository documents to
+exact `(repo, commit, path, blob, sha256, dirty)` entries, writes a
+digest-bound manifest, and rechecks it at resume and acceptance. Generalize
+the same resolver and manifest to definition files: agent instructions,
+skills, tool contracts and environment manifests that teams author and review
+in Git. An owner like Sovite embeds the kit to bind a generation to the exact
+Git objects of its authored inputs, records the manifest digest in its own
+rows, and runs recheck before admission or at activation. The authoring
+repository is the backend; Sovite's database stays the authority for
+proposals, activation and qualification. This is the Git-based backend that
+survives review because it uses Git where Git already is the authority, adds
+no second writable store, needs no per-installation repository, no custody
+change, no purge algorithm beyond ordinary repository governance, and no new
+dependency: `vuoro-knowledge` already reads Git through the CLI in the
+image. Adoption is Sovite's decision (ledger: provision Git as-is, with
+Vuoro's resolver as the adapter).
+
+**C. Publications, candidate selections, derived conflicts, typed diff and
+Git-readable export** for workspace-authored content, as rebuilt in §4.
+Unchanged.
+
+What is not built: a Vuoro-run Git object database, a `vuoro-revision-kit`
+storage adapter, repositories per installation, a merge engine, and any
+fork.
+
+## 8. The fork test and what would reopen the substrate
+
+A fork of an existing Git implementation is justified only when all four
+hold, and the record must name them:
+
+1. the upstream function or format whose behaviour must change, for a stated
+   Vuoro requirement;
+2. proof that configuration, wrapping, a separate repository or a sidecar
+   cannot meet the requirement;
+3. evidence that upstream will not accept the change;
+4. a residual-ownership-cost estimate, which `beads-comparison` is on hold for
+   lack of and which the direction's ledger requires before any build row.
+
+No current requirement passes step 1. The substrate itself (Git objects
+behind an owner's PostgreSQL) would be reconsidered only if a requirement
+appears that rows cannot meet, for example offline authoring of definitions
+with later synchronization, or a customer who must clone their definition
+history with standard tooling. In that case the design would start from:
+identity as a kit-computed SHA-256 manifest and never the Git OID; refs as a
+rebuildable projection of owner retention rows; one repository per access
+boundary; purge by replacing the blob with a tombstone and rewriting the
+tree under a new ref while the manifest digest stays stable; a three-store
+recovery fence; and `dulwich` or `pygit2` as a hash-locked dependency with
+the coordinator review that `uv.lock` changes require. That is a separate
+proposal with its own review.
+
+## 9. Decisions needed from the owner
 
 1. Confirm that publications and candidate selections belong in
    `vuoro-workspace` under Phase 0's PostgreSQL authority, and that no
@@ -305,3 +447,9 @@ Acceptance scenario for V1 through V3 together:
    bundle-transfer design, on the understanding that export stays operator-only.
 5. Decide whether V3's `RunManifest` extension waits for Sprintctl to accept
    the new evidence kind, or ships as a library change first.
+6. Confirm the clarified reading in §7.3: Vuoro offers the reference shape
+   and the Git source-resolution kit to owners, and does not build a Git
+   object store behind their state. If a requirement in §8 is in fact
+   present today, name it so the substrate can be assessed on it.
+7. Decide whether to ask Sovite now to expose a SHA-256 revision digest with
+   each generation and receipt, which unblocks A before anything else lands.
