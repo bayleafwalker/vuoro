@@ -191,3 +191,46 @@ missing case while separating accepted, captured and expected counts. This
 qualifies the supplied-input software contract only. Real source authentication,
 representative outcome samples, recovery-effort comparisons and causal workflow
 claims still require independent evidence.
+
+## Two-arm comparison over a committed case set
+
+`vuoro_evidence.comparison` adds the baseline/candidate pair that a single
+`ExperimentRecord` lacks.
+
+A `CaseSet` (`schema_version: vuoro-case-set/v1`) is a committed JSON file with
+a slug `name`, an integer `version`, a description, selection `limitations` and
+cases. Each case has `case_id`, `workload`, `source_ref` (the real work it was
+drawn from), `criteria` (`pass_fail`, or `scored` with `max_score` and
+`pass_score`) and an optional `observed_on` ISO date. Unknown keys are refused.
+`digest` is the SHA-256 of the canonical document with cases sorted by ID, so
+editing any case or criterion changes it. `ref`
+(`case-set:<name>@v<version>+sha256:...`) is the population reference that both
+arms' records must carry. `load_case_set(path, expected_digest=...)` refuses a
+file that differs from a pinned digest.
+
+`ExperimentComparison(comparison_id, case_set, baseline, candidate, limitations)`
+requires both records to reference that case set and enumerate exactly its
+cases. They must share a task group and revision selector, name different
+revisions, and share no run. `compare(min_cases=..., min_coverage=...,
+review_policy_ref=..., reviewer_ref=...)` has no default thresholds. It reports
+candidate-minus-baseline deltas as exact fractions:
+
+- Acceptance, rejection and capture rates use all case-set cases as the
+  denominator. Rejected, pending, unknown and missing cases stay in it, and
+  `delta_bounds` shows the range still possible if every unresolved case went
+  either way. `transitions` counts per-case disposition pairs, including
+  `missing`.
+- Acceptance, review, rework and recovery seconds, and cost in each currency,
+  compare only cases where both arms know the value. Known and unknown counts
+  are reported. Pairs in different currencies are counted and never converted.
+
+The comparison is suppressed, with explicit reasons and every delta `null`, when
+the case count or the number of cases observed in both arms is below
+`min_cases`, or when paired coverage is below `min_coverage`. A measure with too
+few known pairs is suppressed on its own while the rest are still computed.
+Strata by case-set `workload`, `observed_on` month and pairwise capture apply
+the same minimums, so thin strata are suppressed too. The output records
+`decision: not_recorded_by_this_package` and `causal_attribution:
+not_established`. It does not run either arm, accept work or change a review
+boundary. `tests/test_comparison.py` uses a synthetic case-set fixture. No real
+case set or ablation result has been qualified by this package.
