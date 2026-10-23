@@ -318,6 +318,7 @@ dependencies = [
  "base64 0.22.1",
  "ec00_oa",
  "ec00_oa_v2",
+ "ec00_oa_v3",
  "prost",
  "prost-types",
  "reqwest",
@@ -343,6 +344,18 @@ dependencies = [
 
 [[package]]
 name = "ec00_oa_v2"
+version = "0.0.0"
+dependencies = [
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "serde_with",
+ "url",
+]
+
+[[package]]
+name = "ec00_oa_v3"
 version = "0.0.0"
 dependencies = [
  "reqwest",

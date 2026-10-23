@@ -1,5 +1,128 @@
 # EC-00 disposable qualification workspace
 
+## Versioned v3 unknown-value qualification (23 October 2026)
+
+The isolated v3 fixture passes its bounded unknown-value correctness gates while
+retaining the frozen v1/v2 artifacts and the negative v2 findings below. This is
+not production adoption or EC-00 closure.
+
+`candidates/typespec/unknown-values-v3.tsp` is the sole v3 schema source. Pinned
+TypeSpec compiler/HTTP/OpenAPI/JSON Schema emitters 1.17.0 independently produce
+explicit OpenAPI 3.0.0 for four generated SDKs and JSON Schema 2020-12 for runtime
+validation. The actual JSON Schema emitter option is `bundleId`. Explicit
+`...Record<unknown>` response metadata remains open in both projections; sealed
+command, nested body and signed-artifact inputs refuse unknown fields. One
+canonical decimal-text scalar bounds exact counters to signed int64, including
+refusal of trailing newlines. Lifecycle state remains a closed enum.
+
+The generator derives the operation/schema manifest from emitted operation IDs
+and named schemas. It generates the TypeScript attachment to the existing SDK
+`responseValidator` hook using Ajv 8.20.0. The Python boundary uses jsonschema
+4.26.0 and the same finite supported-feature gate as generation. Both runtimes
+use generated schemas without coercion, injected defaults or property removal;
+remote/dynamic references, fragment references and unsupported schema features refuse.
+Only declared named local resource IDs are admitted, at generation and runtime load. Content
+encoding metadata does not replace owner byte/signature verification. The
+bounded publish/revise/readRequest/readArtifact adapter calls the unchanged
+`OwnerOracle`; it adds no domain state machine or production writer.
+
+Root-owned offline runs passed 13 emitter/schema/owner tests (21.711 s) and four
+cross-client tests (19.665 s). The latter recorded 24 actual HTTP response rows
+across Python, TypeScript, Go and Rust: baseline, additive top metadata, additive
+nested metadata, unknown lifecycle, absent note and empty note. Baseline note is
+explicit null. All four tolerate safe additive metadata, reject unknown lifecycle
+meaning, retain exact large counters and distinguish absent/null/empty values.
+All 24 artifact reads preserve original bytes, envelope, signature and digest;
+all read owner snapshots remain unchanged. There were zero findings and zero
+could-not-check rows.
+
+Fourteen raw HTTP command cases retain one active positive mutation and refuse
+unknown top/nested command fields, validly signed changed envelope meaning, and
+missing/null/numeric/noncanonical/out-of-range counters without owner effects.
+Independent guards reject silent effects and inert positives. Actual SDK
+validation omission accepts the unknown HTTP 200 lifecycle response and is
+rejected by the qualification guard, proving that the attached validator matters.
+A clean regeneration and separate request-schema, result-schema, attachment and
+SDK-output mutations exercise byte-drift refusal. Strict TypeScript noEmit
+checking passes for the generated attachment and new runner with the already
+pinned Node ambient types explicitly selected.
+
+Reproduce the focused correctness gates in the prepared locked environment:
+
+```bash
+nix develop --offline ./tests/experiments/ec00/candidates/toolchain --command \
+  uv run --offline --project tests/experiments/ec00/candidates --locked \
+  python -m unittest discover -s tests/experiments/ec00 -p '*_v3_checks.py' -v
+```
+
+`EC00_UNKNOWN_V3_REPORT` optionally names the v3 matrix output. The source,
+generated outputs and candidate locks are frozen for independent review. This
+qualifies four-language responses and raw command fixtures, not four-language
+SDK mutation serialization or universal JSON Schema enforcement by native
+SDKs. After a rejecting fragment-reference repair, the nine emitter/schema/SDK
+and generation-drift checks passed again (14.702 s). Existing v1/v2 regressions
+passed all 56 tests (143.684 s), the ordinary candidate TypeScript project passed,
+and four built wheels passed all six repository distribution-boundary tests.
+The wider dependency supply, ingress, performance/economics and estate
+qualification remain separate.
+
+## Selected-chain unknown-value findings (23 October 2026)
+
+`unknown_value_checks.py` characterizes the frozen TypeSpec/OpenAPI v2 clients
+against the unchanged persisted `OwnerOracle`. The default focused qualification
+gate deliberately fails: the selected unknown-value policy is **not qualified**.
+Neither the generated clients, IDL, frozen outputs nor owner rules were repaired
+or relaxed to produce a passing result.
+
+The locked runtime ran all 16 response-decoder cases (four variants in Python,
+TypeScript, Go and Rust), seven raw command/control cases and two independent
+policy-guard falsifiers. Every generated read reached the fixture as HTTP 200;
+there were no missing-runtime skips. The guard falsifiers passed. The policy
+gate retained these four findings:
+
+| Case | Actual observation | Disposition |
+|---|---|---|
+| Additive top-level response metadata, Go | Generated decoder refuses the response. | Forward-compatible metadata handling remains unqualified. |
+| Additive nested response-body metadata, Go | Generated decoder refuses the response. | Same gap at the nested response boundary. |
+| Unknown lifecycle state, TypeScript | Generated SDK returns a decoded result containing `future-success`. | Runtime response validation is required before treating that result as known lifecycle meaning. No actual work acceptance was exercised. |
+| Unknown command field | Existing HTTP fixture returns 200 and commits one revision/event/idempotency result while dropping the unknown field. | Command unknown-field refusal is not implemented by this candidate. |
+
+Baseline reads pass in all four languages, including an exact decimal revision
+above the JavaScript safe-integer range and distinct empty/null body values.
+Python and Rust tolerate both additive metadata variants and reject the unknown
+lifecycle state; Go rejects the unknown state as well. All 16 generated artifact
+reads retain original bytes, envelope bytes, signature and digest exactly. Owner
+request/event/idempotency/dependant/artifact snapshots stay unchanged for every
+read. The known command positive control does commit, so the no-effect checks do
+not succeed merely because the fixture never invokes its owner.
+
+Validly signed envelopes containing an unknown nested field or unknown authority
+intent are refused with HTTP 409 and no owner effect. Missing and null mutation
+revisions return 422; zero returns stale-revision 409, all without owner changes.
+The command schema is flat, so ordinary nested command-object coverage is absent;
+the applicable nested input tested here is the signed envelope. Command probes
+use raw HTTP because the frozen generated request models do not all support
+constructing an unknown field. Four-language coverage applies to generated
+response decoders, not to command serialization.
+
+Run the existing locked toolchain, with caches prepared independently:
+
+```bash
+nix develop --offline ./tests/experiments/ec00/candidates/toolchain --command \
+  uv run --offline --project tests/experiments/ec00/candidates --locked \
+  python -m unittest discover -s tests/experiments/ec00 \
+  -p unknown_value_checks.py -v
+```
+
+`EC00_UNKNOWN_REPORT` optionally names a private JSON output containing the matrix,
+raw fixture projections, owner snapshot digests, findings and toolchain paths.
+The existing Go/Rust counter runners use `EC00_UNKNOWN_VALUES=1` for this mode;
+their original counter mode is unchanged. TypeScript uses
+`candidates/run_unknown_values.ts`. No generator/dependency change is included.
+The focused command currently exits 1 for the four findings above. These are
+disposable loopback correctness observations, with no production, ingress,
+performance or general semantic-competence claim. EC-00 remains open.
+
 This directory is an experiment input, not a Vuoro production contract, schema,
 API, selected architecture, or owner implementation. It exists to make the
 architecture comparison reproducible after EC-01 provides observed consumers
