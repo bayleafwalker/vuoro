@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"time"
@@ -116,6 +117,13 @@ func observeUnknownValues() error {
 }
 
 func main() {
+	if mode := os.Getenv("EC00_NATIVE_MODE"); mode != "" {
+		if err := nativeMode(mode); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	if os.Getenv("EC00_UNKNOWN_VALUES") == "1" {
 		if err := observeUnknownValues(); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -132,4 +140,83 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+// Each invocation reads coordinator-persisted restart state and constructs a
+// fresh generated API client. No transport retry can invent a logical key.
+func nativeMode(mode string) error {
+	var state struct {
+		Key              string  `json:"key"`
+		RequestID        string  `json:"requestId"`
+		ExpectedRevision string  `json:"expectedRevision"`
+		Objective        string  `json:"objective"`
+		Cursor           *string `json:"cursor"`
+	}
+	raw, err := os.ReadFile(os.Getenv("EC00_NATIVE_STATE"))
+	if err != nil {
+		return err
+	}
+	if err = json.Unmarshal(raw, &state); err != nil {
+		return err
+	}
+	configuration := ec00oa.NewConfiguration()
+	configuration.Servers = ec00oa.ServerConfigurations{{URL: os.Getenv("EC00_BASE_URL")}}
+	configuration.HTTPClient = &http.Client{Timeout: 5 * time.Second}
+	configuration.AddDefaultHeader("Idempotency-Key", state.Key)
+	client := ec00oa.NewAPIClient(configuration)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	failure := os.Getenv("EC00_NATIVE_FAILURE")
+	if failure == "deadline" {
+		deadline := time.Now().Add(time.Second)
+		if os.Getenv("EC00_NATIVE_PREDISPATCH") == "1" {
+			deadline = time.Now().Add(-time.Second)
+		}
+		var deadlineCancel context.CancelFunc
+		ctx, deadlineCancel = context.WithDeadline(ctx, deadline)
+		defer deadlineCancel()
+	} else if failure == "cancel" {
+		if os.Getenv("EC00_NATIVE_PREDISPATCH") == "1" {
+			cancel()
+		} else {
+			go func() { _, _ = io.ReadFull(os.Stdin, make([]byte, 1)); cancel() }()
+		}
+	}
+	output := map[string]any{"language": "go"}
+	if mode == "watch" {
+		request := client.DefaultAPI.Watch(ctx).Limit(2)
+		if state.Cursor != nil {
+			request = request.Cursor(*state.Cursor)
+		}
+		page, response, callErr := request.Execute()
+		output["status"], output["page"] = responseStatusNumber(response), page
+		if callErr != nil {
+			output["error"] = callErr.Error()
+		}
+	} else {
+		request := ec00oa.NewReviseRequest(state.RequestID, state.Objective)
+		request.SetExpectedRevision(state.ExpectedRevision)
+		first, response, callErr := client.DefaultAPI.Revise(ctx, state.RequestID).ReviseRequest(*request).Execute()
+		output["status"], output["first"] = responseStatusNumber(response), first
+		if callErr != nil {
+			output["error"] = callErr.Error()
+		}
+		if mode == "reconcile" {
+			replay, replayResponse, replayErr := client.DefaultAPI.Revise(ctx, state.RequestID).ReviseRequest(*request).Execute()
+			if replayErr != nil {
+				return replayErr
+			}
+			request.Objective = "changed native effect"
+			_, changedResponse, _ := client.DefaultAPI.Revise(ctx, state.RequestID).ReviseRequest(*request).Execute()
+			output["replay"], output["replayStatus"], output["changedStatus"] = replay, responseStatusNumber(replayResponse), responseStatusNumber(changedResponse)
+		}
+	}
+	return json.NewEncoder(os.Stdout).Encode(output)
+}
+
+func responseStatusNumber(response *http.Response) int {
+	if response == nil {
+		return 0
+	}
+	return response.StatusCode
 }

@@ -5,6 +5,10 @@ import asyncio
 import base64
 import httpx
 import sqlite3
+import socket
+import threading
+import time
+import json
 import tempfile
 import unittest
 
@@ -16,7 +20,7 @@ from owner_oracle import ResponseLost
 from transport_failure_checks import OwnerBoundaryGate
 
 
-class WatchReplayTests(unittest.TestCase):
+class WatchFixture(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="ec00-watch-")
         self.addCleanup(self.temp.cleanup)
@@ -62,6 +66,8 @@ class WatchReplayTests(unittest.TestCase):
             self.assertEqual(grpc.StatusCode.ABORTED, caught.exception.code())
         self.assertEqual(before, self.snapshot())
 
+
+class WatchReplayTests(WatchFixture):
     def test_reconnect_identical_cursor_slow_poll_and_exact_event_order(self):
         before = self.snapshot()
         with CandidateOwnerServer(self.path) as server:
@@ -219,6 +225,196 @@ class WatchReplayTests(unittest.TestCase):
                 db.execute("UPDATE identity SET active=0 WHERE principal_id='requester-a'")
                 db.commit()
             self.refuse(server, cursor)
+
+
+
+class NativeWatchReplayTests(WatchFixture):
+
+    def native(self, server, arm, cursor=None):
+        from versioned_native_checks import NativeRunner, write_native_state
+        state = Path(self.temp.name) / (arm + "-restart.json")
+        write_native_state(state, cursor=cursor)
+        return NativeRunner(arm, server.base_url, state)
+
+    def test_native_cursor_disconnect_restart_order_and_refusals(self):
+        from versioned_counter_http import VersionedCounterServer
+        from versioned_native_checks import native_command, assert_native_failure
+        cursors = {}
+        for arm in ("typescript", "go", "rust"):
+            native_command(arm)
+            with self.subTest(arm=arm):
+                before = self.snapshot()
+                with VersionedCounterServer(self.path) as server:
+                    first = self.native(server, arm).run("watch")
+                    self.assertEqual(200, first["status"])
+                    self.assertEqual(self.page(server, "openapi"), first["page"])
+                    cursor = first["page"]["nextCursor"]
+                    expected = self.page(server, "openapi", cursor)
+                    for phase in ("before", "after"):
+                        for failure in ("deadline", "cancel", "transport"):
+                            with self.subTest(phase=phase, failure=failure):
+                                gate = OwnerBoundaryGate(server.httpd.owner_call, phase, failure)
+                                server.httpd.owner_call = gate
+                                runner = self.native(server, arm, cursor)
+                                process = runner.start("watch", failure)
+                                try:
+                                    self.assertTrue(gate.entered.wait(5))
+                                    if failure == "transport":
+                                        gate.release.set()
+                                    result = runner.finish(process, cancel=failure == "cancel")
+                                    assert_native_failure(self, arm, failure, result)
+                                    self.assertEqual(before, self.snapshot())
+                                finally:
+                                    gate.release.set()
+                                    self.assertTrue(gate.finished.wait(5))
+                                    server.httpd.owner_call = gate.original
+                                    if process.poll() is None:
+                                        process.kill()
+                                        process.communicate()
+                                self.assertEqual(expected, runner.run("watch")["page"])
+                # Same file, new client process and new server process shell.
+                with VersionedCounterServer(self.path) as restarted:
+                    self.assertEqual(first["page"], self.native(restarted, arm).run("watch")["page"])
+                    events, next_cursor = list(first["page"]["events"]), cursor
+                    for _ in range(4):
+                        runner = self.native(restarted, arm, next_cursor)
+                        page = runner.run("watch")["page"]
+                        self.assertEqual(page, runner.run("watch")["page"])
+                        self.assertLessEqual(len(page["events"]), 2)
+                        events.extend(page["events"])
+                        if not page["events"]:
+                            self.assertEqual(next_cursor, page["nextCursor"])
+                            self.assertFalse(page["more"])
+                            break
+                        next_cursor = page["nextCursor"]
+                    self.assertEqual([{"seq": str(r[0]), "requestId": r[2], "action": r[3],
+                                       "revision": str(r[4])} for r in before["event"]], events)
+                    cursors[arm] = {"expired": cursor, "terminal": next_cursor}
+                    self.assertEqual(2, json.loads(base64.urlsafe_b64decode(cursor)[:-32])["position"])
+                    self.assertEqual(5, json.loads(base64.urlsafe_b64decode(next_cursor)[:-32])["position"])
+                for principal in ("requester-a2", "requester-b"):
+                    with VersionedCounterServer(self.path, principal_id=principal) as foreign:
+                        self.assertEqual(409, self.native(foreign, arm, cursor).run("watch")["status"])
+                self.assertEqual(before, self.snapshot())
+        owner = OwnerOracle.connect_as(self.path, "coordinator-a")
+        try:
+            owner.compact_events_through(5)
+        finally:
+            owner.close()
+        compacted = self.snapshot()
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual("6", db.execute(
+                "SELECT value FROM metadata WHERE key='retained_from_seq:workspace-a'").fetchone()[0])
+        revocation_observations = []
+        with VersionedCounterServer(self.path) as server:
+            for arm in ("typescript", "go", "rust"):
+                with self.subTest(arm=arm, case="expired-cursor"):
+                    self.assertEqual(409, self.native(
+                        server, arm, cursors[arm]["expired"]).run("watch")["status"])
+                    self.assertEqual(compacted, self.snapshot())
+                with self.subTest(arm=arm, case="valid-cursor-before-revocation"):
+                    result = self.native(server, arm, cursors[arm]["terminal"]).run("watch")
+                    self.assertEqual(200, result["status"], result)
+                    self.assertEqual({"events": [], "nextCursor": cursors[arm]["terminal"],
+                                      "more": False}, result["page"])
+                    self.assertEqual(compacted, self.snapshot())
+                    revocation_observations.append({"arm": arm, "cursorPosition": 5,
+                        "retainedFromSeq": 6, "beforeRevocationStatus": result["status"]})
+            with closing(sqlite3.connect(self.path)) as db:
+                db.execute("UPDATE identity SET active=0 WHERE principal_id='requester-a'")
+                db.commit()
+                self.assertEqual(0, db.execute(
+                    "SELECT active FROM identity WHERE principal_id='requester-a'").fetchone()[0])
+            for arm in ("typescript", "go", "rust"):
+                with self.subTest(arm=arm, case="revoked-valid-cursor"):
+                    result = self.native(server, arm, cursors[arm]["terminal"]).run("watch")
+                    observation = next(row for row in revocation_observations if row["arm"] == arm)
+                    observation["afterRevocationStatus"] = result["status"]
+                    self.assertEqual(409, result["status"], result)
+                    self.assertEqual(compacted, self.snapshot())
+        print("EC00_NATIVE_CURSOR_REVOCATION=" + json.dumps(revocation_observations, sort_keys=True), flush=True)
+
+
+class StalledConsumerTests(WatchFixture):
+    @staticmethod
+    def kernel_connections(port):
+        """Linux loopback observation, including orphaned FIN/TIME_WAIT sockets."""
+        rows = Path("/proc/net/tcp").read_text().splitlines()[1:]
+        return [row.split()[3] for row in rows
+                if row.split()[1].split(":")[1] == f"{port:04X}" and row.split()[3] != "0A"]
+
+    def test_unread_response_cohorts_bound_body_connections_threads_and_kernel_states(self):
+        before = self.snapshot()
+        observations = []
+        with CandidateOwnerServer(self.path) as server:
+            calls = []
+            original = server.httpd.owner_call
+            def observed(operation, *args, **kwargs):
+                calls.append(operation)
+                return original(operation, *args, **kwargs)
+            server.httpd.owner_call = observed
+            for cohort in range(3):
+                sockets, admitted = [], 0
+                started = time.monotonic()
+                try:
+                    for _ in range(40):
+                        connection = socket.create_connection(server.httpd.server_address, timeout=5)
+                        sockets.append(connection)
+                        connection.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1152)
+                        connection.sendall(b"GET /v1/events?limit=2 HTTP/1.0\r\nHost: fixture\r\n\r\n")
+                        head = b""
+                        try:
+                            while not head.endswith(b"\r\n\r\n"):
+                                byte = connection.recv(1)
+                                if not byte:
+                                    break
+                                head += byte
+                        except ConnectionResetError:
+                            continue
+                        if head:
+                            self.assertIn(b"200", head.split(b"\r\n")[0])
+                            body_bytes = int(head.split(b"Content-Length: ")[1].split(b"\r\n")[0])
+                            self.assertLessEqual(body_bytes, 1024)
+                            admitted += 1
+                    with server.httpd.transport_condition:
+                        active = len(server.httpd.transport_active)
+                    states = self.kernel_connections(server.httpd.server_address[1])
+                    owned_threads = sum(t.name.startswith("ec00-http-handler") or t.name == "ec00-http-deadline"
+                                        for t in threading.enumerate())
+                    observations.append({"cohort":cohort, "attempts":40, "admitted":admitted,
+                        "active":active, "ownedThreads":owned_threads, "bodyBytes":body_bytes,
+                        "kernelStates":states})
+                    self.assertEqual(16, admitted, observations)
+                    self.assertEqual(16, active, observations)
+                    self.assertLessEqual(owned_threads, 32, observations)
+                    self.assertLessEqual(len(states), 16, observations)
+                    self.assertEqual(16, len(calls), "rejected connection reached owner")
+                    self.assertEqual(24, server.httpd.transport_rejected)
+                    self.assertEqual(before, self.snapshot())
+                    with server.httpd.transport_condition:
+                        self.assertTrue(server.httpd.transport_condition.wait_for(
+                            lambda: not server.httpd.transport_active, timeout=5), observations)
+                    observations[-1]["settledSeconds"] = round(time.monotonic() - started, 6)
+                    self.assertLessEqual(observations[-1]["settledSeconds"], 3.0, observations)
+                    self.assertEqual([], self.kernel_connections(server.httpd.server_address[1]), observations)
+                    # Valid consumers make progress after each stalled cohort settles.
+                    page = self.page(server, "openapi")
+                    self.assertEqual((2, True), (len(page["events"]), page["more"]))
+                    self.assertEqual(page, self.page(server, "openapi"))
+                    with server.httpd.transport_condition:
+                        self.assertTrue(server.httpd.transport_condition.wait_for(
+                            lambda: not server.httpd.transport_active, timeout=5))
+                    self.assertEqual([], self.kernel_connections(server.httpd.server_address[1]))
+                    calls.clear()
+                    # Count only this next cohort, not the two progress controls.
+                    server.httpd.transport_rejected = 0
+                finally:
+                    for connection in sockets:
+                        connection.close()
+            self.assertEqual(16, server.httpd.transport_peak_active)
+        print("EC00_STALLED_CONSUMERS=" + json.dumps(observations, sort_keys=True), flush=True)
+        self.assertEqual(before, self.snapshot())
+
 
 
 if __name__ == "__main__":

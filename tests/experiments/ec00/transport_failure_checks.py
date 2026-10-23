@@ -55,6 +55,41 @@ class OwnerBoundaryGate:
 
 
 class TransportFailureTests(unittest.TestCase):
+    def test_python_predispatch_cancellation_and_expired_await_budget_have_no_effect(self):
+        for failure in ("deadline", "cancel"):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "owner.sqlite"
+                initialize_fixture(path)
+                with CandidateOwnerServer(path) as server:
+                    calls = []
+                    original = server.httpd.owner_call
+                    def observed(*args, **kwargs):
+                        calls.append(args[0])
+                        return original(*args, **kwargs)
+                    server.httpd.owner_call = observed
+                    async def exercise():
+                        entered, never_send = asyncio.Event(), asyncio.Event()
+                        async def before_send(request):
+                            entered.set()
+                            await never_send.wait()
+                        async with Client(base_url=server.base_url,
+                                httpx_args={"event_hooks": {"request": [before_send]}}) as client:
+                            task = asyncio.create_task(publish.asyncio_detailed(client=client,
+                                body=PublishRequest(request_id="9007199254740993", objective="predispatch")))
+                            await asyncio.wait_for(entered.wait(), 5)
+                            if failure == "cancel":
+                                task.cancel()
+                                with self.assertRaises(asyncio.CancelledError):
+                                    await task
+                            else:
+                                # Expire the native asyncio await budget while the
+                                # real httpx request is paused before socket send.
+                                with self.assertRaises(TimeoutError):
+                                    await asyncio.wait_for(task, timeout=0)
+                    asyncio.run(exercise())
+                    self.assertEqual([], calls)
+                    self.assertEqual((0, 0, 0), self.snapshot(path))
+
     def snapshot(self, path):
         with closing(sqlite3.connect(path)) as db:
             return tuple(db.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
@@ -171,6 +206,86 @@ class TransportFailureTests(unittest.TestCase):
                     with self.subTest(arm=arm, phase=phase, failure=failure):
                         self.run_case(arm, phase, failure)
 
+
+
+class NativeTransportFailureTests(unittest.TestCase):
+    """Actual generated HTTP clients; process exit never implies owner rollback."""
+
+    def test_native_predispatch_expired_deadline_and_cancel_have_no_call_or_effect(self):
+        from versioned_native_checks import NativeRunner, native_command, write_native_state, assert_native_failure
+        from versioned_counter_checks import initialize_counter, snapshot
+        from versioned_counter_http import VersionedCounterServer
+        for arm in ("typescript", "go", "rust"):
+            native_command(arm)  # Compilation is outside the boundary/deadline observation.
+            for failure in ("deadline", "cancel"):
+                with self.subTest(arm=arm, failure=failure), tempfile.TemporaryDirectory() as directory:
+                    path, state = Path(directory) / "owner.sqlite", Path(directory) / "restart.json"
+                    initialize_counter(path, 1)
+                    write_native_state(state)
+                    before = snapshot(path)
+                    with VersionedCounterServer(path) as server:
+                        calls = []
+                        original = server.httpd.owner_call
+                        def observed(*args, **kwargs):
+                            calls.append(args[0])
+                            return original(*args, **kwargs)
+                        server.httpd.owner_call = observed
+                        result = NativeRunner(arm, server.base_url, state).run("attempt", failure, True)
+                        assert_native_failure(self, arm, failure, result)
+                        self.assertEqual([], calls, "predispatch failure reached the owner")
+                    self.assertEqual(before, snapshot(path))
+
+    def test_native_dispatched_cancel_deadline_loss_and_restarted_reconciliation(self):
+        from versioned_native_checks import NativeRunner, native_command, write_native_state, assert_native_failure
+        from versioned_counter_checks import initialize_counter, snapshot
+        from versioned_counter_http import VersionedCounterServer
+        for arm in ("typescript", "go", "rust"):
+            native_command(arm)
+            for phase in ("before", "after"):
+                for failure in ("deadline", "cancel", "transport"):
+                    with self.subTest(arm=arm, phase=phase, failure=failure), tempfile.TemporaryDirectory() as directory:
+                        path, state = Path(directory) / "owner.sqlite", Path(directory) / "restart.json"
+                        initialize_counter(path, 1)
+                        write_native_state(state)
+                        before = snapshot(path)
+                        with VersionedCounterServer(path) as server:
+                            runner = NativeRunner(arm, server.base_url, state)
+                            gate = OwnerBoundaryGate(server.httpd.owner_call, phase, failure)
+                            server.httpd.owner_call = gate
+                            process = runner.start("attempt", failure)
+                            try:
+                                self.assertTrue(gate.entered.wait(5), "native call never reached owner boundary")
+                                at_boundary = snapshot(path)
+                                self.assertEqual(1 + int(phase == "after"), len(at_boundary["event"]))
+                                if failure == "transport":
+                                    gate.release.set()
+                                result = runner.finish(process, cancel=failure == "cancel")
+                                assert_native_failure(self, arm, failure, result)
+                                self.assertEqual(at_boundary, snapshot(path))
+                            finally:
+                                gate.release.set()
+                                self.assertTrue(gate.finished.wait(5))
+                                server.httpd.owner_call = gate.original
+                                if process.poll() is None:
+                                    process.kill()
+                                    process.communicate()
+                            if failure != "transport":
+                                self.assertIsNone(gate.error)
+                            expected = 1 if phase == "before" and failure == "transport" else 2
+                            self.assertEqual(expected, len(snapshot(path)["event"]))
+                        # A fresh server and fresh native processes restore the same key.
+                        with VersionedCounterServer(path) as restarted:
+                            runner = NativeRunner(arm, restarted.base_url, state)
+                            for _ in range(2):
+                                result = runner.run("reconcile")
+                                self.assertEqual((200, 200, 409),
+                                    (result["status"], result["replayStatus"], result["changedStatus"]))
+                                self.assertEqual({"requestId": "9007199254741199", "revision": "2"}, result["first"])
+                                self.assertEqual(result["first"], result["replay"])
+                                after = snapshot(path)
+                                self.assertEqual(before["event"], after["event"][:-1])
+                                self.assertEqual((2, 2, 2), (after["request"][0][2], len(after["event"]), len(after["idem"])))
+                                self.assertEqual('{"objective":"native bounded effect"}', after["request"][0][5])
 
 if __name__ == "__main__":
     unittest.main()
