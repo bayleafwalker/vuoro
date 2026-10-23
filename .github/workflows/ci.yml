@@ -159,6 +159,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          qualified_python_root="$RUNNER_TEMP/contracts-python-20261001"
+          python_archive="$RUNNER_TEMP/contracts-python-20261001.tar.gz"
+          curl --fail --location --silent --show-error \
+            --output "$python_archive" \
+            'https://github.com/astral-sh/python-build-standalone/releases/download/20261001/cpython-3.13.16%2B20261001-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz'
+          printf '%s  %s\n' 'ffcb50e716789d1a6e1db5e745d4d194ac8ed9b015ccf5eabcaccb179a25e4a8' "$python_archive" | sha256sum --check
+          mkdir "$qualified_python_root"
+          tar -xzf "$python_archive" -C "$qualified_python_root"
+          qualified_python="$qualified_python_root/python/bin/python3.13"
+          test "$(sha256sum "$qualified_python" | cut -d ' ' -f1)" = 'f8188f8dec8f4ae9865dc6789323327c50bb275a5a301373d675464fdbbf933f'
           uv --version
           test "$(uv --version | cut -d ' ' -f2)" = "0.13.1"
           nix develop ./tools/contracts/toolchain --command bash -euc '
@@ -166,9 +176,9 @@ jobs:
             test "$(npm --version)" = "11.19.0"
             npm ci --prefix tools/contracts --ignore-scripts --no-audit --no-fund
           '
-          uv sync --project tools/contracts --locked --no-install-project
+          uv sync --project tools/contracts --python "$qualified_python" --locked --no-install-project
           test "$(tools/contracts/.venv/bin/python --version)" = "Python 3.13.16"
-          uv sync --all-packages --all-extras --locked
+          uv sync --python "$qualified_python" --all-packages --all-extras --locked
           test "$(.venv/bin/python --version)" = "Python 3.13.16"
       - name: Run exact production compiler and SDK contract gates
         shell: bash

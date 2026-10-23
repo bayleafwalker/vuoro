@@ -54,3 +54,11 @@ children with a fresh owned PYTHONPYCACHEPREFIX and PYTHONDONTWRITEBYTECODE=1,
 without ambient PYTHONPATH; admit only qualified tool bin paths. Do not trust a
 matching version in place of artifact hashes. Verify exact path sets and content
 including Node symlink targets; refuse missing/extra/changed executable artifacts.
+
+Restore CPython from the exact build20261001 archive recorded in source-pins,
+verify its archive/executable hashes, and select its interpreter explicitly for
+both venvs. Do not use the newest same-version uv-managed download: vendor builds
+can differ without a Python version change, and uv installation rewrites
+_sysconfigdata with the host prefix. This qualified set uses the unmodified
+vendor stdlib and retains exact byte/set checks; no host-path normalization or
+additional runtime artifact exclusion is allowed.

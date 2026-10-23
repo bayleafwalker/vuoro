@@ -13,15 +13,20 @@
     "narHash": "sha256-MTJCMrhDFb+GRbLxBPTp8kB4dDlO+egmQ5qsJgYuaWw=",
     "rev": "f20cd90e28fe0403873f473b29e42662cd86e8c4"
   },
+  "pythonArchive": {
+    "build": "20261001",
+    "sha256": "ffcb50e716789d1a6e1db5e745d4d194ac8ed9b015ccf5eabcaccb179a25e4a8",
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261001/cpython-3.13.16%2B20261001-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
+  },
+  "pythonSource": "Unmodified CPython3.13.16 vendor build20261001; restore exact archive, not latest uv-managed build or prefix-rewritten stdlib",
   "qualificationScope": "source pins only; root must restore/check exact artifacts and write locks",
   "schemaVersion": "vuoro-contract-toolchain/v1",
   "supplyLedgerStatus": "license/support/artifact hashes/restore/upgrade/rollback evidence remains root-owned and open",
+  "uvSource": "Nix workstation packaged uv0.13.1; explicit executable and exact version required",
   "versions": {
     "node": "24.21.0",
     "npm": "11.19.0",
     "python": "3.13.16",
     "uv": "0.13.1"
-  },
-  "pythonSource": "uv-managed CPython3.13.16; explicit interpreter required; artifact restoration qualification pending",
-  "uvSource": "Nix workstation packaged uv0.13.1; explicit executable and exact version required"
+  }
 }
