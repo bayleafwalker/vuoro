@@ -1,0 +1,67 @@
+{
+  "operations": {
+    "publish": {
+      "method": "POST",
+      "parameters": [
+        {
+          "in": "header",
+          "name": "Idempotency-Key",
+          "schema": "IdempotencyKey.json"
+        }
+      ],
+      "path": "/v3/requests",
+      "request": "PublishRequest.json",
+      "result": "MutationResult.json"
+    },
+    "readArtifact": {
+      "method": "GET",
+      "parameters": [
+        {
+          "in": "path",
+          "name": "requestId",
+          "schema": "RequestId.json"
+        },
+        {
+          "in": "path",
+          "name": "materialRevision",
+          "schema": "Revision.json"
+        }
+      ],
+      "path": "/v3/requests/{requestId}/artifact/{materialRevision}",
+      "request": null,
+      "result": "ArtifactRead.json"
+    },
+    "readRequest": {
+      "method": "GET",
+      "parameters": [
+        {
+          "in": "path",
+          "name": "requestId",
+          "schema": "RequestId.json"
+        }
+      ],
+      "path": "/v3/requests/{requestId}",
+      "request": null,
+      "result": "RequestRead.json"
+    },
+    "revise": {
+      "method": "PATCH",
+      "parameters": [
+        {
+          "in": "path",
+          "name": "requestId",
+          "schema": "RequestId.json"
+        },
+        {
+          "in": "header",
+          "name": "Idempotency-Key",
+          "schema": "IdempotencyKey.json"
+        }
+      ],
+      "path": "/v3/requests/{requestId}",
+      "request": "ReviseRequest.json",
+      "result": "MutationResult.json"
+    }
+  },
+  "schemaBundle": "ec00-v3.schema.json"
+}

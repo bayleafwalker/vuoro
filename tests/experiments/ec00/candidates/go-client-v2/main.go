@@ -89,7 +89,40 @@ func responseStatus(response *http.Response) any {
 	return response.StatusCode
 }
 
+// observeUnknownValues uses the frozen generated API/decoders without filtering
+// unknown fields or states. A decoder refusal is a characterization result.
+func observeUnknownValues() error {
+	baseURL := os.Getenv("EC00_BASE_URL")
+	if baseURL == "" {
+		return fmt.Errorf("EC00_BASE_URL is required")
+	}
+	configuration := ec00oa.NewConfiguration()
+	configuration.Servers = ec00oa.ServerConfigurations{{URL: baseURL}}
+	configuration.HTTPClient = &http.Client{Timeout: 5 * time.Second}
+	client := ec00oa.NewAPIClient(configuration)
+	observe := func(value any, err error) map[string]any {
+		if err != nil {
+			return map[string]any{"decoded": false, "error": fmt.Sprintf("%T", err)}
+		}
+		return map[string]any{"decoded": true, "value": value}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	request, _, requestErr := client.DefaultAPI.ReadRequest(ctx, requestID).Execute()
+	artifact, _, artifactErr := client.DefaultAPI.ReadArtifact(ctx, requestID, "1").Execute()
+	return json.NewEncoder(os.Stdout).Encode(map[string]any{
+		"language": "go", "request": observe(request, requestErr), "artifact": observe(artifact, artifactErr),
+	})
+}
+
 func main() {
+	if os.Getenv("EC00_UNKNOWN_VALUES") == "1" {
+		if err := observeUnknownValues(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	output, err := run()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

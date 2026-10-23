@@ -23,7 +23,9 @@
     "@typespec/streams": "0.87.0",
     "@typespec/versioning": "0.87.0",
     "esbuild": "0.28.2",
-    "tsx": "4.23.13"
+    "tsx": "4.23.13",
+    "@typespec/json-schema": "1.17.0",
+    "ajv": "8.20.0"
   },
   "overrides": {
     "typescript": "5.9.3"

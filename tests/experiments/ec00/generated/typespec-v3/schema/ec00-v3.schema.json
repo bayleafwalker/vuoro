@@ -1,0 +1,298 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ec00-v3.schema.json",
+    "$defs": {
+        "CommandBody": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "CommandBody.json",
+            "type": "object",
+            "properties": {
+                "objective": {
+                    "type": "string",
+                    "maxLength": 65536
+                },
+                "note": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "maxLength": 65536
+                }
+            },
+            "required": [
+                "objective"
+            ],
+            "unevaluatedProperties": {
+                "not": {}
+            }
+        },
+        "SignedArtifactInput": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "SignedArtifactInput.json",
+            "type": "object",
+            "properties": {
+                "artifactDigest": {
+                    "type": "string"
+                },
+                "artifactKeyId": {
+                    "type": "string"
+                },
+                "artifactBytes": {
+                    "type": "string",
+                    "contentEncoding": "base64"
+                },
+                "artifactEnvelope": {
+                    "type": "string",
+                    "contentEncoding": "base64"
+                },
+                "artifactSignature": {
+                    "type": "string",
+                    "contentEncoding": "base64"
+                }
+            },
+            "required": [
+                "artifactDigest",
+                "artifactKeyId",
+                "artifactBytes",
+                "artifactEnvelope",
+                "artifactSignature"
+            ],
+            "unevaluatedProperties": {
+                "not": {}
+            }
+        },
+        "PublishRequest": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "PublishRequest.json",
+            "type": "object",
+            "properties": {
+                "requestId": {
+                    "$ref": "RequestId.json"
+                },
+                "body": {
+                    "$ref": "CommandBody.json"
+                },
+                "dependants": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "minItems": 1,
+                    "maxItems": 64
+                },
+                "artifact": {
+                    "$ref": "SignedArtifactInput.json"
+                }
+            },
+            "required": [
+                "requestId",
+                "body",
+                "dependants"
+            ],
+            "unevaluatedProperties": {
+                "not": {}
+            }
+        },
+        "RequestId": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "RequestId.json",
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,39}$(?![\\s\\S])"
+        },
+        "ReviseRequest": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "ReviseRequest.json",
+            "type": "object",
+            "properties": {
+                "requestId": {
+                    "$ref": "RequestId.json"
+                },
+                "expectedRevision": {
+                    "$ref": "Revision.json"
+                },
+                "body": {
+                    "$ref": "CommandBody.json"
+                }
+            },
+            "required": [
+                "requestId",
+                "expectedRevision",
+                "body"
+            ],
+            "unevaluatedProperties": {
+                "not": {}
+            }
+        },
+        "Revision": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "Revision.json",
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,17}|[1-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6]|9223372036854775807)$(?![\\s\\S])"
+        },
+        "RequestBody": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "RequestBody.json",
+            "type": "object",
+            "properties": {
+                "objective": {
+                    "type": "string"
+                },
+                "note": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "objective"
+            ],
+            "unevaluatedProperties": {}
+        },
+        "MutationResult": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "MutationResult.json",
+            "type": "object",
+            "properties": {
+                "requestId": {
+                    "$ref": "RequestId.json"
+                },
+                "revision": {
+                    "$ref": "Revision.json"
+                }
+            },
+            "required": [
+                "requestId",
+                "revision"
+            ],
+            "unevaluatedProperties": {}
+        },
+        "RequestRead": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "RequestRead.json",
+            "type": "object",
+            "properties": {
+                "requestId": {
+                    "$ref": "RequestId.json"
+                },
+                "revision": {
+                    "$ref": "Revision.json"
+                },
+                "materialRevision": {
+                    "$ref": "Revision.json"
+                },
+                "state": {
+                    "$ref": "RequestState.json"
+                },
+                "body": {
+                    "$ref": "RequestBody.json"
+                },
+                "reported": {
+                    "type": "boolean"
+                },
+                "verified": {
+                    "type": "boolean"
+                },
+                "evidenceRef": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "artifactDecisionDigest": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "createdSeq": {
+                    "$ref": "Revision.json"
+                }
+            },
+            "required": [
+                "requestId",
+                "revision",
+                "materialRevision",
+                "state",
+                "body",
+                "reported",
+                "verified",
+                "createdSeq"
+            ],
+            "unevaluatedProperties": {}
+        },
+        "RequestState": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "RequestState.json",
+            "type": "string",
+            "enum": [
+                "open",
+                "resolved"
+            ]
+        },
+        "ArtifactRead": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "ArtifactRead.json",
+            "type": "object",
+            "properties": {
+                "materialRevision": {
+                    "$ref": "Revision.json"
+                },
+                "materialDigest": {
+                    "type": "string"
+                },
+                "artifactDigest": {
+                    "type": "string"
+                },
+                "keyId": {
+                    "type": "string"
+                },
+                "originalBytes": {
+                    "type": "string",
+                    "contentEncoding": "base64"
+                },
+                "envelopeBytes": {
+                    "type": "string",
+                    "contentEncoding": "base64"
+                },
+                "signature": {
+                    "type": "string",
+                    "contentEncoding": "base64"
+                }
+            },
+            "required": [
+                "materialRevision",
+                "materialDigest",
+                "artifactDigest",
+                "keyId",
+                "originalBytes",
+                "envelopeBytes",
+                "signature"
+            ],
+            "unevaluatedProperties": {}
+        },
+        "IdempotencyKey": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "IdempotencyKey.json",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+        }
+    }
+}

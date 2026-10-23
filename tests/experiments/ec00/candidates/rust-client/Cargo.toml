@@ -5,6 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
+ec00_oa_v3 = { path = "../../generated/typespec-v3/clients/rust", default-features = false, features = ["rustls"] }
 ec00_oa_v2 = { path = "../../generated/typespec-v2/clients/rust", default-features = false, features = ["rustls"] }
 base64 = "=0.22.1"
 ec00_oa = { path = "../../generated/typespec/clients/rust", default-features = false, features = ["rustls"] }

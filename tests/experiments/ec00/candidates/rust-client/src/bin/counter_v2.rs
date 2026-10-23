@@ -47,9 +47,34 @@ fn request(expected_revision: &str, objective: &str) -> models::ReviseRequest {
     }
 }
 
+// Keep the actual generated decoder behavior, including its refusals.
+async fn observe_unknown_values(base_url: String) -> Result<(), Box<dyn Error>> {
+    fn observe<T: Serialize, E>(result: Result<T, E>) -> serde_json::Value {
+        match result {
+            Ok(value) => serde_json::json!({"decoded": true, "value": value}),
+            Err(_) => serde_json::json!({"decoded": false, "error": "generated API/decoder refusal"}),
+        }
+    }
+    let mut configuration = Configuration::new();
+    configuration.base_path = base_url.trim_end_matches('/').to_owned();
+    configuration.client = reqwest::Client::builder().timeout(CALL_TIMEOUT).build()?;
+    let request = default_api::read_request(&configuration, REQUEST_ID).await;
+    let artifact = default_api::read_artifact(&configuration, REQUEST_ID, "1").await;
+    println!("{}", serde_json::json!({
+        "language": "rust", "request": observe(request), "artifact": observe(artifact)
+    }));
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let base_url = env::var("EC00_BASE_URL")?;
+    if env::var("EC00_UNKNOWN_VALUES").as_deref() == Ok("1") {
+        if base_url.is_empty() {
+            return Err(io::Error::other("EC00_BASE_URL is required").into());
+        }
+        return observe_unknown_values(base_url).await;
+    }
     let expected_revision = env::var("EC00_EXPECTED_REVISION")?;
     if base_url.is_empty() || expected_revision.is_empty() {
         return Err(io::Error::new(
