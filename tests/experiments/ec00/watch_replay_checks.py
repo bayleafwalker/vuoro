@@ -355,23 +355,49 @@ class StalledConsumerTests(WatchFixture):
             server.httpd.owner_call = observed
             for cohort in range(3):
                 sockets, admitted = [], 0
+                reset_stages = []
                 started = time.monotonic()
+
+                def capacity_reset(error, stage, rejected_before):
+                    with server.httpd.transport_condition:
+                        context = {"stage": stage, "error": type(error).__name__,
+                            "admitted": admitted, "active": len(server.httpd.transport_active),
+                            "rejectedBefore": rejected_before,
+                            "rejectedAfter": server.httpd.transport_rejected,
+                            "elapsedSeconds": time.monotonic() - started}
+                    # A reset is capacity refusal only with its actual server
+                    # counter and a still-full cohort, never a timed-out slot.
+                    self.assertEqual(16, admitted, context)
+                    self.assertEqual(16, context["active"], context)
+                    self.assertEqual(rejected_before + 1, context["rejectedAfter"], context)
+                    reset_stages.append(stage)
+
                 try:
                     for _ in range(40):
-                        connection = socket.create_connection(server.httpd.server_address, timeout=5)
+                        with server.httpd.transport_condition:
+                            rejected_before = server.httpd.transport_rejected
+                        try:
+                            connection = socket.create_connection(server.httpd.server_address, timeout=5)
+                        except (BrokenPipeError, ConnectionResetError) as error:
+                            capacity_reset(error, "connect", rejected_before)
+                            continue
                         sockets.append(connection)
                         connection.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1152)
-                        connection.sendall(b"GET /v1/events?limit=2 HTTP/1.0\r\nHost: fixture\r\n\r\n")
                         head = b""
+                        stage = "send"
                         try:
+                            connection.sendall(b"GET /v1/events?limit=2 HTTP/1.0\r\nHost: fixture\r\n\r\n")
+                            stage = "read"
                             while not head.endswith(b"\r\n\r\n"):
                                 byte = connection.recv(1)
                                 if not byte:
                                     break
                                 head += byte
-                        except ConnectionResetError:
+                        except (BrokenPipeError, ConnectionResetError) as error:
+                            capacity_reset(error, stage, rejected_before)
                             continue
                         if head:
+                            self.assertTrue(head.endswith(b"\r\n\r\n"), "incomplete positive response headers")
                             self.assertIn(b"200", head.split(b"\r\n")[0])
                             body_bytes = int(head.split(b"Content-Length: ")[1].split(b"\r\n")[0])
                             self.assertLessEqual(body_bytes, 1024)
@@ -383,7 +409,8 @@ class StalledConsumerTests(WatchFixture):
                                         for t in threading.enumerate())
                     observations.append({"cohort":cohort, "attempts":40, "admitted":admitted,
                         "active":active, "ownedThreads":owned_threads, "bodyBytes":body_bytes,
-                        "kernelStates":states})
+                        "kernelStates":states, "capacityResetsByStage": {
+                            stage: reset_stages.count(stage) for stage in sorted(set(reset_stages))}})
                     self.assertEqual(16, admitted, observations)
                     self.assertEqual(16, active, observations)
                     self.assertLessEqual(owned_threads, 32, observations)
