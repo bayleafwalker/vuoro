@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pure F1a manifest and bundle mechanics; production CLI remains an F1b stub."""
+"""Qualified manifest mechanics and finite production TypeSpec/SDK generation."""
 from __future__ import annotations
 from collections.abc import Mapping
 import argparse

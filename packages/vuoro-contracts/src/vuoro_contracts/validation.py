@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from hashlib import sha256
+from importlib import resources
 import json
 import math
 from pathlib import Path, PurePosixPath
@@ -181,7 +182,7 @@ def _manifest_checks(manifest: Any, schemas: dict[str, Any]) -> None:
 
 
 def _format_schema(filename: str) -> dict[str, Any]:
-    path = Path(__file__).parent / "formats" / filename
+    path = resources.files(__package__).joinpath("formats", filename)
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:

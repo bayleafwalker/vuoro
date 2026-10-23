@@ -1,10 +1,11 @@
 # SDK attachment admission
 
-These root-owned templates are source preparation, not installed or qualified SDKs.
-They contain explicit generator placeholders and cannot serve traffic as written.
-The TS decoder is a mandatory injection, with no JSON.parse fallback. Root must
-freeze and falsify its actual bounded UTF-8/duplicate-key/nonfinite decoder before
-F1b. No new parser dependency or claimed support is introduced by this packet.
+These root-owned templates are instantiated by the production generator, with
+real compiler/native SDK source and attachment qualification. They contain explicit
+generator placeholders and cannot serve traffic as written. The TS decoder is a
+mandatory qualified injection, with no JSON.parse fallback. Local source gates
+cover bounded UTF-8, duplicate-key/nonfinite parsing and actual native serializers;
+canonical CI and real-owner F2 remain separate acceptance gates.
 
 Hey API 0.99.0 success responseValidator runs on parsed JSON success only and has
 no status argument. A separate raw fetch guard must validate *every* declared
@@ -22,7 +23,7 @@ request before to_dict(). Exact method/path matching and request/response parame
 validation must be emitted without ambiguous matching. Unsupported async, body or
 status routes reject. No implicit retries, server authority or deployment is added.
 
-F1b root-owned immutable gates still required: generate both SDKs from actual owner
+The F1b root-owned immutable qualification gates are: generate both SDKs from actual owner
 TypeSpec; run their real APIs against bounded in-process HTTPX MockTransport and a
 TS fetch fake; observe exactly one wire request plus independent real owner effect;
 fault the bytes after server validation; unknown state/status/code, duplicate keys,
