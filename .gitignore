@@ -14,3 +14,6 @@ build/
 # NDJSON audit shards from auditctl 0.1.8 hook output (index already ignored above;
 # not committed in this repo)
 _artifacts/*/audit*/
+
+# Locked contract tools are restored by CI; installed dependencies are local.
+tools/contracts/node_modules/

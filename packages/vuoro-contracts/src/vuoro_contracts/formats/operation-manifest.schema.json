@@ -1,0 +1,198 @@
+{
+  "$id": "operation-manifest.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "contractId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "contractVersion": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "operations": {
+      "additionalProperties": false,
+      "minProperties": 1,
+      "patternProperties": {
+        "^[A-Za-z_][A-Za-z0-9_]*$": {
+          "additionalProperties": false,
+          "properties": {
+            "exposure": {
+              "enum": [
+                "internal",
+                "public"
+              ]
+            },
+            "method": {
+              "enum": [
+                "GET",
+                "POST",
+                "PUT",
+                "PATCH",
+                "DELETE",
+                "HEAD",
+                "OPTIONS"
+              ]
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "in": {
+                    "enum": [
+                      "path",
+                      "query",
+                      "header"
+                    ]
+                  },
+                  "name": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "required": {
+                    "type": "boolean"
+                  },
+                  "schema": {
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9_.-]+$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "in",
+                  "schema",
+                  "required"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "path": {
+              "pattern": "^/",
+              "type": "string"
+            },
+            "request": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_.-]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestMaxBytes": {
+              "minimum": 1,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "responseMaxBytes": {
+              "additionalProperties": false,
+              "minProperties": 1,
+              "patternProperties": {
+                "^[1-5][0-9]{2}$": {
+                  "minimum": 1,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            },
+            "responses": {
+              "additionalProperties": false,
+              "minProperties": 1,
+              "patternProperties": {
+                "^[1-5][0-9]{2}$": {
+                  "anyOf": [
+                    {
+                      "minLength": 1,
+                      "pattern": "^[A-Za-z0-9_.-]+$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "method",
+            "path",
+            "request",
+            "parameters",
+            "responses",
+            "exposure",
+            "requestMaxBytes",
+            "responseMaxBytes"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "provenance": {
+      "additionalProperties": false,
+      "properties": {
+        "sourceSha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "toolchainSha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceSha256",
+        "toolchainSha256"
+      ],
+      "type": "object"
+    },
+    "schemaBundle": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.-]+$",
+          "type": "string"
+        },
+        "path": {
+          "pattern": "^schema/[A-Za-z0-9_.-]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "id"
+      ],
+      "type": "object"
+    },
+    "schemaDialect": {
+      "const": "https://json-schema.org/draft/2020-12/schema"
+    },
+    "schemaVersion": {
+      "const": "vuoro-contract-bundle/v1"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "contractId",
+    "contractVersion",
+    "schemaDialect",
+    "schemaBundle",
+    "provenance",
+    "operations"
+  ],
+  "type": "object"
+}

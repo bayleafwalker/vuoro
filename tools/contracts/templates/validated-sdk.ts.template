@@ -1,0 +1,61 @@
+import Ajv2020 from "ajv/dist/2020.js";
+import {createClient} from "./client/index.js";
+import * as sdk from "./sdk.gen.js";
+import {ContractError, strictDecode, validateJsonValue} from "./strict-json.js";
+export {strictDecode};
+export const ABSENT = Symbol("vuoro.absent");
+const manifest = __MANIFEST__ as any;
+const schemas = __BUNDLE__ as any;
+const sdkBindings = __SDK_BINDINGS__ as Record<string,string>;
+const ajv = new Ajv2020({strict:true,strictTypes:false,allErrors:true,coerceTypes:false,useDefaults:false,removeAdditional:false});
+for (const schema of Object.values(schemas.$defs)) ajv.addSchema(schema as any);
+function check(id:string|null,value:any,absent:boolean) { if(id===null){if(!absent) throw new ContractError("schema_value");return;} const v=ajv.getSchema(id); if(absent||!v||!v(value)) throw new ContractError("schema_value"); }
+async function bounded(r:Response,cap:number){const rd=r.body?.getReader();if(!rd)return new Uint8Array();const chunks:Uint8Array[]=[];let n=0;try{while(true){const x=await rd.read();if(x.done)break;n+=x.value.byteLength;if(n>cap){try{await rd.cancel()}finally{try{await r.body?.cancel()}catch{}}throw new ContractError("body_limit");}chunks.push(x.value)}}finally{try{rd.releaseLock()}catch{}}const b=new Uint8Array(n);let o=0;for(const c of chunks){b.set(c,o);o+=c.length}return b;}
+function groupFor(location:string){return location==="header"?"headers":location;}
+function parameterSchema(id:string):any{return Object.values(schemas.$defs).find((x:any)=>x.$id===id);}
+function wireValues(id:string,values:string[]):any{
+ const schema=parameterSchema(id);if(!schema)throw new ContractError("parameter");
+ const type=schema.type;
+ if(type==="array")return values.map(x=>wireScalar(schema.items,x));
+ if(values.length!==1)throw new ContractError("parameter");return wireScalar(schema,values[0]);
+}
+function wireScalar(schema:any,raw:string):any{
+ const type=schema?.type;if(type==="integer"){if(!/^-?(0|[1-9][0-9]*)$/.test(raw))throw new ContractError("parameter");const n=Number(raw);if(!Number.isSafeInteger(n))throw new ContractError("parameter");return n;}
+ if(type==="number"){if(!/^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$/.test(raw))throw new ContractError("parameter");const n=Number(raw);if(!Number.isFinite(n))throw new ContractError("parameter");return n;}
+ if(type==="boolean"){if(raw==="true")return true;if(raw==="false")return false;throw new ContractError("parameter");}return raw;
+}
+function same(a:any,b:any):boolean{return JSON.stringify(a)===JSON.stringify(b);}
+function pathMatch(options:any,op:any){
+ const groups=new Set(op.parameters.map((p:any)=>groupFor(p.in)));if(op.request!==null)groups.add("body");
+ for(const key of Object.keys(options))if(!groups.has(key))throw new ContractError("operation");
+ for(const group of ["path","query","headers"]){const declared=op.parameters.filter((p:any)=>groupFor(p.in)===group);const object=options[group];if(object!==undefined&&(!object||typeof object!=="object"||Array.isArray(object)))throw new ContractError("parameter");
+  const allowed=new Set(declared.map((p:any)=>p.name.toLowerCase()));for(const key of Object.keys(object??{}))if(!allowed.has(key.toLowerCase()))throw new ContractError("parameter");
+  for(const p of declared){const value=Object.entries(object??{}).find(([k])=>k.toLowerCase()===p.name.toLowerCase())?.[1];if(p.required&&value===undefined)throw new ContractError("parameter");const v=ajv.getSchema(p.schema);if(value!==undefined&&(!v||!v(value)))throw new ContractError("parameter");}
+ }
+}
+function validateWire(req:Request,op:any,options:any,baseUrl:string){
+ const url=new URL(req.url),base=new URL(baseUrl);if(url.origin!==base.origin||url.hash||url.username||url.password||req.method.toUpperCase()!==op.method)throw new ContractError("operation");
+ const pathParts=op.path.split("/"),actual=url.pathname.split("/");if(pathParts.length!==actual.length)throw new ContractError("parameter");
+ for(let i=0;i<pathParts.length;i++){const part=pathParts[i];if(part.startsWith("{")&&part.endsWith("}")){let decoded:string;try{decoded=decodeURIComponent(actual[i]);}catch{throw new ContractError("parameter");}const name=part.slice(1,-1),p=op.parameters.find((x:any)=>x.in==="path"&&x.name===name);if(!p)throw new ContractError("parameter");const value=wireValues(p.schema,[decoded]);const validate=ajv.getSchema(p.schema);if(!validate||!validate(value)||!same(value,options.path?.[name]))throw new ContractError("parameter");}else if(part!==actual[i])throw new ContractError("parameter");}
+ const query=new Map<string,string[]>();for(const [k,v] of url.searchParams.entries()){if(!query.has(k))query.set(k,[]);query.get(k)!.push(v);}
+ const queryDefs=op.parameters.filter((p:any)=>p.in==="query");for(const key of query.keys())if(!queryDefs.some((p:any)=>p.name===key))throw new ContractError("parameter");
+ for(const p of queryDefs){const values=query.get(p.name),supplied=options.query?.[p.name];if(!values){if(p.required||supplied!==undefined)throw new ContractError("parameter");continue;}const value=wireValues(p.schema,values);const validate=ajv.getSchema(p.schema);if(!validate||!validate(value)||supplied===undefined||!same(value,supplied))throw new ContractError("parameter");}
+ const headerDefs=op.parameters.filter((p:any)=>p.in==="header"),allowed=new Set(["host","accept","accept-encoding","connection","user-agent","content-length","content-type",...headerDefs.map((p:any)=>p.name.toLowerCase())]);
+ for(const [k] of req.headers.entries())if(!allowed.has(k.toLowerCase()))throw new ContractError("parameter");
+ for(const p of headerDefs){const value=req.headers.get(p.name),supplied=Object.entries(options.headers??{}).find(([k])=>k.toLowerCase()===p.name.toLowerCase())?.[1];if(value===null){if(p.required||supplied!==undefined)throw new ContractError("parameter");continue;}const decoded=wireValues(p.schema,[value]);const validate=ajv.getSchema(p.schema);if(!validate||!validate(decoded)||supplied===undefined||!same(decoded,supplied))throw new ContractError("parameter");}
+}
+export function createValidatedClient({baseUrl,fetch:fetcher}:{baseUrl:string,fetch:typeof fetch}){
+ const methods:any={};
+ for(const [name,op] of Object.entries(manifest.operations) as any){
+  methods[name]=async(options:any)=>{
+   if(!options||typeof options!=="object"||Array.isArray(options))throw new ContractError("parameter");
+   validateJsonValue(options);pathMatch(options,op);const responseContext:any={};
+   const guardFetch=(async(input:any,init:any)=>{const req=input instanceof Request?input:new Request(new URL(input,baseUrl),init);validateWire(req,op,options,baseUrl);const raw=new Uint8Array(await req.clone().arrayBuffer());if(op.request===null)check(null,undefined,raw.length===0);else{if(raw.length>op.requestMaxBytes)throw new ContractError("body_limit");check(op.request,strictDecode(raw,op.requestMaxBytes),false)}const response=await fetcher(req);const status=String(response.status);if(!Object.hasOwn(op.responses,status)){try{await response.body?.cancel()}catch{}throw new ContractError("status")}const id=op.responses[status],cap=op.responseMaxBytes[status];const bytes=await bounded(response,cap??0);const body=id===null?ABSENT:strictDecode(bytes,cap);check(id,body,id===null);responseContext.status=Number(status);responseContext.body=body;responseContext.content=bytes;return new Response(bytes.length?bytes:null,{status:Number(status),headers:response.headers});}) as typeof fetch;
+   const nativeClient=createClient({baseUrl,fetch:guardFetch});
+   const nativeName=sdkBindings[name];if(typeof nativeName!=="string")throw new ContractError("operation");
+   let result:any;try{result=await (sdk as any)[nativeName]({...options,client:nativeClient,requestValidator:async(o:any)=>{check(op.request,o.body,o.body===undefined)},responseValidator:async(v:any)=>{const status=String(responseContext.status);if(!status||!Object.hasOwn(op.responses,status))throw new ContractError("status");check(op.responses[status],v,false);return v},throwOnError:false,responseStyle:"fields"});}catch(error){if(error instanceof ContractError)throw error;throw new ContractError("operation");}
+   if(responseContext.status===undefined)throw new ContractError("status");return {status:responseContext.status,body:responseContext.body,content:responseContext.content};
+  };
+ }
+ return methods;
+}

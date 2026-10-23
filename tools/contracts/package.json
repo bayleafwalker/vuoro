@@ -1,0 +1,29 @@
+{
+  "dependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
+    "@typespec/compiler": "1.17.0",
+    "@typespec/http": "1.17.0",
+    "@typespec/json-schema": "1.17.0",
+    "@typespec/openapi": "1.17.0",
+    "@typespec/openapi3": "1.17.0",
+    "ajv": "8.20.0",
+    "typescript": "5.9.3",
+    "@vuoro/contracts": "file:../../contracts"
+  },
+  "engines": {
+    "node": "24.21.0",
+    "npm": "11.19.0"
+  },
+  "name": "vuoro-contract-tools",
+  "overrides": {
+    "typescript": "5.9.3"
+  },
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "devDependencies": {
+    "@types/node": "24.10.0",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.13"
+  }
+}

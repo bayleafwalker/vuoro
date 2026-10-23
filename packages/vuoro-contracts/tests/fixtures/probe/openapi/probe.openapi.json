@@ -1,0 +1,110 @@
+{
+  "components": {
+    "schemas": {
+      "Counter": {
+        "type": "object"
+      },
+      "Input": {
+        "type": "object"
+      },
+      "Key": {
+        "type": "object"
+      },
+      "Refusal": {
+        "type": "object"
+      },
+      "Result": {
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Generic projection oracle",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.0",
+  "paths": {
+    "/probe/{key}": {
+      "get": {
+        "operationId": "inspect",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "explicit response"
+          }
+        }
+      },
+      "post": {
+        "operationId": "submit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Input"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "explicit response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "explicit response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "explicit response"
+          }
+        }
+      }
+    }
+  }
+}

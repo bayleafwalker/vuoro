@@ -6,11 +6,28 @@
     "default_harness": "codex",
     "default_model_alias": "fast-build",
     "action_classes": {
-      "plan": { "enabled": true, "model_alias": "frontier-plan" },
-      "build": { "enabled": true, "model_alias": "fast-build", "review_required": true },
-      "review": { "enabled": true, "model_alias": "review-synthesis" },
-      "verify": { "enabled": true, "model_alias": "review-synthesis", "review_required": true },
-      "reconcile": { "enabled": true, "model_alias": "review-synthesis" }
+      "plan": {
+        "enabled": true,
+        "model_alias": "frontier-plan"
+      },
+      "build": {
+        "enabled": true,
+        "model_alias": "fast-build",
+        "review_required": true
+      },
+      "review": {
+        "enabled": true,
+        "model_alias": "review-synthesis"
+      },
+      "verify": {
+        "enabled": true,
+        "model_alias": "review-synthesis",
+        "review_required": true
+      },
+      "reconcile": {
+        "enabled": true,
+        "model_alias": "review-synthesis"
+      }
     }
   },
   "skills": {
@@ -57,8 +74,14 @@
       }
     ],
     "applicability": {
-      "paths": ["."],
-      "roles": ["planner", "worker", "reviewer"]
+      "paths": [
+        "."
+      ],
+      "roles": [
+        "planner",
+        "worker",
+        "reviewer"
+      ]
     },
     "entrypoints": {
       "architecture": [
@@ -66,16 +89,30 @@
         "docs/architecture/project-composition.md",
         "docs/architecture/packaging.md"
       ],
-      "plan": ["docs/plans/architectural-simplification-alignment.md"],
+      "plan": [
+        "docs/plans/architectural-simplification-alignment.md"
+      ],
       "runbook": [
         "/projects/dev/agentops/docs/runbooks/hybrid-dispatch.md",
         "/projects/dev/agentops/docs/runbooks/vuoro-workstation-cutover.md"
       ]
     },
     "role_presets": {
-      "planner": { "model": "Sol", "behavior": "xhigh", "tool_mode": "read-only" },
-      "worker": { "model": "Luna", "behavior": "high", "tool_mode": "write" },
-      "reviewer": { "model": "Sol", "behavior": "xhigh", "tool_mode": "read-only" }
+      "planner": {
+        "model": "Sol",
+        "behavior": "xhigh",
+        "tool_mode": "read-only"
+      },
+      "worker": {
+        "model": "Luna",
+        "behavior": "high",
+        "tool_mode": "write"
+      },
+      "reviewer": {
+        "model": "Sol",
+        "behavior": "xhigh",
+        "tool_mode": "read-only"
+      }
     },
     "provider_adapters": [
       {
@@ -125,37 +162,73 @@
   "risk_surfaces": [
     {
       "id": "client-authority-boundary",
-      "paths": ["packages/vuoro-client/**", "tests/test_distribution_boundaries.py"],
-      "skills": ["verify-state-protocols", "reconcile-project-contracts"],
+      "paths": [
+        "packages/vuoro-client/**",
+        "tests/test_distribution_boundaries.py"
+      ],
+      "skills": [
+        "verify-state-protocols",
+        "reconcile-project-contracts"
+      ],
       "default_depth": 2,
       "required_on_change": true
     },
     {
       "id": "service-compatibility-and-migrations",
-      "paths": ["packages/vuoro-service/**", "deploy/**"],
-      "skills": ["verify-state-protocols", "reconcile-project-contracts"],
+      "paths": [
+        "packages/vuoro-service/**",
+        "deploy/**"
+      ],
+      "skills": [
+        "verify-state-protocols",
+        "reconcile-project-contracts"
+      ],
       "default_depth": 2,
       "required_on_change": true
     },
     {
       "id": "knowledge-workspace-store-and-migrations",
-      "paths": ["packages/vuoro-workspace/**"],
-      "skills": ["verify-state-protocols", "reconcile-project-contracts"],
+      "paths": [
+        "packages/vuoro-workspace/**"
+      ],
+      "skills": [
+        "verify-state-protocols",
+        "reconcile-project-contracts"
+      ],
+      "default_depth": 2,
+      "required_on_change": true
+    },
+    {
+      "id": "generated-contract-validation",
+      "paths": [
+        "packages/vuoro-contracts/**",
+        "scripts/contracts/**",
+        "contracts/**",
+        "tools/contracts/**"
+      ],
+      "skills": [
+        "verify-state-protocols",
+        "reconcile-project-contracts"
+      ],
       "default_depth": 2,
       "required_on_change": true
     }
   ],
   "hybrid": {
     "enabled": true,
-    "worker_routes": ["mechanical_bulk"],
+    "worker_routes": [
+      "mechanical_bulk"
+    ],
     "commands": {
       "vuoro.client.tests": "uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests",
       "vuoro.service.tests": "uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests",
       "vuoro.mcp-edge.tests": "uv run --package vuoro-mcp-edge --extra test pytest packages/vuoro-mcp-edge/tests",
       "vuoro.reconciler.tests": "uv run --package vuoro-reconciler --extra test pytest packages/vuoro-reconciler/tests",
       "vuoro.knowledge.tests": "uv run --package vuoro-knowledge --extra test pytest packages/vuoro-knowledge/tests",
-      "vuoro.boundaries": "uv build --package vuoro-client --wheel --out-dir dist/vuoro-client && uv build --package vuoro-service --wheel --out-dir dist/vuoro-service && uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime && uv build --package vuoro-adapter-kit --wheel --out-dir dist/vuoro-adapter-kit && uv run pytest tests/test_distribution_boundaries.py",
-      "vuoro.suite": "uv sync --all-packages --all-extras && uv build --package vuoro-client --wheel --out-dir dist/vuoro-client && uv build --package vuoro-service --wheel --out-dir dist/vuoro-service && uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime && uv build --package vuoro-adapter-kit --wheel --out-dir dist/vuoro-adapter-kit && uv run pytest"
+      "vuoro.boundaries": "uv build --package vuoro-client --wheel --out-dir dist/vuoro-client && uv build --package vuoro-service --wheel --out-dir dist/vuoro-service && uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime && uv build --package vuoro-adapter-kit --wheel --out-dir dist/vuoro-adapter-kit && uv build --package vuoro-contracts --wheel --out-dir dist/vuoro-contracts && uv run pytest tests/test_distribution_boundaries.py",
+      "vuoro.suite": "uv sync --all-packages --all-extras && uv build --package vuoro-client --wheel --out-dir dist/vuoro-client && uv build --package vuoro-service --wheel --out-dir dist/vuoro-service && uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime && uv build --package vuoro-adapter-kit --wheel --out-dir dist/vuoro-adapter-kit && uv build --package vuoro-contracts --wheel --out-dir dist/vuoro-contracts && uv run pytest",
+      "vuoro.contracts.tests": "uv run --package vuoro-contracts --extra test pytest packages/vuoro-contracts/tests/test_validation.py packages/vuoro-contracts/tests/test_generation.py",
+      "vuoro.contracts.generation.tests": "uv run --package vuoro-contracts --extra test pytest packages/vuoro-contracts/tests/test_production_generation.py"
     },
     "protected_paths": [
       "deploy/**",
@@ -182,11 +255,17 @@
     ]
   },
   "verification": {
-    "command_families": ["unit", "architecture", "docs", "full-suite"],
+    "command_families": [
+      "unit",
+      "architecture",
+      "docs",
+      "full-suite"
+    ],
     "targeted_first": true,
     "commands": [
       "uv sync --all-packages --all-extras",
       "uv run --package vuoro-client --extra test pytest packages/vuoro-client/tests",
+      "uv run --package vuoro-contracts --extra test pytest packages/vuoro-contracts/tests/test_validation.py packages/vuoro-contracts/tests/test_generation.py",
       "uv run --package vuoro-service --extra test pytest packages/vuoro-service/tests",
       "uv run --package vuoro-mcp-edge --extra test pytest packages/vuoro-mcp-edge/tests",
       "uv run --package vuoro-reconciler --extra test pytest packages/vuoro-reconciler/tests",
@@ -197,12 +276,16 @@
       "uv build --package vuoro-service --wheel --out-dir dist/vuoro-service",
       "uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime",
       "uv build --package vuoro-adapter-kit --wheel --out-dir dist/vuoro-adapter-kit",
-      "uv sync --all-packages --all-extras && uv build --package vuoro-client --wheel --out-dir dist/vuoro-client && uv build --package vuoro-service --wheel --out-dir dist/vuoro-service && uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime && uv build --package vuoro-adapter-kit --wheel --out-dir dist/vuoro-adapter-kit && uv run pytest",
+      "uv sync --all-packages --all-extras && uv build --package vuoro-client --wheel --out-dir dist/vuoro-client && uv build --package vuoro-service --wheel --out-dir dist/vuoro-service && uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime && uv build --package vuoro-adapter-kit --wheel --out-dir dist/vuoro-adapter-kit && uv build --package vuoro-contracts --wheel --out-dir dist/vuoro-contracts && uv run pytest",
+      "uv build --package vuoro-contracts --wheel --out-dir dist/vuoro-contracts",
       "python /projects/dev/agentops/scripts/validate_verification_artifacts.py --root ."
     ]
   },
   "hooks": {
     "level": "verification",
-    "publishers": ["git", "github"]
+    "publishers": [
+      "git",
+      "github"
+    ]
   }
 }

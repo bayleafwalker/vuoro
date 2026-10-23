@@ -1,0 +1,28 @@
+{
+  "exports": {
+    ".": {
+      "typespec": "./main.tsp"
+    },
+    "./http": {
+      "typespec": "./http/main.tsp"
+    },
+    "./primitives": {
+      "typespec": "./primitives/main.tsp"
+    }
+  },
+  "files": [
+    "main.tsp",
+    "primitives",
+    "http"
+  ],
+  "name": "@vuoro/contracts",
+  "peerDependencies": {
+    "@typespec/compiler": "1.17.0",
+    "@typespec/http": "1.17.0",
+    "@typespec/json-schema": "1.17.0"
+  },
+  "private": false,
+  "tspMain": "main.tsp",
+  "type": "module",
+  "version": "0.1.0"
+}

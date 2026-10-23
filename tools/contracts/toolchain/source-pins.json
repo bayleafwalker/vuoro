@@ -1,0 +1,27 @@
+{
+  "excludedFixtureTools": [
+    "Go",
+    "Rust",
+    "JVM",
+    "Chromium",
+    "protobuf",
+    "connectrpc",
+    "FastAPI",
+    "Uvicorn"
+  ],
+  "nixpkgs": {
+    "narHash": "sha256-MTJCMrhDFb+GRbLxBPTp8kB4dDlO+egmQ5qsJgYuaWw=",
+    "rev": "f20cd90e28fe0403873f473b29e42662cd86e8c4"
+  },
+  "qualificationScope": "source pins only; root must restore/check exact artifacts and write locks",
+  "schemaVersion": "vuoro-contract-toolchain/v1",
+  "supplyLedgerStatus": "license/support/artifact hashes/restore/upgrade/rollback evidence remains root-owned and open",
+  "versions": {
+    "node": "24.21.0",
+    "npm": "11.19.0",
+    "python": "3.13.16",
+    "uv": "0.13.1"
+  },
+  "pythonSource": "uv-managed CPython3.13.16; explicit interpreter required; artifact restoration qualification pending",
+  "uvSource": "Nix workstation packaged uv0.13.1; explicit executable and exact version required"
+}

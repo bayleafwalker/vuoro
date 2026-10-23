@@ -1,0 +1,62 @@
+{
+  "contractId": "probe/v1",
+  "contractVersion": "1.0.0",
+  "operations": {
+    "inspect": {
+      "exposure": "internal",
+      "method": "GET",
+      "parameters": [
+        {
+          "in": "path",
+          "name": "key",
+          "required": true,
+          "schema": "Key.json"
+        }
+      ],
+      "path": "/probe/{key}",
+      "request": null,
+      "requestMaxBytes": null,
+      "responseMaxBytes": {
+        "200": 2048
+      },
+      "responses": {
+        "200": "Result.json"
+      }
+    },
+    "submit": {
+      "exposure": "internal",
+      "method": "POST",
+      "parameters": [
+        {
+          "in": "path",
+          "name": "key",
+          "required": true,
+          "schema": "Key.json"
+        }
+      ],
+      "path": "/probe/{key}",
+      "request": "Input.json",
+      "requestMaxBytes": 1024,
+      "responseMaxBytes": {
+        "200": 2048,
+        "400": 2048,
+        "503": 2048
+      },
+      "responses": {
+        "200": "Result.json",
+        "400": "Refusal.json",
+        "503": "Refusal.json"
+      }
+    }
+  },
+  "provenance": {
+    "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "toolchainSha256": "2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "schemaBundle": {
+    "id": "probe.schema.json",
+    "path": "schema/probe.schema.json"
+  },
+  "schemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "schemaVersion": "vuoro-contract-bundle/v1"
+}

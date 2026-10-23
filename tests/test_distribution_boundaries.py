@@ -134,3 +134,41 @@ def test_candidate_kit_wheel_contains_pure_admission_values_without_fake_owner()
                     assert (node.module or "").split(".", 1)[0] in sys.stdlib_module_names
                 elif isinstance(node, ast.Import):
                     assert all(alias.name.split(".", 1)[0] in sys.stdlib_module_names for alias in node.names)
+
+
+def test_contract_runtime_is_pure_and_wheel_has_metadata_formats(tmp_path) -> None:
+    import ast
+    import json
+    import shutil
+    import subprocess
+    import sys
+    package = ROOT / "packages/vuoro-contracts"
+    project = _project(package / "pyproject.toml")
+    assert project["dependencies"] == ["jsonschema==4.26.0", "referencing==0.37.0"]
+    forbidden = {"vuoro_service", "vuoro_client", "sovite", "sqlite3", "psycopg", "asyncpg", "httpx", "requests", "socket", "subprocess"}
+    for path in (package/"src").rglob("*.py"):
+        tree=ast.parse(path.read_text())
+        imports={node.module.split(".")[0] for node in ast.walk(tree) if isinstance(node,ast.ImportFrom) and node.module}
+        imports.update(alias.name.split(".")[0] for node in ast.walk(tree) if isinstance(node,ast.Import) for alias in node.names)
+        assert not imports & forbidden
+        assert "experiments" not in path.read_text()
+    wheel_path=_one_wheel("vuoro-contracts")
+    with zipfile.ZipFile(wheel_path) as wheel:
+        names=wheel.namelist()
+        assert "vuoro_contracts/formats/operation-manifest.schema.json" in names
+        assert "vuoro_contracts/formats/integrity.schema.json" in names
+        assert all(name.startswith(("vuoro_contracts/","vuoro_contracts-")) for name in names)
+    owner_assets=tmp_path/"owner-assets"
+    shutil.copytree(package/"tests/fixtures/probe",owner_assets)
+    # -I plus wheel-only insertion proves the wheel does not import source/tests.
+    # Qualified jsonschema/referencing must already be installed by the root gate.
+    program="\n".join([
+        "import sys",f"sys.path.insert(0,{str(wheel_path)!r})",
+        "from hashlib import sha256", "from pathlib import Path",
+        "from vuoro_contracts import ContractBundle",f"root=Path({str(owner_assets)!r})",
+        "c=ContractBundle.load(root,integrity_sha256=sha256((root/'integrity.json').read_bytes()).hexdigest())",
+        "v={'state':'ready','revision':'9007199254740995'}",
+        "assert c.validate_response('submit',200,v) is v",
+    ])
+    result=subprocess.run([sys.executable,"-I","-c",program],cwd=tmp_path,text=True,capture_output=True)
+    assert result.returncode==0,result.stderr

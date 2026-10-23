@@ -21,6 +21,7 @@ override-dependencies = [
 
 [tool.uv.sources]
 vuoro-client = { workspace = true }
+vuoro-contracts = { workspace = true }
 
 [tool.uv.workspace]
 exclude = ["packages/vuoro-demo"]
@@ -28,6 +29,7 @@ members = [
   "packages/vuoro-client",
   "packages/vuoro-service",
   "packages/vuoro-schema-runtime",
+  "packages/vuoro-contracts",
   "packages/vuoro-adapter-kit",
   "packages/vuoro-evidence",
   "packages/vuoro-worker",
@@ -43,6 +45,7 @@ testpaths = [
   "packages/vuoro-client/tests",
   "packages/vuoro-service/tests",
   "packages/vuoro-schema-runtime/tests",
+  "packages/vuoro-contracts/tests",
   "packages/vuoro-adapter-kit/tests",
   "packages/vuoro-evidence/tests",
   "packages/vuoro-worker/tests",

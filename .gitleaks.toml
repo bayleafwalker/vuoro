@@ -1,0 +1,18 @@
+[extend]
+useDefault = true
+
+# These three source files contain independently checked SHA256 inventories.
+# Names such as auth.ts trigger generic-api-key even though each value is a
+# digest. Match only a complete hash-map line at these exact paths; other
+# token assignments and every other default detector remain enabled.
+[[rules]]
+id = "generic-api-key"
+[[rules.allowlists]]
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '^packages/vuoro-contracts/tests/fixtures/probe/integrity\.json$',
+  '^scripts/contracts/generate\.py$',
+  '^tools/contracts/toolchain/tool-artifacts\.json$',
+]
+regexes = ['^\s*"[^"]+": "[a-f0-9]{64}",?\s*$']

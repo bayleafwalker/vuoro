@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vuoro-contracts"
+version = "0.1.0"
+description = "Pure generated-contract profile and boundary validation"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["jsonschema==4.26.0", "referencing==0.37.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=8.3,<9"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vuoro_contracts"]

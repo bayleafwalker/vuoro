@@ -1,0 +1,37 @@
+{
+  "byteBounds": {
+    "inspect": {
+      "requestMaxBytes": null,
+      "responseMaxBytes": {
+        "200": 2048
+      }
+    },
+    "submit": {
+      "requestMaxBytes": 1024,
+      "responseMaxBytes": {
+        "200": 2048,
+        "400": 2048,
+        "503": 2048
+      }
+    },
+    "empty": {
+      "requestMaxBytes": null,
+      "responseMaxBytes": {
+        "204": null
+      }
+    },
+    "nullBody": {
+      "requestMaxBytes": null,
+      "responseMaxBytes": {
+        "200": 2048
+      }
+    }
+  },
+  "contractVersion": "1.0.0",
+  "exposures": {
+    "inspect": "internal",
+    "submit": "internal",
+    "empty": "internal",
+    "nullBody": "internal"
+  }
+}

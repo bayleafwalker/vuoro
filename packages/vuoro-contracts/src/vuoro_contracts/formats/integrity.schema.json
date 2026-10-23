@@ -1,0 +1,23 @@
+{
+  "$id": "integrity.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "files": {
+      "additionalProperties": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "minProperties": 1,
+      "type": "object"
+    },
+    "schemaVersion": {
+      "const": "vuoro-contract-integrity/v1"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "files"
+  ],
+  "type": "object"
+}

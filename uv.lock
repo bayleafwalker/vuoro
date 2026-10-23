@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 members = [
     "vuoro-adapter-kit",
     "vuoro-client",
+    "vuoro-contracts",
     "vuoro-dev-workspace",
     "vuoro-evidence",
     "vuoro-knowledge",
@@ -980,6 +981,29 @@ requires-dist = [
     { name = "jsonschema", specifier = ">=4.23,<5" },
     { name = "pydantic", specifier = ">=2.10,<3" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" },
+    { name = "vuoro-contracts", marker = "extra == 'test'", editable = "packages/vuoro-contracts" },
+]
+provides-extras = ["test"]
+
+[[package]]
+name = "vuoro-contracts"
+version = "0.1.0"
+source = { editable = "packages/vuoro-contracts" }
+dependencies = [
+    { name = "jsonschema" },
+    { name = "referencing" },
+]
+
+[package.optional-dependencies]
+test = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "jsonschema", specifier = "==4.26.0" },
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" },
+    { name = "referencing", specifier = "==0.37.0" },
 ]
 provides-extras = ["test"]
 
@@ -1103,6 +1127,7 @@ dependencies = [
 test = [
     { name = "httpx" },
     { name = "pytest" },
+    { name = "vuoro-contracts" },
 ]
 
 [package.metadata]
@@ -1115,6 +1140,7 @@ requires-dist = [
     { name = "pyjwt", specifier = ">=2.10,<3" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34,<1" },
+    { name = "vuoro-contracts", marker = "extra == 'test'", editable = "packages/vuoro-contracts" },
 ]
 provides-extras = ["test"]
 

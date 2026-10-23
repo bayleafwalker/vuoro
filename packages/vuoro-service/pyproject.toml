@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
+  "vuoro-contracts",
   "httpx>=0.27,<1",
   "pytest>=8.3,<9",
 ]
@@ -29,3 +30,6 @@ vuoro-ops = "vuoro_service.ops.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/vuoro_service"]
+
+[tool.uv.sources]
+vuoro-contracts = { workspace = true }
