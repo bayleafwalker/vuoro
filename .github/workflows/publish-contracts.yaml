@@ -1,0 +1,83 @@
+name: publish contracts runtime wheel
+
+on:
+  push:
+    tags:
+      - vuoro-contracts-v*
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contracts-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  qualified-candidate:
+    uses: ./.github/workflows/contracts-production-toolchain.yml
+    with:
+      run-repository-suite: true
+
+  publish:
+    needs: qualified-candidate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.qualified-candidate.outputs.artifact_id }}
+          path: dist/contracts-candidate
+          merge-multiple: true
+      - id: verify
+        name: Verify same-run qualified candidate
+        shell: bash
+        env:
+          EXPECTED_WHEEL_BASENAME: ${{ needs.qualified-candidate.outputs.wheel_basename }}
+          EXPECTED_WHEEL_SHA256: ${{ needs.qualified-candidate.outputs.wheel_sha256 }}
+          EXPECTED_SOURCE_SHA: ${{ needs.qualified-candidate.outputs.source_sha }}
+          EXPECTED_ARTIFACT_NAME: ${{ needs.qualified-candidate.outputs.artifact_name }}
+        run: |
+          set -euo pipefail
+          test "$EXPECTED_SOURCE_SHA" = "$GITHUB_SHA"
+          identity="$(python -I scripts/contracts/release_candidate.py verify \
+            --candidate-dir dist/contracts-candidate \
+            --expected-source-sha "$EXPECTED_SOURCE_SHA" \
+            --expected-run-id "$GITHUB_RUN_ID" \
+            --expected-run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --expected-artifact-name "$EXPECTED_ARTIFACT_NAME" \
+            --expected-wheel-basename "$EXPECTED_WHEEL_BASENAME" \
+            --expected-wheel-sha256 "$EXPECTED_WHEEL_SHA256" \
+            --tag "$GITHUB_REF_NAME")"
+          wheel="$(jq -r .wheel_basename <<<"$identity")"
+          sha256="$(jq -r .wheel_sha256 <<<"$identity")"
+          test "$wheel" = "$EXPECTED_WHEEL_BASENAME"
+          test "$sha256" = "$EXPECTED_WHEEL_SHA256"
+          printf 'wheel=%s\nsha256=%s\n' "dist/contracts-candidate/$wheel" "$sha256" >> "$GITHUB_OUTPUT"
+      - uses: actions/attest@v4
+        with:
+          subject-path: ${{ steps.verify.outputs.wheel }}
+      - name: Create draft verified release
+        shell: bash
+        env:
+          WHEEL: ${{ steps.verify.outputs.wheel }}
+          SHA256: ${{ steps.verify.outputs.sha256 }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" "$WHEEL" \
+            --verify-tag --draft --repo "$GITHUB_REPOSITORY" \
+            --title "vuoro-contracts $GITHUB_REF_NAME ($SHA256)" \
+            --notes "Contracts runtime wheel: $WHEEL\nsha256: $SHA256"
+      - name: Publish verified release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release edit "$GITHUB_REF_NAME" --draft=false --repo "$GITHUB_REPOSITORY"

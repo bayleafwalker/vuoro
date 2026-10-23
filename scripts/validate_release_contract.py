@@ -12,11 +12,12 @@ import zipfile
 PACKAGE_NAMES = {
     "vuoro-client", "vuoro-service",
     "vuoro-schema-runtime", "vuoro-adapter-kit", "vuoro-demo",
-    "vuoro-workspace",
+    "vuoro-workspace", "vuoro-contracts",
 }
 TAG = re.compile(
-    r"^(vuoro-client|vuoro-service|vuoro-schema-runtime|vuoro-adapter-kit|vuoro-demo|vuoro-workspace)-v(.+)$"
+    r"^(vuoro-client|vuoro-service|vuoro-schema-runtime|vuoro-adapter-kit|vuoro-demo|vuoro-workspace|vuoro-contracts)-v(.+)$"
 )
+MAX_METADATA = 1024 * 1024
 IMMUTABLE_VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[a-z]+[0-9]+)?$")
 
 
@@ -27,7 +28,17 @@ def wheel_metadata(path: Path) -> tuple[str, str]:
         ]
         if len(metadata_paths) != 1:
             raise ValueError(f"{path}: expected exactly one wheel METADATA file")
-        metadata = Parser().parsestr(archive.read(metadata_paths[0]).decode())
+        info = archive.getinfo(metadata_paths[0])
+        if info.file_size > MAX_METADATA:
+            raise ValueError(f"{path}: wheel METADATA exceeds the 1 MiB limit")
+        with archive.open(info) as metadata_file:
+            raw_bytes = metadata_file.read(MAX_METADATA + 1)
+        if len(raw_bytes) > MAX_METADATA or len(raw_bytes) != info.file_size:
+            raise ValueError(f"{path}: wheel METADATA exceeds the 1 MiB limit or is truncated")
+        raw_metadata = raw_bytes.decode("utf-8")
+        metadata = Parser().parsestr(raw_metadata)
+        if len(metadata.get_all("Name", [])) != 1 or len(metadata.get_all("Version", [])) != 1:
+            raise ValueError(f"{path}: wheel metadata must contain exactly one Name and Version header")
     name = metadata.get("Name")
     version = metadata.get("Version")
     if not name or not version:
