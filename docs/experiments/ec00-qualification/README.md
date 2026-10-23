@@ -1112,3 +1112,79 @@ grpc-web observations; its latency figures differ (see the receipt):
 108 cases, no security or expectation failures, no ER-010 collapse warnings,
 repeated identity headers kept separate and repeated `x-request-id` joined, all
 refused without effect. The EC-00 gate remains open.
+
+## Native cancellation and durable cursor observations (23 October 2026)
+
+The existing generated HTTP v2 runners now have experiment-only `attempt`,
+`reconcile` and `watch` modes. TypeScript uses native `AbortSignal`, Go uses
+`context` cancellation/deadlines, and Rust drops dispatched reqwest futures on
+in-flight cancellation or Tokio timeout. Rust's pre-dispatch cancellation drops
+an unpolled generated future: this is a language-level no-dispatch control,
+not evidence that generated SDK transport machinery processed cancellation.
+That SDK cancellation qualification remains missing. Each new client process
+reads the logical key and cursor from the same coordinator-written restart file. The Python control
+also pauses a real generated httpx request before socket send: cancellation and
+an expired asyncio await budget dispatch no owner call. This await budget is
+separate from the existing httpx socket read-timeout control.
+
+The command histories distinguish three boundaries. Pre-dispatch controls cause
+no owner call or effect; TS/Go exercise generated calls with native cancellation
+and deadline options, while Rust's unpolled cancellation has the narrower scope
+above. A dispatched handler paused before invocation can still commit after its
+client stops waiting; a
+handler paused after its committed return has already committed. Same-key
+reconciliation by fresh native processes and a restarted fixture server returns
+revision `2` once, while changed meaning receives 409. Complete independent
+SQLite request/event/idempotency rows prove one transition. Cancellation of a
+client wait does not establish owner rollback.
+
+For each native language, six watch histories lose, cancel or time out the
+response before or after the real owner read. Replaying the same persisted
+cursor returns the identical ordered page. New cursor pages cover the complete
+persisted event sequence without gaps, including across client-process and
+fixture-server restart. Cross-principal/workspace and expired reads receive
+explicit 409 refusals with unchanged owner rows. Revocation uses a separate
+otherwise valid terminal cursor at position 5: after compaction moves the
+retention floor to 6, each native client first reads that cursor successfully
+(200), then receives 409 after actual identity revocation. The old position-2
+cursor separately proves expiry. Disabling revocation must make the valid-cursor
+guard fail. These are fresh client processes and fresh in-process fixture
+server instances; they are not a
+production server crash/recovery qualification.
+
+Actual unread response consumers exposed a fixture resource gap. Two-event
+pages were bounded, but completed `ThreadingHTTPServer` handlers left growing
+kernel FIN state for stalled peers. A first bounded repair still left an orphan
+TIME_WAIT socket after a valid progress control, which the kernel-state guard
+rejected. The fixture now admits at most 16 connections before dispatch, has a
+listen backlog of 16, uses 16 fixed HTTP worker threads and at most 16 connection
+deadline timers, and retains a slot through response drain. An absolute two
+second socket lifetime aborts stalled connections. Responses state
+`Connection: close` and retain their existing Content-Length and HTTP/1.0
+one-request behavior. Closing the socket does not cancel an owner operation;
+its slot remains held until the handler and its timer finish.
+
+The slow-consumer check leaves actual response bodies unread in three cohorts
+of 40 loopback connections. Each cohort observes 16 admitted connections,
+24 refusals before owner dispatch, at most 32 owned worker/timer threads, a
+358-byte two-event response, at most 16 server-side kernel connections, and no
+remaining non-listener kernel states after settlement. Valid cursor reads
+continue after each cohort. Enlarging capacity to 64 and extending the deadline
+to ten seconds both make this guard fail. This is a bounded unary cursor fixture
+on the measured Linux loopback path, not a streaming, SSE, arbitrary-rate or
+production ingress backpressure qualification.
+
+The native-wake case remains **missing**. The actual Sprintctl capability
+contract declares `read-while-running`, `attention-during-run` and
+`start-after-stop`; it does not implement an unavailable-wake/continuation-ready
+boundary. Its EC05 source inventory explicitly leaves native runtime adapters
+to EC09 and does not mark the fallback delivered. The disposable OA fixture's
+continuation acknowledgement is not native wake, and no fake wake route or
+passing placeholder was added. ER-002 and EC00 remain open, including generated
+SDK handling of Rust pre-dispatch cancellation, along with the
+other production generation, ingress, workload and operational conditions.
+
+Run the existing `transport_failure_checks.py`, `watch_replay_checks.py` and
+`versioned_native_checks.py` commands in the pinned Nix environment above.
+Missing pinned runtimes fail instead of skipping. Historical IDL, generated
+clients, locks, OwnerOracle and the unknown-value fixtures remain unchanged.

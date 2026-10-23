@@ -8,6 +8,8 @@ import base64
 from pathlib import Path
 import re
 import sqlite3
+import socket
+import struct
 import sys
 import threading
 from typing import Any
@@ -28,6 +30,9 @@ import grpc
 
 class _Server(ThreadingHTTPServer):
     daemon_threads = True
+    request_queue_size = 16
+    max_connections = 16
+    connection_deadline = 2.0
 
     def __init__(self, path: Path, principal_id: str, fault_plan: set[tuple[str, str]] | None = None,
                  address: tuple[str, int] = ("127.0.0.1", 0)):
@@ -35,7 +40,79 @@ class _Server(ThreadingHTTPServer):
         self.principal_id = principal_id
         self.fault_plan = set(fault_plan or ())
         self.fault_consumed: set[tuple[str, str]] = set()
+        self.transport_condition = threading.Condition()
+        self.transport_active: dict[socket.socket, threading.Timer] = {}
+        self.transport_peak_active = 0
+        self.transport_rejected = 0
+        self.transport_completed = 0
+        self._transport_slots = threading.BoundedSemaphore(self.max_connections)
+        self._transport_workers = futures.ThreadPoolExecutor(max_workers=self.max_connections,
+            thread_name_prefix="ec00-http-handler")
         super().__init__(address, _Handler)
+
+    @staticmethod
+    def _abort_connection(connection: socket.socket) -> None:
+        # A timed-out or rejected peer must not leave an unowned FIN wait socket.
+        try:
+            connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+            connection.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        connection.close()
+
+    def process_request(self, request, client_address):
+        if not self._transport_slots.acquire(blocking=False):
+            with self.transport_condition:
+                self.transport_rejected += 1
+                self.transport_condition.notify_all()
+            self._abort_connection(request)
+            return
+        request.settimeout(self.connection_deadline)
+        timer = threading.Timer(self.connection_deadline, self._abort_connection, (request,))
+        timer.daemon = True
+        timer.name = "ec00-http-deadline"
+        with self.transport_condition:
+            self.transport_active[request] = timer
+            self.transport_peak_active = max(self.transport_peak_active, len(self.transport_active))
+            self.transport_condition.notify_all()
+        timer.start()
+        try:
+            self._transport_workers.submit(self.process_request_thread, request, client_address)
+        except BaseException:
+            self._finish_connection(request)
+            raise
+
+    def _finish_connection(self, request):
+        with self.transport_condition:
+            timer = self.transport_active[request]
+        timer.cancel()
+        timer.join()  # Retain the connection slot until its timer is gone too.
+        self._abort_connection(request)
+        with self.transport_condition:
+            del self.transport_active[request]
+            self.transport_completed += 1
+            self._transport_slots.release()
+            self.transport_condition.notify_all()
+
+    def process_request_thread(self, request, client_address):
+        try:
+            self.finish_request(request, client_address)
+            # Every response has Content-Length, so a valid client can finish
+            # and close without our sending FIN first. Retain ownership while
+            # the peer drains; an early server FIN would leave TIME_WAIT state
+            # after the slot was released. The absolute timer bounds this wait.
+            while request.recv(4096):
+                pass
+        except OSError:
+            pass
+        except Exception:
+            self.handle_error(request, client_address)
+        finally:
+            self._finish_connection(request)
+
+    def server_close(self):
+        super().server_close()
+        self._transport_workers.shutdown(wait=True)
 
     def owner_call(self, operation: str, *args: Any, **kwargs: Any) -> dict[str, Any]:
         once_operation = {
@@ -70,6 +147,7 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Connection", "close")
         self.end_headers()
         try:
             self.wfile.write(body)
