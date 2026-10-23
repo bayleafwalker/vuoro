@@ -108,7 +108,7 @@ jobs:
           assert (len(cases), skipped, failed, errors) == (257, 0, 0, 0), (len(cases), skipped, failed, errors)
           PY
       - name: Build the actual vuoro-contracts wheel
-        run: uv build --package vuoro-contracts --wheel --out-dir dist/vuoro-contracts
+        run: uv build --package vuoro-contracts --wheel --out-dir dist/vuoro-contracts --no-create-gitignore
       - name: Exercise wheel resources in an isolated consumer
         shell: bash
         run: |
