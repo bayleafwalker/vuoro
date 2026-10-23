@@ -111,19 +111,33 @@ jobs:
 
   ec00-transport-failures:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v8.3.2
         with:
-          python-version: "3.13"
+          python-version: "3.13.16"
+      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012 # v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: Prepare locked native client runtimes and dependencies
+        shell: bash
+        run: |
+          nix develop ./tests/experiments/ec00/candidates/toolchain --command bash -euc '
+            npm ci --prefix tests/experiments/ec00/candidates --ignore-scripts --no-audit --no-fund
+            "$EC00_CARGO" fetch --locked --manifest-path tests/experiments/ec00/candidates/rust-client/Cargo.toml
+            (cd tests/experiments/ec00 && "$EC00_GO" mod download)
+          '
       - name: Compare generated-client deadline, cancellation and response loss
         run: >-
+          nix develop ./tests/experiments/ec00/candidates/toolchain --command
           uv run --project tests/experiments/ec00/candidates --locked
           python -m unittest discover -s tests/experiments/ec00
           -p transport_failure_checks.py -v
       - name: Compare unary watch replay, reconnect and refusal semantics
         run: >-
+          nix develop ./tests/experiments/ec00/candidates/toolchain --command
           uv run --project tests/experiments/ec00/candidates --locked
           python -m unittest discover -s tests/experiments/ec00
           -p watch_replay_checks.py -v
