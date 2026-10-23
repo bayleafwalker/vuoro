@@ -181,6 +181,19 @@ jobs:
           export VUORO_CONTRACT_DECODER="${GITHUB_WORKSPACE}/tools/contracts/templates/strict-json.ts"
           export PYTHONPATH="${GITHUB_WORKSPACE}/packages/vuoro-contracts/src"
           export PYTHONDONTWRITEBYTECODE=1
+          # Compare bytes before starting a generator child; metadata only.
+          .venv/bin/python - "$VUORO_CONTRACT_NODE" "$VUORO_CONTRACT_PYTHON" <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import sys
+
+          expected = json.loads(pathlib.Path("tools/contracts/toolchain/tool-artifacts.json").read_text())["executables"]
+          paths = {"node": pathlib.Path(sys.argv[1]), "python": pathlib.Path(sys.argv[2]).resolve(), "ruff": pathlib.Path("tools/contracts/.venv/bin/ruff").resolve()}
+          actual = {name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in paths.items()}
+          print(json.dumps({"expected": expected, "actual": actual, "paths": {name: str(path) for name, path in paths.items()}}, sort_keys=True))
+          assert actual == expected, "Restore exactly the qualified executable artifacts before generation"
+          PY
           .venv/bin/python -m pytest -q --tb=short -o addopts= \
             packages/vuoro-contracts/tests \
             packages/vuoro-client/tests/test_generated_contract_boundary.py \
