@@ -24,7 +24,7 @@ def exercise(root: Path, scenario: str) -> dict:
     socket.socket = _forbid_network
     socket.create_connection = _forbid_network
     sys.path.insert(0, str(root / "clients/python"))
-    package = "vuoro_generated_contract_client"
+    package = "vuoro_contract_" + sha256(json.loads((root / "operation-manifest.json").read_bytes())["contractId"].encode("utf-8")).hexdigest() + "_client"
     native_client = importlib.import_module(package + ".client")
     submit = importlib.import_module(package + ".api.default.submit")
     digest = sha256((root / "integrity.json").read_bytes()).hexdigest()

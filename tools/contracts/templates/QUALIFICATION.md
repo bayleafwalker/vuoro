@@ -42,8 +42,11 @@ implementations. Root must admit their complete generic implementation and stric
 decoder before claiming the F1b oracle executable end to end. No generator may
 fall back to a plain JSON.parse decoder or skip absent tooling.
 
-The Python output package is `vuoro_generated_contract_client` (the root-pinned
-openapi-python-client config). Its `validated_client` module exports
+The Python output package is derived from the exact authored manifest
+`contractId` as `vuoro_contract_<sha256-utf8-contractId>_client`, using all 64
+lowercase digest digits without normalization. The public `0.1.0` release still
+used the fixed `vuoro_generated_contract_client` package; that published
+limitation remains historical and unchanged. The `validated_client` module exports
 `create_validated_client(*, client: <actual generated Client>,
 integrity_sha256: str)`. The result has emitted operation methods: `submit(key=,
 body=)`, `inspect(key=)`, `empty(key=)`, and `null_body(key=)` for this supporting

@@ -17,7 +17,7 @@ def exercise(root, scenario):
         raise AssertionError("regression_network_forbidden")
     socket.socket = socket.create_connection = no_socket
     sys.path.insert(0, str(root / "clients/python"))
-    package = "vuoro_generated_contract_client"
+    package = "vuoro_contract_" + sha256(json.loads((root / "operation-manifest.json").read_bytes())["contractId"].encode("utf-8")).hexdigest() + "_client"
     Client = import_module(package + ".client").Client
     Input = import_module(package + ".models.input_").Input
     module = import_module(package + (".api.owner.submit" if scenario == "tagged" else ".api.default.submit"))
@@ -112,7 +112,7 @@ def exercise_final_parameter_regression(root, scenario):
         raise AssertionError("regression_network_forbidden")
     socket.socket = socket.create_connection = no_socket
     sys.path.insert(0, str(root / "clients/python"))
-    package = "vuoro_generated_contract_client"
+    package = "vuoro_contract_" + sha256(json.loads((root / "operation-manifest.json").read_bytes())["contractId"].encode("utf-8")).hexdigest() + "_client"
     Client = import_module(package + ".client").Client
     Input = import_module(package + ".models.input_").Input
     module = import_module(package + ".api.default.submit")
