@@ -197,9 +197,9 @@ def create_validated_client(*, client, integrity_sha256):
             native_kwargs={binding["parameters"].get(p["in"],{}).get(p["name"],p["name"]):kwargs[p["name"]] for p in op["parameters"] if p["name"] in kwargs}
             if body is not ABSENT:
                 model_info=binding["model"]
-                model=getattr(import_module("vuoro_generated_contract_client.models."+model_info["module"]),model_info["class"])
+                model=getattr(import_module(".models."+model_info["module"], package=__package__),model_info["class"])
                 native_kwargs[binding["body_parameter"]]=model.from_dict(body)
-            module=import_module("vuoro_generated_contract_client."+binding["module"])
+            module=import_module("."+binding["module"], package=__package__)
             slot={"operation":name,"parameters":dict(kwargs),"envelopes":[]}; token=current.set(slot)
             try: module.sync_detailed(client=client, **native_kwargs)
             except ContractError: raise

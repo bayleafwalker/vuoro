@@ -16,6 +16,7 @@ import pytest
 from vuoro_contracts import ContractBundle, ContractError, validate_bundle
 
 ROOT = Path(__file__).resolve().parents[3]
+PYTHON_PACKAGE = "vuoro_contract_" + sha256(b"probe/v1").hexdigest() + "_client"
 SOURCE = ROOT / "tools/contracts/fixtures/probe"
 TOOLS = ROOT / "tools/contracts"
 ORACLES = TOOLS / "templates/tests"
@@ -77,7 +78,7 @@ def test_two_clean_generations_default_check_and_owner_resource_load(tmp_path, g
     assert bundle.validate_response("nullBody", 200, None) is None
     assert (second / "clients/typescript/validated-sdk.ts").is_file()
     assert (second / "clients/typescript/strict-json.ts").read_bytes() == (TOOLS / "templates/strict-json.ts").read_bytes()
-    assert (second / "clients/python/vuoro_generated_contract_client/validated_client.py").is_file()
+    assert (second / f"clients/python/{PYTHON_PACKAGE}/validated_client.py").is_file()
     schema = json.loads((second / manifest["schemaBundle"]["path"]).read_bytes())
     validate_bundle(schema)
     assert any(p.name == "sdk.gen.ts" for p in (second / "clients/typescript").rglob("*.ts"))
@@ -92,9 +93,9 @@ def test_real_projection_or_attachment_mutation_fails_read_only_check(tmp_path, 
     paths = {"manifest": out / "operation-manifest.json",
              "schema": next((out / "schema").glob("*.json")),
              "openapi": next((out / "openapi").glob("*.json")),
-             "python": out / "clients/python/vuoro_generated_contract_client/api/default/submit.py",
+             "python": out / f"clients/python/{PYTHON_PACKAGE}/api/default/submit.py",
              "typescript": out / "clients/typescript/sdk.gen.ts",
-             "python_attachment": out / "clients/python/vuoro_generated_contract_client/validated_client.py",
+             "python_attachment": out / f"clients/python/{PYTHON_PACKAGE}/validated_client.py",
              "typescript_attachment": out / "clients/typescript/validated-sdk.ts",
              "decoder": out / "clients/typescript/strict-json.ts"}
     if projection == "extra": (out / "unknown.bin").write_bytes(b"unexpected")
