@@ -38,9 +38,12 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping
+from typing import TYPE_CHECKING, Any, Iterable, Mapping
 
 from .core.model import EvidenceItem, EvidenceSet
+
+if TYPE_CHECKING:
+    from .workflow import WorkflowBindingObservation
 
 
 class RunManifestError(ValueError):
@@ -113,6 +116,10 @@ class RunManifest:
     observed_profile: ObservedProfile
     grant_ids: tuple[str, ...] = ()
     claim_ids: tuple[str, ...] = ()
+    # Optional owner-reported workflow provenance. A selected definition alone
+    # is not an observation: this requires a separate provider receipt reference.
+    # Existing manifests omit this field entirely to preserve their digests.
+    workflow_observation: WorkflowBindingObservation | None = None
 
     def __post_init__(self) -> None:
         _require("run_id", self.run_id)
@@ -127,6 +134,13 @@ class RunManifest:
             )
         _require_ids("grant_ids", self.grant_ids)
         _require_ids("claim_ids", self.claim_ids)
+        if self.workflow_observation is not None:
+            from .workflow import WorkflowBindingObservation
+
+            if not isinstance(self.workflow_observation, WorkflowBindingObservation):
+                raise RunManifestError(
+                    "RunManifest.workflow_observation must identify a binding and provider receipt"
+                )
 
     def composition(self) -> dict[str, Any]:
         """The full composition of the run, from this object alone.
@@ -134,7 +148,7 @@ class RunManifest:
         R8/R9 in one call: what harness build, what model, what recipe, what
         profile was observed, under which grants and claims.
         """
-        return {
+        result = {
             "run_id": self.run_id,
             "harness_id": self.harness_id,
             "harness_build": self.harness_build,
@@ -144,6 +158,9 @@ class RunManifest:
             "grant_ids": list(self.grant_ids),
             "claim_ids": list(self.claim_ids),
         }
+        if self.workflow_observation is not None:
+            result["workflow_observation"] = self.workflow_observation.as_dict()
+        return result
 
     def composition_digest(self) -> str:
         """Digest over the composition *excluding* `run_id`.
