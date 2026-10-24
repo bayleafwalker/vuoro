@@ -200,6 +200,8 @@ def _build_ts_oracle(generated, stage, oracle_name):
                     "__CLIENT__": str(stage / "client/client/index.ts"), "__AJV__": str(TOOLS / "node_modules/ajv/dist/2020.js")}
     manifest = json.loads((generated / "operation-manifest.json").read_bytes())
     for old, new in replacements.items(): runner = runner.replace(old, new)
+    vector_json = (TOOLS / "fixtures/wire-vectors.json").read_text()
+    runner = runner.replace("__WIRE_VECTORS_JSON__", json.dumps(vector_json))
     runner = runner.replace("__MANIFEST_LITERAL__", json.dumps(manifest))
     runner = runner.replace("__BUNDLE_LITERAL__", (generated / manifest["schemaBundle"]["path"]).read_text())
     if oracle_name == "typescript_sdk_oracle.ts":
@@ -246,6 +248,8 @@ def test_actual_attachment_strict_decoder(generated, tmp_path):
 def test_strict_decoder_unit_at_explicit_root_admitted_source(tmp_path):
     source = Path(executable("VUORO_CONTRACT_DECODER"))
     runner = (ORACLES / "strict-decoder-oracle.ts").read_text().replace("__DECODER__", str(source))
+    vector_json = (TOOLS / "fixtures/wire-vectors.json").read_text()
+    runner = runner.replace("__WIRE_VECTORS_JSON__", json.dumps(vector_json))
     entry = tmp_path / "decoder-oracle.ts"
     output = tmp_path / "decoder-oracle.mjs"
     entry.write_text(runner)

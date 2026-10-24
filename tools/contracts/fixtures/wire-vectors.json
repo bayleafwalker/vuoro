@@ -1,0 +1,42 @@
+{
+  "invalid": [
+    {"name": "duplicate-key", "raw": "{\"x\":1,\"x\":2}"},
+    {"name": "escaped-duplicate-key", "raw": "{\"x\":1,\"\\u0078\":2}"},
+    {"name": "non-json-number", "raw": "{\"x\":NaN}"},
+    {"name": "overflow-number", "raw": "1e999"},
+    {"name": "unsafe-exponent-integer", "raw": "1e30"},
+    {"name": "invalid-leading-zero", "raw": "01"},
+    {"name": "trailing-data", "raw": "{} trailing"},
+    {"name": "unpaired-high-surrogate-value", "raw": "\"\\ud800\""},
+    {"name": "unpaired-low-surrogate-key", "raw": "{\"\\udfff\":1}"},
+    {"name": "unsafe-integer-token", "raw": "9007199254740993"},
+    {"name": "invalid-utf8", "base64": "/w=="}
+  ],
+  "valid": [
+    {
+      "name": "nested-unicode-and-number",
+      "raw": "{\"text\":\"é😀\",\"n\":null,\"b\":false,\"a\":[1,-2.5e3]}",
+      "value": {"text": "é😀", "n": null, "b": false, "a": [1, -2500.0]}
+    },
+    {
+      "name": "escaped-supplementary-scalar",
+      "raw": "\"\\ud83d\\ude00\"",
+      "value": "😀"
+    },
+    {
+      "name": "lossless-counter-string",
+      "raw": "{\"revision\":\"9007199254740995\"}",
+      "value": {"revision": "9007199254740995"}
+    },
+    {
+      "name": "largest-safe-integer-token",
+      "raw": "9007199254740991",
+      "value": 9007199254740991
+    },
+    {
+      "name": "prototype-key-is-data",
+      "raw": "{\"__proto__\":{\"polluted\":true}}",
+      "value": {"__proto__": {"polluted": true}}
+    }
+  ]
+}
