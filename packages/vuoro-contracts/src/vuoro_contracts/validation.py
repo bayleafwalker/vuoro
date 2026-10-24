@@ -49,6 +49,142 @@ def _float(value: str) -> float:
     return result
 
 
+def _check_json_complexity(text: str) -> None:
+    """Bound JSON structure before the standard decoder materializes it."""
+    offset = 0
+    nodes = 0
+    size = len(text)
+
+    def space() -> None:
+        nonlocal offset
+        while offset < size and text[offset] in " \t\r\n":
+            offset += 1
+
+    def string() -> None:
+        nonlocal offset
+        if offset >= size or text[offset] != '"':
+            raise ValueError
+        offset += 1
+        while offset < size:
+            character = text[offset]
+            offset += 1
+            if character == '"':
+                return
+            if character == "\\":
+                if offset >= size:
+                    raise ValueError
+                escape = text[offset]
+                offset += 1
+                if escape == "u":
+                    if offset + 4 > size or any(
+                        digit not in "0123456789abcdefABCDEF"
+                        for digit in text[offset:offset + 4]
+                    ):
+                        raise ValueError
+                    offset += 4
+                elif escape not in '"\\/bfnrt':
+                    raise ValueError
+            elif ord(character) < 0x20:
+                raise ValueError
+        raise ValueError
+
+    def number() -> None:
+        nonlocal offset
+        if offset < size and text[offset] == "-":
+            offset += 1
+        if offset < size and text[offset] == "0":
+            offset += 1
+            if offset < size and text[offset].isdigit() and text[offset].isascii():
+                raise ValueError
+        elif offset < size and text[offset] in "123456789":
+            offset += 1
+            while offset < size and text[offset] in "0123456789":
+                offset += 1
+        else:
+            raise ValueError
+        if offset < size and text[offset] == ".":
+            offset += 1
+            start = offset
+            while offset < size and text[offset] in "0123456789":
+                offset += 1
+            if offset == start:
+                raise ValueError
+        if offset < size and text[offset] in "eE":
+            offset += 1
+            if offset < size and text[offset] in "+-":
+                offset += 1
+            start = offset
+            while offset < size and text[offset] in "0123456789":
+                offset += 1
+            if offset == start:
+                raise ValueError
+
+    def value(depth: int) -> None:
+        nonlocal offset, nodes
+        nodes += 1
+        if depth > _MAX_JSON_DEPTH or nodes > _MAX_JSON_NODES or offset >= size:
+            raise ValueError
+        character = text[offset]
+        if character == '"':
+            string()
+        elif character == "[":
+            offset += 1
+            space()
+            if offset < size and text[offset] == "]":
+                offset += 1
+                return
+            while True:
+                value(depth + 1)
+                space()
+                if offset >= size:
+                    raise ValueError
+                delimiter = text[offset]
+                offset += 1
+                if delimiter == "]":
+                    return
+                if delimiter != ",":
+                    raise ValueError
+                space()
+        elif character == "{":
+            offset += 1
+            space()
+            if offset < size and text[offset] == "}":
+                offset += 1
+                return
+            while True:
+                string()
+                space()
+                if offset >= size or text[offset] != ":":
+                    raise ValueError
+                offset += 1
+                space()
+                value(depth + 1)
+                space()
+                if offset >= size:
+                    raise ValueError
+                delimiter = text[offset]
+                offset += 1
+                if delimiter == "}":
+                    return
+                if delimiter != ",":
+                    raise ValueError
+                space()
+        elif text.startswith("true", offset):
+            offset += 4
+        elif text.startswith("false", offset):
+            offset += 5
+        elif text.startswith("null", offset):
+            offset += 4
+        else:
+            number()
+
+    space()
+    value(0)
+    space()
+    if offset != size:
+        raise ValueError
+
+
 def _finite_json(value: Any, *, depth: int = 0, _nodes: list[int] | None = None) -> bool:
     if _nodes is None:
         _nodes = [0]
@@ -102,6 +238,7 @@ def parse_json(raw: bytes | str, *, max_bytes: int) -> Any:
             text = raw
         else:
             raise ContractError("json")
+        _check_json_complexity(text)
         value = json.loads(text, object_pairs_hook=_pairs, parse_constant=_constant,
                            parse_float=_float)
         if not _finite_json(value):
