@@ -191,3 +191,9 @@ Next product step: Cloud's disabled capability and Work/Evidence projection
 must consume these bounded links under per-workspace live authority, then expose
 authorized source snippets through separate artifact access. The browser demo
 remains synthetic. No hosted route or existing live task was modified here.
+
+## Portable agent workflow planning (2026-10-24)
+
+The [portable workflow owner plan](2026-10-24-portable-agent-workflows.md) records the investigated
+next work, dependencies and acceptance gates for repeatable long-running agent
+sessions. It is a proposal for implementation, not evidence of a deployed capability.
