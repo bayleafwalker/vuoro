@@ -260,6 +260,226 @@ class AsyncVuoroClient:
             result = ResourceReference.model_validate(result).model_dump(mode="json")
         return result
 
+    async def publish_operator_request(
+        self,
+        *,
+        request_id: str,
+        packet: Mapping[str, Any],
+        dependants: list[Mapping[str, Any]],
+        idempotency_key: str,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Publish one stable request through the advertised owner operation."""
+        return await self.invoke(
+            "work.request.publish-v1",
+            {
+                "request_id": request_id,
+                "packet": dict(packet),
+                "dependants": [dict(item) for item in dependants],
+                "idempotency_key": idempotency_key,
+            },
+            repo_id=repo_id,
+        )
+
+    async def get_operator_request(
+        self, request_id: str, *, repo_id: str | None = None
+    ) -> dict[str, Any]:
+        """Read the owner snapshot for one request without interpreting it."""
+        return await self.invoke(
+            "work.request.get-v1", {"request_id": request_id}, repo_id=repo_id
+        )
+
+    async def list_operator_requests(
+        self,
+        *,
+        limit: int = 50,
+        after_request_id: str | None = None,
+        state: str | None = None,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Page owner request records using the advertised request contract."""
+        arguments: dict[str, Any] = {"limit": limit}
+        if after_request_id is not None:
+            arguments["after_request_id"] = after_request_id
+        if state is not None:
+            arguments["state"] = state
+        return await self.invoke("work.request.list-v1", arguments, repo_id=repo_id)
+
+    async def list_operator_request_events(
+        self,
+        request_id: str,
+        *,
+        after_revision: int = 0,
+        limit: int = 50,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Read the append-only lifecycle events after a request revision."""
+        return await self.invoke(
+            "work.request.events-v1",
+            {"request_id": request_id, "after_revision": after_revision, "limit": limit},
+            repo_id=repo_id,
+        )
+
+    async def revise_operator_request(
+        self,
+        *,
+        request_id: str,
+        expected_revision: int,
+        packet: Mapping[str, Any],
+        idempotency_key: str,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Replace the packet only at the exact revision read by the producer."""
+        return await self.invoke(
+            "work.request.revise-v1",
+            {
+                "request_id": request_id,
+                "expected_revision": expected_revision,
+                "packet": dict(packet),
+                "idempotency_key": idempotency_key,
+            },
+            repo_id=repo_id,
+        )
+
+    async def add_operator_request_dependant(
+        self,
+        *,
+        request_id: str,
+        expected_revision: int,
+        dependant: Mapping[str, Any],
+        idempotency_key: str,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Attach another source session/work item at an exact revision."""
+        return await self.invoke(
+            "work.request.dependent-add-v1",
+            {
+                "request_id": request_id,
+                "expected_revision": expected_revision,
+                "dependant": dict(dependant),
+                "idempotency_key": idempotency_key,
+            },
+            repo_id=repo_id,
+        )
+
+    async def withdraw_operator_request_dependant(
+        self,
+        *,
+        request_id: str,
+        expected_revision: int,
+        work_item_id: int,
+        session_id: str,
+        idempotency_key: str,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Withdraw only this work/session dependant at an exact revision."""
+        return await self.invoke(
+            "work.request.dependent-withdraw-v1",
+            {
+                "request_id": request_id,
+                "expected_revision": expected_revision,
+                "work_item_id": work_item_id,
+                "session_id": session_id,
+                "idempotency_key": idempotency_key,
+            },
+            repo_id=repo_id,
+        )
+
+    async def record_operator_request_progress(
+        self,
+        *,
+        request_id: str,
+        expected_revision: int,
+        work_item_id: int,
+        session_id: str,
+        step_id: str,
+        status: str,
+        note: str,
+        idempotency_key: str,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Persist one dependent's procedure progress without closing its request."""
+        return await self.invoke(
+            "work.request.progress-v1",
+            {"request_id": request_id, "expected_revision": expected_revision,
+             "work_item_id": work_item_id, "session_id": session_id, "step_id": step_id,
+             "status": status, "note": note, "idempotency_key": idempotency_key},
+            repo_id=repo_id,
+        )
+
+    async def report_operator_request_performed(
+        self,
+        *,
+        request_id: str,
+        expected_revision: int,
+        outcome: str,
+        note: str,
+        idempotency_key: str,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Report a performed, partial or uncertain result; this is unverified."""
+        return await self.invoke(
+            "work.request.report-performed-v1",
+            {"request_id": request_id, "expected_revision": expected_revision,
+             "outcome": outcome, "note": note, "idempotency_key": idempotency_key},
+            repo_id=repo_id,
+        )
+
+    async def attest_operator_request(
+        self,
+        *,
+        request_id: str,
+        expected_revision: int,
+        statement: str,
+        performed_at: str,
+        idempotency_key: str,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Record an explicitly authorized human completion attestation."""
+        return await self.invoke(
+            "work.request.attest-v1",
+            {"request_id": request_id, "expected_revision": expected_revision,
+             "statement": statement, "performed_at": performed_at,
+             "idempotency_key": idempotency_key},
+            repo_id=repo_id,
+        )
+
+    async def decline_operator_request(
+        self,
+        *,
+        request_id: str,
+        expected_revision: int,
+        reason: str,
+        idempotency_key: str,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Decline a live request as a separate lifecycle outcome."""
+        return await self.invoke(
+            "work.request.decline-v1",
+            {"request_id": request_id, "expected_revision": expected_revision,
+             "reason": reason, "idempotency_key": idempotency_key},
+            repo_id=repo_id,
+        )
+
+    async def supersede_operator_request(
+        self,
+        *,
+        request_id: str,
+        expected_revision: int,
+        replacement_request_id: str,
+        packet: Mapping[str, Any],
+        idempotency_key: str,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Create a replacement revision and carry all active dependants forward."""
+        return await self.invoke(
+            "work.request.supersede-v1",
+            {"request_id": request_id, "expected_revision": expected_revision,
+             "replacement_request_id": replacement_request_id, "packet": dict(packet),
+             "idempotency_key": idempotency_key},
+            repo_id=repo_id,
+        )
+
     async def _resource_descriptor(self, resource_kind: str) -> tuple[dict[str, Any], dict[str, Any]]:
         catalog = await self.catalog()
         descriptor = next(
