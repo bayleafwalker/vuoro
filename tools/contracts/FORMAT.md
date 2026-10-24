@@ -22,6 +22,16 @@ Its digest is stored externally by the package consumer/build receipt. Always
 verify inventory at load; verify the external digest when supplied. This detects
 artifact drift, not semantic meaning or domain canonicalization.
 
+The Python SDK wheel repeats just its own `operation-manifest.json`, OpenAPI
+document and schema bundle under `<hashed-contract-package>/data/`, with a nested
+`integrity.json` covering those exact files. Its caller supplies the external
+digest for that nested inventory. The runtime reads package data through
+`importlib.resources`; filesystem and zip resource roots are snapshotted under
+the same 16 MiB per-file, 4096-file and 64 MiB total bounds. It does not extract
+data next to imported code, where ordinary bytecode could pollute the inventory.
+The candidate tree's top-level inventory still covers all generated SDK and
+attachment sources.
+
 Owner source comprises main.tsp, explicit tspconfig.yaml and contract.json
 (`contractVersion`, exact per-operation `exposures` and `byteBounds`). Metadata may not define
 property lists or override emitted schema/status identity. The root generator

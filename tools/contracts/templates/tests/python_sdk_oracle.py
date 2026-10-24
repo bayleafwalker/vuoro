@@ -28,6 +28,7 @@ def exercise(root: Path, scenario: str) -> dict:
     native_client = importlib.import_module(package + ".client")
     submit = importlib.import_module(package + ".api.default.submit")
     digest = sha256((root / "integrity.json").read_bytes()).hexdigest()
+    package_digest = sha256((root / f"clients/python/{package}/data/integrity.json").read_bytes()).hexdigest()
     contract = ContractBundle.load(root, integrity_sha256=digest)
     counts = {"native": 0, "model": 0, "serialize": 0, "parse": 0, "wire": 0, "effect": 0, "server_result": 0}
     wires = []
@@ -123,7 +124,7 @@ def exercise(root: Path, scenario: str) -> dict:
 
     transport = httpx.Client(base_url="https://contracts.invalid", transport=httpx.MockTransport(server), trust_env=False, follow_redirects=False)
     native = native_client.Client(base_url="https://contracts.invalid", raise_on_unexpected_status=True).set_httpx_client(transport)
-    guarded = attachment.create_validated_client(client=native, integrity_sha256=digest)
+    guarded = attachment.create_validated_client(client=native, integrity_sha256=package_digest)
 
     def refuse(call):
         try: call()

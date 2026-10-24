@@ -38,8 +38,12 @@ _QUALIFIED_INPUT_SHA256 = {
     "tools/contracts/tspconfig.template.yaml": "d6b5b33902b26f94a6bc1ae9bcccd8cfffac8af020f74304b215a9b7e624fe91",
     "tools/contracts/python-templates/endpoint_module.py.jinja": "9a626b839af95ca1cdb936e4dee7bedc5839e0aafbed15bc6869d9a8844d0348",
     "tools/contracts/templates/strict-json.ts": "356db0604d14267133842fa7b4b4a467fad6dd8b8b6f9bfa48d123e78c605831",
-    "tools/contracts/templates/validated-client.py.template": "edffa2f556d29f3e4a33c24e636a38def0e9ccf557bf76bcbba361883e7c5841",
+    "tools/contracts/templates/validated-client.py.template": "5992f3ad6c611964c721094a0e42c0993390b89c97658ea94acd86199c117d03",
     "tools/contracts/templates/validated-sdk.ts.template": "c4f700947db3726b5d3ee8d7c6230e30dd12e1ce840bf4a04f1f13d7a68bb58e",
+    "tools/contracts/templates/tests/python_sdk_oracle.py": "c42b52ae9ea95438e2de42862659b05e3582ef9670ef9ab6d532e2a274368346",
+    "tools/contracts/templates/tests/python_sdk_regressions.py": "946068bd391080da28ffd0ec578442f62c38cd6558fa077b12e7ed24c1e9935d",
+    "tools/contracts/templates/QUALIFICATION.md": "adaca3cca5d38109d18ab463ebcfdc7086e68b69a01023414958947e4098e21f",
+    "tools/contracts/FORMAT.md": "e7eae5e2c8653edfa572bc3368926be5fda341ba55aa46345bfc043256b5061e",
 }
 
 
@@ -345,7 +349,7 @@ def main(argv: list[str] | None = None) -> int:
             _typescript_sdk(tree, tools, node, manifest, bundle)
             _remove_generation_caches(tree)
             # Validate the exact staged projection and authenticate every file.
-            _write_runtime_package(tree, root, bundle, manifest)
+            _write_python_package_data(tree, manifest)
             files = inventory_tree(tree)
             (tree / "integrity.json").write_bytes(_json_bytes({"schemaVersion":"vuoro-contract-integrity/v1", "files":files}))
             from vuoro_contracts import ContractBundle
@@ -477,8 +481,11 @@ def _snapshot_digest(snapshot:Path)->str:
 
 
 def _toolchain_digest(tools:Path,root:Path,shared_snapshot:Path)->str:
-    candidates=[tools/"package.json",tools/"package-lock.json",tools/"pyproject.toml",tools/"uv.lock",tools/"openapi-python-client.yaml",tools/"toolchain/source-pins.json",tools/"toolchain/tool-artifacts.json",root/"scripts/contracts/generate.py"]
-    candidates += list((tools/"templates").glob("*.ts"))+list((tools/"templates").glob("*.template"))+[tools/"python-templates/endpoint_module.py.jinja"]
+    runtime=root/"packages/vuoro-contracts/src/vuoro_contracts"
+    candidates=[tools/"package.json",tools/"package-lock.json",tools/"pyproject.toml",tools/"uv.lock",tools/"openapi-python-client.yaml",tools/"toolchain/source-pins.json",tools/"toolchain/tool-artifacts.json",tools/"FORMAT.md",tools/"templates/QUALIFICATION.md",root/"scripts/contracts/generate.py",root/"scripts/contracts/build_python_sdk.py",root/"packages/vuoro-contracts/pyproject.toml",root/"uv.lock"]
+    candidates += [p for p in (tools/"templates").rglob("*") if p.is_file()]
+    candidates += [p for p in (tools/"python-templates").rglob("*") if p.is_file()]
+    candidates += list(runtime.rglob("*.py"))+list((runtime/"formats").glob("*.json"))
     h=sha256()
     for p in sorted(candidates,key=lambda x:x.relative_to(root).as_posix()):
         if p.is_file():
@@ -634,13 +641,28 @@ def _nullable_status_table(openapi_file:Path,bundle:Mapping[str,Any])->dict[str,
     return table
 
 
-def _write_runtime_package(tree: Path, root: Path, bundle: Mapping[str,Any], manifest: Mapping[str,Any]) -> None:
-    # Copy exact owner package format/runtime source, excluding caches and tests.
-    source=root/"packages/vuoro-contracts/src/vuoro_contracts"
-    dest=tree/"clients/python/vuoro_contracts"
-    shutil.copytree(source,dest,ignore=shutil.ignore_patterns("__pycache__","*.pyc"))
-    (tree/"clients/python/vuoro_contracts/data").mkdir(exist_ok=True)
-    (tree/"clients/python/vuoro_contracts/data/schema").mkdir(exist_ok=True)
+def _write_python_package_data(tree: Path, manifest: Mapping[str,Any]) -> None:
+    """Attach only this contract's authenticated documents to its SDK package."""
+    package_name = python_package_name(manifest.get("contractId"))
+    package = tree / "clients/python" / package_name
+    data = package / "data"
+    (data / "openapi").mkdir(parents=True)
+    (data / "schema").mkdir()
+    shutil.copyfile(tree / "operation-manifest.json", data / "operation-manifest.json")
+    shutil.copyfile(tree / "openapi/contract.openapi.json", data / "openapi/contract.openapi.json")
+    schema_relative = manifest["schemaBundle"]["path"]
+    if not isinstance(schema_relative, str) or not schema_relative.startswith("schema/"):
+        _fail()
+    schema_name = schema_relative.removeprefix("schema/")
+    if not schema_name or "/" in schema_name or "\\" in schema_name or schema_name in {".", ".."}:
+        _fail()
+    shutil.copyfile(tree / schema_relative, data / schema_relative)
+    # This nested inventory authenticates the package data independently from
+    # the source tree's inventory, which also covers SDK code and other outputs.
+    (data / "integrity.json").write_bytes(_json_bytes({
+        "schemaVersion": "vuoro-contract-integrity/v1",
+        "files": inventory_tree(data),
+    }))
 
 
 def _render_python_attachment(tree: Path, bundle: Mapping[str,Any], package_name: str) -> None:

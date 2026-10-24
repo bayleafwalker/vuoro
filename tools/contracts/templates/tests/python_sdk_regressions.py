@@ -43,7 +43,8 @@ def exercise(root, scenario):
     positive = module.sync_detailed(key="k", body=Input.from_dict(deepcopy(body)), client=native, **extra)
     assert positive.status_code == 200 and positive.parsed.to_dict() == success
     assert wires[-1][0] == "POST"
-    guarded = attachment.create_validated_client(client=native, integrity_sha256=sha256((root / "integrity.json").read_bytes()).hexdigest())
+    package_digest = sha256((root / f"clients/python/{package}/data/integrity.json").read_bytes()).hexdigest()
+    guarded = attachment.create_validated_client(client=native, integrity_sha256=package_digest)
     kwargs = {"key": "k", "body": deepcopy(body)}
     if extra: kwargs["x-token"] = "k"
     assert guarded.submit(**kwargs).body == success
@@ -140,7 +141,8 @@ def exercise_final_parameter_regression(root, scenario):
     if scenario == "omitted_query": assert wires[-1]["url"] == "https://contracts.invalid/probe/k?selector=k"
     if scenario == "omitted_header": assert wires[-1]["token"] == "k"
     if scenario == "numeric_query": assert wires[-1]["url"] == "https://contracts.invalid/probe/k?count=7"
-    guarded = attachment.create_validated_client(client=native, integrity_sha256=sha256((root / "integrity.json").read_bytes()).hexdigest())
+    package_digest = sha256((root / f"clients/python/{package}/data/integrity.json").read_bytes()).hexdigest()
+    guarded = attachment.create_validated_client(client=native, integrity_sha256=package_digest)
     # Omission by the caller is valid and must not become blanket-required behavior.
     if scenario in ("omitted_query", "omitted_header", "numeric_query"):
         assert guarded.submit(key="k", body=deepcopy(body)).body == success

@@ -79,6 +79,16 @@ def test_two_clean_generations_default_check_and_owner_resource_load(tmp_path, g
     assert (second / "clients/typescript/validated-sdk.ts").is_file()
     assert (second / "clients/typescript/strict-json.ts").read_bytes() == (TOOLS / "templates/strict-json.ts").read_bytes()
     assert (second / f"clients/python/{PYTHON_PACKAGE}/validated_client.py").is_file()
+    python_package = second / "clients/python" / PYTHON_PACKAGE
+    assert (python_package / "data/operation-manifest.json").is_file()
+    assert (python_package / "data/openapi/contract.openapi.json").is_file()
+    assert not (second / "clients/python/vuoro_contracts").exists()
+    package_integrity = python_package / "data/integrity.json"
+    package_bundle = ContractBundle.load(
+        python_package / "data",
+        integrity_sha256=sha256(package_integrity.read_bytes()).hexdigest(),
+    )
+    assert package_bundle.manifest == manifest
     schema = json.loads((second / manifest["schemaBundle"]["path"]).read_bytes())
     validate_bundle(schema)
     assert any(p.name == "sdk.gen.ts" for p in (second / "clients/typescript").rglob("*.ts"))

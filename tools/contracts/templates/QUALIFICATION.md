@@ -62,6 +62,15 @@ status/body before `_parse_response` or any generated response model conversion.
 Known declared 4xx/5xx responses return their validated status/body envelope;
 unknown status/code/body is a safe ContractError, never a raw SDK error/body leak.
 
+Each generated SDK wheel carries its own `data/` resource root and nested exact
+inventory. The common `vuoro-contracts` runtime is an installed dependency; it is
+not copied into each SDK distribution. Installed consumers load resources through
+`importlib.resources`, so normal bytecode creation beside SDK code does not enter
+the contract-data inventory. Qualification installs two distinct SDK wheels and
+the runtime from a local wheel cache with bytecode enabled, then imports both
+native operation modules and reads both authenticated resource roots outside the
+checkout.
+
 The TS attachment `validated-sdk.ts` exports `ABSENT`, `strictDecode(raw:
 Uint8Array, maxBytes: number)`, and
 `createValidatedClient({baseUrl: string, fetch: typeof fetch})`. Each emitted method

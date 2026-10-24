@@ -107,8 +107,115 @@ jobs:
           errors = sum(case.find("error") is not None for case in cases)
           assert (len(cases), skipped, failed, errors) == (257, 0, 0, 0), (len(cases), skipped, failed, errors)
           PY
+      - name: Run separate portable Python namespace and resource gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="${GITHUB_WORKSPACE}/packages/vuoro-contracts/src"
+          .venv/bin/python -m pytest -q --tb=short -o addopts= \
+            tools/contracts/portable_tests/test_namespace_portability.py \
+            --junitxml="$RUNNER_TEMP/contracts-portable.xml"
+          .venv/bin/python - "$RUNNER_TEMP/contracts-portable.xml" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+          cases = ET.parse(sys.argv[1]).getroot().findall(".//testcase")
+          skipped = sum(case.find("skipped") is not None for case in cases)
+          failed = sum(case.find("failure") is not None for case in cases)
+          errors = sum(case.find("error") is not None for case in cases)
+          assert (len(cases), skipped, failed, errors) == (26, 0, 0, 0), (len(cases), skipped, failed, errors)
+          PY
       - name: Build the actual vuoro-contracts wheel
         run: uv build --package vuoro-contracts --wheel --out-dir dist/vuoro-contracts --no-create-gitignore
+      - name: Build and consume two installed contract SDK wheels offline
+        shell: bash
+        run: |
+          set -euo pipefail
+          node_bin="$(nix develop ./tools/contracts/toolchain --command bash -euc 'command -v node')"
+          test "$("$node_bin" --version)" = "v24.21.0"
+          export VUORO_CONTRACT_NODE="$node_bin"
+          export VUORO_CONTRACT_PYTHON="${GITHUB_WORKSPACE}/tools/contracts/.venv/bin/python"
+          export PYTHONPATH="${GITHUB_WORKSPACE}/packages/vuoro-contracts/src"
+          first="$RUNNER_TEMP/contract-probe-v1"
+          second="$RUNNER_TEMP/contract-probe-v2"
+          .venv/bin/python scripts/contracts/generate.py \
+            --source tools/contracts/fixtures/probe --output "$first" \
+            --contract-id 'probe/v1' --write
+          .venv/bin/python scripts/contracts/generate.py \
+            --source tools/contracts/fixtures/probe --output "$second" \
+            --contract-id 'probe/v2' --write
+          .venv/bin/python scripts/contracts/build_python_sdk.py \
+            --bundle "$first" --output-dir "$RUNNER_TEMP/sdk-wheels"
+          .venv/bin/python scripts/contracts/build_python_sdk.py \
+            --bundle "$second" --output-dir "$RUNNER_TEMP/sdk-wheels"
+          .venv/bin/python - "$first" "$second" "$RUNNER_TEMP/sdk-integrity-digests.json" <<'PY'
+          from hashlib import sha256
+          import json
+          from pathlib import Path
+          import sys
+          digests = {}
+          for root in map(Path, sys.argv[1:3]):
+              manifest = json.loads((root / "operation-manifest.json").read_bytes())
+              package = "vuoro_contract_" + sha256(manifest["contractId"].encode("utf-8")).hexdigest() + "_client"
+              integrity = root / "clients/python" / package / "data/integrity.json"
+              digests[manifest["contractId"]] = sha256(integrity.read_bytes()).hexdigest()
+          Path(sys.argv[3]).write_text(json.dumps(digests, sort_keys=True) + "\n")
+          PY
+          consumer="$RUNNER_TEMP/vuoro-contract-sdks-consumer"
+          uv venv --python "$qualified_python" "$consumer"
+          uv pip install --offline --no-config --python "$consumer/bin/python" \
+            dist/vuoro-contracts/*.whl "$RUNNER_TEMP"/sdk-wheels/*.whl
+          cd "$RUNNER_TEMP"
+          "$consumer/bin/python" -I - <<'PY'
+          from hashlib import sha256
+          from importlib import import_module, resources
+          import json
+          from pathlib import Path
+          import sys
+
+          import httpx
+          from vuoro_contracts import ContractBundle
+
+          external_digests = json.loads(Path("sdk-integrity-digests.json").read_text())
+          expected = {
+              "probe/v1": "vuoro_contract_" + sha256(b"probe/v1").hexdigest() + "_client",
+              "probe/v2": "vuoro_contract_" + sha256(b"probe/v2").hexdigest() + "_client",
+          }
+          assert Path(import_module("vuoro_contracts").__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
+          for contract_id, package_name in expected.items():
+              package = import_module(package_name)
+              import_module(package_name + ".api.default.submit")
+              import_module(package_name + ".validated_client")
+              assert Path(package.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
+              root = resources.files(package_name).joinpath("data")
+              integrity = root.joinpath("integrity.json").read_bytes()
+              digest = external_digests[contract_id]
+              assert sha256(integrity).hexdigest() == digest
+              bundle = ContractBundle.load(root, integrity_sha256=digest)
+              assert bundle.manifest["contractId"] == contract_id
+              assert Path(package.__file__).parent.joinpath("__pycache__").is_dir()
+              requests = []
+              def respond(request):
+                  requests.append(request)
+                  return httpx.Response(200, json={"state": "ready", "revision": "1"}, request=request)
+              transport = httpx.Client(
+                  base_url="https://contracts.invalid",
+                  transport=httpx.MockTransport(respond),
+                  trust_env=False,
+              )
+              native = import_module(package_name + ".client").Client(
+                  base_url="https://contracts.invalid"
+              ).set_httpx_client(transport)
+              guarded = import_module(package_name + ".validated_client").create_validated_client(
+                  client=native, integrity_sha256=digest
+              )
+              result = guarded.submit(
+                  key="k", body={"revision": "1", "enabled": True, "nested": {"label": "x"}}
+              )
+              assert result.status == 200 and result.body == {"state": "ready", "revision": "1"}
+              assert len(requests) == 1 and requests[0].method == "POST"
+              transport.close()
+          print("two generated SDK wheels import independently with bytecode enabled")
+          PY
       - name: Exercise wheel resources in an isolated consumer
         shell: bash
         run: |
