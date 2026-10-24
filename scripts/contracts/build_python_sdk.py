@@ -127,10 +127,13 @@ def build(bundle_root: Path, output_dir: Path, repository_root: Path) -> Path:
             f"vuoro-contracts=={runtime_version}",
         ]
 
-        distribution = re.sub(r"[-_.]+", "-", package_name).lower()
+        # Wheel filenames use hyphens as field separators, so package-name
+        # separators must be encoded as underscores to keep the hashed SDK
+        # namespace in the single distribution field.
+        distribution = re.sub(r"[-_.]+", "_", package_name).lower()
         wheel_version = version_text.replace("-", "_")
         filename = f"{distribution}-{wheel_version}-py3-none-any.whl"
-        dist_info = f"{distribution.replace('-', '_')}-{version_text.replace('-', '_')}.dist-info"
+        dist_info = f"{distribution}-{version_text.replace('-', '_')}.dist-info"
         metadata = (
             "Metadata-Version: 2.3\n"
             f"Name: {package_name}\n"
