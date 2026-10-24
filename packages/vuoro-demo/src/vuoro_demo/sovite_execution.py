@@ -34,6 +34,79 @@ def _reject_constant(_value: str) -> None:
     raise ValueError("non_finite_json_number")
 
 
+def _preflight_json(raw: bytes) -> str:
+    """Check lexical structure and resource limits before materializing JSON."""
+    try:
+        source = raw.decode("utf-8", "strict")
+    except UnicodeDecodeError:
+        raise ValueError("invalid_json_encoding") from None
+    stack: list[str] = []
+    nodes = 0
+    index = 0
+    length = len(source)
+    while index < length:
+        char = source[index]
+        if char in " \t\r\n,:":
+            index += 1
+            continue
+        if char in "[{":
+            stack.append(char)
+            nodes += 1
+            if len(stack) - 1 > MAX_JSON_DEPTH or nodes > MAX_JSON_NODES:
+                raise ValueError("json_resource_limit")
+            index += 1
+            continue
+        if char in "]}":
+            if not stack or (char == "]") != (stack[-1] == "["):
+                raise ValueError("invalid_json_structure")
+            stack.pop()
+            index += 1
+            continue
+        if char == '"':
+            index += 1
+            while index < length:
+                current = source[index]
+                if current == '"':
+                    index += 1
+                    break
+                if ord(current) < 0x20:
+                    raise ValueError("invalid_json_string")
+                if current == "\\":
+                    index += 1
+                    if index >= length or source[index] not in '"\\/bfnrtu':
+                        raise ValueError("invalid_json_escape")
+                    if source[index] == "u":
+                        digits = source[index + 1:index + 5]
+                        if len(digits) != 4 or any(c not in "0123456789abcdefABCDEF" for c in digits):
+                            raise ValueError("invalid_json_escape")
+                        index += 4
+                index += 1
+            else:
+                raise ValueError("unterminated_json_string")
+            lookahead = index
+            while lookahead < length and source[lookahead] in " \t\r\n":
+                lookahead += 1
+            # Object member names are not value nodes; JSON parsing below will
+            # reject a string in any other invalid structural position.
+            if lookahead >= length or source[lookahead] != ":":
+                nodes += 1
+                if len(stack) > MAX_JSON_DEPTH or nodes > MAX_JSON_NODES:
+                    raise ValueError("json_resource_limit")
+            continue
+        if char in "-0123456789tfn":
+            nodes += 1
+            if len(stack) > MAX_JSON_DEPTH or nodes > MAX_JSON_NODES:
+                raise ValueError("json_resource_limit")
+            index += 1
+            while index < length and source[index] not in " \t\r\n,:[]{}\"":
+                index += 1
+            continue
+        raise ValueError("invalid_json_structure")
+    if stack:
+        raise ValueError("unterminated_json_structure")
+    return source
+
+
 def _validate_json_limits(value: Any) -> None:
     pending = [(value, 0)]
     nodes = 0
@@ -251,7 +324,9 @@ class SoviteExecutionClient:
     @staticmethod
     def _encode(model: BaseModel) -> bytes:
         try:
-            raw = json.dumps(model.model_dump(mode="json"), ensure_ascii=False,
+            dumped = model.model_dump(mode="json")
+            _validate_json_limits(dumped)
+            raw = json.dumps(dumped, ensure_ascii=False,
                              allow_nan=False, separators=(",", ":")).encode("utf-8", "strict")
         except (TypeError, ValueError, UnicodeEncodeError, RecursionError):
             raise SoviteExecutionError(status_code=None, code="invalid_request") from None
@@ -288,7 +363,9 @@ class SoviteExecutionClient:
                 raise SoviteExecutionUncertain(operation_id=operation_id or "unknown") from None
             raise SoviteExecutionError(status_code=None, code="transport_error") from None
         try:
-            payload = json.loads(b"".join(chunks), object_pairs_hook=_unique_object,
+            response_bytes = b"".join(chunks)
+            source = _preflight_json(response_bytes)
+            payload = json.loads(source, object_pairs_hook=_unique_object,
                                  parse_constant=_reject_constant)
             _validate_json_limits(payload)
             return response_model.model_validate(payload)
