@@ -305,6 +305,21 @@ class AsyncVuoroClient:
             arguments["state"] = state
         return await self.invoke("work.request.list-v1", arguments, repo_id=repo_id)
 
+    async def list_operator_request_events(
+        self,
+        request_id: str,
+        *,
+        after_revision: int = 0,
+        limit: int = 50,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Read the append-only lifecycle events after a request revision."""
+        return await self.invoke(
+            "work.request.events-v1",
+            {"request_id": request_id, "after_revision": after_revision, "limit": limit},
+            repo_id=repo_id,
+        )
+
     async def revise_operator_request(
         self,
         *,
@@ -367,6 +382,101 @@ class AsyncVuoroClient:
                 "session_id": session_id,
                 "idempotency_key": idempotency_key,
             },
+            repo_id=repo_id,
+        )
+
+    async def record_operator_request_progress(
+        self,
+        *,
+        request_id: str,
+        expected_revision: int,
+        work_item_id: int,
+        session_id: str,
+        step_id: str,
+        status: str,
+        note: str,
+        idempotency_key: str,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Persist one dependent's procedure progress without closing its request."""
+        return await self.invoke(
+            "work.request.progress-v1",
+            {"request_id": request_id, "expected_revision": expected_revision,
+             "work_item_id": work_item_id, "session_id": session_id, "step_id": step_id,
+             "status": status, "note": note, "idempotency_key": idempotency_key},
+            repo_id=repo_id,
+        )
+
+    async def report_operator_request_performed(
+        self,
+        *,
+        request_id: str,
+        expected_revision: int,
+        outcome: str,
+        note: str,
+        idempotency_key: str,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Report a performed, partial or uncertain result; this is unverified."""
+        return await self.invoke(
+            "work.request.report-performed-v1",
+            {"request_id": request_id, "expected_revision": expected_revision,
+             "outcome": outcome, "note": note, "idempotency_key": idempotency_key},
+            repo_id=repo_id,
+        )
+
+    async def attest_operator_request(
+        self,
+        *,
+        request_id: str,
+        expected_revision: int,
+        statement: str,
+        performed_at: str,
+        idempotency_key: str,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Record an explicitly authorized human completion attestation."""
+        return await self.invoke(
+            "work.request.attest-v1",
+            {"request_id": request_id, "expected_revision": expected_revision,
+             "statement": statement, "performed_at": performed_at,
+             "idempotency_key": idempotency_key},
+            repo_id=repo_id,
+        )
+
+    async def decline_operator_request(
+        self,
+        *,
+        request_id: str,
+        expected_revision: int,
+        reason: str,
+        idempotency_key: str,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Decline a live request as a separate lifecycle outcome."""
+        return await self.invoke(
+            "work.request.decline-v1",
+            {"request_id": request_id, "expected_revision": expected_revision,
+             "reason": reason, "idempotency_key": idempotency_key},
+            repo_id=repo_id,
+        )
+
+    async def supersede_operator_request(
+        self,
+        *,
+        request_id: str,
+        expected_revision: int,
+        replacement_request_id: str,
+        packet: Mapping[str, Any],
+        idempotency_key: str,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Create a replacement revision and carry all active dependants forward."""
+        return await self.invoke(
+            "work.request.supersede-v1",
+            {"request_id": request_id, "expected_revision": expected_revision,
+             "replacement_request_id": replacement_request_id, "packet": dict(packet),
+             "idempotency_key": idempotency_key},
             repo_id=repo_id,
         )
 

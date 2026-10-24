@@ -19,6 +19,7 @@ enum RequestState {
   reportedPerformed: "reported-performed",
   verifying,
   resolved,
+  declined,
   withdrawn,
   superseded,
 }
@@ -115,8 +116,69 @@ model WithdrawDependant {
   idempotency_key: string;
 }
 
+enum ProgressStatus {
+  inProgress: "in-progress",
+  completed,
+  blocked,
+  uncertain,
+}
+
+enum PerformedOutcome {
+  performed,
+  partial,
+  uncertain,
+}
+
+model RecordProcedureProgress {
+  request_id: RequestId;
+  expected_revision: int32;
+  work_item_id: int64;
+  session_id: string;
+  step_id: string;
+  status: ProgressStatus;
+  note: string;
+  idempotency_key: string;
+}
+
+model ReportPerformed {
+  request_id: RequestId;
+  expected_revision: int32;
+  outcome: PerformedOutcome;
+  note: string;
+  idempotency_key: string;
+}
+
+model HumanAttestation {
+  request_id: RequestId;
+  expected_revision: int32;
+  statement: string;
+  performed_at: string;
+  idempotency_key: string;
+}
+
+model DeclineRequest {
+  request_id: RequestId;
+  expected_revision: int32;
+  reason: string;
+  idempotency_key: string;
+}
+
+model SupersedeRequest {
+  request_id: RequestId;
+  expected_revision: int32;
+  replacement_request_id: RequestId;
+  packet: RequestPacket;
+  idempotency_key: string;
+}
+
 model GetRequest {
   request_id: RequestId;
+}
+
+model ListRequestEvents {
+  request_id: RequestId;
+  after_revision: int32;
+  limit: int32;
 }
 
 model ListRequests {
@@ -130,9 +192,14 @@ enum DependantState {
   withdrawn,
 }
 
-model DependantRecord extends Dependant {
+model DependantRecord {
+  work_item_id: int64;
+  session_id: string;
+  runtime_id: string | null;
   state: DependantState;
   work_revision: string;
+  current_work_revision: string | null;
+  source_changed: boolean;
   attached_at: string;
   withdrawn_at: string | null;
 }
@@ -148,6 +215,15 @@ model RequestSnapshot {
   updated_at: string;
 }
 
+model RequestEvent {
+  request_id: RequestId;
+  revision: int32;
+  action: string;
+  actor: string;
+  details: Record<unknown>;
+  recorded_at: string;
+}
+
 model MutationResult {
   request_id: RequestId;
   revision: int32;
@@ -157,4 +233,10 @@ model MutationResult {
 model ListRequestsResult {
   requests: RequestSnapshot[];
   next_after_request_id: RequestId | null;
+}
+
+model ListRequestEventsResult {
+  request_id: RequestId;
+  events: RequestEvent[];
+  next_after_revision: int32;
 }
