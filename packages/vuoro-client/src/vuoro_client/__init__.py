@@ -15,6 +15,23 @@ from vuoro_client.discovery import (
 )
 from vuoro_client.profile import Profile, ProfileError, load_profile
 from vuoro_client.errors import ClientIncompatibleError, InvocationRejectedError
+from vuoro_client.sovite_execution import (
+    CompleteRequest,
+    ExecutionIdentity,
+    ExecutionMutation,
+    LookupRequest,
+    PullRequest,
+    PullResponse,
+    StartResponse,
+    RenewResponse,
+    StatusResponse,
+    HandbackResponse,
+    CompleteResponse,
+    LookupResponse,
+    SoviteExecutionClient,
+    SoviteExecutionError,
+    SoviteExecutionUncertain,
+)
 
 try:
     __version__ = version("vuoro-client")
@@ -34,6 +51,21 @@ __all__ = [
     "Profile",
     "ProfileError",
     "InvocationRejectedError",
+    "CompleteRequest",
+    "ExecutionIdentity",
+    "ExecutionMutation",
+    "LookupRequest",
+    "PullRequest",
+    "PullResponse",
+    "StartResponse",
+    "RenewResponse",
+    "StatusResponse",
+    "HandbackResponse",
+    "CompleteResponse",
+    "LookupResponse",
+    "SoviteExecutionClient",
+    "SoviteExecutionError",
+    "SoviteExecutionUncertain",
     "load_profile",
     "parse_bootstrap_manifest",
     "parse_discovery",
