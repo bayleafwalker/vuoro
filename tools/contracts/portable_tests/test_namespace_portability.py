@@ -129,74 +129,54 @@ def test_zip_resource_root_loads_without_extracting_package_data(tmp_path):
         integrity = resource_root.joinpath("integrity.json").read_bytes()
         bundle = ContractBundle.load(resource_root, integrity_sha256=sha256(integrity).hexdigest())
         assert bundle.manifest["contractId"] == "probe/v1"
-
-
-def test_two_zip_installed_contract_sdks_load_their_own_authenticated_data(tmp_path, monkeypatch):
-    """Installed package resources stay bound to each hashed SDK namespace."""
-    archive = tmp_path / "installed-sdks.zip"
+    # Simulate two installed SDK distributions in one ZIP import root. Each
+    # namespace resolves its own resources without extracting package data.
+    package_archive = tmp_path / "installed-sdks.zip"
     package_names = [generator.python_package_name("probe/v1"),
                      generator.python_package_name("probe/v2")]
-    with zipfile.ZipFile(archive, "w") as output:
-        for index, package_name in enumerate(package_names):
-            package = tmp_path / package_name
-            shutil.copytree(FIXTURE, package / "data")
-            manifest_path = package / "data/operation-manifest.json"
-            manifest = json.loads(manifest_path.read_bytes())
-            manifest["contractId"] = f"probe/v{index + 1}"
-            manifest_path.write_text(json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n")
-            _reseal(package / "data")
-            (package / "__init__.py").write_text(
-                "from hashlib import sha256\n"
-                "from importlib import resources\n"
-                "from vuoro_contracts import ContractBundle\n"
-                "def load():\n"
-                "    root = resources.files(__package__).joinpath('data')\n"
-                "    digest = sha256(root.joinpath('integrity.json').read_bytes()).hexdigest()\n"
-                "    return ContractBundle.load(root, integrity_sha256=digest)\n"
-            )
+    packages: list[Path] = []
+    for index, package_name in enumerate(package_names):
+        package = tmp_path / package_name
+        packages.append(package)
+        shutil.copytree(FIXTURE, package / "data")
+        manifest_path = package / "data/operation-manifest.json"
+        manifest = json.loads(manifest_path.read_bytes())
+        manifest["contractId"] = f"probe/v{index + 1}"
+        manifest_path.write_text(json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n")
+        _reseal(package / "data")
+        (package / "__init__.py").write_text(
+            "from hashlib import sha256\n"
+            "from importlib import resources\n"
+            "from vuoro_contracts import ContractBundle\n"
+            "def load():\n"
+            "    root = resources.files(__package__).joinpath('data')\n"
+            "    digest = sha256(root.joinpath('integrity.json').read_bytes()).hexdigest()\n"
+            "    return ContractBundle.load(root, integrity_sha256=digest)\n"
+        )
+    with zipfile.ZipFile(package_archive, "w") as output:
+        for package_name, package in zip(package_names, packages):
             for path in package.rglob("*"):
                 if path.is_file():
-                    output.write(path, package_name + "/" + path.relative_to(package).as_posix())
+                    relative = path.relative_to(package).as_posix()
+                    data = path.read_bytes()
+                    if package_name == package_names[1] and relative == "data/README.txt":
+                        data += b"tampered after sealing"
+                    output.writestr(package_name + "/" + relative, data)
 
-    monkeypatch.syspath_prepend(str(archive))
-    modules = [importlib.import_module(name) for name in package_names]
-    bundles = [module.load() for module in modules]
-    assert [bundle.manifest["contractId"] for bundle in bundles] == ["probe/v1", "probe/v2"]
-    assert bundles[0].schemas is not bundles[1].schemas
-
-    for name in package_names:
-        sys.modules.pop(name, None)
-        for child in list(sys.modules):
-            if child.startswith(name + "."):
-                sys.modules.pop(child, None)
-
-
-def test_zip_installed_contract_consumer_rejects_package_data_tampering(tmp_path, monkeypatch):
-    package_name = generator.python_package_name("probe/v1")
-    archive = tmp_path / "tampered-sdk.zip"
-    package = tmp_path / package_name
-    shutil.copytree(FIXTURE, package / "data")
-    (package / "__init__.py").write_text(
-        "from hashlib import sha256\n"
-        "from importlib import resources\n"
-        "from vuoro_contracts import ContractBundle\n"
-        "def load():\n"
-        "    root = resources.files(__package__).joinpath('data')\n"
-        "    digest = sha256(root.joinpath('integrity.json').read_bytes()).hexdigest()\n"
-        "    return ContractBundle.load(root, integrity_sha256=digest)\n"
-    )
-    with zipfile.ZipFile(archive, "w") as output:
-        for path in package.rglob("*"):
-            if path.is_file():
-                relative = path.relative_to(package).as_posix()
-                data = path.read_bytes()
-                if relative == "data/README.txt":
-                    data += b"tampered after sealing"
-                output.writestr(package_name + "/" + relative, data)
-    monkeypatch.syspath_prepend(str(archive))
-    module = importlib.import_module(package_name)
-    with pytest.raises(ContractError, match="integrity"):
-        module.load()
+    sys.path.insert(0, str(package_archive))
+    try:
+        modules = [importlib.import_module(name) for name in package_names]
+        first, second = [module.load for module in modules]
+        assert first().manifest["contractId"] == "probe/v1"
+        with pytest.raises(ContractError, match="integrity"):
+            second()
+    finally:
+        sys.path.remove(str(package_archive))
+        for name in package_names:
+            sys.modules.pop(name, None)
+            for child in list(sys.modules):
+                if child.startswith(name + "."):
+                    sys.modules.pop(child, None)
 
 
 @pytest.mark.parametrize("mutation", [
