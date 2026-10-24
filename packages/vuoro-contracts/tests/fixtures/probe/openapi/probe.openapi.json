@@ -60,6 +60,13 @@
             "schema": {
               "$ref": "#/components/schemas/Key"
             }
+          },
+          {
+            "in": "header",
+            "name": "x-trace",
+            "schema": {
+              "$ref": "#/components/schemas/Key"
+            }
           }
         ],
         "requestBody": {

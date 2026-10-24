@@ -10,7 +10,10 @@
           "in": "path",
           "name": "key",
           "required": true,
-          "schema": "Key.json"
+          "schema": "Key.json",
+          "style": "simple",
+          "explode": false,
+          "allowReserved": false
         }
       ],
       "path": "/probe/{key}",
@@ -31,6 +34,18 @@
           "in": "path",
           "name": "key",
           "required": true,
+          "schema": "Key.json",
+          "style": "simple",
+          "explode": false,
+          "allowReserved": false
+        },
+        {
+          "in": "header",
+          "name": "x-trace",
+          "required": false,
+          "style": "simple",
+          "explode": false,
+          "allowReserved": false,
           "schema": "Key.json"
         }
       ],

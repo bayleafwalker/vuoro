@@ -94,6 +94,15 @@ ambient executable fallback. Output may not overlap source, escape its admitted
 parent or follow links. A write replaces only the admitted generated tree after
 successful generation/validation; failure preserves existing output.
 
+OpenAPI parameter serialization defaults are normalized into every manifest
+parameter: path and header parameters use `style: simple`, query parameters use
+`style: form`, and `explode` defaults to true only for `form`. `required`
+defaults to true for path parameters and false for query/header parameters.
+Explicit values that differ from this finite supported profile are rejected.
+Header parameters remain visible in the HTTP operation manifest but make an
+operation ineligible for MCP projection until an owner contract defines a safe
+binding.
+
 F1a runtime/profile and pure manifest/inventory mechanics are the first bounded
 unit. F1b compiler/SDK orchestration must additionally prove actual Python and TS
 request serialization and all status/body paths using generated SDKs; a pure

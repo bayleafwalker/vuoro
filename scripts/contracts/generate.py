@@ -44,7 +44,7 @@ _QUALIFIED_INPUT_SHA256 = {
     "tools/contracts/templates/tests/python_sdk_oracle.py": "c42b52ae9ea95438e2de42862659b05e3582ef9670ef9ab6d532e2a274368346",
     "tools/contracts/templates/tests/python_sdk_regressions.py": "946068bd391080da28ffd0ec578442f62c38cd6558fa077b12e7ed24c1e9935d",
     "tools/contracts/templates/QUALIFICATION.md": "adaca3cca5d38109d18ab463ebcfdc7086e68b69a01023414958947e4098e21f",
-    "tools/contracts/FORMAT.md": "e20b8d8149449b778a161dd604686aced332198e8a5b6f3c95c88b0c5531cade",
+    "tools/contracts/FORMAT.md": "1ba997fdc555c4b73b64e0615b4139f6cac63eca827aee400f94dae37106b2f7",
 }
 
 
@@ -168,21 +168,28 @@ def operation_manifest(openapi: Mapping[str, Any], bundle: Mapping[str, Any], *,
                     if key in seen_params:
                         _fail()
                     seen_params.add(key)
-                    if type(parameter.get("required")) is not bool:
+                    required = parameter.get("required", location == "path")
+                    if type(required) is not bool or (location == "path" and required is not True):
                         _fail()
                     if ("content" in parameter or "allowEmptyValue" in parameter
                             or set(parameter) - {"name", "in", "required", "schema", "description",
                                                  "deprecated", "style", "explode", "allowReserved"}):
                         _fail()
-                    style = parameter.get("style", "simple" if location == "path" else "form")
-                    explode = parameter.get("explode", location == "query")
+                    # OpenAPI parameter defaults depend on location: path and
+                    # header use simple, query uses form; explode defaults to
+                    # true only for form serialization. Normalize these
+                    # defaults into the manifest so downstream consumers never
+                    # have to guess (including for intentionally ineligible
+                    # domain headers).
+                    style = parameter.get("style", "form" if location == "query" else "simple")
+                    explode = parameter.get("explode", style == "form")
                     allow_reserved = parameter.get("allowReserved", False)
-                    if (style != ("simple" if location == "path" else "form")
-                            or type(explode) is not bool or explode != (location == "query")
+                    if (style != ("form" if location == "query" else "simple")
+                            or type(explode) is not bool or explode != (style == "form")
                             or allow_reserved is not False):
                         _fail()
                     emitted_parameters.append({"in": location, "name": param_name,
-                                               "required": parameter["required"],
+                                               "required": required,
                                                "style": style, "explode": explode,
                                                "allowReserved": False,
                                                "schema": _schema_id(parameter.get("schema"), openapi, bundle)})

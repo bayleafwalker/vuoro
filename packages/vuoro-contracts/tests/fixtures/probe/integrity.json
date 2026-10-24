@@ -1,8 +1,8 @@
 {
   "files": {
     "README.txt": "5a5d82701da7c599213e38a3b79225f5c1aeae6e2d3cc506e54ccbfd6c763f53",
-    "openapi/probe.openapi.json": "96ca3409ecd36cd6fa298118fcb751d56a3520b4f2124c4e1bb194e94d1036a2",
-    "operation-manifest.json": "3499bae258a0dc703cb460d8b8c99579b3e93e4ed9d9ee549cc9abac67d5ccad",
+    "openapi/probe.openapi.json": "a81ce3e61cb5dbdb73321d2a785ce90ef1af06c878ff0d0238d4406e2ca02abf",
+    "operation-manifest.json": "1b432d81af495f07acc128b3a871ad6b89730f63bb8698e704a6e63555575782",
     "schema/probe.schema.json": "0dcfa8d0a2daaabe1f543c8fe92b91624b49d36487707a997b6a7a42c1741845"
   },
   "schemaVersion": "vuoro-contract-integrity/v1"
