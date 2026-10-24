@@ -2,9 +2,9 @@
 from dataclasses import dataclass
 from contextvars import ContextVar
 from importlib import import_module
+from importlib import resources
 import json
 import math
-from pathlib import Path
 import re
 from urllib.parse import unquote_to_bytes
 from vuoro_contracts import ABSENT, ContractBundle, ContractError, parse_json
@@ -16,7 +16,10 @@ class Envelope:
     content: bytes
 
 def create_validated_client(*, client, integrity_sha256):
-    bundle = ContractBundle.load(Path(__file__).resolve().parents[3], integrity_sha256=integrity_sha256)
+    bundle = ContractBundle.load(
+        resources.files(__package__).joinpath("data"),
+        integrity_sha256=integrity_sha256,
+    )
     manifest = bundle.manifest
     ops = manifest["operations"]
     native_bindings = __NATIVE_BINDINGS__
