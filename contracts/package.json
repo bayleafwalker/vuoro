@@ -8,12 +8,16 @@
     },
     "./primitives": {
       "typespec": "./primitives/main.tsp"
+    },
+    "./operator-requests": {
+      "typespec": "./operator-requests/main.tsp"
     }
   },
   "files": [
     "main.tsp",
     "primitives",
-    "http"
+    "http",
+    "operator-requests"
   ],
   "name": "@vuoro/contracts",
   "peerDependencies": {
