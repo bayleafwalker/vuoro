@@ -155,3 +155,11 @@ The independent verification observation is labeled
 observation label from 0.1.1 and records the actual installed harness version.
 The [follow-up native proof](../../verification/specialized/private-workflow/schema-fixed.json)
 repeats the complete real execution and owner acceptance with those labels.
+
+# Provisional Sovite remote execution client
+
+`vuoro_demo.sovite_execution.SoviteExecutionClient` is an opt-in, standalone candidate adapter for the local Sovite source pinned at `ca9b5df3caef28d6dca0dd587e251aff482dcf11` (`sovite/execution_api.py` and `sovite/remote_execution.py`). It covers `pull`, `start`, `renew`, `status`, `handback`, `complete`, and `lookup` under `/internal/execution/`. It is not connected to `AsyncVuoroClient`, service composition, or a live worker path.
+
+The bearer is supplied directly for the execution-owner API and sent only as an Authorization header to the configured base endpoint. HTTPS is required except for loopback HTTP; redirects are disabled. Requests and streamed response bodies are bounded, response JSON rejects duplicate keys, non-finite values, and excessive depth/size, response models reject unknown fields, and the client does not retry. An ambiguous mutation outcome raises `SoviteExecutionUncertain` with the operation ID and recommends lookup before retrying or advancing. A lookup 404 is unresolved: absence from the journal does not establish that retry is safe.
+
+This is provisional source integration only. Before runtime adoption, qualify all seven route/request/response shapes against the exact pin; bounded streaming and malformed/oversized payload refusals; token scope and redirect behavior; and uncertain-outcome recovery, including the meaning of lookup 404. Update the source pin if the Sovite contract changes.

@@ -8,6 +8,8 @@ version = "0.1.2"
 description = "Optional disposable native-client settlement conformance demonstration"
 requires-python = ">=3.12"
 dependencies = [
+  "httpx>=0.27,<1",
+  "pydantic>=2.10,<3",
   "vuoro-client @ https://github.com/bayleafwalker/vuoro/releases/download/vuoro-client-v0.1.2/vuoro_client-0.1.2-py3-none-any.whl#sha256=7a4f32d4e2531a1abc99f5dc017fb8f6f22c4a1ef191079b98808be897081660",
   "vuoro-service @ https://github.com/bayleafwalker/vuoro/releases/download/vuoro-service-v0.1.97/vuoro_service-0.1.97-py3-none-any.whl#sha256=38b08a352617d88592dbc93da0f91afc1d5f5f230729761ca7e041de9fb32a56",
   "sprintctl[remote] @ https://github.com/bayleafwalker/sprintctl/releases/download/v0.22.0/sprintctl-0.22.0-py3-none-any.whl#sha256=2783651fc835e3e6123a14e3b1ca7587f9920db3c76c79c6ac7fdf5869cb2ca3",
