@@ -1,0 +1,187 @@
+{
+  "$id": "mcp-toolset.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "vuoro-mcp-toolset/v1"
+    },
+    "contractId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "contractVersion": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "projectionRequirementsVersion": {
+      "const": "mcp-toolset-projection/v1"
+    },
+    "provenance": {
+      "additionalProperties": false,
+      "properties": {
+        "sourceSha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "toolchainSha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "manifestSha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "schemaBundleSha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceSha256",
+        "toolchainSha256",
+        "manifestSha256",
+        "schemaBundleSha256"
+      ],
+      "type": "object"
+    },
+    "tools": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 64,
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          },
+          "inputSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "$schema": {
+                "const": "https://json-schema.org/draft/2020-12/schema"
+              },
+              "type": {
+                "const": "object"
+              },
+              "properties": {
+                "type": "object"
+              },
+              "required": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "additionalProperties": {
+                "const": false
+              },
+              "$defs": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "$schema",
+              "type",
+              "properties",
+              "required",
+              "additionalProperties"
+            ],
+            "type": "object"
+          },
+          "binding": {
+            "additionalProperties": false,
+            "properties": {
+              "operationId": {
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "method": {
+                "enum": [
+                  "GET",
+                  "POST",
+                  "PUT",
+                  "PATCH",
+                  "DELETE",
+                  "HEAD",
+                  "OPTIONS"
+                ]
+              },
+              "path": {
+                "pattern": "^/",
+                "type": "string"
+              },
+              "arguments": {
+                "additionalProperties": false,
+                "patternProperties": {
+                  "^[A-Za-z_][A-Za-z0-9_]*$": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "in": {
+                        "enum": [
+                          "path",
+                          "query",
+                          "body"
+                        ]
+                      },
+                      "name": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "schema": {
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9_.-]+$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "in",
+                      "name",
+                      "schema"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "required": [
+              "operationId",
+              "method",
+              "path",
+              "arguments"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "title",
+          "description",
+          "inputSchema",
+          "binding"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "contractId",
+    "contractVersion",
+    "projectionRequirementsVersion",
+    "provenance",
+    "tools"
+  ],
+  "type": "object"
+}

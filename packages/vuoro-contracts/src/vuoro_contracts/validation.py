@@ -28,6 +28,22 @@ _MAX_JSON_DEPTH = 64
 _MAX_JSON_NODES = 100_000
 _STATUS = re.compile(r"^[1-5][0-9]{2}$")
 _SCHEMA_ID = re.compile(r"^[A-Za-z0-9_.-]+$")
+_MCP_TOOL_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+_MCP_SCHEMA_KEYS = {
+    "$ref", "$schema", "$id", "$anchor", "$comment", "$defs",
+    "title", "description", "default", "examples", "deprecated", "readOnly", "writeOnly",
+    "type", "enum", "const", "multipleOf", "maximum", "exclusiveMaximum",
+    "minimum", "exclusiveMinimum", "maxLength", "minLength", "pattern",
+    "maxItems", "minItems", "uniqueItems", "maxContains", "minContains",
+    "maxProperties", "minProperties", "required", "additionalProperties",
+    "unevaluatedProperties", "properties", "patternProperties", "propertyNames",
+    "dependentRequired", "dependentSchemas", "allOf", "anyOf", "oneOf", "not",
+    "if", "then", "else", "items", "prefixItems", "contains",
+}
+_MCP_SCHEMA_MAPS = {"$defs", "properties", "patternProperties", "dependentSchemas"}
+_MCP_SCHEMA_LISTS = {"allOf", "anyOf", "oneOf", "prefixItems"}
+_MCP_SCHEMA_SINGLE = {"additionalProperties", "unevaluatedProperties", "propertyNames",
+                      "not", "if", "then", "else", "items", "contains"}
 
 
 def _pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -304,6 +320,20 @@ def _manifest_checks(manifest: Any, schemas: dict[str, Any]) -> None:
     if bundle_ref["id"] != schemas["$id"]:
         raise ContractError("manifest")
     operations = manifest["operations"]
+    mcp_tools = manifest.get("mcpTools", {})
+    if not isinstance(mcp_tools, dict):
+        raise ContractError("manifest")
+    public_ids = {name for name, operation in operations.items()
+                  if operation["exposure"] == "public"}
+    if set(mcp_tools) != public_ids:
+        raise ContractError("manifest")
+    mcp_names = [mapping.get("name") for mapping in mcp_tools.values()
+                 if isinstance(mapping, dict)]
+    if (len(mcp_names) != len(mcp_tools)
+            or len(set(mcp_names)) != len(mcp_names)
+            or any(not isinstance(name, str) or not _MCP_TOOL_NAME.fullmatch(name)
+                   for name in mcp_names)):
+        raise ContractError("manifest")
     bindings: set[tuple[str, str]] = set()
     for operation in operations.values():
         identity = (operation["method"], operation["path"])
@@ -337,6 +367,209 @@ def _manifest_checks(manifest: Any, schemas: dict[str, Any]) -> None:
                 raise ContractError("manifest")
             if cap is not None and (type(cap) is not int or cap <= 0):
                 raise ContractError("manifest")
+
+
+def _mcp_schema_refs(schema: Any) -> set[str]:
+    refs: set[str] = set()
+    if isinstance(schema, bool):
+        return refs
+    if not isinstance(schema, Mapping):
+        raise ContractError("manifest")
+    if set(schema) - _MCP_SCHEMA_KEYS:
+        raise ContractError("manifest")
+    ref = schema.get("$ref")
+    if ref is not None:
+        if not isinstance(ref, str) or not _SCHEMA_ID.fullmatch(ref):
+            raise ContractError("manifest")
+        refs.add(ref)
+    for key in _MCP_SCHEMA_MAPS:
+        children = schema.get(key)
+        if children is not None:
+            if not isinstance(children, Mapping):
+                raise ContractError("manifest")
+            for child in children.values():
+                refs.update(_mcp_schema_refs(child))
+    for key in _MCP_SCHEMA_LISTS:
+        children = schema.get(key)
+        if children is not None:
+            if not isinstance(children, list):
+                raise ContractError("manifest")
+            for child in children:
+                refs.update(_mcp_schema_refs(child))
+    for key in _MCP_SCHEMA_SINGLE:
+        if key in schema:
+            refs.update(_mcp_schema_refs(schema[key]))
+    return refs
+
+
+def _mcp_rebase_schema(schema: Any) -> Any:
+    if isinstance(schema, bool):
+        return schema
+    if not isinstance(schema, Mapping):
+        raise ContractError("manifest")
+    if set(schema) - _MCP_SCHEMA_KEYS:
+        raise ContractError("manifest")
+    result: dict[str, Any] = {}
+    for key, value in schema.items():
+        if key == "$id":
+            continue
+        if key == "$ref":
+            if not isinstance(value, str) or not _SCHEMA_ID.fullmatch(value):
+                raise ContractError("manifest")
+            result[key] = "#/$defs/" + value
+        elif key in _MCP_SCHEMA_MAPS:
+            if not isinstance(value, Mapping):
+                raise ContractError("manifest")
+            result[key] = {name: _mcp_rebase_schema(child) for name, child in value.items()}
+        elif key in _MCP_SCHEMA_LISTS:
+            if not isinstance(value, list):
+                raise ContractError("manifest")
+            result[key] = [_mcp_rebase_schema(child) for child in value]
+        elif key in _MCP_SCHEMA_SINGLE:
+            result[key] = _mcp_rebase_schema(value)
+        else:
+            result[key] = value
+    return result
+
+
+def _expected_mcp_tool(operation_id: str, operation: dict[str, Any],
+                       resources_by_id: dict[str, Mapping[str, Any]]) -> tuple[dict[str, Any], dict[str, Any]]:
+    properties: dict[str, Any] = {}
+    required: set[str] = set()
+    arguments: dict[str, Any] = {}
+    path_parameters: set[str] = set()
+    schema_ids: set[str] = set()
+    for parameter in operation["parameters"]:
+        location, name, schema_id = parameter["in"], parameter["name"], parameter["schema"]
+        if location not in {"path", "query"} or name in properties:
+            raise ContractError("manifest")
+        if location == "path" and parameter["required"] is not True:
+            raise ContractError("manifest")
+        if schema_id not in resources_by_id:
+            raise ContractError("manifest")
+        properties[name] = {"$ref": "#/$defs/" + schema_id}
+        arguments[name] = {"in": location, "name": name, "schema": schema_id}
+        schema_ids.add(schema_id)
+        if parameter["required"]:
+            required.add(name)
+        if location == "path":
+            path_parameters.add(name)
+    path = operation["path"]
+    if path.count("{") != path.count("}"):
+        raise ContractError("manifest")
+    path_fields = re.findall(r"\{([^{}]+)\}", path)
+    if (len(path_fields) != path.count("{")
+            or len(set(path_fields)) != len(path_fields)
+            or set(path_fields) != path_parameters):
+        raise ContractError("manifest")
+
+    request_id = operation["request"]
+    if request_id is not None:
+        body = resources_by_id.get(request_id)
+        if body is None:
+            raise ContractError("manifest")
+        if body.get("type") == "object":
+            body_properties = body.get("properties", {})
+            if (not isinstance(body_properties, Mapping)
+                    or body.get("additionalProperties") is not False
+                    or set(body) - {"$id", "$schema", "title", "description", "type", "properties", "required", "additionalProperties"}):
+                raise ContractError("manifest")
+            body_required = body.get("required", [])
+            if (not isinstance(body_required, list)
+                    or not all(isinstance(name, str) and name in body_properties for name in body_required)
+                    or len(set(body_required)) != len(body_required)):
+                raise ContractError("manifest")
+            if set(properties) & set(body_properties):
+                raise ContractError("manifest")
+            for name, schema in body_properties.items():
+                if not isinstance(name, str) or not isinstance(schema, (Mapping, bool)):
+                    raise ContractError("manifest")
+                properties[name] = _mcp_rebase_schema(schema)
+                arguments[name] = {"in": "body", "name": name, "schema": request_id}
+                schema_ids.update(_mcp_schema_refs(schema))
+            required.update(body_required)
+        else:
+            if "body" in properties:
+                raise ContractError("manifest")
+            properties["body"] = {"$ref": "#/$defs/" + request_id}
+            arguments["body"] = {"in": "body", "name": "body", "schema": request_id}
+            required.add("body")
+            schema_ids.add(request_id)
+
+    closure: dict[str, Any] = {}
+    pending = list(schema_ids)
+    while pending:
+        schema_id = pending.pop()
+        if schema_id in closure:
+            continue
+        resource = resources_by_id.get(schema_id)
+        if resource is None:
+            raise ContractError("manifest")
+        closure[schema_id] = _mcp_rebase_schema(resource)
+        pending.extend(_mcp_schema_refs(resource) - closure.keys())
+    input_schema: dict[str, Any] = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": properties,
+        "required": sorted(required),
+        "additionalProperties": False,
+    }
+    if closure:
+        input_schema["$defs"] = dict(sorted(closure.items()))
+    binding = {
+        "operationId": operation_id,
+        "method": operation["method"],
+        "path": path,
+        "arguments": dict(sorted(arguments.items())),
+    }
+    return input_schema, binding
+
+
+def _toolset_checks(toolset: Any, manifest: dict[str, Any], manifest_bytes: bytes,
+                    schema_bytes: bytes, resources_by_id: dict[str, Mapping[str, Any]],
+                    *, integrity_digest_supplied: bool) -> list[dict[str, Any]]:
+    _validate_document(toolset, _format_schema("mcp-toolset.schema.json"), "manifest")
+    expected_provenance = {
+        "sourceSha256": manifest["provenance"]["sourceSha256"],
+        "toolchainSha256": manifest["provenance"]["toolchainSha256"],
+        "manifestSha256": sha256(manifest_bytes).hexdigest(),
+        "schemaBundleSha256": sha256(schema_bytes).hexdigest(),
+    }
+    if (toolset["contractId"] != manifest["contractId"]
+            or toolset["contractVersion"] != manifest["contractVersion"]
+            or toolset["provenance"] != expected_provenance):
+        raise ContractError("manifest")
+    mappings = manifest.get("mcpTools", {})
+    if mappings and not integrity_digest_supplied:
+        raise ContractError("integrity")
+    tools = toolset["tools"]
+    public_ids = {name for name, operation in manifest["operations"].items()
+                  if operation["exposure"] == "public"}
+    if {tool["binding"]["operationId"] for tool in tools} != public_ids:
+        raise ContractError("manifest")
+    names: set[str] = set()
+    by_operation = {tool["binding"]["operationId"]: tool for tool in tools}
+    if len(by_operation) != len(tools):
+        raise ContractError("manifest")
+    for operation_id in sorted(public_ids):
+        tool = by_operation[operation_id]
+        mapping = mappings[operation_id]
+        if (tool["name"] != mapping["name"]
+                or tool["title"] != mapping["title"]
+                or tool["description"] != mapping["description"]
+                or tool["name"] in names):
+            raise ContractError("manifest")
+        names.add(tool["name"])
+        expected_schema, expected_binding = _expected_mcp_tool(
+            operation_id, manifest["operations"][operation_id], resources_by_id
+        )
+        if tool["inputSchema"] != expected_schema or tool["binding"] != expected_binding:
+            raise ContractError("manifest")
+        try:
+            Draft202012Validator.check_schema(tool["inputSchema"])
+        except Exception:
+            raise ContractError("manifest") from None
+    return tools
 
 
 def _format_schema(filename: str) -> dict[str, Any]:
@@ -473,6 +706,18 @@ class ContractBundle:
             wrapped = dict(bundle)
             wrapped["resources"] = resources
             _manifest_checks(manifest, wrapped)
+            toolset_bytes = snapshots.get("mcp-tools.json")
+            mappings = manifest.get("mcpTools", {})
+            if toolset_bytes is None:
+                if mappings:
+                    raise ContractError("manifest")
+                projected_tools: list[dict[str, Any]] = []
+            else:
+                projected_tools = _toolset_checks(
+                    _parse_json_bytes(toolset_bytes), manifest, manifest_bytes,
+                    schema_bytes, resources,
+                    integrity_digest_supplied=integrity_sha256 is not None,
+                )
             registry = Registry(retrieve=_no_remote).with_resources(
                 (identifier, Resource.from_contents(schema)) for identifier, schema in resources.items())
             validators = {identifier: Draft202012Validator(schema, registry=registry)
@@ -482,6 +727,7 @@ class ContractBundle:
             instance.manifest = manifest
             instance.schemas = resources
             instance.validators = validators
+            instance.mcp_tools = projected_tools
             return instance
         except ContractError:
             raise

@@ -11,6 +11,38 @@
       "minLength": 1,
       "type": "string"
     },
+    "mcpTools": {
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[A-Za-z_][A-Za-z0-9_]*$": {
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "maxLength": 64,
+              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+              "type": "string"
+            },
+            "title": {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            "description": {
+              "maxLength": 500,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "title",
+            "description"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
     "operations": {
       "additionalProperties": false,
       "minProperties": 1,

@@ -3,9 +3,11 @@
 Normative manifest/integrity formats are wheel package data in
 `vuoro_contracts/formats/`. They validate packaging metadata, not domain fields.
 The domain operation schemas are independently emitted from TypeSpec.
-The proposed [MCP toolset projection requirements](../../docs/plans/2026-10-24-mcp-toolset-projection-requirements.md)
-describe a future definition-only mapping. They do not change this manifest
-format or admit a public operation.
+The [MCP toolset projection requirements](../../docs/plans/2026-10-24-mcp-toolset-projection-requirements.md)
+define the source-authored mapping and deterministic tool artifact described below.
+The current contract source contains no authored HTTP operations, so its generated
+tool list is empty by architecture; the operator-request TypeSpec models remain
+types and do not become tools or handlers by inference.
 
 `operation-manifest.json` records `vuoro-contract-bundle/v1`, explicit contract
 identity/version, dialect, schema bundle path and resource ID, source/toolchain
@@ -17,6 +19,44 @@ inline/ambiguous boundaries, unknown schema IDs, duplicate operation IDs or dupl
 method/path/parameter bindings refuse. SDK IDs are identifiers; catalog names remain
 separate. Response codes are not guessed from success. No implicit exposure.
 
+Owner `contract.json` may include `mcpTools`, an object keyed by the exact
+OpenAPI `operationId` set whose `exposures` value is `public`. Each entry has
+exactly `name`, `title`, and `description`; names are stable explicit identifiers
+matching `^[a-z][a-z0-9_]{0,63}$`, titles are 1..100 characters and descriptions
+1..500 characters. Missing, extra, duplicate-name, internal-operation, or
+malformed entries refuse the entire projection. No mapping is inferred from a
+path, HTTP verb, SDK name, or schema title. When no operation is public, the
+mapping may be omitted or empty.
+
+The generator emits `mcp-tools.json` with the tool metadata, a closed
+`inputSchema`, and a private reversible binding plan. Path and query parameters
+become named arguments; a JSON object request body contributes its properties;
+a non-object body uses the single `body` argument. Header parameters, argument
+name collisions, open object bodies, and unsupported top-level body keywords
+refuse projection. Input schemas retain only the transitive schema-resource
+closure needed by their arguments, with named references rebased locally.
+The binding plan records each argument's source location and schema ID plus the
+operation ID, method, and path; it is generation metadata, not caller input or
+authorization. The artifact carries the exact source/toolchain, manifest and
+schema-bundle digests and projection-requirements version. `mcp-tools.json` is
+included in the top-level integrity inventory and Python SDK package data.
+
+The projection schema vocabulary is explicitly bounded to Draft 2020-12 core,
+validation, and annotation keywords: `$ref`, `$schema`, `$id`, `$anchor`,
+`$comment`, `$defs`, `title`, `description`, `default`, `examples`,
+`deprecated`, `readOnly`, `writeOnly`, `type`, `enum`, `const`, numeric and
+string/array/object bounds and assertions (`multipleOf`, `maximum`,
+`exclusiveMaximum`, `minimum`, `exclusiveMinimum`, `maxLength`, `minLength`,
+`pattern`, `maxItems`, `minItems`, `uniqueItems`, `maxContains`, `minContains`,
+`maxProperties`, `minProperties`), `required`, `additionalProperties`,
+`unevaluatedProperties`, `properties`, `patternProperties`, `propertyNames`,
+`dependentRequired`, `dependentSchemas`, `allOf`, `anyOf`, `oneOf`, `not`,
+`if`, `then`, `else`, `items`, `prefixItems`, and `contains`. Every schema
+position is traversed recursively. Unknown keywords and external, fragment,
+or unresolved references refuse projection; annotation values are opaque.
+The parsed schema bundle and its digest both come from the same immutable
+inventory snapshot.
+
 `integrity.json` records `vuoro-contract-integrity/v1` and the exact POSIX relative
 file -> lowercase SHA-256 inventory, excluding only itself. Include manifest,
 OpenAPI, independent schemas, SDK sources and attachments. Reject extra/missing
@@ -25,8 +65,8 @@ Its digest is stored externally by the package consumer/build receipt. Always
 verify inventory at load; verify the external digest when supplied. This detects
 artifact drift, not semantic meaning or domain canonicalization.
 
-The Python SDK wheel repeats just its own `operation-manifest.json`, OpenAPI
-document and schema bundle under `<hashed-contract-package>/data/`, with a nested
+The Python SDK wheel repeats just its own `operation-manifest.json`, `mcp-tools.json`,
+OpenAPI document and schema bundle under `<hashed-contract-package>/data/`, with a nested
 `integrity.json` covering those exact files. Its caller supplies the external
 digest for that nested inventory. The runtime reads package data through
 `importlib.resources`; filesystem and zip resource roots are snapshotted under
@@ -36,8 +76,9 @@ The candidate tree's top-level inventory still covers all generated SDK and
 attachment sources.
 
 Owner source comprises main.tsp, explicit tspconfig.yaml and contract.json
-(`contractVersion`, exact per-operation `exposures` and `byteBounds`). Metadata may not define
-property lists or override emitted schema/status identity. The root generator
+(`contractVersion`, exact per-operation `exposures` and `byteBounds`, and optional
+exact `mcpTools` metadata). Metadata may not define property lists or override
+emitted schema/status identity. The root generator
 accepts --source, --output and --contract-id. --check is default and read-only;
 --write is explicit. It verifies selected tool versions/lock/artifact identity,
 compiles in a fresh temporary directory, derives manifest, emits Python/TS SDKs
@@ -49,8 +90,11 @@ successful generation/validation; failure preserves existing output.
 F1a runtime/profile and pure manifest/inventory mechanics are the first bounded
 unit. F1b compiler/SDK orchestration must additionally prove actual Python and TS
 request serialization and all status/body paths using generated SDKs; a pure
-schema test cannot close F1b. Q3 upgrade/rollback/supply and F2 real owner, EC02,
-positive public MCP, Q2/Q4/Q5 and OA obligations remain open.
+schema review cannot close F1b. The generic projection engine does not create
+service handlers, expose credentials, or grant permission. A runtime must still
+dispatch through the existing caller authorization and owner operation paths.
+Q3 upgrade/rollback/supply, F2 real owner, EC02, Q2/Q4/Q5 and OA obligations
+remain separate work.
 
 Runtime absent body uses exported ABSENT, distinct from JSON null, empty object or
 empty text. parse_json(raw, *, max_bytes) requires an explicit positive byte cap.

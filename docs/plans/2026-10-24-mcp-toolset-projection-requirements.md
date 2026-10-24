@@ -1,7 +1,9 @@
 # MCP toolset projection requirements
 
-Status: proposed definition-only requirements. This document does not select a
-public MCP tool roster or make any operation available.
+Status: source-side projection architecture selected and implemented in the
+P08 candidate. The current authored contract has no HTTP operations, so its
+generated public tool roster is empty by design. Operator-request models remain
+schemas, not implicit tools or handlers.
 
 ## Context
 
@@ -122,35 +124,41 @@ remain authoritative; projection adds a representation only.
     credentials, and makes no assertion that an operation is reachable or
     authorized. Existing owner and service authorization remain mandatory at
     invocation.
-18. This specification does not define or authorize authentication, grants,
-    handlers, transport routes, dynamic tool listing, runtime discovery,
-    installation, deployment, or public availability. It does not change
-    `operation-manifest.json`, generator behavior, contract source, or tests.
-    A positive projection requires a separate reviewed implementation and
-    explicit operation-owner decisions.
+18. This specification defines input metadata only. It does not define or
+    authorize authentication, grants, handlers, dynamic tool listing, runtime
+    discovery, installation, deployment, or public availability. A positive
+    tool list requires a public OpenAPI operation plus its exact `mcpTools`
+    entry in that operation's source `contract.json`; it does not infer a
+    handler or bypass the owner authorization used at invocation.
 
-## Open owner decisions
+## Selected architecture and current roster
 
-The following decisions are deliberately not made by this requirements
-document:
+These choices are implemented in the P08 candidate and are not blocked on an
+additional owner decision:
 
-- The production contract ID/version and exact operation IDs eligible for
-  public MCP exposure. The current contracts tree has no authored production
-  HTTP operation roster to map.
-- For each eligible operation, the stable MCP tool name, user-facing title,
-  description, and confirmation that its public exposure is intended.
-- Whether any candidate's domain header parameters, non-object body, or
-  parameter/body name collision should receive a specifically designed
-  binding. Until decided, the refusal rules above apply.
-- The exact supported JSON Schema keyword/profile version for public MCP input
-  metadata, beyond the requirement that it be a finite subset of the existing
-  qualified profile.
-- Whether a future caller-visible error or output shape should be defined.
-  This document specifies input metadata only.
-- The identity and grant model, publication gate, transport, dynamic listing
-  policy, and any production rollout. These require their own owner decisions
-  and are outside this proposal.
+- Only OpenAPI operations emitted from an authored owner TypeSpec source are
+  eligible; existing models and client method names are not operation evidence.
+- The public roster is the exact set of operations whose source exposure is
+  `public`. Each requires an explicit stable tool name, title, and description
+  in `contract.json`; mapping coverage is complete and all-or-nothing.
+- Path and query parameters are top-level arguments. Object request properties
+  are top-level arguments when the body schema is explicitly closed; non-object
+  bodies bind to `body`. Header parameters, collisions, open body objects, and
+  unsupported object keywords refuse the entire projection.
+- The generator's finite JSON Schema 2020-12 profile and transitive local
+  resource closure define supported input schema vocabulary. The generated
+  `mcp-tools.json` is provenance-bound and included in the package inventory.
+- Tool metadata does not select credentials or authorize invocation. Runtime
+  dispatch must use the existing caller identity and owner operation path.
 
-No open decision may be filled by deriving names from operation IDs or by
-promoting an `internal` operation. An owner decision must be recorded against
-the exact contract version before adding a mapping.
+The current `contracts` source imports the operator-request model library but
+does not define any HTTP service operations. The deliberate output is therefore
+an empty tool list. The P08 change does not invent routes for the existing
+`work.request.*` RPC methods. Adding a future public operation is a normal source
+change: define it in TypeSpec, set its exposure to `public`, and provide its
+exact mapping in the same owner's `contract.json`. No separate approval gate is
+part of this projection architecture.
+
+Names must never be derived from operation IDs or promoted from `internal`
+exposure. Each emitted tool remains bound to the exact source, toolchain,
+manifest, and schema-bundle digests.
