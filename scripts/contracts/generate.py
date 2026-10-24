@@ -38,7 +38,7 @@ _QUALIFIED_INPUT_SHA256 = {
     "tools/contracts/tspconfig.template.yaml": "d6b5b33902b26f94a6bc1ae9bcccd8cfffac8af020f74304b215a9b7e624fe91",
     "tools/contracts/python-templates/endpoint_module.py.jinja": "9a626b839af95ca1cdb936e4dee7bedc5839e0aafbed15bc6869d9a8844d0348",
     "tools/contracts/templates/strict-json.ts": "356db0604d14267133842fa7b4b4a467fad6dd8b8b6f9bfa48d123e78c605831",
-    "tools/contracts/templates/validated-client.py.template": "5992f3ad6c611964c721094a0e42c0993390b89c97658ea94acd86199c117d03",
+    "tools/contracts/templates/validated-client.py.template": "17297df2e9f6797993470565a67b0ca718cd5cd991ed2546b09038967e4dcdee",
     "tools/contracts/templates/validated-sdk.ts.template": "c4f700947db3726b5d3ee8d7c6230e30dd12e1ce840bf4a04f1f13d7a68bb58e",
     "tools/contracts/templates/tests/python_sdk_oracle.py": "c42b52ae9ea95438e2de42862659b05e3582ef9670ef9ab6d532e2a274368346",
     "tools/contracts/templates/tests/python_sdk_regressions.py": "946068bd391080da28ffd0ec578442f62c38cd6558fa077b12e7ed24c1e9935d",

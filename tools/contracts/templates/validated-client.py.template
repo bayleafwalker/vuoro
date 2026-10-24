@@ -7,7 +7,8 @@ import json
 import math
 import re
 from urllib.parse import unquote_to_bytes
-from vuoro_contracts import ABSENT, ContractBundle, ContractError, parse_json
+from vuoro_contracts import (ABSENT, ContractBundle, ContractError, parse_wire_json,
+                             validate_wire_json_limit)
 
 @dataclass(frozen=True)
 class Envelope:
@@ -157,23 +158,33 @@ def create_validated_client(*, client, integrity_sha256):
         name, op = resolve(request)
         decoded_parameters(request,name,op)
         raw = bytes(request.content)
-        value = ABSENT if not raw else parse_json(raw, max_bytes=op["requestMaxBytes"])
+        if op["request"] is None:
+            if raw: raise ContractError("schema_value")
+            value = ABSENT
+        else:
+            request_cap = validate_wire_json_limit(op["requestMaxBytes"])
+            value = parse_wire_json(raw, max_bytes=request_cap)
         bundle.validate_request(name, value)
     def on_response(response):
         name, op = resolve(response.request)
         status = str(response.status_code)
         if status not in op["responses"]: raise ContractError("status")
         cap = op["responseMaxBytes"][status]
+        response_cap=(validate_wire_json_limit(cap)
+                      if op["responses"][status] is not None else cap)
         chunks=[]; size=0
         try:
             for chunk in response.iter_bytes():
                 size += len(chunk)
-                if cap is None or size > cap:
+                if response_cap is None or size > response_cap:
                     response.close(); raise ContractError("body_limit")
                 chunks.append(chunk)
         except ContractError: raise
         raw=b"".join(chunks); response._content=raw
-        value=ABSENT if not raw and op["responses"][status] is None else parse_json(raw,max_bytes=cap)
+        if op["responses"][status] is None:
+            value=ABSENT
+        else:
+            value=parse_wire_json(raw,max_bytes=response_cap)
         bundle.validate_response(name,response.status_code,value)
         slot=current.get()
         if slot is not None:
