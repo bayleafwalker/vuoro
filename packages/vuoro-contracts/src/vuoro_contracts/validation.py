@@ -402,6 +402,35 @@ def _mcp_schema_refs(schema: Any) -> set[str]:
     return refs
 
 
+def _mcp_resource_closure(roots: set[str], resources: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    closure: dict[str, Any] = {}
+    state: dict[str, int] = {}
+    for root in sorted(roots):
+        stack: list[tuple[str, bool]] = [(root, False)]
+        while stack:
+            identifier, exiting = stack.pop()
+            if exiting:
+                state[identifier] = 2
+                closure[identifier] = _mcp_rebase_schema(resources[identifier])
+                continue
+            mark = state.get(identifier, 0)
+            if mark == 1:
+                raise ContractError("manifest")
+            if mark == 2:
+                continue
+            resource = resources.get(identifier)
+            if resource is None:
+                raise ContractError("manifest")
+            state[identifier] = 1
+            stack.append((identifier, True))
+            for ref in sorted(_mcp_schema_refs(resource), reverse=True):
+                if state.get(ref) == 1:
+                    raise ContractError("manifest")
+                if state.get(ref) != 2:
+                    stack.append((ref, False))
+    return closure
+
+
 def _mcp_rebase_schema(schema: Any) -> Any:
     if isinstance(schema, bool):
         return schema
@@ -443,12 +472,20 @@ def _expected_mcp_tool(operation_id: str, operation: dict[str, Any],
         location, name, schema_id = parameter["in"], parameter["name"], parameter["schema"]
         if location not in {"path", "query"} or name in properties:
             raise ContractError("manifest")
+        if (parameter["style"] != ("simple" if location == "path" else "form")
+                or parameter["explode"] != (location == "query")
+                or parameter["allowReserved"] is not False):
+            raise ContractError("manifest")
         if location == "path" and parameter["required"] is not True:
             raise ContractError("manifest")
         if schema_id not in resources_by_id:
             raise ContractError("manifest")
+        if resources_by_id[schema_id].get("type") not in {"string", "integer", "number", "boolean"}:
+            raise ContractError("manifest")
         properties[name] = {"$ref": "#/$defs/" + schema_id}
-        arguments[name] = {"in": location, "name": name, "schema": schema_id}
+        arguments[name] = {"in": location, "name": name, "schema": schema_id,
+                           "style": parameter["style"], "explode": parameter["explode"],
+                           "allowReserved": parameter["allowReserved"]}
         schema_ids.add(schema_id)
         if parameter["required"]:
             required.add(name)
@@ -496,17 +533,7 @@ def _expected_mcp_tool(operation_id: str, operation: dict[str, Any],
             required.add("body")
             schema_ids.add(request_id)
 
-    closure: dict[str, Any] = {}
-    pending = list(schema_ids)
-    while pending:
-        schema_id = pending.pop()
-        if schema_id in closure:
-            continue
-        resource = resources_by_id.get(schema_id)
-        if resource is None:
-            raise ContractError("manifest")
-        closure[schema_id] = _mcp_rebase_schema(resource)
-        pending.extend(_mcp_schema_refs(resource) - closure.keys())
+    closure = _mcp_resource_closure(schema_ids, resources_by_id)
     input_schema: dict[str, Any] = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",

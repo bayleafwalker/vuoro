@@ -34,7 +34,14 @@ become named arguments; a JSON object request body contributes its properties;
 a non-object body uses the single `body` argument. Header parameters, argument
 name collisions, open object bodies, and unsupported top-level body keywords
 refuse projection. Input schemas retain only the transitive schema-resource
-closure needed by their arguments, with named references rebased locally.
+closure needed by their arguments, with named references rebased locally;
+cycles, including self-references, refuse the projection. Path/query parameters
+are limited to scalar string, integer, number, or boolean schemas, using path
+`simple`/non-exploded and query `form`/exploded serialization with
+`allowReserved: false`. The generator normalizes these defaults into the
+manifest and rejects parameter content, non-default serialization, and
+array/object/composed parameter schemas. The binding metadata retains these
+serialization fields for path and query arguments.
 The binding plan records each argument's source location and schema ID plus the
 operation ID, method, and path; it is generation metadata, not caller input or
 authorization. The artifact carries the exact source/toolchain, manifest and

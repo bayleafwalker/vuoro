@@ -141,6 +141,18 @@
                         "minLength": 1,
                         "pattern": "^[A-Za-z0-9_.-]+$",
                         "type": "string"
+                      },
+                      "style": {
+                        "enum": [
+                          "simple",
+                          "form"
+                        ]
+                      },
+                      "explode": {
+                        "type": "boolean"
+                      },
+                      "allowReserved": {
+                        "const": false
                       }
                     },
                     "required": [

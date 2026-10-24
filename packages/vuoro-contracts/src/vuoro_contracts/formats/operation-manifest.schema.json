@@ -78,6 +78,18 @@
                       "header"
                     ]
                   },
+                  "style": {
+                    "enum": [
+                      "simple",
+                      "form"
+                    ]
+                  },
+                  "explode": {
+                    "type": "boolean"
+                  },
+                  "allowReserved": {
+                    "const": false
+                  },
                   "name": {
                     "minLength": 1,
                     "type": "string"
@@ -94,6 +106,9 @@
                 "required": [
                   "name",
                   "in",
+                  "style",
+                  "explode",
+                  "allowReserved",
                   "schema",
                   "required"
                 ],

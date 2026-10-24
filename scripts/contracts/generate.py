@@ -44,7 +44,7 @@ _QUALIFIED_INPUT_SHA256 = {
     "tools/contracts/templates/tests/python_sdk_oracle.py": "c42b52ae9ea95438e2de42862659b05e3582ef9670ef9ab6d532e2a274368346",
     "tools/contracts/templates/tests/python_sdk_regressions.py": "946068bd391080da28ffd0ec578442f62c38cd6558fa077b12e7ed24c1e9935d",
     "tools/contracts/templates/QUALIFICATION.md": "adaca3cca5d38109d18ab463ebcfdc7086e68b69a01023414958947e4098e21f",
-    "tools/contracts/FORMAT.md": "b3bb4492cc7b5eebce039760fc251c54ceb18d4f335e0d3cf41720a1fe11ee3e",
+    "tools/contracts/FORMAT.md": "e20b8d8149449b778a161dd604686aced332198e8a5b6f3c95c88b0c5531cade",
 }
 
 
@@ -170,8 +170,21 @@ def operation_manifest(openapi: Mapping[str, Any], bundle: Mapping[str, Any], *,
                     seen_params.add(key)
                     if type(parameter.get("required")) is not bool:
                         _fail()
+                    if ("content" in parameter or "allowEmptyValue" in parameter
+                            or set(parameter) - {"name", "in", "required", "schema", "description",
+                                                 "deprecated", "style", "explode", "allowReserved"}):
+                        _fail()
+                    style = parameter.get("style", "simple" if location == "path" else "form")
+                    explode = parameter.get("explode", location == "query")
+                    allow_reserved = parameter.get("allowReserved", False)
+                    if (style != ("simple" if location == "path" else "form")
+                            or type(explode) is not bool or explode != (location == "query")
+                            or allow_reserved is not False):
+                        _fail()
                     emitted_parameters.append({"in": location, "name": param_name,
                                                "required": parameter["required"],
+                                               "style": style, "explode": explode,
+                                               "allowReserved": False,
                                                "schema": _schema_id(parameter.get("schema"), openapi, bundle)})
                 request = None
                 body = operation.get("requestBody")
@@ -391,6 +404,35 @@ def _schema_refs(schema: Any) -> set[str]:
     return found
 
 
+def _schema_resource_closure(roots: set[str], resources: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    closure: dict[str, Any] = {}
+    state: dict[str, int] = {}
+    for root in sorted(roots):
+        stack: list[tuple[str, bool]] = [(root, False)]
+        while stack:
+            identifier, exiting = stack.pop()
+            if exiting:
+                state[identifier] = 2
+                closure[identifier] = _rewrite_schema_refs(resources[identifier])
+                continue
+            mark = state.get(identifier, 0)
+            if mark == 1:
+                _fail()
+            if mark == 2:
+                continue
+            resource = resources.get(identifier)
+            if resource is None:
+                _fail()
+            state[identifier] = 1
+            stack.append((identifier, True))
+            for ref in sorted(_schema_refs(resource), reverse=True):
+                if state.get(ref) == 1:
+                    _fail()
+                if state.get(ref) != 2:
+                    stack.append((ref, False))
+    return closure
+
+
 def _rewrite_schema_refs(schema: Any) -> Any:
     """Copy a schema while rebasing named resources into the tool's local $defs."""
     if isinstance(schema, bool):
@@ -434,6 +476,13 @@ def _closed_tool_schema(operation_id: str, operation: Mapping[str, Any], bundle:
         location, name, schema_id = parameter.get("in"), parameter.get("name"), parameter.get("schema")
         if location == "header" or location not in {"path", "query"}:
             _fail()
+        if (parameter.get("style") != ("simple" if location == "path" else "form")
+                or parameter.get("explode") != (location == "query")
+                or parameter.get("allowReserved") is not False):
+            _fail()
+        parameter_schema = resources[schema_id]
+        if parameter_schema.get("type") not in {"string", "integer", "number", "boolean"}:
+            _fail()
         if (not isinstance(name, str) or not name or name in properties
                 or not isinstance(schema_id, str) or schema_id not in resources):
             _fail()
@@ -444,7 +493,9 @@ def _closed_tool_schema(operation_id: str, operation: Mapping[str, Any], bundle:
         properties[name] = {"$ref": "#/$defs/" + schema_id}
         if parameter.get("required") is True:
             required.add(name)
-        bindings[name] = {"in": location, "name": name, "schema": schema_id}
+        bindings[name] = {"in": location, "name": name, "schema": schema_id,
+                          "style": parameter["style"], "explode": parameter["explode"],
+                          "allowReserved": parameter["allowReserved"]}
 
     path = operation.get("path")
     if not isinstance(path, str) or path.count("{") != path.count("}"):
@@ -496,17 +547,7 @@ def _closed_tool_schema(operation_id: str, operation: Mapping[str, Any], bundle:
                 schema_refs.update(_schema_refs(schema))
         else:
             schema_refs.add(request_id)
-    closure: dict[str, Any] = {}
-    pending = list(schema_refs)
-    while pending:
-        schema_id = pending.pop()
-        if schema_id in closure:
-            continue
-        resource = resources.get(schema_id)
-        if resource is None:
-            _fail()
-        closure[schema_id] = _rewrite_schema_refs(resource)
-        pending.extend(_schema_refs(resource) - closure.keys())
+    closure = _schema_resource_closure(schema_refs, resources)
     tool_schema = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",

@@ -76,6 +76,13 @@ remain authoritative; projection adds a representation only.
    URL, HTTP method, or transport option to the caller. Unbound arguments,
    ambiguous binding, duplicate names, unsupported parameter serialization,
    or a body/parameter collision refuse.
+   The supported parameter subset is scalar `string`, `integer`, `number`, or
+   `boolean`, with path `style: simple, explode: false` and query
+   `style: form, explode: true`; these OpenAPI defaults are normalized into
+   the manifest. `allowReserved` must be false. Parameter `content`, alternate
+   styles, array/object/composed schemas, and other serialization controls
+   refuse instead of being discarded. The normalized style, explode, and
+   allowReserved values are copied into the reversible binding metadata.
 9. Only the operation's input contract is projected. Responses, response
    schemas, status codes, and transport errors do not become tool arguments.
    Tool execution and result projection require separate contracts and review.
@@ -86,12 +93,12 @@ remain authoritative; projection adds a representation only.
     object. It is built from the authenticated schema bundle and named
     references; it does not fetch remote resources, resolve external or
     fragment references, or interpret annotation keywords as validation rules.
-11. Projection supports only schema forms accepted by the existing finite
-    contract profile. Any unsupported keyword or semantic form, unresolved or
-    undeclared `$ref`/`$id`, recursive or ambiguous binding, or incompatible
-    schema dialect refuses the entire mapping. The supported subset must be
-    stated and versioned before implementation; an emitter's ability to
-    produce a schema does not establish support.
+11. Projection supports only the explicitly listed and versioned JSON Schema
+    vocabulary in `tools/contracts/FORMAT.md`. Any unsupported keyword or
+    semantic form, unresolved or undeclared `$ref`/`$id`, cycle in the
+    transitive named-resource reference graph (including self-reference), or
+    incompatible schema dialect refuses the entire mapping. An emitter's
+    ability to produce a schema does not establish support.
 12. `additionalProperties` behavior and required-property sets remain exactly
     as authored by the owner schema. Projection must not make closed command
     schemas open or closed metadata schemas more restrictive. No filtering,
