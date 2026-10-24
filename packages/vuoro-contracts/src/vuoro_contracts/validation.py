@@ -23,6 +23,8 @@ _MAX_FILE_BYTES = 16 * 1024 * 1024
 _MAX_BUNDLE_FILES = 4096
 _MAX_BUNDLE_BYTES = 64 * 1024 * 1024
 _MAX_SAFE_JSON_INTEGER = 9_007_199_254_740_991
+_MAX_JSON_DEPTH = 64
+_MAX_JSON_NODES = 100_000
 _STATUS = re.compile(r"^[1-5][0-9]{2}$")
 _SCHEMA_ID = re.compile(r"^[A-Za-z0-9_.-]+$")
 
@@ -47,8 +49,11 @@ def _float(value: str) -> float:
     return result
 
 
-def _finite_json(value: Any, *, depth: int = 0) -> bool:
-    if depth > 256:
+def _finite_json(value: Any, *, depth: int = 0, _nodes: list[int] | None = None) -> bool:
+    if _nodes is None:
+        _nodes = [0]
+    _nodes[0] += 1
+    if depth > _MAX_JSON_DEPTH or _nodes[0] > _MAX_JSON_NODES:
         return False
     if value is None or type(value) is bool:
         return True
@@ -62,11 +67,11 @@ def _finite_json(value: Any, *, depth: int = 0) -> bool:
         return (math.isfinite(value)
                 and (not value.is_integer() or abs(value) <= _MAX_SAFE_JSON_INTEGER))
     if isinstance(value, list):
-        return all(_finite_json(item, depth=depth + 1) for item in value)
+        return all(_finite_json(item, depth=depth + 1, _nodes=_nodes) for item in value)
     if isinstance(value, dict):
         return all(type(key) is str
                    and not any(0xD800 <= ord(character) <= 0xDFFF for character in key)
-                   and _finite_json(item, depth=depth + 1)
+                   and _finite_json(item, depth=depth + 1, _nodes=_nodes)
                    for key, item in value.items())
     return False
 
