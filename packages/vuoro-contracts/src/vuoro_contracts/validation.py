@@ -22,6 +22,7 @@ ABSENT = object()
 _MAX_FILE_BYTES = 16 * 1024 * 1024
 _MAX_BUNDLE_FILES = 4096
 _MAX_BUNDLE_BYTES = 64 * 1024 * 1024
+_MAX_SAFE_JSON_INTEGER = 9_007_199_254_740_991
 _STATUS = re.compile(r"^[1-5][0-9]{2}$")
 _SCHEMA_ID = re.compile(r"^[A-Za-z0-9_.-]+$")
 
@@ -49,14 +50,23 @@ def _float(value: str) -> float:
 def _finite_json(value: Any, *, depth: int = 0) -> bool:
     if depth > 256:
         return False
-    if value is None or type(value) in (str, bool, int):
+    if value is None or type(value) is bool:
         return True
+    if type(value) is str:
+        return not any(0xD800 <= ord(character) <= 0xDFFF for character in value)
+    if type(value) is int:
+        # Keep integer tokens exact in both Python and JavaScript SDKs. Larger
+        # exact counters belong in decimal strings, not rounded JSON numbers.
+        return abs(value) <= _MAX_SAFE_JSON_INTEGER
     if type(value) is float:
-        return math.isfinite(value)
+        return (math.isfinite(value)
+                and (not value.is_integer() or abs(value) <= _MAX_SAFE_JSON_INTEGER))
     if isinstance(value, list):
         return all(_finite_json(item, depth=depth + 1) for item in value)
     if isinstance(value, dict):
-        return all(type(key) is str and _finite_json(item, depth=depth + 1)
+        return all(type(key) is str
+                   and not any(0xD800 <= ord(character) <= 0xDFFF for character in key)
+                   and _finite_json(item, depth=depth + 1)
                    for key, item in value.items())
     return False
 
