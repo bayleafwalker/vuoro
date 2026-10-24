@@ -22,6 +22,7 @@ ABSENT = object()
 _MAX_FILE_BYTES = 16 * 1024 * 1024
 _MAX_BUNDLE_FILES = 4096
 _MAX_BUNDLE_BYTES = 64 * 1024 * 1024
+_MAX_WIRE_BODY_BYTES = 4 * 1024 * 1024
 _MAX_SAFE_JSON_INTEGER = 9_007_199_254_740_991
 _MAX_JSON_DEPTH = 64
 _MAX_JSON_NODES = 100_000
@@ -248,6 +249,18 @@ def parse_json(raw: bytes | str, *, max_bytes: int) -> Any:
         raise
     except Exception:
         raise ContractError("json") from None
+
+
+def validate_wire_json_limit(max_bytes: int) -> int:
+    """Validate a JSON wire-body cap against the cross-language hard limit."""
+    if type(max_bytes) is not int or max_bytes <= 0 or max_bytes > _MAX_WIRE_BODY_BYTES:
+        raise ContractError("body_limit")
+    return max_bytes
+
+
+def parse_wire_json(raw: bytes | str, *, max_bytes: int) -> Any:
+    """Decode a wire body using the shared 4 MiB hard cap."""
+    return parse_json(raw, max_bytes=validate_wire_json_limit(max_bytes))
 
 
 def _no_remote(uri: str) -> Any:
