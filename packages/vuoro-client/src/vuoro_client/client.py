@@ -260,6 +260,116 @@ class AsyncVuoroClient:
             result = ResourceReference.model_validate(result).model_dump(mode="json")
         return result
 
+    async def publish_operator_request(
+        self,
+        *,
+        request_id: str,
+        packet: Mapping[str, Any],
+        dependants: list[Mapping[str, Any]],
+        idempotency_key: str,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Publish one stable request through the advertised owner operation."""
+        return await self.invoke(
+            "work.request.publish-v1",
+            {
+                "request_id": request_id,
+                "packet": dict(packet),
+                "dependants": [dict(item) for item in dependants],
+                "idempotency_key": idempotency_key,
+            },
+            repo_id=repo_id,
+        )
+
+    async def get_operator_request(
+        self, request_id: str, *, repo_id: str | None = None
+    ) -> dict[str, Any]:
+        """Read the owner snapshot for one request without interpreting it."""
+        return await self.invoke(
+            "work.request.get-v1", {"request_id": request_id}, repo_id=repo_id
+        )
+
+    async def list_operator_requests(
+        self,
+        *,
+        limit: int = 50,
+        after_request_id: str | None = None,
+        state: str | None = None,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Page owner request records using the advertised request contract."""
+        arguments: dict[str, Any] = {"limit": limit}
+        if after_request_id is not None:
+            arguments["after_request_id"] = after_request_id
+        if state is not None:
+            arguments["state"] = state
+        return await self.invoke("work.request.list-v1", arguments, repo_id=repo_id)
+
+    async def revise_operator_request(
+        self,
+        *,
+        request_id: str,
+        expected_revision: int,
+        packet: Mapping[str, Any],
+        idempotency_key: str,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Replace the packet only at the exact revision read by the producer."""
+        return await self.invoke(
+            "work.request.revise-v1",
+            {
+                "request_id": request_id,
+                "expected_revision": expected_revision,
+                "packet": dict(packet),
+                "idempotency_key": idempotency_key,
+            },
+            repo_id=repo_id,
+        )
+
+    async def add_operator_request_dependant(
+        self,
+        *,
+        request_id: str,
+        expected_revision: int,
+        dependant: Mapping[str, Any],
+        idempotency_key: str,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Attach another source session/work item at an exact revision."""
+        return await self.invoke(
+            "work.request.dependent-add-v1",
+            {
+                "request_id": request_id,
+                "expected_revision": expected_revision,
+                "dependant": dict(dependant),
+                "idempotency_key": idempotency_key,
+            },
+            repo_id=repo_id,
+        )
+
+    async def withdraw_operator_request_dependant(
+        self,
+        *,
+        request_id: str,
+        expected_revision: int,
+        work_item_id: int,
+        session_id: str,
+        idempotency_key: str,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Withdraw only this work/session dependant at an exact revision."""
+        return await self.invoke(
+            "work.request.dependent-withdraw-v1",
+            {
+                "request_id": request_id,
+                "expected_revision": expected_revision,
+                "work_item_id": work_item_id,
+                "session_id": session_id,
+                "idempotency_key": idempotency_key,
+            },
+            repo_id=repo_id,
+        )
+
     async def _resource_descriptor(self, resource_kind: str) -> tuple[dict[str, Any], dict[str, Any]]:
         catalog = await self.catalog()
         descriptor = next(
