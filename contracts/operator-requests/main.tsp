@@ -1,4 +1,3 @@
-import "../primitives/main.tsp";
 import "@typespec/json-schema";
 using TypeSpec.JsonSchema;
 
@@ -82,7 +81,7 @@ model RequestPacket {
 }
 
 model Dependant {
-  work_item_id: NonnegativeInt64Decimal;
+  work_item_id: int64;
   session_id: string;
   runtime_id?: string;
 }
@@ -96,22 +95,22 @@ model PublishRequest {
 
 model ReviseRequest {
   request_id: RequestId;
-  expected_revision: NonnegativeInt64Decimal;
+  expected_revision: int32;
   packet: RequestPacket;
   idempotency_key: string;
 }
 
 model ChangeDependant {
   request_id: RequestId;
-  expected_revision: NonnegativeInt64Decimal;
+  expected_revision: int32;
   dependant: Dependant;
   idempotency_key: string;
 }
 
 model WithdrawDependant {
   request_id: RequestId;
-  expected_revision: NonnegativeInt64Decimal;
-  work_item_id: NonnegativeInt64Decimal;
+  expected_revision: int32;
+  work_item_id: int64;
   session_id: string;
   idempotency_key: string;
 }
@@ -140,7 +139,7 @@ model DependantRecord extends Dependant {
 
 model RequestSnapshot {
   request_id: RequestId;
-  revision: NonnegativeInt64Decimal;
+  revision: int32;
   state: RequestState;
   freshness: RequestFreshness;
   packet: RequestPacket;
@@ -151,7 +150,7 @@ model RequestSnapshot {
 
 model MutationResult {
   request_id: RequestId;
-  revision: NonnegativeInt64Decimal;
+  revision: int32;
   replayed: boolean;
 }
 
