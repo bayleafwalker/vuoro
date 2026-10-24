@@ -3,6 +3,9 @@
 Normative manifest/integrity formats are wheel package data in
 `vuoro_contracts/formats/`. They validate packaging metadata, not domain fields.
 The domain operation schemas are independently emitted from TypeSpec.
+The proposed [MCP toolset projection requirements](../../docs/plans/2026-10-24-mcp-toolset-projection-requirements.md)
+describe a future definition-only mapping. They do not change this manifest
+format or admit a public operation.
 
 `operation-manifest.json` records `vuoro-contract-bundle/v1`, explicit contract
 identity/version, dialect, schema bundle path and resource ID, source/toolchain
