@@ -86,7 +86,7 @@ def test_sdk_wheel_installs_offline_and_loads_authenticated_resources(tmp_path, 
         "print(json.dumps([first, second]))"
     )
     observed = subprocess.run(
-        [sys._base_executable, "-c", source], env=env, text=True, capture_output=True, timeout=30,
+        [sys.executable, "-c", source], env=env, text=True, capture_output=True, timeout=30,
         check=False,
     )
     assert observed.returncode == 0, observed.stdout + observed.stderr

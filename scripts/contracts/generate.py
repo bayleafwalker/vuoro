@@ -37,13 +37,13 @@ _QUALIFIED_INPUT_SHA256 = {
     "tools/contracts/openapi-python-client.yaml": "59dbde8f0e28cddd825cb5bb83fb6e21db9083551806eeb2f7e1177728f1be80",
     "tools/contracts/tspconfig.template.yaml": "d6b5b33902b26f94a6bc1ae9bcccd8cfffac8af020f74304b215a9b7e624fe91",
     "tools/contracts/python-templates/endpoint_module.py.jinja": "9a626b839af95ca1cdb936e4dee7bedc5839e0aafbed15bc6869d9a8844d0348",
-    "tools/contracts/templates/strict-json.ts": "356db0604d14267133842fa7b4b4a467fad6dd8b8b6f9bfa48d123e78c605831",
+    "tools/contracts/templates/strict-json.ts": "f3de764b9cd1f0b6a889b811d6296b4673d5b68f81d02932cdbf9af8cf68f67b",
     "tools/contracts/templates/validated-client.py.template": "17297df2e9f6797993470565a67b0ca718cd5cd991ed2546b09038967e4dcdee",
     "tools/contracts/templates/validated-sdk.ts.template": "c4f700947db3726b5d3ee8d7c6230e30dd12e1ce840bf4a04f1f13d7a68bb58e",
     "tools/contracts/templates/tests/python_sdk_oracle.py": "c42b52ae9ea95438e2de42862659b05e3582ef9670ef9ab6d532e2a274368346",
     "tools/contracts/templates/tests/python_sdk_regressions.py": "946068bd391080da28ffd0ec578442f62c38cd6558fa077b12e7ed24c1e9935d",
     "tools/contracts/templates/QUALIFICATION.md": "adaca3cca5d38109d18ab463ebcfdc7086e68b69a01023414958947e4098e21f",
-    "tools/contracts/FORMAT.md": "e7eae5e2c8653edfa572bc3368926be5fda341ba55aa46345bfc043256b5061e",
+    "tools/contracts/FORMAT.md": "09c700e33c2b3e05b35be265703d1144dc654ec0668a1c5ce2b5accd78b954a8",
 }
 
 

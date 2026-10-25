@@ -95,6 +95,8 @@ jobs:
           PY
           .venv/bin/python -m pytest -q --tb=short -o addopts= \
             packages/vuoro-contracts/tests \
+            --ignore=packages/vuoro-contracts/tests/test_cross_language_vectors.py \
+            --ignore=packages/vuoro-contracts/tests/test_sdk_wheel_install.py \
             packages/vuoro-client/tests/test_generated_contract_boundary.py \
             packages/vuoro-service/tests/test_generated_contract_foundation.py \
             --junitxml="$RUNNER_TEMP/contracts-pytest.xml"
@@ -106,6 +108,24 @@ jobs:
           failed = sum(case.find("failure") is not None for case in cases)
           errors = sum(case.find("error") is not None for case in cases)
           assert (len(cases), skipped, failed, errors) == (257, 0, 0, 0), (len(cases), skipped, failed, errors)
+          PY
+      - name: Run portable wire vectors and installed SDK wheel tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="${GITHUB_WORKSPACE}/packages/vuoro-contracts/src"
+          .venv/bin/python -m pytest -q --tb=short -o addopts= \
+            packages/vuoro-contracts/tests/test_cross_language_vectors.py \
+            packages/vuoro-contracts/tests/test_sdk_wheel_install.py \
+            --junitxml="$RUNNER_TEMP/contracts-sdk-portable.xml"
+          .venv/bin/python - "$RUNNER_TEMP/contracts-sdk-portable.xml" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+          cases = ET.parse(sys.argv[1]).getroot().findall(".//testcase")
+          skipped = sum(case.find("skipped") is not None for case in cases)
+          failed = sum(case.find("failure") is not None for case in cases)
+          errors = sum(case.find("error") is not None for case in cases)
+          assert (len(cases), skipped, failed, errors) == (20, 0, 0, 0), (len(cases), skipped, failed, errors)
           PY
       - name: Run separate portable Python namespace and resource gate
         shell: bash
