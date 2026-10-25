@@ -43,7 +43,7 @@ _QUALIFIED_INPUT_SHA256 = {
     "tools/contracts/templates/tests/python_sdk_oracle.py": "c42b52ae9ea95438e2de42862659b05e3582ef9670ef9ab6d532e2a274368346",
     "tools/contracts/templates/tests/python_sdk_regressions.py": "946068bd391080da28ffd0ec578442f62c38cd6558fa077b12e7ed24c1e9935d",
     "tools/contracts/templates/QUALIFICATION.md": "adaca3cca5d38109d18ab463ebcfdc7086e68b69a01023414958947e4098e21f",
-    "tools/contracts/FORMAT.md": "09c700e33c2b3e05b35be265703d1144dc654ec0668a1c5ce2b5accd78b954a8",
+    "tools/contracts/FORMAT.md": "9398afec6d8018175ee3b3b3a1185768ff91804dbda078e8348dd714e6f33508",
 }
 
 
