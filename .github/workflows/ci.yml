@@ -243,6 +243,7 @@ jobs:
           uv run pytest
           --ignore=packages/vuoro-contracts/tests/test_production_generation.py
           --ignore=packages/vuoro-contracts/tests/test_production_generation_regressions.py
+          --ignore=packages/vuoro-contracts/tests/test_mcp_projection.py
       - name: Fetch immutable adapter wheels
         run: >-
           python scripts/fetch_pinned_adapters.py

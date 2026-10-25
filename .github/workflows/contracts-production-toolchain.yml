@@ -96,6 +96,7 @@ jobs:
           .venv/bin/python -m pytest -q --tb=short -o addopts= \
             packages/vuoro-contracts/tests \
             --ignore=packages/vuoro-contracts/tests/test_cross_language_vectors.py \
+            --ignore=packages/vuoro-contracts/tests/test_mcp_projection.py \
             --ignore=packages/vuoro-contracts/tests/test_sdk_wheel_install.py \
             packages/vuoro-client/tests/test_generated_contract_boundary.py \
             packages/vuoro-service/tests/test_generated_contract_foundation.py \
@@ -108,6 +109,28 @@ jobs:
           failed = sum(case.find("failure") is not None for case in cases)
           errors = sum(case.find("error") is not None for case in cases)
           assert (len(cases), skipped, failed, errors) == (257, 0, 0, 0), (len(cases), skipped, failed, errors)
+          PY
+      - name: Run MCP definition-only projection gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          node_bin="$(nix develop ./tools/contracts/toolchain --command bash -euc 'command -v node')"
+          test "$("$node_bin" --version)" = "v24.21.0"
+          export VUORO_CONTRACT_NODE="$node_bin"
+          export VUORO_CONTRACT_PYTHON="${GITHUB_WORKSPACE}/tools/contracts/.venv/bin/python"
+          export VUORO_CONTRACT_DECODER="${GITHUB_WORKSPACE}/tools/contracts/templates/strict-json.ts"
+          export PYTHONPATH="${GITHUB_WORKSPACE}/packages/vuoro-contracts/src"
+          .venv/bin/python -m pytest -q --tb=short -o addopts= \
+            packages/vuoro-contracts/tests/test_mcp_projection.py \
+            --junitxml="$RUNNER_TEMP/contracts-mcp-projection.xml"
+          .venv/bin/python - "$RUNNER_TEMP/contracts-mcp-projection.xml" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+          cases = ET.parse(sys.argv[1]).getroot().findall(".//testcase")
+          skipped = sum(case.find("skipped") is not None for case in cases)
+          failed = sum(case.find("failure") is not None for case in cases)
+          errors = sum(case.find("error") is not None for case in cases)
+          assert (len(cases), skipped, failed, errors) == (10, 0, 0, 0), (len(cases), skipped, failed, errors)
           PY
       - name: Run portable wire vectors and installed SDK wheel tests
         shell: bash

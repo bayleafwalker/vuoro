@@ -5,7 +5,11 @@ Normative manifest/integrity formats are wheel package data in
 The domain operation schemas are independently emitted from TypeSpec.
 The proposed [MCP toolset projection requirements](../../docs/plans/2026-10-24-mcp-toolset-projection-requirements.md)
 describe a future definition-only mapping. They do not change this manifest
-format or admit a public operation.
+format or admit a public operation. A separate generated `mcp-tools.json`
+sidecar may carry an explicitly mapped definition-only projection. It is
+covered by the complete generated-tree integrity inventory and is not an
+operation handler, route, grant, or authorization decision. Current owner
+contracts without an explicit `mcpTools` mapping emit an empty tool list.
 
 `operation-manifest.json` records `vuoro-contract-bundle/v1`, explicit contract
 identity/version, dialect, schema bundle path and resource ID, source/toolchain

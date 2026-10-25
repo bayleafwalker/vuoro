@@ -1,0 +1,88 @@
+{
+  "$id": "mcp-toolset.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contractId",
+    "contractVersion",
+    "projectionRequirementsVersion",
+    "provenance",
+    "tools"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "vuoro-mcp-toolset/v1" },
+    "contractId": { "type": "string", "minLength": 1 },
+    "contractVersion": { "type": "string", "minLength": 1 },
+    "projectionRequirementsVersion": { "const": "mcp-toolset-projection/v1" },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceSha256", "toolchainSha256", "manifestSha256", "schemaBundleSha256"],
+      "properties": {
+        "sourceSha256": { "$ref": "#/$defs/sha256" },
+        "toolchainSha256": { "$ref": "#/$defs/sha256" },
+        "manifestSha256": { "$ref": "#/$defs/sha256" },
+        "schemaBundleSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "tools": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "title", "description", "intent", "inputSchema", "binding"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+          "title": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "description": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "intent": { "enum": ["read", "proposal"] },
+          "inputSchema": { "$ref": "#/$defs/argumentSchema" },
+          "binding": { "$ref": "#/$defs/binding" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "argumentSchema": {
+      "type": "object",
+      "required": ["$schema", "type", "properties", "required", "additionalProperties"],
+      "properties": {
+        "$schema": { "const": "https://json-schema.org/draft/2020-12/schema" },
+        "type": { "const": "object" },
+        "properties": { "type": "object" },
+        "required": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "additionalProperties": { "const": false },
+        "$defs": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "bindingArgument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["in", "name", "schema"],
+      "properties": {
+        "in": { "enum": ["path", "query", "body"] },
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "schema": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+        "style": { "enum": ["simple", "form"] },
+        "explode": { "type": "boolean" },
+        "allowReserved": { "const": false }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operationId", "method", "path", "arguments"],
+      "properties": {
+        "operationId": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+        "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] },
+        "path": { "type": "string", "pattern": "^/" },
+        "arguments": { "type": "object", "additionalProperties": { "$ref": "#/$defs/bindingArgument" } }
+      }
+    }
+  }
+}

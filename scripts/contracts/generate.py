@@ -22,6 +22,7 @@ _METHODS = {"get": "GET", "post": "POST", "put": "PUT", "patch": "PATCH",
             "delete": "DELETE", "head": "HEAD", "options": "OPTIONS"}
 _STATUS = re.compile(r"^[1-5][0-9]{2}$")
 _SCHEMA_ID = re.compile(r"^[A-Za-z0-9_.-]+$")
+_MCP_TOOL_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
 # Qualified source inputs are pinned to the root-admitted freeze. Upgrade work
 # must requalify the artifacts, then deliberately update these reviewed pins.
@@ -43,7 +44,8 @@ _QUALIFIED_INPUT_SHA256 = {
     "tools/contracts/templates/tests/python_sdk_oracle.py": "c42b52ae9ea95438e2de42862659b05e3582ef9670ef9ab6d532e2a274368346",
     "tools/contracts/templates/tests/python_sdk_regressions.py": "946068bd391080da28ffd0ec578442f62c38cd6558fa077b12e7ed24c1e9935d",
     "tools/contracts/templates/QUALIFICATION.md": "adaca3cca5d38109d18ab463ebcfdc7086e68b69a01023414958947e4098e21f",
-    "tools/contracts/FORMAT.md": "9398afec6d8018175ee3b3b3a1185768ff91804dbda078e8348dd714e6f33508",
+    "tools/contracts/FORMAT.md": "0a647774647df87a52dd872469c08825c8aafd6cfedf6f663eb5210920aa93e9",
+    "tools/contracts/metadata/mcp-toolset.schema.json": "0b68117e2a5349dfd5a5e8ae8bd7b7910b402fdc19f426b1f27c82d2ffb1e050",
 }
 
 
@@ -161,6 +163,16 @@ def operation_manifest(openapi: Mapping[str, Any], bundle: Mapping[str, Any], *,
                     location, param_name = parameter.get("in"), parameter.get("name")
                     if location not in ("path", "query", "header") or not isinstance(param_name, str) or not param_name:
                         _fail()
+                    default_style = "simple" if location == "path" else "form"
+                    default_explode = location == "query"
+                    # Public MCP projections require a reversible supported
+                    # serialization plan. Preserve existing internal contract
+                    # generation for OpenAPI parameter styles that the owner
+                    # manifest has historically left to its generated SDK.
+                    if (exposure == "public" and (parameter.get("style", default_style) != default_style
+                            or parameter.get("explode", default_explode) is not default_explode
+                            or parameter.get("allowReserved", False) is not False)):
+                        _fail()
                     key = (location, param_name)
                     if key in seen_params:
                         _fail()
@@ -263,24 +275,360 @@ def compare_trees(expected: Path, actual: Path) -> None:
         raise ContractError("integrity")
 
 
-def public_mcp_tools(manifest: Mapping[str, Any], bundle: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """Enforce explicit exposure; public tool mapping is intentionally not specified in F1a."""
+def _validate_mcp_tool_mapping(operation_id: str, mapping: Any) -> None:
+    """Require explicit bounded public tool metadata for one HTTP operation."""
+    if (not isinstance(operation_id, str)
+            or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", operation_id)
+            or not isinstance(mapping, Mapping)
+            or set(mapping) != {"name", "title", "description", "intent"}):
+        _fail()
+    name, title, description = (mapping.get(key) for key in ("name", "title", "description"))
+    try:
+        text_is_valid = all(
+            isinstance(value, str)
+            and len(value.encode("utf-8", "strict")) <= maximum * 4
+            and all(ord(ch) >= 0x20 and not 0x7F <= ord(ch) <= 0x9F for ch in value)
+            for value, maximum in ((title, 100), (description, 500))
+        )
+    except (UnicodeError, TypeError):
+        text_is_valid = False
+    if (not isinstance(name, str) or not _MCP_TOOL_NAME.fullmatch(name)
+            or not isinstance(title, str) or not 1 <= len(title) <= 100
+            or not isinstance(description, str) or not 1 <= len(description) <= 500
+            or mapping.get("intent") not in {"read", "proposal"}
+            or not text_is_valid):
+        _fail()
+
+
+def _schema_resource_map(bundle: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    definitions = bundle.get("$defs")
+    if not isinstance(definitions, Mapping):
+        _fail()
+    result: dict[str, Mapping[str, Any]] = {}
+    for definition in definitions.values():
+        if not isinstance(definition, Mapping):
+            _fail()
+        identifier = definition.get("$id")
+        if not isinstance(identifier, str) or not _SCHEMA_ID.fullmatch(identifier) or identifier in result:
+            _fail()
+        result[identifier] = definition
+    return result
+
+
+_TOOL_SCHEMA_KEYS = {
+    "$ref", "$schema", "$id", "$anchor", "$comment", "$defs",
+    "title", "description", "default", "examples", "deprecated", "readOnly", "writeOnly",
+    "type", "enum", "const", "multipleOf", "maximum", "exclusiveMaximum",
+    "minimum", "exclusiveMinimum", "maxLength", "minLength", "pattern",
+    "maxItems", "minItems", "uniqueItems", "maxContains", "minContains",
+    "maxProperties", "minProperties", "required", "additionalProperties",
+    "unevaluatedProperties", "properties", "patternProperties", "propertyNames",
+    "dependentRequired", "dependentSchemas", "allOf", "anyOf", "oneOf", "not",
+    "if", "then", "else", "items", "prefixItems", "contains",
+}
+_TOOL_SCHEMA_MAPS = {"$defs", "properties", "patternProperties", "dependentSchemas"}
+_TOOL_SCHEMA_LISTS = {"allOf", "anyOf", "oneOf", "prefixItems"}
+_TOOL_SCHEMA_SINGLE = {"additionalProperties", "unevaluatedProperties", "propertyNames",
+                       "not", "if", "then", "else", "items", "contains"}
+
+
+def _check_tool_schema_vocabulary(schema: Any) -> None:
+    """Fail closed on unsupported keywords and recursively inspect schema positions."""
+    if isinstance(schema, bool):
+        return
+    if not isinstance(schema, Mapping) or set(schema) - _TOOL_SCHEMA_KEYS:
+        _fail()
+    for key in _TOOL_SCHEMA_MAPS:
+        if key in schema:
+            if not isinstance(schema[key], Mapping):
+                _fail()
+            for child in schema[key].values():
+                _check_tool_schema_vocabulary(child)
+    for key in _TOOL_SCHEMA_LISTS:
+        if key in schema:
+            if not isinstance(schema[key], list):
+                _fail()
+            for child in schema[key]:
+                _check_tool_schema_vocabulary(child)
+    for key in _TOOL_SCHEMA_SINGLE:
+        if key in schema:
+            _check_tool_schema_vocabulary(schema[key])
+
+
+def _schema_refs(schema: Any) -> set[str]:
+    """Collect references from schema keywords, treating annotations as opaque."""
+    found: set[str] = set()
+    if isinstance(schema, bool):
+        return found
+    if not isinstance(schema, Mapping):
+        _fail()
+    _check_tool_schema_vocabulary(schema)
+    ref = schema.get("$ref")
+    if ref is not None:
+        if not isinstance(ref, str) or not _SCHEMA_ID.fullmatch(ref):
+            _fail()
+        found.add(ref)
+    for key in _TOOL_SCHEMA_MAPS:
+        children = schema.get(key)
+        if children is not None:
+            if not isinstance(children, Mapping):
+                _fail()
+            for child in children.values():
+                found.update(_schema_refs(child))
+    for key in _TOOL_SCHEMA_LISTS:
+        children = schema.get(key)
+        if children is not None:
+            if not isinstance(children, list):
+                _fail()
+            for child in children:
+                found.update(_schema_refs(child))
+    for key in _TOOL_SCHEMA_SINGLE:
+        if key in schema:
+            found.update(_schema_refs(schema[key]))
+    return found
+
+
+def _schema_resource_closure(roots: set[str], resources: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    closure: dict[str, Any] = {}
+    state: dict[str, int] = {}
+    for root in sorted(roots):
+        stack: list[tuple[str, bool]] = [(root, False)]
+        while stack:
+            identifier, exiting = stack.pop()
+            if exiting:
+                state[identifier] = 2
+                closure[identifier] = _rewrite_schema_refs(resources[identifier])
+                continue
+            mark = state.get(identifier, 0)
+            if mark == 1:
+                _fail()
+            if mark == 2:
+                continue
+            resource = resources.get(identifier)
+            if resource is None:
+                _fail()
+            state[identifier] = 1
+            stack.append((identifier, True))
+            for ref in sorted(_schema_refs(resource), reverse=True):
+                if state.get(ref) == 1:
+                    _fail()
+                if state.get(ref) != 2:
+                    stack.append((ref, False))
+    return closure
+
+
+def _rewrite_schema_refs(schema: Any) -> Any:
+    """Copy a schema while rebasing named resources into the tool's local $defs."""
+    if isinstance(schema, bool):
+        return schema
+    if not isinstance(schema, Mapping):
+        _fail()
+    _check_tool_schema_vocabulary(schema)
+    result: dict[str, Any] = {}
+    for key, value in schema.items():
+        if key == "$id":
+            continue
+        if key == "$ref":
+            if not isinstance(value, str) or not _SCHEMA_ID.fullmatch(value):
+                _fail()
+            result[key] = "#/$defs/" + value
+        elif key in _TOOL_SCHEMA_MAPS:
+            if not isinstance(value, Mapping):
+                _fail()
+            result[key] = {name: _rewrite_schema_refs(child) for name, child in value.items()}
+        elif key in _TOOL_SCHEMA_LISTS:
+            if not isinstance(value, list):
+                _fail()
+            result[key] = [_rewrite_schema_refs(child) for child in value]
+        elif key in _TOOL_SCHEMA_SINGLE:
+            result[key] = _rewrite_schema_refs(value)
+        else:
+            result[key] = value
+    return result
+
+
+def _closed_tool_schema(operation_id: str, operation: Mapping[str, Any], bundle: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Build a closed MCP input object and the private reversible binding plan."""
+    resources = _schema_resource_map(bundle)
+    properties: dict[str, Any] = {}
+    required: set[str] = set()
+    bindings: dict[str, Any] = {}
+    path_parameters: set[str] = set()
+    for parameter in operation.get("parameters", []):
+        if not isinstance(parameter, Mapping):
+            _fail()
+        location, name, schema_id = parameter.get("in"), parameter.get("name"), parameter.get("schema")
+        if location == "header" or location not in {"path", "query"}:
+            _fail()
+        style = "simple" if location == "path" else "form"
+        explode = location == "query"
+        allow_reserved = False
+        parameter_schema = resources[schema_id]
+        if parameter_schema.get("type") not in {"string", "integer", "number", "boolean"}:
+            _fail()
+        if (not isinstance(name, str) or not name or name in properties
+                or not isinstance(schema_id, str) or schema_id not in resources):
+            _fail()
+        if location == "path" and parameter.get("required") is not True:
+            _fail()
+        if location == "path":
+            path_parameters.add(name)
+        properties[name] = {"$ref": "#/$defs/" + schema_id}
+        if parameter.get("required") is True:
+            required.add(name)
+        bindings[name] = {"in": location, "name": name, "schema": schema_id,
+                          "style": style, "explode": explode,
+                          "allowReserved": allow_reserved}
+
+    path = operation.get("path")
+    if not isinstance(path, str) or path.count("{") != path.count("}"):
+        _fail()
+    path_fields = re.findall(r"\{([^{}]+)\}", path)
+    if (len(path_fields) != path.count("{")
+            or len(set(path_fields)) != len(path_fields)
+            or set(path_fields) != path_parameters):
+        _fail()
+
+    request_id = operation.get("request")
+    if request_id is not None:
+        if not isinstance(request_id, str) or request_id not in resources:
+            _fail()
+        body = resources[request_id]
+        if body.get("type") == "object":
+            body_properties = body.get("properties", {})
+            closed_by_unevaluated = body.get("unevaluatedProperties") is False or body.get("unevaluatedProperties") == {"not": {}}
+            if (not isinstance(body_properties, Mapping)
+                    or not (body.get("additionalProperties") is False
+                            or closed_by_unevaluated)
+                    or set(body) - {"$id", "$schema", "title", "description", "type", "properties", "required", "additionalProperties", "unevaluatedProperties"}):
+                _fail()
+            body_required = body.get("required", [])
+            if (not isinstance(body_required, list)
+                    or not all(isinstance(name, str) and name in body_properties for name in body_required)
+                    or len(set(body_required)) != len(body_required)):
+                _fail()
+            if set(properties) & set(body_properties):
+                _fail()
+            for name, schema in body_properties.items():
+                if not isinstance(name, str) or not isinstance(schema, (Mapping, bool)):
+                    _fail()
+                properties[name] = _rewrite_schema_refs(schema)
+                bindings[name] = {"in": "body", "name": name, "schema": request_id}
+            required.update(body_required)
+        else:
+            if "body" in properties:
+                _fail()
+            properties["body"] = {"$ref": "#/$defs/" + request_id}
+            required.add("body")
+            bindings["body"] = {"in": "body", "name": "body", "schema": request_id}
+
+    schema_refs: set[str] = set()
+    for schema_id in (parameter.get("schema") for parameter in operation.get("parameters", [])):
+        if schema_id is not None:
+            schema_refs.add(schema_id)
+    if request_id is not None:
+        if resources[request_id].get("type") == "object":
+            for schema in resources[request_id].get("properties", {}).values():
+                schema_refs.update(_schema_refs(schema))
+        else:
+            schema_refs.add(request_id)
+    closure = _schema_resource_closure(schema_refs, resources)
+    tool_schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": properties,
+        "required": sorted(required),
+        "additionalProperties": False,
+    }
+    if closure:
+        tool_schema["$defs"] = dict(sorted(closure.items()))
+    from jsonschema import Draft202012Validator
+    try:
+        Draft202012Validator.check_schema(tool_schema)
+    except Exception:
+        _fail()
+    local_refs: set[str] = set()
+
+    def collect_local_refs(schema: Any) -> None:
+        if isinstance(schema, bool):
+            return
+        if not isinstance(schema, Mapping):
+            _fail()
+        ref = schema.get("$ref")
+        if ref is not None:
+            if not isinstance(ref, str) or not ref.startswith("#/$defs/"):
+                _fail()
+            local_refs.add(ref.removeprefix("#/$defs/"))
+        for key in _TOOL_SCHEMA_MAPS:
+            values = schema.get(key)
+            if values is not None:
+                if not isinstance(values, Mapping):
+                    _fail()
+                for child in values.values():
+                    collect_local_refs(child)
+        for key in _TOOL_SCHEMA_LISTS:
+            values = schema.get(key)
+            if values is not None:
+                if not isinstance(values, list):
+                    _fail()
+                for child in values:
+                    collect_local_refs(child)
+        for key in _TOOL_SCHEMA_SINGLE:
+            if key in schema:
+                collect_local_refs(schema[key])
+
+    collect_local_refs(tool_schema)
+    if local_refs != set(closure):
+        _fail()
+    binding = {
+        "operationId": operation_id,
+        "method": operation.get("method"),
+        "path": operation.get("path"),
+        "arguments": dict(sorted(bindings.items())),
+    }
+    return tool_schema, binding
+
+def public_mcp_tools(
+    manifest: Mapping[str, Any],
+    bundle: Mapping[str, Any],
+    mappings: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Project explicit read/proposal metadata; this emits no handlers or authority."""
     try:
         validate_bundle(bundle)
         operations = manifest.get("operations") if isinstance(manifest, Mapping) else None
-        if not isinstance(operations, Mapping):
+        if not isinstance(operations, Mapping) or not isinstance(mappings, Mapping):
             _fail()
         if any(not isinstance(item, Mapping) or item.get("exposure") not in ("internal", "public")
                for item in operations.values()):
             _fail()
-        if any(item["exposure"] == "public" for item in operations.values()):
+        public_ids = {name for name, item in operations.items() if item["exposure"] == "public"}
+        if set(mappings) != public_ids:
             _fail()
-        return []
+        tools: list[dict[str, Any]] = []
+        names: set[str] = set()
+        for operation_id in sorted(public_ids):
+            mapping = mappings[operation_id]
+            _validate_mcp_tool_mapping(operation_id, mapping)
+            name = mapping["name"]
+            if name in names:
+                _fail()
+            names.add(name)
+            operation = operations[operation_id]
+            tool_schema, binding = _closed_tool_schema(operation_id, operation, bundle)
+            tools.append({
+                "name": name,
+                "title": mapping["title"],
+                "description": mapping["description"],
+                "intent": mapping["intent"],
+                "inputSchema": tool_schema,
+                "binding": binding,
+            })
+        return tools
     except ContractError:
         raise
     except Exception:
         raise ContractError("manifest") from None
-
 
 def main(argv: list[str] | None = None) -> int:
     """Compile an authored TypeSpec project and atomically admit its projections."""
@@ -338,12 +686,31 @@ def main(argv: list[str] | None = None) -> int:
             manifest = operation_manifest(openapi, bundle, contract_id=args.contract_id,
                 contract_version=metadata["contractVersion"], source_sha256=source_digest,
                 toolchain_sha256=tool_digest, exposures=metadata["exposures"], byte_bounds=metadata["byteBounds"])
+            manifest_bytes = _json_bytes(manifest)
+            schema_bytes = schema_file.read_bytes()
+            toolset = {
+                "schemaVersion": "vuoro-mcp-toolset/v1",
+                "contractId": args.contract_id,
+                "contractVersion": metadata["contractVersion"],
+                "projectionRequirementsVersion": "mcp-toolset-projection/v1",
+                "provenance": {
+                    "sourceSha256": source_digest,
+                    "toolchainSha256": tool_digest,
+                    "manifestSha256": sha256(manifest_bytes).hexdigest(),
+                    "schemaBundleSha256": sha256(schema_bytes).hexdigest(),
+                },
+                "tools": public_mcp_tools(manifest, bundle, metadata.get("mcpTools", {})),
+            }
+            from jsonschema import Draft202012Validator
+            mcp_schema = json.loads((tools / "metadata/mcp-toolset.schema.json").read_bytes())
+            Draft202012Validator(mcp_schema).validate(toolset)
             tree = Path(scratch) / "candidate"
             tree.mkdir()
             (tree / "openapi").mkdir(); (tree / "schema").mkdir()
             shutil.copyfile(openapi_file, tree / "openapi/contract.openapi.json")
             shutil.copyfile(schema_file, tree / ("schema/" + bundle["$id"]))
-            (tree / "operation-manifest.json").write_bytes(_json_bytes(manifest))
+            (tree / "operation-manifest.json").write_bytes(manifest_bytes)
+            (tree / "mcp-tools.json").write_bytes(_json_bytes(toolset))
             (tree / ".vuoro-generated-marker").write_bytes(b"vuoro-contract-output/v1\n")
             _python_sdk(openapi_file, tree, tools, python, bundle)
             _typescript_sdk(tree, tools, node, manifest, bundle)
@@ -397,7 +764,11 @@ def _validate_owner_project(source:Path,tools:Path,node:Path)->None:
     if not {"main.tsp","contract.json","tspconfig.yaml"}.issubset({p.relative_to(source).as_posix() for p in files}):_fail()
     if (source/"tspconfig.yaml").read_bytes()!=(tools/"tspconfig.template.yaml").read_bytes():_fail()
     metadata=parse_json((source/"contract.json").read_bytes(),max_bytes=65536)
-    if not isinstance(metadata,dict) or set(metadata)!={"contractVersion","exposures","byteBounds"}:_fail()
+    metadata_keys = {"contractVersion", "exposures", "byteBounds"}
+    if (not isinstance(metadata, dict)
+            or set(metadata) not in (metadata_keys, metadata_keys | {"mcpTools"})
+            or ("mcpTools" in metadata and not isinstance(metadata["mcpTools"], Mapping))):
+        _fail()
     _validate_tsp_imports(source,files,source,tools,node)
 
 
@@ -482,7 +853,15 @@ def _snapshot_digest(snapshot:Path)->str:
 
 def _toolchain_digest(tools:Path,root:Path,shared_snapshot:Path)->str:
     runtime=root/"packages/vuoro-contracts/src/vuoro_contracts"
-    candidates=[tools/"package.json",tools/"package-lock.json",tools/"pyproject.toml",tools/"uv.lock",tools/"openapi-python-client.yaml",tools/"toolchain/source-pins.json",tools/"toolchain/tool-artifacts.json",tools/"FORMAT.md",tools/"templates/QUALIFICATION.md",root/"scripts/contracts/generate.py",root/"scripts/contracts/build_python_sdk.py",root/"packages/vuoro-contracts/pyproject.toml",root/"uv.lock"]
+    candidates = [
+        tools / "package.json", tools / "package-lock.json", tools / "pyproject.toml",
+        tools / "uv.lock", tools / "openapi-python-client.yaml",
+        tools / "toolchain/source-pins.json", tools / "toolchain/tool-artifacts.json",
+        tools / "FORMAT.md", tools / "metadata/mcp-toolset.schema.json",
+        tools / "templates/QUALIFICATION.md", root / "scripts/contracts/generate.py",
+        root / "scripts/contracts/build_python_sdk.py", root / "packages/vuoro-contracts/pyproject.toml",
+        root / "uv.lock",
+    ]
     candidates += [p for p in (tools/"templates").rglob("*") if p.is_file()]
     candidates += [p for p in (tools/"python-templates").rglob("*") if p.is_file()]
     candidates += list(runtime.rglob("*.py"))+list((runtime/"formats").glob("*.json"))
