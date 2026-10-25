@@ -60,6 +60,9 @@ Python and TypeScript apply the same wire-value limits: JSON strings must contai
 Unicode scalar values, and integer-valued numbers must fit JavaScript's exact
 safe-integer range (−9007199254740991 through 9007199254740991). Encode larger
 exact counters as decimal strings so clients preserve them without rounding.
+The shared `NonnegativeInt64Decimal` and `SignedInt64Decimal` TypeSpec scalars
+model PostgreSQL BIGINT wire values as canonical decimal strings; signed owner
+preimages may use `SignedInt64Decimal` to preserve the full signed BIGINT range.
 
 F1a projection rejects path-level inherited parameters and response-object references. They must not be silently omitted or classified as absent bodies. Supporting those semantic forms requires separate qualification. Schema annotation and enum/const data are opaque to reference-edge traversal. Bundle documents are validated from the exact byte snapshot authenticated by the inventory; rereading a changing file must not detach parsed content from its integrity check.
 

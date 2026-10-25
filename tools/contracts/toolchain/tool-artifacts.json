@@ -5290,7 +5290,7 @@
         "@vuoro/contracts/http/main.tsp": "c84a51fdfefee88c9dcd738fcb7d7d3d9b3fdb971cc9912bc7e8138e7712c688",
         "@vuoro/contracts/main.tsp": "b543eb8bc5eb1cd8ea2f04aa2f06f222cc865490beeca9d45a5ded651b2abc02",
         "@vuoro/contracts/package.json": "2c846e33bbd1c6fc58dd2e0862bdf36791ac44e1decdd819c71b8694c788377b",
-        "@vuoro/contracts/primitives/main.tsp": "c92a9c749e674e3f08131a86857f4579c56a9cd77fee5623fa96802181c20611",
+        "@vuoro/contracts/primitives/main.tsp": "cf96550faf4474ee840b3554726128a5e8cffc0b4da18bfd8dfd5ededb1c3291",
         "ajv-draft-04/LICENSE": "6e737548e1fc84ae35ef356774ab1f764674f9e0f35b80e77dc2e158d5104fa3",
         "ajv-draft-04/README.md": "4034b6dd12cf1cca8a684ac2923074d63bc04592505a1229a0fa21d737a2b259",
         "ajv-draft-04/dist/index.d.ts": "706fddf475c77bd45be0aa3537b913951c527be3f9f483f4dcdb13e7315f8955",

@@ -127,6 +127,37 @@ def test_two_clean_generations_default_check_and_owner_resource_load(tmp_path, g
     assert binding["executionPull"]["module"] == "api.default.pull"
     assert binding["executionPull"]["parameters"] == {}
 
+    # The shared signed BIGINT primitive preserves owner preimages such as a
+    # negative generation while keeping all exact values as wire strings.
+    signed_source = tmp_path / "signed-probe"
+    shutil.copytree(SOURCE, signed_source)
+    source_main = signed_source / "main.tsp"
+    source_main.write_text(source_main.read_text().replace(
+        "NonnegativeInt64Decimal", "SignedInt64Decimal"))
+    signed_output = tmp_path / "signed-generated"
+    assert invoke(signed_output, "--write", source=signed_source) == 0
+    signed_manifest = json.loads((signed_output / "operation-manifest.json").read_bytes())
+    signed_bundle = ContractBundle.load(
+        signed_output,
+        integrity_sha256=sha256((signed_output / "integrity.json").read_bytes()).hexdigest(),
+    )
+    accepted = ("-9223372036854775808", "-1", "0", "9223372036854775807")
+    for value in accepted:
+        raw_signed = {"revision": value, "enabled": True, "nested": {"label": "x"}}
+        assert signed_bundle.validate_request("submit", raw_signed) is raw_signed
+        assert signed_bundle.validate_response("submit", 200, {
+            "state": "ready", "revision": value,
+        })["revision"] == value
+    rejected = ("-9223372036854775809", "9223372036854775808", "-0", "+1", "01", "-01", "1.0", -1)
+    for value in rejected:
+        raw_signed = {"revision": value, "enabled": True, "nested": {"label": "x"}}
+        with pytest.raises(ContractError):
+            signed_bundle.validate_request("submit", raw_signed)
+        with pytest.raises(ContractError):
+            signed_bundle.validate_response("submit", 200, {
+                "state": "ready", "revision": value,
+            })
+
 
 @pytest.mark.parametrize("projection", ["manifest", "schema", "openapi", "python", "typescript", "python_attachment", "typescript_attachment", "decoder", "extra", "missing"])
 def test_real_projection_or_attachment_mutation_fails_read_only_check(tmp_path, generated, projection):
