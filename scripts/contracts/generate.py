@@ -31,7 +31,7 @@ _QUALIFIED_INPUT_SHA256 = {
     "tools/contracts/pyproject.toml": "cf6acd87c346aac3ed1bec6fd111436af93b113fcf79ff709205b93aa8e6b418",
     "tools/contracts/uv.lock": "74cd467bf25ff11fa74096e35edbb62d3bb0baeb0957fd2b5f3ea5c71b870175",
     "tools/contracts/toolchain/source-pins.json": "0c181359c6777ee1920909ff5a16b6c60a7451cfdf63be90dca0cf682032444c",
-    "tools/contracts/toolchain/tool-artifacts.json": "5b8c7758ff5b0fb11ae9afdceaa752909a3868d5c4318390afc3ab47e7f701ab",
+    "tools/contracts/toolchain/tool-artifacts.json": "ef364149da0917b856aeed8f97b3b40248933275ca688e038b68ff431860209c",
     "tools/contracts/toolchain/flake.lock": "27ee4fbd30db0101fea9d69cbe4028d7ccdebf5ffdc4f3cf538bcf4fb3de8578",
     "tools/contracts/toolchain/flake.nix": "93bdb4acbdb3acd1232793b7e0f3f381568d29a202ff277ae5de79b7f4019f68",
     "tools/contracts/openapi-python-client.yaml": "59dbde8f0e28cddd825cb5bb83fb6e21db9083551806eeb2f7e1177728f1be80",
@@ -413,8 +413,8 @@ def _validate_shared_project(shared:Path,tools:Path,node:Path)->None:
         if len(files)>64 or size>1024*1024:_fail()
     manifest=parse_json((shared/"package.json").read_bytes(),max_bytes=65536)
     if manifest.get("name")!="@vuoro/contracts" or manifest.get("tspMain")!="main.tsp":_fail()
-    if set(manifest.get("exports",{}))!={".","./http","./primitives"}:_fail()
-    expected_exports={".":"./main.tsp","./http":"./http/main.tsp","./primitives":"./primitives/main.tsp"}
+    if set(manifest.get("exports",{}))!={".","./http","./primitives","./operator-requests"}:_fail()
+    expected_exports={".":"./main.tsp","./http":"./http/main.tsp","./primitives":"./primitives/main.tsp","./operator-requests":"./operator-requests/main.tsp"}
     for key,target in expected_exports.items():
         if manifest["exports"][key]!={"typespec":target}:_fail()
     if manifest.get("peerDependencies")!={"@typespec/compiler":"1.17.0","@typespec/http":"1.17.0","@typespec/json-schema":"1.17.0"}:_fail()
@@ -423,7 +423,7 @@ def _validate_shared_project(shared:Path,tools:Path,node:Path)->None:
 
 
 def _validate_tsp_imports(source:Path,files:list[Path],local_root:Path,tools:Path,node:Path)->None:
-    external={"@vuoro/contracts","@vuoro/contracts/http","@vuoro/contracts/primitives","@typespec/compiler","@typespec/http","@typespec/openapi","@typespec/openapi3","@typespec/json-schema"}
+    external={"@vuoro/contracts","@vuoro/contracts/http","@vuoro/contracts/primitives","@vuoro/contracts/operator-requests","@typespec/compiler","@typespec/http","@typespec/openapi","@typespec/openapi3","@typespec/json-schema"}
     tsp_files=[file for file in files if file.suffix==".tsp"]
     if not tsp_files:return
     parser=tools/"node_modules/@typespec/compiler/dist/src/core/parser.js"
