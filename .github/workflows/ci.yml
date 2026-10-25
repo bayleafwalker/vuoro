@@ -147,7 +147,7 @@ jobs:
 
   native-settlement-demo:
     # Optional consumer against released immutable owners, outside workspace/image.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -169,7 +169,7 @@ jobs:
             /tmp/vuoro-demo-conformance/bin/python -m pytest packages/vuoro-demo/tests -q
   workspace-store:
     # Knowledge workspace store against a disposable PostgreSQL 16 cluster.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -186,7 +186,7 @@ jobs:
           uv run --package vuoro-workspace --extra test pytest packages/vuoro-workspace/tests -ra
       - run: uv build --package vuoro-workspace --wheel --out-dir dist/vuoro-workspace
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # vuoro-ops isolated-restore tests fail, never skip, without PostgreSQL 16.
       VUORO_OPS_REQUIRE_PG16: "1"
