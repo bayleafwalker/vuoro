@@ -20,7 +20,7 @@ try:
     __version__ = version("vuoro-client")
 except PackageNotFoundError:
     # Source-only tooling may import the package without an installed wheel.
-    __version__ = "0.1.3"
+    __version__ = "0.1.4"
 
 __all__ = [
     "AsyncVuoroClient",

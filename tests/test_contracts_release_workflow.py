@@ -146,10 +146,13 @@ def test_ci_calls_same_source_reusable_without_duplicate_producer() -> None:
     assert "Run exact production compiler and SDK contract gates" not in text
 
 
-def test_legacy_publisher_and_its_existing_oracles_are_immutable() -> None:
-    expected = {".github/workflows/publish-python-packages.yaml": "8364554fb84763e6436c118db0a030fd655635660dfe19ff85bd0b8e4e90d919", "tests/test_release_workflow.py": "11f87a767870efa631d45b218cca8847c27c8f9f8e531d3ccb1cf2b78e827fab"}
+def test_reviewed_contract_aware_publisher_successor_and_its_oracle_are_pinned() -> None:
+    expected = {".github/workflows/publish-python-packages.yaml": "04e92fcd5292c6b1b44e4f247736b32a8ee3e49379b6be9d8853cab44f25315b", "tests/test_release_workflow.py": "3a0fd1cca919cce862f86ab53d115310c1157851422db1feb8f5b45db9e2ae96"}
     for path, digest in expected.items():
         assert hashlib.sha256((ROOT / path).read_bytes()).hexdigest() == digest
+    recovery = (ROOT / "docs/plans/2026-10-25-vuoro-client-0.1.4-release-recovery.md").read_text()
+    assert "8364554fb84763e6436c118db0a030fd655635660dfe19ff85bd0b8e4e90d919" in recovery
+    assert "vuoro-client-v0.1.3" in recovery and "40203510472" in recovery
 
 
 @pytest.mark.parametrize("path", [REUSABLE, PUBLISHER])
