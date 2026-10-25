@@ -17,13 +17,29 @@ permissions:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      VUORO_OPS_REQUIRE_PG16: "1"
+      VUORO_PG_BIN: /usr/lib/postgresql/16/bin
+      VUORO_WORKSPACE_REQUIRE_PG: "1"
+      VUORO_WORKSPACE_TEST_PG_BIN: /usr/lib/postgresql/16/bin
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v8.3.2
         with:
+          version: "0.13.1"
           python-version: "3.12"
           enable-cache: true
+      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012 # v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: Install disposable PostgreSQL 16 tools for owner release tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-16
       - id: package
         shell: bash
         run: |
@@ -36,11 +52,56 @@ jobs:
           esac
           echo "name=$package" >> "$GITHUB_OUTPUT"
           echo "version=${tag#*-v}" >> "$GITHUB_OUTPUT"
+      - name: Prepare the pinned contract compiler and decoder
+        shell: bash
+        run: |
+          set -euo pipefail
+          qualified_python_root="$RUNNER_TEMP/contracts-python-20261001"
+          python_archive="$RUNNER_TEMP/contracts-python-20261001.tar.gz"
+          curl --fail --location --silent --show-error \
+            --output "$python_archive" \
+            'https://github.com/astral-sh/python-build-standalone/releases/download/20261001/cpython-3.13.16%2B20261001-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz'
+          printf '%s  %s\n' 'ffcb50e716789d1a6e1db5e745d4d194ac8ed9b015ccf5eabcaccb179a25e4a8' "$python_archive" | sha256sum --check
+          mkdir "$qualified_python_root"
+          tar -xzf "$python_archive" -C "$qualified_python_root"
+          qualified_python="$qualified_python_root/python/bin/python3.13"
+          test "$(sha256sum "$qualified_python" | cut -d ' ' -f1)" = 'f8188f8dec8f4ae9865dc6789323327c50bb275a5a301373d675464fdbbf933f'
+          printf 'qualified_python=%s\n' "$qualified_python" >> "$GITHUB_ENV"
+          test "$(uv --version | cut -d ' ' -f2)" = "0.13.1"
+          nix develop ./tools/contracts/toolchain --command bash -euc '
+            test "$(node --version)" = "v24.21.0"
+            test "$(npm --version)" = "11.19.0"
+            npm ci --prefix tools/contracts --ignore-scripts --no-audit --no-fund
+          '
+          uv sync --project tools/contracts --python "$qualified_python" --locked --no-install-project
+          test "$(tools/contracts/.venv/bin/python --version)" = "Python 3.13.16"
+          node_bin="$(nix develop ./tools/contracts/toolchain --command bash -euc 'command -v node')"
+          test "$("$node_bin" --version)" = "v24.21.0"
+          tools/contracts/.venv/bin/python - "$node_bin" <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          import sys
+          expected = json.loads(Path("tools/contracts/toolchain/tool-artifacts.json").read_text())["executables"]
+          paths = {
+              "node": Path(sys.argv[1]),
+              "python": Path("tools/contracts/.venv/bin/python").resolve(),
+              "ruff": Path("tools/contracts/.venv/bin/ruff").resolve(),
+          }
+          actual = {name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in paths.items()}
+          assert actual == expected, {"expected": expected, "actual": actual}
+          PY
+          printf 'VUORO_CONTRACT_NODE=%s\n' "$node_bin" >> "$GITHUB_ENV"
+          printf 'VUORO_CONTRACT_PYTHON=%s\n' "$GITHUB_WORKSPACE/tools/contracts/.venv/bin/python" >> "$GITHUB_ENV"
+          printf 'VUORO_CONTRACT_DECODER=%s\n' "$GITHUB_WORKSPACE/tools/contracts/templates/strict-json.ts" >> "$GITHUB_ENV"
+          printf 'PYTHONPATH=%s/packages/vuoro-contracts/src\n' "$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+          printf 'PYTHONDONTWRITEBYTECODE=1\n' >> "$GITHUB_ENV"
       - name: Synchronize the complete locked workspace
-        run: uv sync --all-packages --all-extras --locked
+        run: uv sync --all-packages --all-extras --locked --python "$qualified_python"
       - name: Build the complete release candidate once
         run: |
           uv build --package vuoro-client --wheel --out-dir dist/vuoro-client
+          uv build --package vuoro-contracts --wheel --out-dir dist/vuoro-contracts --no-create-gitignore
           uv build --package vuoro-service --wheel --out-dir dist/vuoro-service
           uv build --package vuoro-schema-runtime --wheel --out-dir dist/vuoro-schema-runtime
           uv build --package vuoro-adapter-kit --wheel --out-dir dist/vuoro-adapter-kit
@@ -52,7 +113,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          wheels=(dist/vuoro-client/*.whl dist/vuoro-service/*.whl dist/vuoro-schema-runtime/*.whl dist/vuoro-adapter-kit/*.whl)
+          wheels=(dist/vuoro-client/*.whl dist/vuoro-contracts/*.whl dist/vuoro-service/*.whl dist/vuoro-schema-runtime/*.whl dist/vuoro-adapter-kit/*.whl)
           uv run --package vuoro-service --extra test python \
             scripts/validate_release_contract.py "${wheels[@]}" --release
           uv venv --python 3.12 /tmp/vuoro-release-conformance
@@ -65,8 +126,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y postgresql-16
           uv run --package vuoro-service --extra test python \
             scripts/validate_release_contract.py dist/vuoro-workspace/*.whl --release
           VUORO_WORKSPACE_REQUIRE_PG=1 VUORO_WORKSPACE_TEST_PG_BIN=/usr/lib/postgresql/16/bin \
@@ -76,8 +135,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y postgresql-16
           uv venv --python 3.12 /tmp/vuoro-demo-release
           wheels=(dist/vuoro-demo/*.whl)
           uv pip install --no-config --python /tmp/vuoro-demo-release/bin/python "${wheels[0]}[private]" 'pytest>=8,<10'

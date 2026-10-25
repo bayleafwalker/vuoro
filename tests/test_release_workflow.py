@@ -12,6 +12,7 @@ CI_WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
 
 
 def _assert_python_release_order(workflow: str) -> None:
+    preparation = workflow.index("name: Prepare the pinned contract compiler and decoder")
     sync = workflow.index("uv sync --all-packages --all-extras --locked")
     full_suite = workflow.index(
         "name: Run the complete repository test suite\n        run: uv run pytest\n"
@@ -29,9 +30,12 @@ def _assert_python_release_order(workflow: str) -> None:
         "name: Publish the GitHub release after attestation and draft creation"
     )
 
-    assert sync < build < full_suite < release_gate < served_gate
+    assert preparation < sync < build < full_suite < release_gate < served_gate
     assert served_gate < selection < tag_gate < attestation < release_create < release_finalize
-    assert workflow.count("uv build --package") == 5
+    assert workflow.count("uv build --package") == 6
+    assert "uv build --package vuoro-contracts --wheel --out-dir dist/vuoro-contracts --no-create-gitignore" in workflow
+    assert 'dist/vuoro-contracts/*.whl' in workflow
+    assert 'wheels=(dist/vuoro-client/*.whl dist/vuoro-contracts/*.whl dist/vuoro-service/*.whl dist/vuoro-schema-runtime/*.whl dist/vuoro-adapter-kit/*.whl)' in workflow
     assert 'wheel_stem="${package//-/_}"' in workflow
     assert 'wheels=(dist/"${package}"/"${wheel_stem}"-*.whl)' in workflow
     assert 'cp -- "${wheels[0]}" "$wheel"' in workflow
@@ -150,6 +154,51 @@ def test_python_release_workflow_uses_independent_immutable_package_tags() -> No
         assert tag in workflow
     assert "vuoro-bootstrap" not in workflow
     _assert_python_release_order(workflow)
+
+
+def test_python_release_pins_contract_toolchain_and_exports_decoder_environment() -> None:
+    workflow = PYTHON_WORKFLOW.read_text()
+    preparation = workflow.split(
+        "      - name: Prepare the pinned contract compiler and decoder\n", 1
+    )[1].split("      - name:", 1)[0]
+    for token in (
+        "0.13.1",
+        "contracts-python-20261001.tar.gz",
+        "ffcb50e716789d1a6e1db5e745d4d194ac8ed9b015ccf5eabcaccb179a25e4a8",
+        "f8188f8dec8f4ae9865dc6789323327c50bb275a5a301373d675464fdbbf933f",
+        "v24.21.0",
+        "11.19.0",
+        "npm ci --prefix tools/contracts --ignore-scripts --no-audit --no-fund",
+        "tools/contracts/toolchain/tool-artifacts.json",
+        "VUORO_CONTRACT_NODE",
+        "VUORO_CONTRACT_PYTHON",
+        "VUORO_CONTRACT_DECODER",
+        "PYTHONPATH",
+        "PYTHONDONTWRITEBYTECODE",
+    ):
+        assert token in preparation
+    assert "runs-on: ubuntu-24.04" in workflow
+    assert "VUORO_OPS_REQUIRE_PG16: \"1\"" in workflow
+    assert "VUORO_PG_BIN: /usr/lib/postgresql/16/bin" in workflow
+    assert "VUORO_WORKSPACE_REQUIRE_PG: \"1\"" in workflow
+    assert "VUORO_WORKSPACE_TEST_PG_BIN: /usr/lib/postgresql/16/bin" in workflow
+    pg_setup = workflow.index("name: Install disposable PostgreSQL 16 tools for owner release tests")
+    sync = workflow.index("name: Synchronize the complete locked workspace")
+    full_suite = workflow.index("name: Run the complete repository test suite")
+    assert pg_setup < sync < full_suite
+
+
+def test_client_release_candidate_uses_fresh_version_after_failed_immutable_tag() -> None:
+    import tomllib
+
+    project = tomllib.loads((ROOT / "packages/vuoro-client/pyproject.toml").read_text())["project"]
+    lock = tomllib.loads((ROOT / "uv.lock").read_text())
+    locked = [package for package in lock["package"] if package["name"] == "vuoro-client"]
+    assert project["version"] == "0.1.4"
+    assert len(locked) == 1 and locked[0]["version"] == "0.1.4"
+    assert '__version__ = "0.1.4"' in (ROOT / "packages/vuoro-client/src/vuoro_client/__init__.py").read_text()
+    recovery = (ROOT / "docs/plans/2026-10-25-vuoro-client-0.1.4-release-recovery.md").read_text()
+    assert "does not retag 0.1.3" in recovery
 
 
 def test_python_release_is_github_only_and_publishes_the_created_release() -> None:
