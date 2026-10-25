@@ -5,6 +5,13 @@ recorded here.
 
 ## Unreleased
 
+- Sprintctl 0.24.0 caps new session notes at 16,384 Unicode characters and
+  caps predecessor-context results at 1 MiB of compact UTF-8 JSON. The record
+  edge publishes and validates the matching write bound, accepts byte-limited
+  short pages with progressing per-list cursors, and preserves explicit
+  failure for a historical row that cannot fit. No edge-held credential or
+  database access is introduced.
+
 - vuoro-service 0.1.97 / vuoro-mcp-edge 0.1.8: E4 records a rejected
   rate-limit citation, forwards the owner parking disposition, and observes
   a later explicit release/reclaim through bounded work facts. Exact owned
