@@ -1104,6 +1104,15 @@ def create_composed_app(
     )
     work_store.repo_id = _runtime_env("VUORO_WORK_REPOSITORY_ID", environ)
     work_application = WorkApplication.postgres(work_store)
+    # Seed the owner's runtime with the read-only observed schema before
+    # registering its schema-gated operations. Sprintctl 0.23 omits all work
+    # operations when the observed version is its initial sentinel (zero).
+    work_handshake = work_migrations.compatibility_handshake(work_store)
+    work_state = _compatibility("work", work_handshake, work_pin)
+    if work_state.state == "compatible":
+        remote_schema = work_handshake.get("remote_schema")
+        if isinstance(remote_schema, Mapping):
+            work_store.remote_schema_version = remote_schema.get("actual")
     bindings_path = project_bindings_path or _runtime_path(
         "VUORO_PROJECT_BINDINGS_FILE",
         environ,
@@ -1211,18 +1220,6 @@ def create_composed_app(
     _bind_work_resource_visibility(
         registry, work_application, work_resource_observation_authorizer
     )
-    work_handshake = work_migrations.compatibility_handshake(work_store)
-    work_state = _compatibility("work", work_handshake, work_pin)
-    if work_state.state == "compatible":
-        # The owner gates schema-additive operations (run invocation receipts
-        # at 23, the agent directory and inbox at 25) on the schema version
-        # its runtime store observed. Record the read-only handshake result,
-        # as the owner's own runtime startup does; this never migrates. The
-        # catalog is already registered, so it still derives only from the
-        # released artifacts.
-        remote_schema = work_handshake.get("remote_schema")
-        if isinstance(remote_schema, Mapping):
-            work_store.remote_schema_version = remote_schema.get("actual")
 
     audit_pin = manifest.pin("audit")
     from auditctl.vuoro_adapter import VuoroAuditAdapter
