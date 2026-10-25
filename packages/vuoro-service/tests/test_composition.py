@@ -195,13 +195,9 @@ def test_checked_in_adapter_artifact_urls_are_source_named_or_exact_semver_relea
 
 
 def test_checked_in_work_pin_is_the_release_actor_binding_release() -> None:
-    # 0.3.5 closes the one served work operation of 43 that accepted a
-    # caller-supplied actor without validating it. `work.reservation.release`
-    # passed it straight to `release_reservation`, which writes it as the
-    # `reservation.released` event actor -- an authorization hole and durable
-    # attribution forgery. It now rejects `actor-mismatch` the way `reserve`
-    # and `reassign` do, and defaults to the authenticated actor. Update this
-    # pin and this assertion in the same commit, never one without the other.
+    # Sprintctl 0.24.0 pins the bounded note/context contract while retaining
+    # the schema-28 owner API. The source, immutable wheel URL and digest must
+    # advance together.
     pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("work")
     assert (
         pin.source_revision,
@@ -209,16 +205,16 @@ def test_checked_in_work_pin_is_the_release_actor_binding_release() -> None:
         pin.api_version,
         pin.schema_version,
     ) == (
-        "bfe962aebed936f5fd5f01198a85396092584415",
-        "0.23.0",
+        "c2c1cc6e3cbd0f0170c7175726cfff23eac50e33",
+        "0.24.0",
         "work-api/v1",
         "work-schema/v1",
     )
     assert pin.artifact_url.endswith(
-        "/v0.23.0/sprintctl-0.23.0-py3-none-any.whl"
+        "/v0.24.0/sprintctl-0.24.0-py3-none-any.whl"
     )
     assert pin.artifact_sha256 == (
-        "a33c065b5328cde3a0abd593249704da1d412f0578bb52a1c4205e652148d433"
+        "53872068f8cbf670e31fe24fd20a70ff0ca611b93aa9edd2d2cdb0944df10b2f"
     )
     assert [
         (item.lock_id, item.lock_kind, item.distribution, item.distribution_version)
@@ -670,7 +666,7 @@ def test_load_and_verify_accept_a_shared_filename_with_an_identical_digest(tmp_p
 
     source = ROOT / "composition" / "adapter-pins.json"
     raw = json.loads(source.read_text(encoding="utf-8"))
-    artifact = tmp_path / "sprintctl-0.23.0-py3-none-any.whl"
+    artifact = tmp_path / "sprintctl-0.24.0-py3-none-any.whl"
     artifact.write_bytes(b"same-filename-same-digest")
     digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
     work_lock = next(lock for lock in raw["release_locks"] if lock["lock_id"] == "work-adapter")
@@ -687,7 +683,7 @@ def test_load_and_verify_accept_a_shared_filename_with_an_identical_digest(tmp_p
     manifest = CompositionManifest.load(path)
     filenames = {lock.artifact_url.rsplit("/", 1)[-1] for lock in manifest.release_locks
                  if lock.lock_id in ("work-adapter", "work-adapter-dup")}
-    assert filenames == {"sprintctl-0.23.0-py3-none-any.whl"}
+    assert filenames == {"sprintctl-0.24.0-py3-none-any.whl"}
 
     # verify_adapter_artifacts checks every lock in the manifest, so isolate
     # the two colliding locks (rather than staging real wheels for the whole
@@ -706,7 +702,7 @@ def test_load_and_verify_reject_a_shared_filename_with_a_differing_digest(tmp_pa
 
     source = ROOT / "composition" / "adapter-pins.json"
     raw = json.loads(source.read_text(encoding="utf-8"))
-    artifact = tmp_path / "sprintctl-0.23.0-py3-none-any.whl"
+    artifact = tmp_path / "sprintctl-0.24.0-py3-none-any.whl"
     artifact.write_bytes(b"same-filename-differing-digest")
     digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
     work_lock = next(lock for lock in raw["release_locks"] if lock["lock_id"] == "work-adapter")

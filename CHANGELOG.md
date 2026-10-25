@@ -5,6 +5,10 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service 0.1.99 / vuoro-mcp-edge 0.1.9: pin Sprintctl 0.24.0 for
+  the bounded session-note write and predecessor-context contracts. PostgreSQL
+  schema 28 is unchanged; no migration is required.
+
 - Sprintctl 0.24.0 caps new session notes at 16,384 Unicode characters and
   caps predecessor-context results at 1 MiB of compact UTF-8 JSON. The record
   edge publishes and validates the matching write bound, accepts byte-limited

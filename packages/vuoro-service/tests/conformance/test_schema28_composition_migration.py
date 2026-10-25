@@ -33,7 +33,7 @@ from .test_bound_proposal_http import assert_installed_composition
 
 pytestmark = pytest.mark.essential_safety
 
-CATALOG_REVISION = '36c4c8579c670ad50dc8704c6185b7e940e765329b681d66bffaa766752962df'
+CATALOG_REVISION = '3995d4f88ef28f8aea71f836420e13b435f1af5e164d344b495c423eb6676cab'
 CATALOG_TOTAL = 144
 INBOX_OPERATIONS = ('work.agent.register-v1', 'work.agent.observe-v1', 'work.agent.retire-v1',
                     'work.agent.list-v1', 'work.agent.describe-v1', 'work.message.send-v1',
@@ -267,7 +267,7 @@ def test_actual_schema28_refusal_explicit28_cli_migration_and_runtime_ddl_denial
                    'workspace_id': 'schema28-fixture', 'authorities': ['work.effect.mark-applied'],
                    'repo_ids': ['agentops']},
         'b' * 40: {'actor': 'fixture-agent', 'principal_id': 'github:2:0', 'environment': 'schema28-fixture',
-                   'workspace_id': 'schema28-fixture', 'authorities': ['work:read', 'work:evidence'],
+                   'workspace_id': 'schema28-fixture', 'authorities': ['work:read', 'work:write', 'work:evidence'],
                    'repo_ids': ['agentops']}}}))
     observers = tmp_path / 'observers.json'
     observers.write_text(json.dumps({'schema_version': 'vuoro-work-resource-observers/v1', 'grants': []}))
@@ -322,7 +322,7 @@ def test_actual_schema28_refusal_explicit28_cli_migration_and_runtime_ddl_denial
         response = client.get('/api/meta/v1/handshake', headers={'X-Vuoro-Client-Protocol': '1'})
         assert response.status_code == 200, response.json()
         handshake = response.json()
-        assert handshake['service_version'] == '0.1.98' and handshake['compatibility']['state'] == 'compatible'
+        assert handshake['service_version'] == '0.1.99' and handshake['compatibility']['state'] == 'compatible'
         assert all(x['state'] == 'compatible' for x in handshake['compatibility']['domains'].values())
         catalog = client.get('/api/catalog/v1', headers={'X-Vuoro-Client-Protocol': '1'}).json()
         assert len(catalog['operations']) == CATALOG_TOTAL
@@ -385,9 +385,79 @@ def test_actual_schema28_refusal_explicit28_cli_migration_and_runtime_ddl_denial
         assert any(entry['principal_id'] == 'github:2:0' for entry in listed['entries'])
         request_page = invoke('work.request.list-v1', {'limit': 20}, 'x' * 40)
         assert request_page['requests'] == [] and request_page['next_after_request_id'] is None
+
+        # Exercise the released 0.24.0 owner through the composed service with
+        # only the separately provisioned DML runtime role. Byte-limited pages
+        # may be short but each cursor must advance to the last returned note.
+        parent = invoke('work.run.register-v1', {
+            'harness_id': 'schema28-budget', 'harness_build': 'test',
+            'model_id': 'scripted', 'recipe_id': 'schema28-note-budget/v1',
+            'observed_profile': {'instruction_digest': 'sha256:' + 'e' * 64, 'skill_digests': []},
+            'idempotency_key': 'schema28-budget-parent',
+        }, 'b' * 40)['run']['run_id']
+        note_value = '🧭' * 16_384
+        for index in range(18):
+            written = invoke('work.session-note.write-v1', {
+                'run_id': parent, 'note': note_value,
+                'idempotency_key': f'schema28-note-{index:02d}',
+            }, 'b' * 40)
+            assert len(written['note']) == 16_384
+
+        refused = client.post('/api/invoke/v1', headers={
+            'X-Vuoro-Client-Protocol': '1', 'Authorization': 'Bearer ' + 'b' * 40,
+        }, json={
+            'schema_version': 'invocation/v1', 'request_id': uuid.uuid4().hex,
+            'repo_id': 'agentops', 'catalog_revision': CATALOG_REVISION,
+            'operation': 'work.session-note.write-v1', 'arguments': {
+                'run_id': parent, 'note': note_value + 'x',
+                'idempotency_key': 'schema28-note-oversized',
+            },
+        })
+        assert refused.status_code == 422
+        assert refused.json()['error']['code'] == 'schema-validation-failed'
+
+        successor = invoke('work.run.register-v1', {
+            'harness_id': 'schema28-budget', 'harness_build': 'test',
+            'model_id': 'scripted', 'recipe_id': 'schema28-note-budget/v1',
+            'predecessor_run_id': parent,
+            'observed_profile': {'instruction_digest': 'sha256:' + 'f' * 64, 'skill_digests': []},
+            'idempotency_key': 'schema28-budget-successor',
+        }, 'b' * 40)['run']['run_id']
+        gathered = []
+        cursor = None
+        page_count = 0
+        while True:
+            arguments = {'run_id': successor, 'limit': 200}
+            if cursor is not None:
+                arguments['after_note_id'] = cursor
+            response = client.post('/api/invoke/v1', headers={
+                'X-Vuoro-Client-Protocol': '1', 'Authorization': 'Bearer ' + 'b' * 40,
+            }, json={
+                'schema_version': 'invocation/v1', 'request_id': uuid.uuid4().hex,
+                'repo_id': 'agentops', 'catalog_revision': CATALOG_REVISION,
+                'operation': 'work.run.predecessor-context-v1', 'arguments': arguments,
+            })
+            assert response.status_code == 200, response.json()
+            assert len(response.content) <= 1_048_576
+            page = response.json()['result']
+            gathered.extend(page['session_notes'])
+            next_cursor = page['next_after_note_id']
+            if next_cursor is None:
+                break
+            assert page['session_notes'] and next_cursor == page['session_notes'][-1]['note_id']
+            cursor = next_cursor
+            page_count += 1
+        assert page_count > 1 and len(gathered) == 18
+        assert all(row['note'] == note_value for row in gathered)
+        with psycopg.connect(runtime) as conn:
+            assert conn.execute(
+                'SELECT count(*) FROM session_note WHERE repo_id=%s AND run_id=%s',
+                ('agentops', parent),
+            ).fetchone()[0] == 18
     after = legacy_rows()
     for table, rows in before.items():
-        if table in ('work_idempotency_ledger', 'agent_instance', 'agent_declaration_revision'):
+        if table in ('work_idempotency_ledger', 'agent_instance', 'agent_declaration_revision',
+                     'run', 'run_predecessor', 'session_note'):
             assert all(row in after[table] for row in rows)
         else:
             assert after[table] == rows, table

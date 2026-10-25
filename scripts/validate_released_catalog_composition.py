@@ -13,7 +13,7 @@ from vuoro_workspace.vuoro_adapter import KnowledgeApplication, register_knowled
 
 
 EXPECTED_TOTAL = 144
-EXPECTED_REVISION = "ba95d69765cc11d255ed08264397cffb29fc9d7607fa7e6dcfe15b15b39bd872"
+EXPECTED_REVISION = "29544721a52ed3e3f824213074354a0473932cba74c0c11946e12b8c248743aa"
 EXPECTED_DOMAIN_COUNTS = {"work": 121, "audit": 5, "knowledge": 18}
 
 

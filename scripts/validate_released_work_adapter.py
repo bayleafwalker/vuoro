@@ -30,7 +30,7 @@ _EXPECTED_ADAPTER_KIT = (
 )
 _EXPECTED_WORK_OPERATION_COUNT = 118
 _EXPECTED_WORK_METADATA_SHA256 = (
-    "8e056a45dfebad36f426cfdf052f15f5fe1baff686fccba9f8c4738e9c2d6c0e"
+    "c7628ba21ba468c72bab93c75a082588618f7cea27d826a50b9a101247a66116"
 )
 
 
@@ -64,14 +64,16 @@ def _work_pin(manifest_path: Path) -> dict[str, str]:
 def _assert_owner_metadata() -> None:
     specs = catalog_operation_specs(resource_schema_available=False)
     assert len(specs) == _EXPECTED_WORK_OPERATION_COUNT
-    operations = {spec["name"] for spec in specs}
+    operations = {spec["name"]: spec for spec in specs}
+    assert operations["work.session-note.write-v1"]["input_schema"]["properties"]["note"]["maxLength"] == 16_384
+    assert operations["work.run.predecessor-context-v1"]["input_schema"]["properties"]["limit"]["maximum"] == 200
     assert {
         "work.request.publish-v1", "work.request.get-v1", "work.request.list-v1",
         "work.request.revise-v1", "work.request.dependent-add-v1",
         "work.request.dependent-withdraw-v1", "work.request.events-v1",
         "work.request.progress-v1", "work.request.report-performed-v1",
         "work.request.attest-v1", "work.request.decline-v1", "work.request.supersede-v1",
-    } <= operations
+    } <= operations.keys()
     encoded = json.dumps(specs, sort_keys=True, separators=(",", ":")).encode()
     assert hashlib.sha256(encoded).hexdigest() == _EXPECTED_WORK_METADATA_SHA256
 
