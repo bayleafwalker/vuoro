@@ -50,8 +50,7 @@ def test_manifest_refuses_unmappable_or_unqualified_projection(change):
 
 def test_internal_operations_excluded_from_mcp():
     _,bundle,_=inputs();m=json.loads((FIXTURE/"operation-manifest.json").read_text())
-    assert generator.public_mcp_tools(m,bundle)==[]
-    # This zero-tool control proves exclusion only. Public work mapping remains due.
+    assert generator.public_mcp_tools(m,bundle,{})==[]
 
 @pytest.mark.parametrize("relative",["schema/probe.schema.json","openapi/probe.openapi.json","operation-manifest.json","clients/python/client.py","clients/typescript/validated-sdk.ts"])
 def test_drift_detects_each_projection_attachment_and_inventory(tmp_path,relative):

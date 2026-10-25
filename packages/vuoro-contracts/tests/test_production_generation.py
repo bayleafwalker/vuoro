@@ -67,6 +67,10 @@ def test_two_clean_generations_default_check_and_owner_resource_load(tmp_path, g
     assert invoke(second) == 0 and inventory(second) == saved
     assert inventory(SOURCE) == before
     manifest = json.loads((second / "operation-manifest.json").read_bytes())
+    toolset = json.loads((second / "mcp-tools.json").read_bytes())
+    assert toolset["tools"] == []
+    assert toolset["contractId"] == "probe/v1"
+    assert toolset["provenance"]["manifestSha256"] == sha256((second / "operation-manifest.json").read_bytes()).hexdigest()
     assert set(manifest["operations"]) == {"submit", "inspect", "empty", "nullBody"}
     assert manifest["operations"]["submit"]["responses"]["400"] != manifest["operations"]["submit"]["responses"]["503"]
     assert manifest["operations"]["empty"]["responses"] == {"204": None}
