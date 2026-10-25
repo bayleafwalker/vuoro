@@ -724,9 +724,12 @@ def _derive_python_bindings(client_root:Path,openapi:Mapping[str,Any],manifest:M
                         for key,value in zip(node.value.keys,node.value.values):
                             if isinstance(key,ast.Constant) and key.value=="method" and isinstance(value,ast.Constant): method=str(value.value).upper()
                             if isinstance(key,ast.Constant) and key.value=="url":
-                                for call in ast.walk(value):
-                                    if isinstance(call,ast.Call) and isinstance(call.func,ast.Attribute) and call.func.attr=="format" and isinstance(call.func.value,ast.Constant):
-                                        route=call.func.value.value;path_args={kw.arg:_last_name(kw.value) for kw in call.keywords if kw.arg and _last_name(kw.value)}
+                                if isinstance(value,ast.Constant) and isinstance(value.value,str):
+                                    route=value.value;path_args={}
+                                else:
+                                    for call in ast.walk(value):
+                                        if isinstance(call,ast.Call) and isinstance(call.func,ast.Attribute) and call.func.attr=="format" and isinstance(call.func.value,ast.Constant) and isinstance(call.func.value.value,str):
+                                            route=call.func.value.value;path_args={kw.arg:_last_name(kw.value) for kw in call.keywords if kw.arg and _last_name(kw.value)}
         if not method or not route: continue
         key=(method,route)
         if key not in expected: continue
