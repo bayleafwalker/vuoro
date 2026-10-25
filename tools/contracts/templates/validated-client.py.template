@@ -2,12 +2,13 @@
 from dataclasses import dataclass
 from contextvars import ContextVar
 from importlib import import_module
+from importlib import resources
 import json
 import math
-from pathlib import Path
 import re
 from urllib.parse import unquote_to_bytes
-from vuoro_contracts import ABSENT, ContractBundle, ContractError, parse_json
+from vuoro_contracts import (ABSENT, ContractBundle, ContractError, parse_wire_json,
+                             validate_wire_json_limit)
 
 @dataclass(frozen=True)
 class Envelope:
@@ -16,7 +17,10 @@ class Envelope:
     content: bytes
 
 def create_validated_client(*, client, integrity_sha256):
-    bundle = ContractBundle.load(Path(__file__).resolve().parents[3], integrity_sha256=integrity_sha256)
+    bundle = ContractBundle.load(
+        resources.files(__package__).joinpath("data"),
+        integrity_sha256=integrity_sha256,
+    )
     manifest = bundle.manifest
     ops = manifest["operations"]
     native_bindings = __NATIVE_BINDINGS__
@@ -154,23 +158,33 @@ def create_validated_client(*, client, integrity_sha256):
         name, op = resolve(request)
         decoded_parameters(request,name,op)
         raw = bytes(request.content)
-        value = ABSENT if not raw else parse_json(raw, max_bytes=op["requestMaxBytes"])
+        if op["request"] is None:
+            if raw: raise ContractError("schema_value")
+            value = ABSENT
+        else:
+            request_cap = validate_wire_json_limit(op["requestMaxBytes"])
+            value = parse_wire_json(raw, max_bytes=request_cap)
         bundle.validate_request(name, value)
     def on_response(response):
         name, op = resolve(response.request)
         status = str(response.status_code)
         if status not in op["responses"]: raise ContractError("status")
         cap = op["responseMaxBytes"][status]
+        response_cap=(validate_wire_json_limit(cap)
+                      if op["responses"][status] is not None else cap)
         chunks=[]; size=0
         try:
             for chunk in response.iter_bytes():
                 size += len(chunk)
-                if cap is None or size > cap:
+                if response_cap is None or size > response_cap:
                     response.close(); raise ContractError("body_limit")
                 chunks.append(chunk)
         except ContractError: raise
         raw=b"".join(chunks); response._content=raw
-        value=ABSENT if not raw and op["responses"][status] is None else parse_json(raw,max_bytes=cap)
+        if op["responses"][status] is None:
+            value=ABSENT
+        else:
+            value=parse_wire_json(raw,max_bytes=response_cap)
         bundle.validate_response(name,response.status_code,value)
         slot=current.get()
         if slot is not None:
@@ -197,9 +211,9 @@ def create_validated_client(*, client, integrity_sha256):
             native_kwargs={binding["parameters"].get(p["in"],{}).get(p["name"],p["name"]):kwargs[p["name"]] for p in op["parameters"] if p["name"] in kwargs}
             if body is not ABSENT:
                 model_info=binding["model"]
-                model=getattr(import_module("vuoro_generated_contract_client.models."+model_info["module"]),model_info["class"])
+                model=getattr(import_module(".models."+model_info["module"], package=__package__),model_info["class"])
                 native_kwargs[binding["body_parameter"]]=model.from_dict(body)
-            module=import_module("vuoro_generated_contract_client."+binding["module"])
+            module=import_module("."+binding["module"], package=__package__)
             slot={"operation":name,"parameters":dict(kwargs),"envelopes":[]}; token=current.set(slot)
             try: module.sync_detailed(client=client, **native_kwargs)
             except ContractError: raise

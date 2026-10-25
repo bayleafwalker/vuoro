@@ -75,8 +75,10 @@ if (scenario === 'shadow_small') {
     const kind = Math.floor(random() * (depth < 4 ? 7 : 5));
     if (kind === 0) return null;
     if (kind === 1) return random() < .5;
-    if (kind === 2) return (random() - .5) * 1e20;
-    if (kind === 3) return [0, -0, 1e-300, 1e300][Math.floor(random() * 4)];
+    // The valid domain is bounded by FORMAT.md: integer-valued JSON numbers
+    // must remain exactly representable by both Python and JavaScript.
+    if (kind === 2) return (random() - .5) * 1e12;
+    if (kind === 3) return [0, -0, 1e-300, 1e12][Math.floor(random() * 4)];
     if (kind === 4) return strings[Math.floor(random() * strings.length)];
     if (kind === 5) return Array.from({length: Math.floor(random() * 5)}, () => value(depth + 1));
     const object: any = {};
@@ -92,6 +94,15 @@ if (scenario === 'shadow_small') {
     assert.equal(validateJsonValue(original), original);
   }
   assert(Object.is(strictDecode(encode('-0'), 2), -0));
+  for (const raw of ['9007199254740992', '9007199254740993',
+                     '-9007199254740992', '1e30']) {
+    safeFailure(() => strictDecode(encode(raw), encode(raw).length));
+  }
+  for (const value of [9007199254740992, 9007199254740993, -9007199254740992, 1e30]) {
+    safeFailure(() => validateJsonValue(value));
+  }
+  assert.equal(strictDecode(encode('9007199254740991'), 16), Number.MAX_SAFE_INTEGER);
+  assert.equal(strictDecode(encode('-9007199254740991'), 17), Number.MIN_SAFE_INTEGER);
   assert.deepEqual(strictDecode(encode('{"é":1,"e\\u0301":2}'), 64), {'é':1, 'é':2});
   const storage = new Uint8Array([255, 123, 125, 255]);
   assert.deepEqual(strictDecode(storage.subarray(1, 3), 2), {});

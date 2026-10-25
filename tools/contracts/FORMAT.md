@@ -3,6 +3,9 @@
 Normative manifest/integrity formats are wheel package data in
 `vuoro_contracts/formats/`. They validate packaging metadata, not domain fields.
 The domain operation schemas are independently emitted from TypeSpec.
+The proposed [MCP toolset projection requirements](../../docs/plans/2026-10-24-mcp-toolset-projection-requirements.md)
+describe a future definition-only mapping. They do not change this manifest
+format or admit a public operation.
 
 `operation-manifest.json` records `vuoro-contract-bundle/v1`, explicit contract
 identity/version, dialect, schema bundle path and resource ID, source/toolchain
@@ -21,6 +24,16 @@ files, links, escapes and nonregular entries; never ignore an unknown suffix.
 Its digest is stored externally by the package consumer/build receipt. Always
 verify inventory at load; verify the external digest when supplied. This detects
 artifact drift, not semantic meaning or domain canonicalization.
+
+The Python SDK wheel repeats just its own `operation-manifest.json`, OpenAPI
+document and schema bundle under `<hashed-contract-package>/data/`, with a nested
+`integrity.json` covering those exact files. Its caller supplies the external
+digest for that nested inventory. The runtime reads package data through
+`importlib.resources`; filesystem and zip resource roots are snapshotted under
+the same 16 MiB per-file, 4096-file and 64 MiB total bounds. It does not extract
+data next to imported code, where ordinary bytecode could pollute the inventory.
+The candidate tree's top-level inventory still covers all generated SDK and
+attachment sources.
 
 Owner source comprises main.tsp, explicit tspconfig.yaml and contract.json
 (`contractVersion`, exact per-operation `exposures` and `byteBounds`). Metadata may not define
@@ -43,6 +56,10 @@ Runtime absent body uses exported ABSENT, distinct from JSON null, empty object 
 empty text. parse_json(raw, *, max_bytes) requires an explicit positive byte cap.
 Known error categories are schema_profile, schema_value, manifest, integrity,
 operation, status, parameter, json and body_limit; code/path exclude payload values.
+Python and TypeScript apply the same wire-value limits: JSON strings must contain
+Unicode scalar values, and integer-valued numbers must fit JavaScript's exact
+safe-integer range (−9007199254740991 through 9007199254740991). Encode larger
+exact counters as decimal strings so clients preserve them without rounding.
 
 F1a projection rejects path-level inherited parameters and response-object references. They must not be silently omitted or classified as absent bodies. Supporting those semantic forms requires separate qualification. Schema annotation and enum/const data are opaque to reference-edge traversal. Bundle documents are validated from the exact byte snapshot authenticated by the inventory; rereading a changing file must not detach parsed content from its integrity check.
 

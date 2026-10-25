@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { strictDecode, validateJsonValue } from '__DECODER__';
 
+const wireVectors: any = JSON.parse(__WIRE_VECTORS_JSON__);
 const dataEqual = (actual: unknown, expected: unknown) => assert.deepEqual(JSON.parse(JSON.stringify(actual)), expected);
 const bytes = (value: string) => new TextEncoder().encode(value);
 const decode = (value: string): any => strictDecode(bytes(value), bytes(value).byteLength);
@@ -15,6 +16,22 @@ const refused = (raw: Uint8Array, max: number, code = 'json') => {
     return true;
   });
 };
+
+for (const vector of wireVectors.valid) {
+  const raw = bytes(vector.raw);
+  dataEqual(strictDecode(raw, raw.byteLength), vector.value);
+}
+for (const vector of wireVectors.invalid) {
+  const raw = vector.base64 === undefined ? bytes(vector.raw) :
+    new Uint8Array(Buffer.from(vector.base64, 'base64'));
+  refused(raw, Math.max(1, raw.byteLength));
+}
+const protoVector: any = strictDecode(bytes('{"__proto__":{"polluted":true}}'), 64);
+assert(Object.hasOwn(protoVector, '__proto__'));
+assert.equal((Object.prototype as any).polluted, undefined);
+for (const value of [Number('9007199254740992'), 1e30]) {
+  assert.throws(() => validateJsonValue(value), (error: any) => error.code === 'json');
+}
 
 dataEqual(decode('{"x":"é😀","n":null,"b":false,"a":[1,-2.5e3]}'),
   {x: 'é😀', n: null, b: false, a: [1, -2500]});

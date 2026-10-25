@@ -16,6 +16,7 @@ import pytest
 from vuoro_contracts import ContractBundle, ContractError, validate_bundle
 
 ROOT = Path(__file__).resolve().parents[3]
+PYTHON_PACKAGE = "vuoro_contract_" + sha256(b"probe/v1").hexdigest() + "_client"
 SOURCE = ROOT / "tools/contracts/fixtures/probe"
 TOOLS = ROOT / "tools/contracts"
 ORACLES = TOOLS / "templates/tests"
@@ -77,7 +78,17 @@ def test_two_clean_generations_default_check_and_owner_resource_load(tmp_path, g
     assert bundle.validate_response("nullBody", 200, None) is None
     assert (second / "clients/typescript/validated-sdk.ts").is_file()
     assert (second / "clients/typescript/strict-json.ts").read_bytes() == (TOOLS / "templates/strict-json.ts").read_bytes()
-    assert (second / "clients/python/vuoro_generated_contract_client/validated_client.py").is_file()
+    assert (second / f"clients/python/{PYTHON_PACKAGE}/validated_client.py").is_file()
+    python_package = second / "clients/python" / PYTHON_PACKAGE
+    assert (python_package / "data/operation-manifest.json").is_file()
+    assert (python_package / "data/openapi/contract.openapi.json").is_file()
+    assert not (second / "clients/python/vuoro_contracts").exists()
+    package_integrity = python_package / "data/integrity.json"
+    package_bundle = ContractBundle.load(
+        python_package / "data",
+        integrity_sha256=sha256(package_integrity.read_bytes()).hexdigest(),
+    )
+    assert package_bundle.manifest == manifest
     schema = json.loads((second / manifest["schemaBundle"]["path"]).read_bytes())
     validate_bundle(schema)
     assert any(p.name == "sdk.gen.ts" for p in (second / "clients/typescript").rglob("*.ts"))
@@ -92,9 +103,9 @@ def test_real_projection_or_attachment_mutation_fails_read_only_check(tmp_path, 
     paths = {"manifest": out / "operation-manifest.json",
              "schema": next((out / "schema").glob("*.json")),
              "openapi": next((out / "openapi").glob("*.json")),
-             "python": out / "clients/python/vuoro_generated_contract_client/api/default/submit.py",
+             "python": out / f"clients/python/{PYTHON_PACKAGE}/api/default/submit.py",
              "typescript": out / "clients/typescript/sdk.gen.ts",
-             "python_attachment": out / "clients/python/vuoro_generated_contract_client/validated_client.py",
+             "python_attachment": out / f"clients/python/{PYTHON_PACKAGE}/validated_client.py",
              "typescript_attachment": out / "clients/typescript/validated-sdk.ts",
              "decoder": out / "clients/typescript/strict-json.ts"}
     if projection == "extra": (out / "unknown.bin").write_bytes(b"unexpected")
@@ -189,6 +200,8 @@ def _build_ts_oracle(generated, stage, oracle_name):
                     "__CLIENT__": str(stage / "client/client/index.ts"), "__AJV__": str(TOOLS / "node_modules/ajv/dist/2020.js")}
     manifest = json.loads((generated / "operation-manifest.json").read_bytes())
     for old, new in replacements.items(): runner = runner.replace(old, new)
+    vector_json = (TOOLS / "fixtures/wire-vectors.json").read_text()
+    runner = runner.replace("__WIRE_VECTORS_JSON__", json.dumps(vector_json))
     runner = runner.replace("__MANIFEST_LITERAL__", json.dumps(manifest))
     runner = runner.replace("__BUNDLE_LITERAL__", (generated / manifest["schemaBundle"]["path"]).read_text())
     if oracle_name == "typescript_sdk_oracle.ts":
@@ -235,6 +248,8 @@ def test_actual_attachment_strict_decoder(generated, tmp_path):
 def test_strict_decoder_unit_at_explicit_root_admitted_source(tmp_path):
     source = Path(executable("VUORO_CONTRACT_DECODER"))
     runner = (ORACLES / "strict-decoder-oracle.ts").read_text().replace("__DECODER__", str(source))
+    vector_json = (TOOLS / "fixtures/wire-vectors.json").read_text()
+    runner = runner.replace("__WIRE_VECTORS_JSON__", json.dumps(vector_json))
     entry = tmp_path / "decoder-oracle.ts"
     output = tmp_path / "decoder-oracle.mjs"
     entry.write_text(runner)

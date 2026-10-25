@@ -34,17 +34,33 @@ _QUALIFIED_INPUT_SHA256 = {
     "tools/contracts/toolchain/tool-artifacts.json": "991b908c5add16168dcc80b2126965c5e41acdf64076eae84d3e2ac2b224b237",
     "tools/contracts/toolchain/flake.lock": "27ee4fbd30db0101fea9d69cbe4028d7ccdebf5ffdc4f3cf538bcf4fb3de8578",
     "tools/contracts/toolchain/flake.nix": "93bdb4acbdb3acd1232793b7e0f3f381568d29a202ff277ae5de79b7f4019f68",
-    "tools/contracts/openapi-python-client.yaml": "8137aaffde27e43f9ddea16a16ecce20780265990660bdd9330029367d6ad23e",
+    "tools/contracts/openapi-python-client.yaml": "59dbde8f0e28cddd825cb5bb83fb6e21db9083551806eeb2f7e1177728f1be80",
     "tools/contracts/tspconfig.template.yaml": "d6b5b33902b26f94a6bc1ae9bcccd8cfffac8af020f74304b215a9b7e624fe91",
     "tools/contracts/python-templates/endpoint_module.py.jinja": "9a626b839af95ca1cdb936e4dee7bedc5839e0aafbed15bc6869d9a8844d0348",
-    "tools/contracts/templates/strict-json.ts": "356db0604d14267133842fa7b4b4a467fad6dd8b8b6f9bfa48d123e78c605831",
-    "tools/contracts/templates/validated-client.py.template": "1135cbc41fb74eeb27dcbcf7242d107bfd035b844a1e21aee945c5d72899575f",
+    "tools/contracts/templates/strict-json.ts": "f3de764b9cd1f0b6a889b811d6296b4673d5b68f81d02932cdbf9af8cf68f67b",
+    "tools/contracts/templates/validated-client.py.template": "17297df2e9f6797993470565a67b0ca718cd5cd991ed2546b09038967e4dcdee",
     "tools/contracts/templates/validated-sdk.ts.template": "c4f700947db3726b5d3ee8d7c6230e30dd12e1ce840bf4a04f1f13d7a68bb58e",
+    "tools/contracts/templates/tests/python_sdk_oracle.py": "c42b52ae9ea95438e2de42862659b05e3582ef9670ef9ab6d532e2a274368346",
+    "tools/contracts/templates/tests/python_sdk_regressions.py": "946068bd391080da28ffd0ec578442f62c38cd6558fa077b12e7ed24c1e9935d",
+    "tools/contracts/templates/QUALIFICATION.md": "adaca3cca5d38109d18ab463ebcfdc7086e68b69a01023414958947e4098e21f",
+    "tools/contracts/FORMAT.md": "09c700e33c2b3e05b35be265703d1144dc654ec0668a1c5ce2b5accd78b954a8",
 }
 
 
 def _fail() -> None:
     raise ContractError("manifest")
+
+
+def python_package_name(contract_id: str) -> str:
+    """Derive the native SDK namespace from the exact valid UTF-8 identity."""
+    if not isinstance(contract_id, str) or not contract_id:
+        _fail()
+    try:
+        encoded = contract_id.encode("utf-8", "strict")
+    except UnicodeEncodeError:
+        _fail()
+    digest = sha256(encoded).hexdigest()
+    return f"vuoro_contract_{digest}_client"
 
 
 def _schema_id(schema: Any, openapi: Mapping[str, Any], bundle: Mapping[str, Any]) -> str:
@@ -100,6 +116,7 @@ def operation_manifest(openapi: Mapping[str, Any], bundle: Mapping[str, Any], *,
                 not isinstance(source_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", source_sha256) or
                 not isinstance(toolchain_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", toolchain_sha256)):
             _fail()
+        python_package_name(contract_id)
         paths = openapi.get("paths")
         if not isinstance(paths, Mapping) or not paths:
             _fail()
@@ -332,7 +349,7 @@ def main(argv: list[str] | None = None) -> int:
             _typescript_sdk(tree, tools, node, manifest, bundle)
             _remove_generation_caches(tree)
             # Validate the exact staged projection and authenticate every file.
-            _write_runtime_package(tree, root, bundle, manifest)
+            _write_python_package_data(tree, manifest)
             files = inventory_tree(tree)
             (tree / "integrity.json").write_bytes(_json_bytes({"schemaVersion":"vuoro-contract-integrity/v1", "files":files}))
             from vuoro_contracts import ContractBundle
@@ -464,8 +481,11 @@ def _snapshot_digest(snapshot:Path)->str:
 
 
 def _toolchain_digest(tools:Path,root:Path,shared_snapshot:Path)->str:
-    candidates=[tools/"package.json",tools/"package-lock.json",tools/"pyproject.toml",tools/"uv.lock",tools/"openapi-python-client.yaml",tools/"toolchain/source-pins.json",tools/"toolchain/tool-artifacts.json",root/"scripts/contracts/generate.py"]
-    candidates += list((tools/"templates").glob("*.ts"))+list((tools/"templates").glob("*.template"))+[tools/"python-templates/endpoint_module.py.jinja"]
+    runtime=root/"packages/vuoro-contracts/src/vuoro_contracts"
+    candidates=[tools/"package.json",tools/"package-lock.json",tools/"pyproject.toml",tools/"uv.lock",tools/"openapi-python-client.yaml",tools/"toolchain/source-pins.json",tools/"toolchain/tool-artifacts.json",tools/"FORMAT.md",tools/"templates/QUALIFICATION.md",root/"scripts/contracts/generate.py",root/"scripts/contracts/build_python_sdk.py",root/"packages/vuoro-contracts/pyproject.toml",root/"uv.lock"]
+    candidates += [p for p in (tools/"templates").rglob("*") if p.is_file()]
+    candidates += [p for p in (tools/"python-templates").rglob("*") if p.is_file()]
+    candidates += list(runtime.rglob("*.py"))+list((runtime/"formats").glob("*.json"))
     h=sha256()
     for p in sorted(candidates,key=lambda x:x.relative_to(root).as_posix()):
         if p.is_file():
@@ -570,7 +590,17 @@ def _compile(source: Path, stage: Path, tools: Path, node: Path) -> None:
 def _python_sdk(openapi_file: Path, tree: Path, tools: Path, python: Path, bundle: Mapping[str,Any]) -> None:
     target = tree / "clients/python"
     target.mkdir(parents=True)
-    cfgpath = tools / "openapi-python-client.yaml"
+    manifest = json.loads((tree / "operation-manifest.json").read_bytes())
+    package_name = python_package_name(manifest.get("contractId"))
+    config_template = (tools / "openapi-python-client.yaml").read_text()
+    placeholder = "__VUORO_PYTHON_PACKAGE__"
+    if config_template.count(placeholder) != 1:
+        _fail()
+    config = config_template.replace(placeholder, package_name)
+    cfgpath = tree.parent / "openapi-python-client.yaml"
+    if cfgpath.exists() or cfgpath.is_symlink():
+        _fail()
+    cfgpath.write_text(config)
     env={"PATH":str((tools/".venv/bin").resolve()),"HOME":str(tree),"LANG":"C.UTF-8","LC_ALL":"C.UTF-8","PYTHONDONTWRITEBYTECODE":"1","PYTHONPYCACHEPREFIX":str(tree/".python-pycache"),"RUFF_CACHE_DIR":str(tree/".ruff_cache")}
     custom=tree/"python-templates";custom.mkdir()
     template=(tools/"python-templates/endpoint_module.py.jinja").read_text()
@@ -580,10 +610,13 @@ def _python_sdk(openapi_file: Path, tree: Path, tools: Path, python: Path, bundl
     pyver=json.loads((tools/"toolchain/source-pins.json").read_bytes())["versions"]["python"]
     site=(tools/".venv/lib"/("python"+".".join(pyver.split(".")[:2]))/"site-packages").resolve(strict=True)
     bootstrap="import runpy,sys;site=sys.argv[1];args=sys.argv[2:];sys.path.insert(0,site);sys.argv=args;runpy.run_module(args[0],run_name='__main__')"
-    child=[str(python),"-I","-S","-X",f"pycache_prefix={tree/'.python-pycache'}","-c",bootstrap,str(site),"openapi_python_client","generate","--path",str(openapi_file),"--config",str(cfgpath),"--custom-template-path",str(custom),"--output-path",str(target/"vuoro_generated_contract_client"),"--meta","none","--overwrite"]
-    _run(child,cwd=tools,env=env)
+    child=[str(python),"-I","-S","-X",f"pycache_prefix={tree/'.python-pycache'}","-c",bootstrap,str(site),"openapi_python_client","generate","--path",str(openapi_file),"--config",str(cfgpath),"--custom-template-path",str(custom),"--output-path",str(target/package_name),"--meta","none","--overwrite"]
+    try:
+        _run(child,cwd=tools,env=env)
+    finally:
+        cfgpath.unlink(missing_ok=True)
     shutil.rmtree(custom)
-    _render_python_attachment(tree, bundle)
+    _render_python_attachment(tree, bundle, package_name)
 
 
 def _nullable_status_table(openapi_file:Path,bundle:Mapping[str,Any])->dict[str,dict[str,list[str]]]:
@@ -608,21 +641,37 @@ def _nullable_status_table(openapi_file:Path,bundle:Mapping[str,Any])->dict[str,
     return table
 
 
-def _write_runtime_package(tree: Path, root: Path, bundle: Mapping[str,Any], manifest: Mapping[str,Any]) -> None:
-    # Copy exact owner package format/runtime source, excluding caches and tests.
-    source=root/"packages/vuoro-contracts/src/vuoro_contracts"
-    dest=tree/"clients/python/vuoro_contracts"
-    shutil.copytree(source,dest,ignore=shutil.ignore_patterns("__pycache__","*.pyc"))
-    (tree/"clients/python/vuoro_contracts/data").mkdir(exist_ok=True)
-    (tree/"clients/python/vuoro_contracts/data/schema").mkdir(exist_ok=True)
+def _write_python_package_data(tree: Path, manifest: Mapping[str,Any]) -> None:
+    """Attach only this contract's authenticated documents to its SDK package."""
+    package_name = python_package_name(manifest.get("contractId"))
+    package = tree / "clients/python" / package_name
+    data = package / "data"
+    (data / "openapi").mkdir(parents=True)
+    (data / "schema").mkdir()
+    shutil.copyfile(tree / "operation-manifest.json", data / "operation-manifest.json")
+    shutil.copyfile(tree / "openapi/contract.openapi.json", data / "openapi/contract.openapi.json")
+    schema_relative = manifest["schemaBundle"]["path"]
+    if not isinstance(schema_relative, str) or not schema_relative.startswith("schema/"):
+        _fail()
+    schema_name = schema_relative.removeprefix("schema/")
+    if not schema_name or "/" in schema_name or "\\" in schema_name or schema_name in {".", ".."}:
+        _fail()
+    shutil.copyfile(tree / schema_relative, data / schema_relative)
+    # This nested inventory authenticates the package data independently from
+    # the source tree's inventory, which also covers SDK code and other outputs.
+    (data / "integrity.json").write_bytes(_json_bytes({
+        "schemaVersion": "vuoro-contract-integrity/v1",
+        "files": inventory_tree(data),
+    }))
 
 
-def _render_python_attachment(tree: Path, bundle: Mapping[str,Any]) -> None:
+def _render_python_attachment(tree: Path, bundle: Mapping[str,Any], package_name: str) -> None:
     import json
     from vuoro_contracts import ContractError
     manifest = json.loads((tree / "operation-manifest.json").read_bytes())
     openapi=json.loads((tree/"openapi/contract.openapi.json").read_bytes())
-    models_dir=tree/"clients/python/vuoro_generated_contract_client/models"
+    package_dir=tree/"clients/python"/package_name
+    models_dir=package_dir/"models"
     available={}
     for path in models_dir.glob("*.py"):
         try:
@@ -644,7 +693,7 @@ def _render_python_attachment(tree: Path, bundle: Mapping[str,Any]) -> None:
     native_bindings=_derive_python_bindings(models_dir.parent,openapi,manifest,available,request_models)
     template=(Path(__file__).resolve().parents[2]/"tools/contracts/templates/validated-client.py.template").read_text()
     code=template.replace("__REQUEST_MODELS__",repr(request_models)).replace("__NATIVE_BINDINGS__",repr(native_bindings))
-    (tree / "clients/python/vuoro_generated_contract_client/validated_client.py").write_text(code)
+    (package_dir/"validated_client.py").write_text(code)
 
 
 def _derive_python_bindings(client_root:Path,openapi:Mapping[str,Any],manifest:Mapping[str,Any],available:Mapping[str,Any],request_models:Mapping[str,Any])->dict[str,Any]:

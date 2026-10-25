@@ -177,8 +177,9 @@ class Parser {
       if (!this.digit(this.text.charCodeAt(this.offset))) fail();
       while (this.digit(this.text.charCodeAt(this.offset))) this.offset++;
     }
-    const number = Number(this.text.slice(start, this.offset));
-    if (!Number.isFinite(number)) fail();
+    const token = this.text.slice(start, this.offset);
+    const number = Number(token);
+    if (!Number.isFinite(number) || (Number.isInteger(number) && !Number.isSafeInteger(number))) fail();
     return number;
   }
 
@@ -285,7 +286,7 @@ export function validateJsonValue(value: unknown): JsonValue {
     if (typeof item === 'boolean') { addBytes(item ? 4 : 5); return; }
     if (typeof item === 'string') { stringBytes(item); return; }
     if (typeof item === 'number') {
-      if (!Number.isFinite(item)) fail();
+      if (!Number.isFinite(item) || (Number.isInteger(item) && !Number.isSafeInteger(item))) fail();
       addBytes(String(item).length); // JSON number spellings are ASCII; String(-0) is the JSON spelling "0".
       return;
     }

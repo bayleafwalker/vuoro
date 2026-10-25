@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   qualify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     outputs:
       artifact_name: ${{ steps.candidate.outputs.artifact_name }}
@@ -95,6 +95,8 @@ jobs:
           PY
           .venv/bin/python -m pytest -q --tb=short -o addopts= \
             packages/vuoro-contracts/tests \
+            --ignore=packages/vuoro-contracts/tests/test_cross_language_vectors.py \
+            --ignore=packages/vuoro-contracts/tests/test_sdk_wheel_install.py \
             packages/vuoro-client/tests/test_generated_contract_boundary.py \
             packages/vuoro-service/tests/test_generated_contract_foundation.py \
             --junitxml="$RUNNER_TEMP/contracts-pytest.xml"
@@ -107,8 +109,173 @@ jobs:
           errors = sum(case.find("error") is not None for case in cases)
           assert (len(cases), skipped, failed, errors) == (257, 0, 0, 0), (len(cases), skipped, failed, errors)
           PY
+      - name: Run portable wire vectors and installed SDK wheel tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="${GITHUB_WORKSPACE}/packages/vuoro-contracts/src"
+          .venv/bin/python -m pytest -q --tb=short -o addopts= \
+            packages/vuoro-contracts/tests/test_cross_language_vectors.py \
+            packages/vuoro-contracts/tests/test_sdk_wheel_install.py \
+            --junitxml="$RUNNER_TEMP/contracts-sdk-portable.xml"
+          .venv/bin/python - "$RUNNER_TEMP/contracts-sdk-portable.xml" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+          cases = ET.parse(sys.argv[1]).getroot().findall(".//testcase")
+          skipped = sum(case.find("skipped") is not None for case in cases)
+          failed = sum(case.find("failure") is not None for case in cases)
+          errors = sum(case.find("error") is not None for case in cases)
+          assert (len(cases), skipped, failed, errors) == (20, 0, 0, 0), (len(cases), skipped, failed, errors)
+          PY
+      - name: Run separate portable Python namespace and resource gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="${GITHUB_WORKSPACE}/packages/vuoro-contracts/src"
+          .venv/bin/python -m pytest -q --tb=short -o addopts= \
+            tools/contracts/portable_tests/test_namespace_portability.py \
+            --junitxml="$RUNNER_TEMP/contracts-portable.xml"
+          .venv/bin/python - "$RUNNER_TEMP/contracts-portable.xml" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+          cases = ET.parse(sys.argv[1]).getroot().findall(".//testcase")
+          skipped = sum(case.find("skipped") is not None for case in cases)
+          failed = sum(case.find("failure") is not None for case in cases)
+          errors = sum(case.find("error") is not None for case in cases)
+          assert (len(cases), skipped, failed, errors) == (26, 0, 0, 0), (len(cases), skipped, failed, errors)
+          PY
       - name: Build the actual vuoro-contracts wheel
         run: uv build --package vuoro-contracts --wheel --out-dir dist/vuoro-contracts --no-create-gitignore
+      - name: Build and consume two installed contract SDK wheels offline
+        shell: bash
+        run: |
+          set -euo pipefail
+          node_bin="$(nix develop ./tools/contracts/toolchain --command bash -euc 'command -v node')"
+          test "$("$node_bin" --version)" = "v24.21.0"
+          export VUORO_CONTRACT_NODE="$node_bin"
+          export VUORO_CONTRACT_PYTHON="${GITHUB_WORKSPACE}/tools/contracts/.venv/bin/python"
+          export PYTHONPATH="${GITHUB_WORKSPACE}/packages/vuoro-contracts/src"
+          first="$RUNNER_TEMP/contract-probe-v1"
+          second="$RUNNER_TEMP/contract-probe-v2"
+          .venv/bin/python scripts/contracts/generate.py \
+            --source tools/contracts/fixtures/probe --output "$first" \
+            --contract-id 'probe/v1' --write
+          .venv/bin/python scripts/contracts/generate.py \
+            --source tools/contracts/fixtures/probe --output "$second" \
+            --contract-id 'probe/v2' --write
+          .venv/bin/python scripts/contracts/build_python_sdk.py \
+            --bundle "$first" --output-dir "$RUNNER_TEMP/sdk-wheels"
+          .venv/bin/python scripts/contracts/build_python_sdk.py \
+            --bundle "$second" --output-dir "$RUNNER_TEMP/sdk-wheels"
+          .venv/bin/python - "$first" "$second" "$RUNNER_TEMP/sdk-integrity-digests.json" <<'PY'
+          from hashlib import sha256
+          import json
+          from pathlib import Path
+          import sys
+          digests = {}
+          for root in map(Path, sys.argv[1:3]):
+              manifest = json.loads((root / "operation-manifest.json").read_bytes())
+              package = "vuoro_contract_" + sha256(manifest["contractId"].encode("utf-8")).hexdigest() + "_client"
+              integrity = root / "clients/python" / package / "data/integrity.json"
+              digests[manifest["contractId"]] = sha256(integrity.read_bytes()).hexdigest()
+          Path(sys.argv[3]).write_text(json.dumps(digests, sort_keys=True) + "\n")
+          PY
+          .venv/bin/python - "$GITHUB_WORKSPACE/uv.lock" "$RUNNER_TEMP/sdk-wheel-requirements.txt" <<'PY'
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          lock = tomllib.loads(Path(sys.argv[1]).read_text())
+          packages = {item["name"]: item for item in lock["package"]}
+          if len(packages) != len(lock["package"]):
+              raise SystemExit("dependency lock contains multiple versions for an SDK consumer package")
+          pending = ["attrs", "httpx", "typing-extensions", "jsonschema", "referencing"]
+          selected = set()
+          while pending:
+              name = pending.pop()
+              if name in selected:
+                  continue
+              package = packages.get(name)
+              if package is None or package.get("source", {}).get("registry") != "https://pypi.org/simple":
+                  raise SystemExit(f"expected registry-pinned SDK dependency {name}")
+              selected.add(name)
+              pending.extend(dep["name"] for dep in package.get("dependencies", []))
+          requirements = []
+          for name in sorted(selected):
+              package = packages[name]
+              hashes = sorted({wheel["hash"] for wheel in package.get("wheels", [])
+                               if isinstance(wheel.get("hash"), str) and wheel["hash"].startswith("sha256:")})
+              if not hashes:
+                  raise SystemExit(f"locked SDK dependency has no wheel hashes: {name}")
+              requirements.append(
+                  f"{name}=={package['version']} "
+                  + " ".join(f"--hash={digest}" for digest in hashes)
+              )
+          Path(sys.argv[2]).write_text("\n".join(requirements) + "\n")
+          PY
+          wheelhouse="$RUNNER_TEMP/sdk-dependency-wheels"
+          mkdir -p "$wheelhouse"
+          PIP_CONFIG_FILE=/dev/null "$qualified_python" -m pip download \
+            --disable-pip-version-check --isolated --no-deps --only-binary=:all: \
+            --require-hashes --index-url https://pypi.org/simple \
+            --dest "$wheelhouse" -r "$RUNNER_TEMP/sdk-wheel-requirements.txt"
+          consumer="$RUNNER_TEMP/vuoro-contract-sdks-consumer"
+          uv venv --python "$qualified_python" "$consumer"
+          uv pip install --offline --no-index --no-config \
+            --find-links "$wheelhouse" --python "$consumer/bin/python" \
+            dist/vuoro-contracts/*.whl "$RUNNER_TEMP"/sdk-wheels/*.whl
+          cd "$RUNNER_TEMP"
+          "$consumer/bin/python" -I - <<'PY'
+          from hashlib import sha256
+          from importlib import import_module, resources
+          import json
+          from pathlib import Path
+          import sys
+
+          import httpx
+          from vuoro_contracts import ContractBundle
+
+          external_digests = json.loads(Path("sdk-integrity-digests.json").read_text())
+          expected = {
+              "probe/v1": "vuoro_contract_" + sha256(b"probe/v1").hexdigest() + "_client",
+              "probe/v2": "vuoro_contract_" + sha256(b"probe/v2").hexdigest() + "_client",
+          }
+          assert Path(import_module("vuoro_contracts").__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
+          for contract_id, package_name in expected.items():
+              package = import_module(package_name)
+              import_module(package_name + ".api.default.submit")
+              import_module(package_name + ".validated_client")
+              assert Path(package.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
+              root = resources.files(package_name).joinpath("data")
+              integrity = root.joinpath("integrity.json").read_bytes()
+              digest = external_digests[contract_id]
+              assert sha256(integrity).hexdigest() == digest
+              bundle = ContractBundle.load(root, integrity_sha256=digest)
+              assert bundle.manifest["contractId"] == contract_id
+              assert Path(package.__file__).parent.joinpath("__pycache__").is_dir()
+              requests = []
+              def respond(request):
+                  requests.append(request)
+                  return httpx.Response(200, json={"state": "ready", "revision": "1"}, request=request)
+              transport = httpx.Client(
+                  base_url="https://contracts.invalid",
+                  transport=httpx.MockTransport(respond),
+                  trust_env=False,
+              )
+              native = import_module(package_name + ".client").Client(
+                  base_url="https://contracts.invalid"
+              ).set_httpx_client(transport)
+              guarded = import_module(package_name + ".validated_client").create_validated_client(
+                  client=native, integrity_sha256=digest
+              )
+              result = guarded.submit(
+                  key="k", body={"revision": "1", "enabled": True, "nested": {"label": "x"}}
+              )
+              assert result.status == 200 and result.body == {"state": "ready", "revision": "1"}
+              assert len(requests) == 1 and requests[0].method == "POST"
+              transport.close()
+          print("two generated SDK wheels import independently with bytecode enabled")
+          PY
       - name: Exercise wheel resources in an isolated consumer
         shell: bash
         run: |

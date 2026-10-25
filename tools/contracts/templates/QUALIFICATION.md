@@ -42,8 +42,11 @@ implementations. Root must admit their complete generic implementation and stric
 decoder before claiming the F1b oracle executable end to end. No generator may
 fall back to a plain JSON.parse decoder or skip absent tooling.
 
-The Python output package is `vuoro_generated_contract_client` (the root-pinned
-openapi-python-client config). Its `validated_client` module exports
+The Python output package is derived from the exact authored manifest
+`contractId` as `vuoro_contract_<sha256-utf8-contractId>_client`, using all 64
+lowercase digest digits without normalization. The public `0.1.0` release still
+used the fixed `vuoro_generated_contract_client` package; that published
+limitation remains historical and unchanged. The `validated_client` module exports
 `create_validated_client(*, client: <actual generated Client>,
 integrity_sha256: str)`. The result has emitted operation methods: `submit(key=,
 body=)`, `inspect(key=)`, `empty(key=)`, and `null_body(key=)` for this supporting
@@ -58,6 +61,15 @@ bytes before transport; response hooks bound and validate the actual received
 status/body before `_parse_response` or any generated response model conversion.
 Known declared 4xx/5xx responses return their validated status/body envelope;
 unknown status/code/body is a safe ContractError, never a raw SDK error/body leak.
+
+Each generated SDK wheel carries its own `data/` resource root and nested exact
+inventory. The common `vuoro-contracts` runtime is an installed dependency; it is
+not copied into each SDK distribution. Installed consumers load resources through
+`importlib.resources`, so normal bytecode creation beside SDK code does not enter
+the contract-data inventory. Qualification installs two distinct SDK wheels and
+the runtime from a local wheel cache with bytecode enabled, then imports both
+native operation modules and reads both authenticated resource roots outside the
+checkout.
 
 The TS attachment `validated-sdk.ts` exports `ABSENT`, `strictDecode(raw:
 Uint8Array, maxBytes: number)`, and

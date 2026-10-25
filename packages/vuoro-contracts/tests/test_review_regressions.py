@@ -91,18 +91,33 @@ def test_parsed_document_bytes_are_bound_to_authenticated_inventory(tmp_path, mo
         changed['$defs']['Result']['properties']['state'] = {'const': 'future'}
         replacement = json.dumps(changed).encode()
         status, invalid_value = 200, {'state': 'future', 'revision': '0'}
-    read_bytes = Path.read_bytes
+    path_open = Path.open
     fired = []
 
-    def change_after_first_read(path):
-        data = read_bytes(path)
-        if path == target and not fired:
-            fired.append(True)
-            target.write_bytes(replacement)
-        return data
+    def change_after_first_read(path, *args, **kwargs):
+        stream = path_open(path, *args, **kwargs)
+        if path != target or fired:
+            return stream
+
+        class SnapshotReader:
+            def __enter__(self):
+                stream.__enter__()
+                return self
+
+            def __exit__(self, *exc):
+                return stream.__exit__(*exc)
+
+            def read(self, size=-1):
+                data = stream.read(size)
+                if not fired:
+                    fired.append(True)
+                    target.write_bytes(replacement)
+                return data
+
+        return SnapshotReader()
 
     with monkeypatch.context() as scope:
-        scope.setattr(Path, 'read_bytes', change_after_first_read)
+        scope.setattr(Path, 'open', change_after_first_read)
         try:
             loaded = ContractBundle.load(root, integrity_sha256=external_digest)
         except ContractError:
