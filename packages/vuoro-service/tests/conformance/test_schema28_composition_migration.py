@@ -167,7 +167,9 @@ finally:s.conn.close()
 '''
 
 
-def test_actual_schema28_refusal_explicit28_cli_migration_and_runtime_ddl_denial(tmp_path):
+def test_actual_schema28_refusal_explicit28_cli_migration_and_runtime_ddl_denial(
+    tmp_path, monkeypatch,
+):
     if not all(os.environ.get(x) for x in NAMES):
         if os.environ.get('VUORO_SCHEMA28_COMPOSITION_PROOF') == '1':
             pytest.fail('mandatory schema28 upgrade fixture is incompletely configured')
@@ -318,7 +320,29 @@ def test_actual_schema28_refusal_explicit28_cli_migration_and_runtime_ddl_denial
     assert checked.returncode == 0 and json.loads(checked.stdout)['compatible'] is True
     assert legacy_rows() == before
 
-    with TestClient(factory()) as client:
+    # Capture the exact released Sprintctl 0.24 root application constructed by
+    # the service composition. This lets the HTTP readiness path exercise its
+    # reconnect hook and then prove that a later repository-scoped invocation
+    # uses the refreshed root connection.
+    from sprintctl.application import WorkApplication
+
+    root_work_apps = []
+    original_postgres = WorkApplication.postgres.__func__
+
+    def capture_postgres(cls, store, **kwargs):
+        application = original_postgres(cls, store, **kwargs)
+        if store.repo_id == 'agentops':
+            root_work_apps.append(application)
+        return application
+
+    monkeypatch.setattr(WorkApplication, 'postgres', classmethod(capture_postgres))
+    composed_app = factory()
+    assert root_work_apps, 'composition did not construct the pinned Sprintctl root application'
+    root_work_app = root_work_apps[0]
+    original_connection_factory = root_work_app.store.connection_factory
+    assert callable(original_connection_factory)
+
+    with TestClient(composed_app) as client:
         response = client.get('/api/meta/v1/handshake', headers={'X-Vuoro-Client-Protocol': '1'})
         assert response.status_code == 200, response.json()
         handshake = response.json()
@@ -339,6 +363,45 @@ def test_actual_schema28_refusal_explicit28_cli_migration_and_runtime_ddl_denial
         assert {'work.run.delegate-v1', 'work.run.delegation-revoke-v1',
                 'work.run.delegation-get-v1'} <= served
         assert client.get('/health/ready').status_code == 200
+
+        # Simulate the essential DB connection being lost while its replacement
+        # is temporarily unavailable. Liveness stays process-only; readiness
+        # becomes a stable redacted 503, then recovers through the released
+        # owner's root connection factory after it is restored.
+        root_work_app.store.conn.close()
+
+        def unavailable_connection_factory():
+            raise psycopg.OperationalError('synthetic disposable reconnect outage')
+
+        root_work_app.store.connection_factory = unavailable_connection_factory
+        assert client.get('/health/live').status_code == 200
+        unavailable = client.get('/health/ready')
+        assert unavailable.status_code == 503
+        assert unavailable.json() == {
+            'status': 'not-ready',
+            'compatibility': 'compatible',
+            'error': {
+                'code': 'runtime-unavailable',
+                'message': 'an essential service runtime dependency is unavailable',
+            },
+        }
+        assert 'synthetic disposable reconnect outage' not in unavailable.text
+
+        root_work_app.store.connection_factory = original_connection_factory
+        recovered = client.get('/health/ready')
+        assert recovered.status_code == 200, recovered.json()
+        assert recovered.json() == {'status': 'ready', 'compatibility': 'compatible'}
+
+        # A scoped read after readiness recovers must use the refreshed root
+        # connection; readiness alone must not leave a detached old store.
+        scoped_read = client.post('/api/invoke/v1', headers={
+            'X-Vuoro-Client-Protocol': '1', 'Authorization': 'Bearer ' + 'x' * 40,
+        }, json={
+            'schema_version': 'invocation/v1', 'request_id': uuid.uuid4().hex,
+            'repo_id': 'agentops', 'catalog_revision': CATALOG_REVISION,
+            'operation': 'work.read.sprints', 'arguments': {},
+        })
+        assert scoped_read.status_code == 200, scoped_read.json()
     with psycopg.connect(runtime) as conn:
         role = conn.execute('SELECT rolsuper,rolcreatedb,rolcreaterole,rolreplication,rolbypassrls '
                             'FROM pg_roles WHERE rolname=current_user').fetchone()
