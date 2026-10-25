@@ -114,6 +114,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          node_bin="$(nix develop ./tools/contracts/toolchain --command bash -euc 'command -v node')"
+          test "$("$node_bin" --version)" = "v24.21.0"
+          export VUORO_CONTRACT_NODE="$node_bin"
+          export VUORO_CONTRACT_PYTHON="${GITHUB_WORKSPACE}/tools/contracts/.venv/bin/python"
           export PYTHONPATH="${GITHUB_WORKSPACE}/packages/vuoro-contracts/src"
           .venv/bin/python -m pytest -q --tb=short -o addopts= \
             packages/vuoro-contracts/tests/test_mcp_projection.py \
