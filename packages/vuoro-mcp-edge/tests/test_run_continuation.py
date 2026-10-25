@@ -513,12 +513,14 @@ class FakeOwner:
         resolve_binding: dict[str, Any] | None = None,
         hang_catalog: bool = False,
         context_result: dict[str, Any] | None = None,
+        context_refusal: str | None = None,
         register_refusal: str | None = None,
     ) -> None:
         self.operations = operations
         self.catalog_failures = catalog_failures
         self.hang_catalog = hang_catalog
         self.context_result = context_result
+        self.context_refusal = context_refusal
         self.register_refusal = register_refusal
         self.catalog_reads = 0
         self.invoked: list[dict[str, Any]] = []
@@ -560,6 +562,8 @@ class FakeOwner:
                             **self.resolve_binding},
             )
         if operation == CONTEXT_OPERATION:
+            if self.context_refusal is not None:
+                return self._error(operation, self.context_refusal, 413)
             if self.context_result is not None:
                 return self._ok(operation, self.context_result)
             return self._ok(operation, {
@@ -906,7 +910,7 @@ def test_paging_arguments_reach_the_owner_and_its_cursors_come_back(keys) -> Non
     client = _sprintctl_edge(keys, owner)
     listed = _listed(client, _successor_headers(keys))
     properties = listed["read_predecessor_context"]["inputSchema"]["properties"]
-    assert properties["limit"]["maximum"] == 500
+    assert properties["limit"]["maximum"] == 200
     result = _result(
         client, _successor_headers(keys)(), "read_predecessor_context",
         {"run_id": SUCCESSOR_RUN, "limit": 1, "after_note_id": 7, "after_chain_seq": 3},
@@ -960,12 +964,13 @@ def _context_page(notes: list[int], seqs: list[int], **cursors: Any) -> dict[str
         # Entries not past the cursor sent, or out of order.
         ({"after_chain_seq": 3}, _context_page([], [3])),
         ({}, _context_page([2, 1], [])),
-        # A cursor on a page that is not full.
-        ({"limit": 5}, _context_page([1, 2], [], next_after_note_id=2)),
+        # A cursor must advance the page and equal its final returned key.
+        ({"limit": 5}, _context_page([], [], next_after_note_id=2)),
+        ({"limit": 5}, _context_page([1, 2], [], next_after_note_id=1)),
     ],
     ids=[
         "over-limit", "over-default", "non-advancing", "regressing",
-        "not-past-cursor", "out-of-order", "cursor-on-short-page",
+        "not-past-cursor", "out-of-order", "cursor-on-empty-page", "cursor-not-last-entry",
     ],
 )
 def test_an_inconsistent_page_fails_closed(keys, arguments, page) -> None:
@@ -989,6 +994,33 @@ def test_a_consistent_full_page_with_cursors_passes(keys) -> None:
     )
     assert result["isError"] is False, result
     assert result["structuredContent"]["next_after_note_id"] == 4
+
+
+def test_a_byte_budget_partial_page_with_a_progressing_cursor_passes(keys) -> None:
+    page = _context_page([3, 4], [0], next_after_note_id=4, next_after_chain_seq=0)
+    owner = FakeOwner(NEW_OWNER_OPERATIONS, resolve_binding=_successor_binding(), context_result=page)
+    client = _sprintctl_edge(keys, owner)
+    result = _result(
+        client, _successor_headers(keys)(), "read_predecessor_context",
+        {"run_id": SUCCESSOR_RUN, "limit": 20, "after_note_id": 2},
+    )
+    assert result["isError"] is False, result
+    assert result["structuredContent"]["next_after_note_id"] == 4
+
+
+def test_oversized_historical_context_row_is_refused_without_edge_truncation(keys) -> None:
+    owner = FakeOwner(
+        NEW_OWNER_OPERATIONS,
+        resolve_binding=_successor_binding(),
+        context_refusal="context-item-exceeds-byte-budget",
+    )
+    client = _sprintctl_edge(keys, owner)
+    result = _result(
+        client, _successor_headers(keys)(), "read_predecessor_context",
+        {"run_id": SUCCESSOR_RUN},
+    )
+    assert result["isError"] is True
+    assert _error_code(result) == "context-item-exceeds-byte-budget"
 
 
 def test_an_unpaged_store_refuses_paging_rather_than_ignoring_it() -> None:

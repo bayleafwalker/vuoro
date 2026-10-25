@@ -818,6 +818,24 @@ class TestWriteSessionNote:
         assert result["note_id"] == 1
         assert result["note"] == "hi"
 
+    def test_note_schema_and_parser_share_the_unicode_character_limit(self) -> None:
+        toolset = build_toolset(_context(_store(_FakeShell())))
+        spec = next(t for t in toolset.tools if t.name == "write_session_note")
+        assert spec.definition["inputSchema"]["properties"]["note"]["maxLength"] == 16_384
+        parsed = spec.parse({
+            "run_id": RUN_ID,
+            "note": "🧭" * 16_384,
+            "idempotency_key": "note-key-0010",
+        })
+        assert len(parsed["note"]) == 16_384
+        with pytest.raises(ToolFailure) as excinfo:
+            spec.parse({
+                "run_id": RUN_ID,
+                "note": "🧭" * 16_385,
+                "idempotency_key": "note-key-0011",
+            })
+        assert excinfo.value.code == "invalid-arguments"
+
     def test_writing_to_someone_elses_run_is_run_not_found(self) -> None:
         shell = _FakeShell(_rejected("work.run.resolve-v1", "run-not-found", status=404))
         toolset = build_toolset(_context(_store(shell)))

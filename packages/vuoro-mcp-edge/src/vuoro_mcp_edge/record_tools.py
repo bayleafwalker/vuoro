@@ -100,7 +100,8 @@ OPERATION_RUN_PREDECESSOR_CONTEXT = "work.run.predecessor-context-v1"
 _CONTEXT_CURSORS = ("next_after_note_id", "next_after_chain_seq")
 #: The paging arguments read_predecessor_context accepts and forwards.
 _CONTEXT_PAGING = ("limit", "after_note_id", "after_chain_seq")
-CONTEXT_MAX_LIMIT = 500
+CONTEXT_MAX_LIMIT = 200
+SESSION_NOTE_MAX_LENGTH = 16_384
 #: sprintctl#114's page size when the caller sends no limit.
 CONTEXT_DEFAULT_LIMIT = 100
 _CATALOG_PATH = "/api/catalog/v1"
@@ -200,9 +201,9 @@ def _page_is_consistent(
     defines (`sprintctl.pg.predecessor_context`): at most `limit` entries
     (default `CONTEXT_DEFAULT_LIMIT`), each with `key` strictly greater than
     the cursor sent (`after_*`, or none when absent -- sprintctl reads
-    `> -1`) and strictly ascending; and a non-null next cursor only on a
-    full page, equal to the last entry's `key` (sprintctl sets
-    `next_after_* = entries[-1][key]` when more rows remain).  Anything else
+    `> -1`) and strictly ascending; and a non-null next cursor only when at
+    least one entry was returned, equal to the last entry's `key` (the owner
+    may end a page early at its serialized-byte budget). Anything else
     is a broken owner: the edge fails closed rather than return a page that
     could skip, repeat or silently truncate rows."""
 
@@ -217,7 +218,7 @@ def _page_is_consistent(
         previous = value
     if cursor is None:
         return True
-    return len(entries) == limit and cursor == previous
+    return bool(entries) and cursor == previous
 
 
 class RecordShellClient:
@@ -1255,7 +1256,10 @@ _WRITE_SESSION_NOTE_DEFINITION: dict[str, Any] = {
                 "pattern": RUN_ID.pattern,
                 "description": "A run_id from register_run.",
             },
-            "note": {"type": "string", "minLength": 1},
+            "note": {
+                "type": "string", "minLength": 1,
+                "maxLength": SESSION_NOTE_MAX_LENGTH,
+            },
             "idempotency_key": IDEMPOTENCY_KEY_SCHEMA,
         },
         "required": ["run_id", "note", "idempotency_key"],
@@ -1275,9 +1279,15 @@ def _parse_write_session_note(arguments: dict[str, Any]) -> dict[str, Any]:
     run_id = arguments.get("run_id")
     if not isinstance(run_id, str) or not RUN_ID.fullmatch(run_id):
         raise ToolFailure("invalid-arguments", "run_id must be a run_<ULID> handle")
+    note = _require_str(arguments, "note")
+    if len(note) > SESSION_NOTE_MAX_LENGTH:
+        raise ToolFailure(
+            "invalid-arguments",
+            f"note must be at most {SESSION_NOTE_MAX_LENGTH} characters",
+        )
     return {
         "run_id": run_id,
-        "note": _require_str(arguments, "note"),
+        "note": note,
         "idempotency_key": require_key(arguments),
     }
 
@@ -1296,8 +1306,11 @@ _READ_PREDECESSOR_CONTEXT_DEFINITION: dict[str, Any] = {
         "up where it stopped. run_id is your own run; an unknown or someone "
         "else's run_id is a tool error with code run-not-found. A run with "
         "no predecessor returns predecessor_run_id null and empty lists. "
-        "Results are paged: each call returns at most limit notes and limit "
-        "evidence items (default 100, at most 500); when next_after_note_id "
+        "Each note is at most 16,384 characters. Results are paged: each "
+        "call returns at most limit notes and limit evidence items (default "
+        "100, at most 200), and the owner caps the compact UTF-8 JSON result "
+        "at 1 MiB. A byte-limited page may contain fewer than limit entries; "
+        "when next_after_note_id "
         "or next_after_chain_seq is not null, call again passing it as "
         "after_note_id / after_chain_seq for the rest of that list. "
         "Read-only: it grants nothing the predecessor could do, and the "
