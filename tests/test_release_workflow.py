@@ -15,8 +15,11 @@ def _assert_python_release_order(workflow: str) -> None:
     preparation = workflow.index("name: Prepare the pinned contract compiler and decoder")
     sync = workflow.index("uv sync --all-packages --all-extras --locked")
     full_suite = workflow.index(
-        "name: Run the complete repository test suite\n        run: uv run pytest\n"
+        'name: Run the complete repository test suite\n        run: uv run --locked --all-packages --all-extras --python "$qualified_python" pytest\n'
     )
+    for command in (line for line in workflow.splitlines() if "uv run" in line):
+        assert "--locked" in command and "--all-packages" in command and "--all-extras" in command
+        assert '--python "$qualified_python"' in command
     build = workflow.index("uv build --package vuoro-client")
     release_gate = workflow.index(
         'scripts/validate_release_contract.py "${wheels[@]}" --release'
@@ -175,6 +178,7 @@ def test_python_release_pins_contract_toolchain_and_exports_decoder_environment(
         "VUORO_CONTRACT_DECODER",
         "PYTHONPATH",
         "PYTHONDONTWRITEBYTECODE",
+        "UV_PYTHON=%s",
     ):
         assert token in preparation
     assert "runs-on: ubuntu-24.04" in workflow
@@ -194,11 +198,23 @@ def test_client_release_candidate_uses_fresh_version_after_failed_immutable_tag(
     project = tomllib.loads((ROOT / "packages/vuoro-client/pyproject.toml").read_text())["project"]
     lock = tomllib.loads((ROOT / "uv.lock").read_text())
     locked = [package for package in lock["package"] if package["name"] == "vuoro-client"]
-    assert project["version"] == "0.1.4"
-    assert len(locked) == 1 and locked[0]["version"] == "0.1.4"
-    assert '__version__ = "0.1.4"' in (ROOT / "packages/vuoro-client/src/vuoro_client/__init__.py").read_text()
-    recovery = (ROOT / "docs/plans/2026-10-25-vuoro-client-0.1.4-release-recovery.md").read_text()
-    assert "does not retag 0.1.3" in recovery
+    assert project["version"] == "0.1.5"
+    assert len(locked) == 1 and locked[0]["version"] == "0.1.5"
+    assert '__version__ = "0.1.5"' in (ROOT / "packages/vuoro-client/src/vuoro_client/__init__.py").read_text()
+    recovery = (ROOT / "docs/plans/2026-10-25-vuoro-client-0.1.5-release-recovery.md").read_text()
+    assert "Neither immutable tag is retagged" in recovery
+    assert "0.1.4" in recovery and "40209690209" in recovery
+
+
+def test_publisher_uv_runs_preserve_the_qualified_python_and_workspace() -> None:
+    workflow = PYTHON_WORKFLOW.read_text()
+    assert 'UV_PYTHON=%s\\n' in workflow
+    runs = [line.strip() for line in workflow.splitlines() if "uv run" in line]
+    assert runs
+    for command in runs:
+        assert "--locked" in command
+        assert "--all-packages" in command and "--all-extras" in command
+        assert '--python "$qualified_python"' in command
 
 
 def test_python_release_is_github_only_and_publishes_the_created_release() -> None:
@@ -225,7 +241,7 @@ def test_python_release_is_github_only_and_publishes_the_created_release() -> No
             "uv sync --all-packages --all-extras --locked", "uv sync --all-packages"
         ),
         lambda workflow: workflow.replace(
-            "run: uv run pytest", "run: uv run pytest tests/test_release_workflow.py"
+            'run: uv run --locked --all-packages --all-extras --python "$qualified_python" pytest', 'run: uv run --locked --python "$qualified_python" pytest tests/test_release_workflow.py'
         ),
         lambda workflow: workflow.replace(
             "      - name: Publish the GitHub release after attestation and draft creation\n",

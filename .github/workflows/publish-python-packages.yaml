@@ -67,6 +67,8 @@ jobs:
           qualified_python="$qualified_python_root/python/bin/python3.13"
           test "$(sha256sum "$qualified_python" | cut -d ' ' -f1)" = 'f8188f8dec8f4ae9865dc6789323327c50bb275a5a301373d675464fdbbf933f'
           printf 'qualified_python=%s\n' "$qualified_python" >> "$GITHUB_ENV"
+          # setup-uv may export its configured 3.12 interpreter; keep every later uv command on the already qualified 3.13.16 environment.
+          printf 'UV_PYTHON=%s\n' "$qualified_python" >> "$GITHUB_ENV"
           test "$(uv --version | cut -d ' ' -f2)" = "0.13.1"
           nix develop ./tools/contracts/toolchain --command bash -euc '
             test "$(node --version)" = "v24.21.0"
@@ -108,13 +110,13 @@ jobs:
           uv build --package vuoro-workspace --wheel --out-dir dist/vuoro-workspace
           uv build --project packages/vuoro-demo --wheel --out-dir dist/vuoro-demo
       - name: Run the complete repository test suite
-        run: uv run pytest
+        run: uv run --locked --all-packages --all-extras --python "$qualified_python" pytest
       - name: Exercise the complete release candidate
         shell: bash
         run: |
           set -euo pipefail
           wheels=(dist/vuoro-client/*.whl dist/vuoro-contracts/*.whl dist/vuoro-service/*.whl dist/vuoro-schema-runtime/*.whl dist/vuoro-adapter-kit/*.whl)
-          uv run --package vuoro-service --extra test python \
+          uv run --locked --all-packages --all-extras --python "$qualified_python" python \
             scripts/validate_release_contract.py "${wheels[@]}" --release
           uv venv --python 3.12 /tmp/vuoro-release-conformance
           uv pip install --no-config --python /tmp/vuoro-release-conformance/bin/python \
@@ -126,10 +128,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          uv run --package vuoro-service --extra test python \
+          uv run --locked --all-packages --all-extras --python "$qualified_python" python \
             scripts/validate_release_contract.py dist/vuoro-workspace/*.whl --release
           VUORO_WORKSPACE_REQUIRE_PG=1 VUORO_WORKSPACE_TEST_PG_BIN=/usr/lib/postgresql/16/bin \
-            uv run --package vuoro-workspace --extra test pytest packages/vuoro-workspace/tests -ra
+            uv run --locked --all-packages --all-extras --python "$qualified_python" pytest packages/vuoro-workspace/tests -ra
       - name: Qualify optional demo against its published owner closure
         if: steps.package.outputs.name == 'vuoro-demo'
         shell: bash
@@ -164,7 +166,7 @@ jobs:
           echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
       - name: Validate the selected gated wheel against its tag
         run: >-
-          uv run --package vuoro-service --extra test python
+          uv run --locked --all-packages --all-extras --python "$qualified_python" python
           scripts/validate_release_contract.py
           ${{ steps.publication.outputs.wheel }}
           --tag "${GITHUB_REF_NAME}"
