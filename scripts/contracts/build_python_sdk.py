@@ -8,8 +8,10 @@ import csv
 from hashlib import sha256
 import io
 import json
+import os
 from pathlib import Path, PurePosixPath
 import re
+import tempfile
 import tomllib
 import zipfile
 
@@ -124,6 +126,7 @@ def build(bundle_root: Path, output_dir: Path, repository_root: Path) -> Path:
         requirements = [
             f"attrs=={locked['attrs']}",
             f"httpx=={locked['httpx']}",
+            f"typing-extensions=={locked['typing-extensions']}",
             f"vuoro-contracts=={runtime_version}",
         ]
 
@@ -164,12 +167,25 @@ def build(bundle_root: Path, output_dir: Path, repository_root: Path) -> Path:
         target = output_dir / filename
         if target.exists() or target.is_symlink():
             _fail()
-        with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as wheel:
-            for name, data in sorted(entries.items()):
-                info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
-                info.compress_type = zipfile.ZIP_DEFLATED
-                info.external_attr = 0o100644 << 16
-                wheel.writestr(info, data)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{filename}.", suffix=".tmp", dir=output_dir
+        )
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "wb") as stream:
+                with zipfile.ZipFile(stream, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as wheel:
+                    for name, data in sorted(entries.items()):
+                        info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+                        info.compress_type = zipfile.ZIP_DEFLATED
+                        info.external_attr = 0o100644 << 16
+                        wheel.writestr(info, data)
+                stream.flush()
+                os.fsync(stream.fileno())
+            # A same-directory hard link publishes atomically without replacing
+            # a target created after the preflight existence check.
+            os.link(temporary, target)
+        finally:
+            temporary.unlink(missing_ok=True)
         return target
     except ContractError:
         raise
