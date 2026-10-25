@@ -96,13 +96,14 @@ def assert_reusable(flow: dict) -> None:
     assert all("continue-on-error" not in s for s in steps)
     restore = next(s for s in steps if s.get("name") == "Restore locked contract toolchain and test environments")
     production = next(s for s in steps if s.get("name") == "Run exact production compiler and SDK contract gates")
+    mcp_projection = next(s for s in steps if s.get("name") == "Run MCP definition-only projection gate")
     build = next(s for s in steps if "uv build --package vuoro-contracts " in s.get("run", ""))
     consumer = next(s for s in steps if s.get("name") == "Exercise wheel resources in an isolated consumer")
     ordinary = next(s for s in steps if s.get("name") == "Run repository release gates")
     candidate = next(s for s in steps if s.get("id") == "candidate")
     upload = next(s for s in steps if s.get("id") == "upload")
-    assert steps.index(restore) < steps.index(production) < steps.index(build) < steps.index(consumer) < steps.index(ordinary) < steps.index(candidate) < steps.index(upload)
-    for step in (restore, production, build, consumer, candidate, upload):
+    assert steps.index(restore) < steps.index(production) < steps.index(mcp_projection) < steps.index(build) < steps.index(consumer) < steps.index(ordinary) < steps.index(candidate) < steps.index(upload)
+    for step in (restore, production, mcp_projection, build, consumer, candidate, upload):
         assert "if" not in step
     assert ordinary["if"] == "${{ inputs.run-repository-suite }}"
     full = script(job)
@@ -111,6 +112,8 @@ def assert_reusable(flow: dict) -> None:
         assert token in restore["run"]
     for token in ("VUORO_CONTRACT_NODE", "VUORO_CONTRACT_PYTHON", "VUORO_CONTRACT_DECODER", "PYTHONDONTWRITEBYTECODE", "tool-artifacts.json", "assert actual == expected", "packages/vuoro-contracts/tests", "packages/vuoro-client/tests/test_generated_contract_boundary.py", "packages/vuoro-service/tests/test_generated_contract_foundation.py", '(257, 0, 0, 0)', '--junitxml="$RUNNER_TEMP/contracts-pytest.xml"'):
         assert token in production["run"]
+    for token in ("VUORO_CONTRACT_NODE", "VUORO_CONTRACT_PYTHON", "VUORO_CONTRACT_DECODER", "test_mcp_projection.py", '(10, 0, 0, 0)', '--junitxml="$RUNNER_TEMP/contracts-mcp-projection.xml"'):
+        assert token in mcp_projection["run"]
     assert "uv venv --python 3.13.16" not in consumer["run"]
     assert 'uv venv --python "$qualified_python"' in consumer["run"]
     assert "Draft202012Validator.check_schema" in consumer["run"] and "-I -" in consumer["run"]
@@ -144,6 +147,11 @@ def test_ci_calls_same_source_reusable_without_duplicate_producer() -> None:
     text = (ROOT / ".github/workflows/ci.yml").read_text()
     assert "contracts-python-20261001.tar.gz" not in text
     assert "Run exact production compiler and SDK contract gates" not in text
+    ordinary = flow["jobs"]["test"]
+    pytest_step = next(step for step in ordinary["steps"] if "uv run pytest" in step.get("run", ""))
+    assert "--ignore=packages/vuoro-contracts/tests/test_production_generation.py" in pytest_step["run"]
+    assert "--ignore=packages/vuoro-contracts/tests/test_production_generation_regressions.py" in pytest_step["run"]
+    assert "--ignore=packages/vuoro-contracts/tests/test_mcp_projection.py" in pytest_step["run"]
 
 
 def test_legacy_publisher_and_its_existing_oracles_are_immutable() -> None:
