@@ -13,7 +13,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
     parser.add_argument("--artifact-cache", type=Path)
-    parser.add_argument("--closure", choices=("schema21", "schema22", "schema25"), default="schema21",
+    parser.add_argument("--closure", choices=("schema21", "schema22", "schema25", "schema27"), default="schema21",
                         help="old closure fixture pair under packages/vuoro-service/tests/fixtures")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -44,11 +44,12 @@ def main() -> None:
     subprocess.run(["uv", "pip", "install", "--python", str(interpreter), "--no-deps",
                     *(str(wheels / p["artifact_url"].rsplit("/", 1)[-1]) for p in pins)], check=True)
     subprocess.run(["uv", "pip", "check", "--python", str(interpreter)], check=True)
-    # The old closures predate the knowledge domain: attest them as the
-    # historical work + audit compositions they are.
+    # Closures through schema25 predate the knowledge domain; schema27 has all
+    # three domains and is attested under the ordinary current composition rules.
+    attest_args = (["--historical-two-domain-closure"]
+                   if args.closure in ("schema21", "schema22", "schema25") else [])
     subprocess.run([str(interpreter), "-I", str(root / "scripts/attest_installed_composition.py"),
-                    "--historical-two-domain-closure",
-                    str(manifest), str(wheels), str(output / "installed.json")], check=True)
+                    *attest_args, str(manifest), str(wheels), str(output / "installed.json")], check=True)
 
 
 if __name__ == "__main__":

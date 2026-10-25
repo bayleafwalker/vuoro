@@ -1,0 +1,8 @@
+{
+  "source_repository": "https://github.com/bayleafwalker/vuoro",
+  "source_revision": "48835a29492e57673bf087d0a1d762c7acfbd00a",
+  "artifact_url": "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-service-v0.1.97/vuoro_service-0.1.97-py3-none-any.whl",
+  "artifact_sha256": "38b08a352617d88592dbc93da0f91afc1d5f5f230729761ca7e041de9fb32a56",
+  "distribution": "vuoro-service",
+  "distribution_version": "0.1.97"
+}

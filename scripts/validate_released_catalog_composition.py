@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tempfile
+from types import SimpleNamespace
 
 from auditctl.vuoro_adapter import VuoroAuditAdapter
 from sprintctl.vuoro_adapter import register_work_catalog
@@ -11,15 +12,17 @@ from vuoro_workspace import FsObjectStore
 from vuoro_workspace.vuoro_adapter import KnowledgeApplication, register_knowledge_catalog
 
 
-EXPECTED_TOTAL = 129
-EXPECTED_REVISION = "127fed8e9a23acb01fcd4a64fa4a3a1380701e8985e6d95e79aea8cb21abdb7d"
-EXPECTED_DOMAIN_COUNTS = {"work": 106, "audit": 5, "knowledge": 18}
+EXPECTED_TOTAL = 144
+EXPECTED_REVISION = "ba95d69765cc11d255ed08264397cffb29fc9d7607fa7e6dcfe15b15b39bd872"
+EXPECTED_DOMAIN_COUNTS = {"work": 121, "audit": 5, "knowledge": 18}
 
 
 class WorkStub:
+    store = SimpleNamespace(remote_schema_version=28)
+
     @staticmethod
     def maintenance_resource_schema_available() -> bool:
-        return False
+        return True
 
 
 def main() -> int:

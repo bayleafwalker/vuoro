@@ -22,7 +22,7 @@ from psycopg import sql
 from vuoro_service.composition import CompositionError, create_composed_app
 from .test_bound_proposal_http import assert_installed_composition
 from .knowledge_fixture import provision_knowledge, validate_knowledge_urls
-from .test_schema27_composition_migration import CATALOG_REVISION, CATALOG_TOTAL
+from .test_schema28_composition_migration import CATALOG_REVISION, CATALOG_TOTAL
 
 pytestmark = pytest.mark.essential_safety
 
@@ -239,7 +239,7 @@ else:
         response=client.get('/api/meta/v1/handshake',headers={'X-Vuoro-Client-Protocol':'1'})
         assert response.status_code==200,response.json()
         handshake=response.json()
-        assert handshake['service_version']=='0.1.97' and handshake['compatibility']['state']=='compatible'
+        assert handshake['service_version']=='0.1.98' and handshake['compatibility']['state']=='compatible'
         assert all(x['state']=='compatible' for x in handshake['compatibility']['domains'].values())
         catalog=client.get('/api/catalog/v1',headers={'X-Vuoro-Client-Protocol':'1'}).json()
         assert len(catalog['operations'])==CATALOG_TOTAL

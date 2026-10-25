@@ -18,8 +18,8 @@ BOUND = 'work.effect.propose-bound-v1'
 
 
 def assert_installed_composition():
-    expected = {'vuoro-service': ('vuoro_service','0.1.97'),
-                'sprintctl': ('sprintctl','0.22.0'),
+    expected = {'vuoro-service': ('vuoro_service','0.1.98'),
+                'sprintctl': ('sprintctl','0.23.0'),
                 'vuoro-adapter-kit': ('vuoro_adapter_kit','0.2.2'),
                 'vuoro-schema-runtime': ('vuoro_schema_runtime','0.1.0'),
                 'auditctl': ('auditctl','0.1.9'),
@@ -34,7 +34,7 @@ def bound_owner(request):
     url = request.config.getoption('--lease-pg-url')
     if url is None: pytest.skip('requires configured disposable PostgreSQL owner')
     if os.environ.get('VUORO_BOUND_COMPOSITION_PROOF') == '1': assert_installed_composition()
-    assert version('sprintctl') == '0.22.0'
+    assert version('sprintctl') == '0.23.0'
     from sprintctl.vuoro_adapter import register_work_catalog
     owner = SprintctlProvider(url)
     identity = Identity(actor='A', environment='lease-conformance',
