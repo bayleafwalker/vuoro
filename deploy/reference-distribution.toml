@@ -8,7 +8,7 @@ deployment_status = "unknown"
 composition_manifest = "packages/vuoro-service/composition/adapter-pins.json"
 service_package = "packages/vuoro-service/pyproject.toml"
 service_distribution = "vuoro-service"
-service_version = "0.1.97"
+service_version = "0.1.98"
 image_policy = "immutable-digest-required"
 
 [support]
@@ -24,7 +24,7 @@ support_claim = "No public or customer support commitment is established by this
 domain = "work"
 lock_id = "work-adapter"
 distribution = "sprintctl"
-pinned_version = "0.22.0"
+pinned_version = "0.23.0"
 api_version = "work-api/v1"
 schema_version = "work-schema/v1"
 capability_summary = "Sprintctl work operations composed through the released adapter."
