@@ -10,7 +10,7 @@ import pytest
 
 from vuoro_evidence.comparison import CaseSet, ExperimentComparison, load_case_set
 from vuoro_evidence.experiment import (ExperimentError, ExperimentRecord, OutcomeObservation,
-                                       population_digest, run_revision)
+                                       OwnerOutcomeQualification, population_digest, run_revision)
 from vuoro_evidence.run import ObservedProfile, RunManifest
 
 FIXTURE = Path(__file__).parent / "fixtures" / "case_set_synthetic.json"
@@ -18,28 +18,55 @@ CASES = load_case_set(FIXTURE)
 POLICY = {"review_policy_ref": "owner:policy@rev1", "reviewer_ref": "reviewer:1"}
 
 
-def run(run_id, instructions):
-    return RunManifest(run_id, "native", "build-1", "model-a", "recipe-1", ObservedProfile(instructions))
+def run(run_id, instructions, model="model-a", recipe="recipe-1", harness_build="build-1"):
+    return RunManifest(run_id, "native", harness_build, model, recipe, ObservedProfile(instructions))
+
+
+_UNSET = object()
+
+
+def qualified(case_id, owner_ref, release_digest, disposition):
+    accepted = disposition == "accepted"
+    return OwnerOutcomeQualification(
+        case_id=case_id,
+        owner_record_ref=owner_ref,
+        status="qualified",
+        qualification_ref=f"owner:qualification/{case_id}@rev1",
+        source_snapshot_ref=f"owner:snapshot/{case_id}@immutable1",
+        source_snapshot_sha256="sha256:" + "f" * 64,
+        owner_revision_ref=f"sprintctl:item/{case_id}@revision1",
+        release_digest=release_digest,
+        independent_verification_ref=f"check:{case_id}@immutable1" if accepted else None,
+        actual_use_ref=f"use:{case_id}@immutable1" if accepted else None,
+    )
 
 
 def obs(case_id, run_id, disposition="accepted", captured=True, **kwargs):
+    owner_ref = f"owner:{case_id}@rev1"
+    owner_release_digest = kwargs.pop("owner_release_digest", "a" * 64 if disposition == "accepted" else None)
+    source_qualification = kwargs.pop("source_qualification", _UNSET)
+    if source_qualification is _UNSET:
+        source_qualification = qualified(case_id, owner_ref, owner_release_digest, disposition)
     return OutcomeObservation(case_id, (run_id,), disposition, f"owner:{case_id}@rev1",
-                              ("artifact:sha256:x",), "independent_observation", captured, **kwargs)
+                              ("artifact:sha256:x",), "independent_observation", captured,
+                              owner_release_digest=owner_release_digest,
+                              source_qualification=source_qualification, **kwargs)
 
 
-def arm(name, rows, case_set=CASES, population=None):
+def arm(name, rows, case_set=CASES, population=None, *, revision_kind="observed_profile",
+        model="model-a", recipe="recipe-1", profile=None, harness_build="build-1"):
     """rows: {case_id: (disposition, captured, kwargs)}"""
-    profile = f"sha256:{name}-instructions"
-    manifests = tuple(run(f"{name}-{c}", profile) for c in rows)
+    profile = profile or f"sha256:{name}-instructions"
+    manifests = tuple(run(f"{name}-{c}", profile, model, recipe, harness_build) for c in rows)
     observations = tuple(obs(c, f"{name}-{c}", d, cap, **kw) for c, (d, cap, kw) in rows.items())
-    revision = run("probe", profile)
-    rev = run_revision(revision, "observed_profile")
+    revision = run("probe", profile, model, recipe, harness_build)
+    rev = run_revision(revision, revision_kind)
     population = case_set.case_ids if population is None else population
     return ExperimentRecord(
         f"exp-{name}", rev, "bounded-task", case_set.ref, population, observations, manifests,
-        ("Synthetic arm.",), revision_kind="observed_profile",
+        ("Synthetic arm.",), revision_kind=revision_kind,
         population_sha256=population_digest(population_ref=case_set.ref, task_group="bounded-task",
-                                            expected_case_ids=population, revision_kind="observed_profile",
+                                            expected_case_ids=population, revision_kind=revision_kind,
                                             revision_ref=rev),
         population_registered_at=datetime(2026, 10, 1, tzinfo=timezone.utc),
         population_registration_ref="owner:registration@1")
@@ -96,6 +123,10 @@ def test_full_paired_comparison_computes_exact_deltas_and_strata():
             "c4": ("accepted", True, {})}
     s = comparison(base, cand).compare(min_cases=2, min_coverage=Fraction(1, 2), **POLICY)
     assert s["status"] == "computed" and s["suppression_reasons"] == []
+    assert s["schema_version"] == "vuoro-experiment-comparison/v2"
+    assert s["comparison_readiness"] == "eligible_for_review"
+    assert s["source_qualification"]["qualified_paired_cases"] == 4
+    assert s["source_qualification"]["authentication"] == "not_performed_by_this_package"
     acc = s["metrics"]["acceptance_rate"]
     assert (acc["baseline_rate"], acc["candidate_rate"], acc["delta"]) == ("1/2", "1", "1/2")
     assert acc["delta_bounds"] == {"lower": "1/2", "upper": "1/2"}
@@ -131,7 +162,7 @@ def test_failures_and_unknowns_stay_in_the_denominator():
     assert acc["delta_bounds"] == {"lower": "-1/2", "upper": "1/4"}
     assert s["metrics"]["rejection_rate"]["baseline_rate"] == "1/4"
     assert s["arms"]["candidate"]["states"] == {"accepted": 1, "rejected": 1, "pending": 1,
-                                                "unknown": 0, "missing": 1}
+                                                "unknown": 0, "unqualified": 0, "missing": 1}
     assert s["arms"]["candidate"]["capture"]["unknown_or_missing"] == 2
     assert s["transitions"]["unknown->missing"] == 1
     assert s["metrics"]["capture_rate"]["denominator"] == 4
@@ -156,11 +187,12 @@ def test_inadequate_coverage_suppresses_comparison():
     cand = {"c1": A}
     s = comparison(base, cand).compare(min_cases=1, min_coverage=Fraction(1, 2), **POLICY)
     assert s["status"] == "suppressed"
-    assert s["suppression_reasons"] == ["paired_coverage_below_minimum"]
+    assert "paired_coverage_below_minimum" in s["suppression_reasons"]
     assert s["paired_coverage"] == "1/4"
     assert s["metrics"]["acceptance_rate"]["delta"] is None
     s2 = comparison(base, cand).compare(min_cases=2, min_coverage=Fraction(0), **POLICY)
-    assert s2["suppression_reasons"] == ["paired_observations_below_minimum"]
+    assert s2["suppression_reasons"] == ["paired_observations_below_minimum",
+                                        "source_qualified_pairs_below_minimum"]
 
 
 def test_measure_with_sparse_known_values_is_suppressed_separately():
@@ -198,8 +230,115 @@ def test_arms_must_bind_the_same_committed_case_set_and_differ_by_one_revision()
         ExperimentComparison("cmp", CASES, base, cand, ())
 
 
+def test_arms_must_match_all_named_composition_axes_outside_selected_revision():
+    base = arm("base", {"c1": A}, revision_kind="model_id", model="model-a",
+               profile="sha256:shared-instructions")
+    candidate = arm("candidate", {"c1": A}, revision_kind="model_id", model="model-b",
+                    profile="sha256:shared-instructions")
+    ExperimentComparison("model-cmp", CASES, base, candidate, ("Synthetic comparison.",))
+
+    confounded = arm("confounded", {"c1": A}, revision_kind="model_id", model="model-b",
+                     recipe="recipe-2", profile="sha256:shared-instructions")
+    with pytest.raises(ExperimentError, match="outside the selected revision"):
+        ExperimentComparison("confounded-cmp", CASES, base, confounded,
+                             ("Synthetic comparison.",))
+
+
 @pytest.mark.parametrize("minimum,coverage", [(0, Fraction(1)), (True, Fraction(1)),
                                                 (1, 0.5), (1, Fraction(3, 2))])
 def test_no_implicit_or_malformed_thresholds(minimum, coverage):
     with pytest.raises(ExperimentError):
         comparison({"c1": A}, {"c1": A}).compare(min_cases=minimum, min_coverage=coverage, **POLICY)
+
+
+def test_unqualified_owner_sources_are_explicit_and_cannot_produce_acceptance_delta():
+    rows = {case_id: A for case_id in CASES.case_ids}
+    stale = OwnerOutcomeQualification(
+        case_id="c1", owner_record_ref="owner:c1@rev1", status="stale",
+        release_digest="a" * 64,
+        reason="the terminal item revision advanced after the supplied snapshot",
+    )
+    base = dict(rows)
+    base["c1"] = ("accepted", True, {"source_qualification": stale})
+    s = comparison(base, rows).compare(min_cases=4, min_coverage=Fraction(3, 4), **POLICY)
+
+    assert s["status"] == "suppressed"
+    assert s["comparison_readiness"] == "inconclusive"
+    assert "source_qualified_pairs_below_minimum" in s["inconclusive_reasons"]
+    assert s["source_qualification"]["baseline"]["unqualified_cases"] == 1
+    assert s["source_qualification"]["baseline"]["cases"][0]["reason_codes"] == ["source-stale"]
+    assert "advanced" in s["source_qualification"]["baseline"]["cases"][0]["qualification_reason"]
+    assert s["transitions"]["unqualified->accepted"] == 1
+    assert s["metrics"]["acceptance_rate"]["delta"] is None
+
+
+def test_unresolved_intake_rows_suppress_the_paired_owner_outcome_comparison():
+    rows = {case_id: A for case_id in CASES.case_ids}
+    rows["c1"] = ("accepted", True, {"source_qualification": None})
+    s = comparison(rows, rows).compare(min_cases=4, min_coverage=Fraction(1), **POLICY)
+
+    assert s["comparison_readiness"] == "inconclusive"
+    assert s["source_qualification"]["qualified_paired_cases"] == 3
+    assert s["source_qualification"]["baseline"]["cases"][0]["reason_codes"] == [
+        "source-qualification-missing"]
+    assert s["metrics"]["acceptance_rate"]["delta"] is None
+
+
+def test_outcome_rates_use_only_the_same_source_qualified_pairs():
+    base = {case_id: A for case_id in CASES.case_ids}
+    candidate = dict(base)
+    candidate["c1"] = ("accepted", True, {"source_qualification": None})
+    s = comparison(base, candidate).compare(min_cases=3, min_coverage=Fraction(3, 4), **POLICY)
+
+    assert s["comparison_readiness"] == "eligible_for_review"
+    acceptance = s["metrics"]["acceptance_rate"]
+    assert acceptance["baseline"] == {"count": 3, "unresolved": 1}
+    assert acceptance["candidate"] == {"count": 3, "unresolved": 1}
+    assert acceptance["delta"] == "0"
+    assert acceptance["delta_bounds"] == {"lower": "-1/4", "upper": "1/4"}
+    assert s["source_qualification"]["candidate"]["cases"][0]["owner_disposition"] == "accepted"
+
+
+def test_acceptance_needs_matching_release_independent_check_and_actual_use():
+    incomplete = OwnerOutcomeQualification(
+        case_id="c1", owner_record_ref="owner:c1@rev1", status="qualified",
+        qualification_ref="owner:qualification/c1@rev1",
+        source_snapshot_ref="owner:snapshot/c1@immutable1",
+        source_snapshot_sha256="sha256:" + "f" * 64,
+        owner_revision_ref="sprintctl:item/c1@revision1",
+        release_digest="b" * 64,
+    )
+    observation = obs("c1", "r1", source_qualification=incomplete)
+    assert observation.comparison_qualified is False
+    assert observation.source_qualification_reasons == (
+        "release-digest-mismatch", "independent-verification-missing", "actual-use-missing")
+    mismatched_owner = qualified("c1", "owner:c1@rev1", "a" * 64, "accepted")
+    mismatched_owner = replace(mismatched_owner, owner_record_ref="owner:other@rev1")
+    observation = obs("c1", "r1", source_qualification=mismatched_owner)
+    assert observation.comparison_qualified is False
+    assert observation.source_qualification_reasons == ("qualification-owner-record-mismatch",)
+
+
+def test_unqualified_pair_coverage_suppresses_all_outcome_and_cost_deltas():
+    measured = ("accepted", True, {"review_seconds": 10,
+                                    "known_cost": Decimal("1.00"), "currency": "EUR"})
+    rows = {case_id: measured for case_id in CASES.case_ids}
+    unverified = OwnerOutcomeQualification(
+        case_id="c1", owner_record_ref="owner:c1@rev1", status="unverified",
+        reason="the owner source has not been resolved",
+    )
+    base = dict(rows)
+    cand = dict(rows)
+    base["c1"] = ("accepted", True, {"source_qualification": unverified})
+    cand["c1"] = ("accepted", True, {"source_qualification": unverified})
+    s = comparison(base, cand).compare(min_cases=4, min_coverage=Fraction(1), **POLICY)
+
+    assert s["status"] == "suppressed"
+    assert s["comparison_readiness"] == "inconclusive"
+    assert "source_qualification_coverage_below_minimum" in s["inconclusive_reasons"]
+    assert s["source_qualification"]["qualified_paired_coverage"] == "3/4"
+    assert s["metrics"]["acceptance_rate"]["delta"] is None
+    assert s["metrics"]["review_seconds"]["delta_total"] is None
+    assert s["metrics"]["known_cost"]["by_currency"]["EUR"]["delta_total"] is None
+    assert s["metrics"]["capture_rate"]["status"] == "computed"
+    assert s["metrics"]["capture_rate"]["delta"] == "0"

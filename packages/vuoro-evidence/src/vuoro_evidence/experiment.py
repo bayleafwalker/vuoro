@@ -54,6 +54,55 @@ def run_revision(manifest: RunManifest, kind: str) -> str:
 
 
 @dataclass(frozen=True)
+class OwnerOutcomeQualification:
+    """Caller-supplied source check for one owner outcome.
+
+    This is a joinable report from the owner-side source resolver, not an
+    authentication performed by this package. An accepted outcome also needs
+    separate independent-check and actual-use references before it can count
+    as comparison-qualified.
+    """
+
+    case_id: str
+    owner_record_ref: str
+    status: str  # qualified | unverified | unavailable | stale | conflicting
+    qualification_ref: str | None = None
+    source_snapshot_ref: str | None = None
+    source_snapshot_sha256: str | None = None
+    owner_revision_ref: str | None = None
+    release_digest: str | None = None
+    independent_verification_ref: str | None = None
+    actual_use_ref: str | None = None
+    reason: str | None = None
+
+    def __post_init__(self) -> None:
+        for name in ("case_id", "owner_record_ref"):
+            _text(name, getattr(self, name))
+        if not isinstance(self.status, str) or self.status not in {
+                "qualified", "unverified", "unavailable", "stale", "conflicting"}:
+            raise ExperimentError("qualification status must identify a source check result")
+        for name in ("qualification_ref", "source_snapshot_ref", "owner_revision_ref",
+                     "independent_verification_ref", "actual_use_ref", "reason"):
+            value = getattr(self, name)
+            if value is not None:
+                _text(name, value)
+        if self.source_snapshot_sha256 is not None and (
+                not isinstance(self.source_snapshot_sha256, str)
+                or not re.fullmatch(r"sha256:[0-9a-f]{64}", self.source_snapshot_sha256)):
+            raise ExperimentError("source_snapshot_sha256 must be a sha256 reference")
+        if self.release_digest is not None and (
+                not isinstance(self.release_digest, str)
+                or not re.fullmatch(r"[0-9a-f]{64}", self.release_digest)):
+            raise ExperimentError("release_digest must be 64 lowercase hexadecimal characters or unknown")
+        if self.status == "qualified":
+            if not all((self.qualification_ref, self.source_snapshot_ref,
+                        self.source_snapshot_sha256, self.owner_revision_ref)):
+                raise ExperimentError("qualified sources require a report, immutable snapshot and current owner revision")
+        elif self.reason is None:
+            raise ExperimentError("unqualified source checks require a reason")
+
+
+@dataclass(frozen=True)
 class OutcomeObservation:
     """A supplied owner observation, never inferred from session completion.
 
@@ -75,6 +124,8 @@ class OutcomeObservation:
     recovery_seconds: int | None = None
     known_cost: Decimal | None = None
     currency: str | None = None
+    owner_release_digest: str | None = field(default=None, kw_only=True)
+    source_qualification: OwnerOutcomeQualification | None = field(default=None, kw_only=True)
 
     def __post_init__(self) -> None:
         for name in ("case_id", "owner_record_ref", "evidence_class"):
@@ -100,6 +151,45 @@ class OutcomeObservation:
                 raise ExperimentError("currency must be a uppercase three-letter currency identifier")
         elif self.currency is not None:
             raise ExperimentError("currency without known cost is ambiguous")
+        if self.owner_release_digest is not None and (
+                not isinstance(self.owner_release_digest, str)
+                or not re.fullmatch(r"[0-9a-f]{64}", self.owner_release_digest)):
+            raise ExperimentError("owner_release_digest must be 64 lowercase hexadecimal characters or unknown")
+        if self.source_qualification is not None and not isinstance(
+                self.source_qualification, OwnerOutcomeQualification):
+            raise ExperimentError("source_qualification must be an OwnerOutcomeQualification or unknown")
+
+    @property
+    def source_qualification_reasons(self) -> tuple[str, ...]:
+        """Stable reasons this supplied outcome cannot enter a qualified comparison."""
+        qualification = self.source_qualification
+        if qualification is None:
+            return ("source-qualification-missing",)
+        reasons = []
+        if qualification.case_id != self.case_id:
+            reasons.append("qualification-case-mismatch")
+        if qualification.owner_record_ref != self.owner_record_ref:
+            reasons.append("qualification-owner-record-mismatch")
+        if qualification.status != "qualified":
+            reasons.append(f"source-{qualification.status}")
+            return tuple(reasons)
+        if self.disposition == "accepted" and (
+                self.owner_release_digest is None or qualification.release_digest is None):
+            reasons.append("release-digest-missing")
+        elif qualification.release_digest != self.owner_release_digest:
+            reasons.append("release-digest-missing" if self.owner_release_digest is None
+                           else "release-digest-mismatch")
+        if self.disposition == "accepted":
+            if qualification.independent_verification_ref is None:
+                reasons.append("independent-verification-missing")
+            if qualification.actual_use_ref is None:
+                reasons.append("actual-use-missing")
+        return tuple(reasons)
+
+    @property
+    def comparison_qualified(self) -> bool:
+        """Whether caller-supplied qualification is structurally complete for this outcome."""
+        return not self.source_qualification_reasons
 
 
 @dataclass(frozen=True)
@@ -180,15 +270,16 @@ class ExperimentRecord:
         _text("review_policy_ref", review_policy_ref)
         _text("reviewer_ref", reviewer_ref)
         n = len(self.expected_case_ids)
-        accepted = [o for o in self.observations if o.disposition == "accepted"]
+        owner_reported_accepted = [o for o in self.observations if o.disposition == "accepted"]
+        accepted = [o for o in owner_reported_accepted if o.comparison_qualified]
         captured = sum(o.captured is True for o in self.observations)
         reasons = []
         if len(accepted) < min_accepted_cases:
             reasons.append("too_few_accepted_cases")
+        if len(owner_reported_accepted) > len(accepted):
+            reasons.append("source_qualification_incomplete")
         if Fraction(captured, n) < min_capture:
             reasons.append("insufficient_capture")
-        currencies = sorted({o.currency for o in accepted if o.known_cost is not None})
-
         def burden(rows, denominator):
             totals = {}
             for name in ("review_seconds", "rework_seconds", "recovery_seconds"):
@@ -203,13 +294,57 @@ class ExperimentRecord:
                              "known_cases": sum(o.known_cost is not None for o in rows),
                              "unknown_cases": denominator - sum(o.known_cost is not None for o in rows)}}
 
-        effort = {}
-        for name in ("acceptance_seconds", "review_seconds", "rework_seconds", "recovery_seconds"):
-            known = [getattr(o, name) for o in accepted if getattr(o, name) is not None]
-            effort[name] = {"known_total": sum(known) if known else None,
-                            "known_cases": len(known), "unknown_cases": len(accepted) - len(known)}
+        def accepted_effort(rows):
+            effort = {}
+            for name in ("acceptance_seconds", "review_seconds", "rework_seconds", "recovery_seconds"):
+                known = [getattr(o, name) for o in rows if getattr(o, name) is not None]
+                effort[name] = {"known_total": sum(known) if known else None,
+                                "known_cases": len(known), "unknown_cases": len(rows) - len(known)}
+            return effort
+
+        def accepted_cost(rows):
+            units = sorted({o.currency for o in rows if o.known_cost is not None})
+            return {"known_totals": {currency: str(sum(
+                        (o.known_cost for o in rows
+                         if o.currency == currency and o.known_cost is not None), Decimal(0)))
+                        for currency in units},
+                    "known_cases": sum(o.known_cost is not None for o in rows),
+                    "unknown_cases": len(rows) - sum(o.known_cost is not None for o in rows)}
+
+        accepted_effort_by_source = accepted_effort(accepted)
+        owner_reported_effort = accepted_effort(owner_reported_accepted)
+        qualified_cost = accepted_cost(accepted)
+        owner_reported_cost = accepted_cost(owner_reported_accepted)
+        by_case = {o.case_id: o for o in self.observations}
+        unqualified_case_ids = sorted(
+            case_id for case_id in self.expected_case_ids
+            if case_id not in by_case or not by_case[case_id].comparison_qualified)
+        qualification_cases = []
+        for case_id in sorted(self.expected_case_ids):
+            observation = by_case.get(case_id)
+            if observation is None:
+                qualification_cases.append({"case_id": case_id, "status": "missing_observation",
+                                           "reason_codes": ["observation-missing"]})
+                continue
+            qualification = observation.source_qualification
+            qualification_cases.append({
+                "case_id": case_id,
+                "status": qualification.status if qualification is not None else "missing",
+                "qualified_for_comparison": observation.comparison_qualified,
+                "reason_codes": list(observation.source_qualification_reasons),
+                "qualification_ref": qualification.qualification_ref if qualification is not None else None,
+                "source_snapshot_ref": qualification.source_snapshot_ref if qualification is not None else None,
+                "source_snapshot_sha256": qualification.source_snapshot_sha256 if qualification is not None else None,
+                "owner_revision_ref": qualification.owner_revision_ref if qualification is not None else None,
+                "owner_release_digest": observation.owner_release_digest,
+                "qualification_release_digest": qualification.release_digest if qualification is not None else None,
+                "qualification_reason": qualification.reason if qualification is not None else None,
+                "independent_verification_ref": (
+                    qualification.independent_verification_ref if qualification is not None else None),
+                "actual_use_ref": qualification.actual_use_ref if qualification is not None else None,
+            })
         return {
-            "schema_version": "vuoro-experiment-summary/v1",
+            "schema_version": "vuoro-experiment-summary/v2",
             "experiment_id": self.experiment_id, "revision_ref": self.revision_ref,
             "task_group": self.task_group, "population_ref": self.population_ref,
             "revision_kind": self.revision_kind,
@@ -219,6 +354,8 @@ class ExperimentRecord:
                 "registration_authenticity_and_pre_run_order": "not_verified_by_this_package"},
             "expected_cases": n, "observed_cases": len(self.observations),
             "accepted_cases": len(accepted),
+            "source_qualified_accepted_cases": len(accepted),
+            "owner_reported_accepted_cases": len(owner_reported_accepted),
             "dispositions": {state: sum(o.disposition == state for o in self.observations)
                              for state in ("accepted", "rejected", "pending", "unknown")},
             "missing_case_ids": sorted(set(self.expected_case_ids) - {o.case_id for o in self.observations}),
@@ -229,19 +366,25 @@ class ExperimentRecord:
                                   "min_capture": str(min_capture),
                                   "review_policy_ref": review_policy_ref, "reviewer_ref": reviewer_ref,
                                   "predeclaration": "not_verified_by_this_package"},
+            "source_qualification": {
+                "qualified_cases": sum(o.comparison_qualified for o in self.observations),
+                "unqualified_cases": n - sum(o.comparison_qualified for o in self.observations),
+                "unqualified_case_ids": unqualified_case_ids,
+                "cases": qualification_cases,
+                "basis": "caller_supplied",
+                "authentication": "not_performed_by_this_package",
+            },
             "comparison_readiness": "inconclusive" if reasons else "eligible_for_review",
             "inconclusive_reasons": reasons,
-            "accepted_effort": effort,
+            "accepted_effort": accepted_effort_by_source,
+            "owner_reported_accepted_effort": owner_reported_effort,
             "population_burden": burden(self.observations, n),
             "burden_by_disposition": {state: burden(
                 [o for o in self.observations if o.disposition == state],
                 sum(o.disposition == state for o in self.observations))
                 for state in ("accepted", "rejected", "pending", "unknown")},
-            "accepted_cost": {"known_totals": {currency: str(sum(
-                (o.known_cost for o in accepted if o.currency == currency and o.known_cost is not None), Decimal(0)))
-                for currency in currencies},
-                "known_cases": sum(o.known_cost is not None for o in accepted),
-                "unknown_cases": sum(o.known_cost is None for o in accepted)},
+            "accepted_cost": qualified_cost,
+            "owner_reported_accepted_cost": owner_reported_cost,
             "observations": [{"case_id": o.case_id, "disposition": o.disposition,
                 "owner_record_ref": o.owner_record_ref, "run_ids": list(o.run_ids),
                 "evidence_refs": list(o.evidence_refs), "evidence_class": o.evidence_class,
