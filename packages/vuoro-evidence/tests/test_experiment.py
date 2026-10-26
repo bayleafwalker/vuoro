@@ -7,7 +7,8 @@ import json
 
 import pytest
 
-from vuoro_evidence.experiment import ExperimentError, ExperimentRecord, OutcomeObservation, population_digest, run_revision
+from vuoro_evidence.experiment import (ExperimentError, ExperimentRecord, OutcomeObservation,
+                                      OwnerOutcomeQualification, population_digest, run_revision)
 from vuoro_evidence.run import ObservedProfile, RunManifest
 
 
@@ -17,8 +18,22 @@ def run(run_id="r1", model="model-a"):
 
 
 def outcome(case_id="c1", run_id="r1", **kwargs):
-    return OutcomeObservation(case_id, (run_id,), "accepted", "owner:acceptance/1@rev1",
-                              ("artifact:sha256:exact",), "independent_observation", True, **kwargs)
+    owner_ref = "owner:acceptance/1@rev1"
+    release_digest = "a" * 64
+    qualification = OwnerOutcomeQualification(
+        case_id=case_id, owner_record_ref=owner_ref, status="qualified",
+        qualification_ref=f"owner:qualification/{case_id}@rev1",
+        source_snapshot_ref=f"owner:snapshot/{case_id}@immutable1",
+        source_snapshot_sha256="sha256:" + "f" * 64,
+        owner_revision_ref=f"sprintctl:item/{case_id}@revision1",
+        release_digest=release_digest,
+        independent_verification_ref=f"check:{case_id}@immutable1",
+        actual_use_ref=f"use:{case_id}@immutable1",
+    )
+    return OutcomeObservation(case_id, (run_id,), "accepted", owner_ref,
+                              ("artifact:sha256:exact",), "independent_observation", True,
+                              owner_release_digest=release_digest,
+                              source_qualification=qualification, **kwargs)
 
 
 def record(observations=None, manifests=None, population=("c1", "c2")):
@@ -35,7 +50,9 @@ def record(observations=None, manifests=None, population=("c1", "c2")):
 
 def test_missing_population_is_not_zero_cost_or_success_and_capture_keeps_denominator():
     summary = record().summarize(review_policy_ref="owner:review-policy@rev1", reviewer_ref="reviewer:1", min_accepted_cases=2, min_capture=Fraction(3, 4))
+    assert summary["schema_version"] == "vuoro-experiment-summary/v2"
     assert summary["expected_cases"] == 2 and summary["accepted_cases"] == 1
+    assert summary["source_qualified_accepted_cases"] == 1
     assert summary["missing_case_ids"] == ["c2"]
     assert summary["capture"] == {"captured_cases": 1, "expected_cases": 2,
                                   "uncaptured_cases": 0, "unknown_cases": 1}
@@ -43,7 +60,8 @@ def test_missing_population_is_not_zero_cost_or_success_and_capture_keeps_denomi
     assert summary["accepted_effort"]["review_seconds"] == {
         "known_total": None, "known_cases": 0, "unknown_cases": 1}
     assert summary["comparison_readiness"] == "inconclusive"
-    assert set(summary["inconclusive_reasons"]) == {"too_few_accepted_cases", "insufficient_capture"}
+    assert set(summary["inconclusive_reasons"]) == {
+        "too_few_accepted_cases", "insufficient_capture"}
 
 
 def test_rejected_and_pending_outcomes_never_become_acceptance():
@@ -101,6 +119,43 @@ def test_empty_observation_window_remains_inconclusive_with_explicit_population(
     s = record((), ()).summarize(review_policy_ref="owner:review-policy@rev1", reviewer_ref="reviewer:1", min_accepted_cases=1, min_capture=Fraction(0))
     assert s["accepted_cases"] == 0 and s["capture"]["unknown_cases"] == 2
     assert s["comparison_readiness"] == "inconclusive"
+
+
+def test_owner_reported_acceptance_without_qualification_is_not_eligible_for_review():
+    unqualified = replace(outcome(), source_qualification=None)
+    summary = record((unqualified,)).summarize(
+        min_accepted_cases=1, min_capture=Fraction(0),
+        review_policy_ref="owner:policy@rev1", reviewer_ref="reviewer:1")
+    assert summary["accepted_cases"] == 0
+    assert summary["source_qualified_accepted_cases"] == 0
+    assert summary["owner_reported_accepted_cases"] == 1
+    assert summary["comparison_readiness"] == "inconclusive"
+    assert summary["inconclusive_reasons"] == [
+        "too_few_accepted_cases", "source_qualification_incomplete"]
+    assert summary["source_qualification"]["unqualified_case_ids"] == ["c1", "c2"]
+
+
+def test_qualified_source_report_requires_immutable_verification_inputs():
+    with pytest.raises(ExperimentError, match="immutable snapshot"):
+        OwnerOutcomeQualification("c1", "owner:record@rev1", "qualified")
+    with pytest.raises(ExperimentError, match="require a reason"):
+        OwnerOutcomeQualification("c1", "owner:record@rev1", "stale")
+
+
+@pytest.mark.parametrize("owner_digest,qualification_digest", [(None, None), ("a" * 64, None), (None, "a" * 64)])
+def test_accepted_outcome_requires_a_matching_release_digest(owner_digest, qualification_digest):
+    observation = outcome()
+    qualification = replace(observation.source_qualification, release_digest=qualification_digest)
+    observation = replace(observation, owner_release_digest=owner_digest,
+                          source_qualification=qualification)
+    assert observation.comparison_qualified is False
+    assert "release-digest-missing" in observation.source_qualification_reasons
+
+
+@pytest.mark.parametrize("status", [None, 1, {}])
+def test_source_qualification_refuses_nontext_status(status):
+    with pytest.raises(ExperimentError, match="qualification status"):
+        OwnerOutcomeQualification("c1", "owner:record@rev1", status)
 
 
 @pytest.mark.parametrize("field,value", [("known_cost", Decimal("NaN")), ("known_cost", Decimal("Infinity")),
