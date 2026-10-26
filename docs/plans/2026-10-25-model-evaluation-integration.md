@@ -104,6 +104,80 @@ case and one failed/unqualified case to the correct owner record, immutable
 artifact digest, run identity and actual cost/unknown cost. A provider's
 successful session cannot enter `accepted` by itself.
 
+## Comparison protocol and exit gates [AE-04/AE-05]
+
+### Freeze before the first run
+
+Register separate committed `CaseSet`s for the work cohort and decision
+replay, using existing work and decision references, with inclusion/exclusion
+criteria and a pinned digest. For each comparison,
+predeclare its task group, the one revision field being compared (for example,
+`model_id` or a digest of the full observed profile), exact case IDs, initial
+revision, acceptance/checking criteria, reviewer, `review_policy_ref`,
+`min_accepted_cases` and `min_capture` for each record summary, and
+`min_cases` and `min_coverage` for the paired comparison. Freeze the
+cost-allocation rule and decision-error costs too. Do not choose thresholds,
+remove cases, or change scoring after seeing outcomes.
+
+Preflight the exact provider/model version, account permission, billing type,
+data boundary, budget and native harness capability for each arm. A failed
+preflight removes no registered case: mark that arm unavailable or the
+observation missing, with its reason. No automatic failover or credential
+expansion. Record exact provider/model requested and observed, all attempts,
+harness/build/profile and instruction digests, tool policy, initial commit,
+test/checker output, owner disposition, and cost provenance. For a flat
+subscription, use only a pre-registered allocation basis; otherwise cost is
+unknown/unallocated, never zero. Keep currencies separate.
+
+### Run matched and blinded cohorts
+
+For VU-ME1, start every model on the same registered issue inputs and clean
+worktree at the same commit, with identical instructions, tool permissions,
+tests and acceptance oracle. Randomize the arm order. Do not share patches,
+intermediate model output or history between arms. Give outputs arm-neutral IDs;
+where practical, lock independent-checker dispositions before revealing model
+identity, and record any identity exposure as a limitation. Keep the harness
+and every non-model factor fixed. If provider, harness or profile changes
+together, label the arm as a full-stack comparison and do not attribute its
+result to model identity alone. Treat Gemini's separate task cohort as a distinct study, not
+a head-to-head arm.
+
+For VU-ME2, freeze the legal-choice schema, deterministic baseline, prompts,
+model/profile revisions, labels and error-cost table before replay. Keep scored
+labels out of model inputs and have the choice labels owner-reviewed before
+the run. If prompts or rules need tuning, use a disjoint development set and
+leave scored cases held out. Report abstentions, coverage, false-route and
+critical-error counts/cost by choice class, and end-to-end latency p50/p95.
+Any predeclared critical unsafe route stops the trial; it does not trigger an
+automatic routing change.
+
+### Qualify and compare
+
+Before interpreting VU-ME1 results, complete VU-ME3 source qualification on
+real supplied Sprintctl records. Independently resolve the owner, current item
+revision, terminal Release/Decision and exact artifact digest outside the pure
+intake adapter. Report owner disposition separately from independent functional
+verification and actual-use evidence required by the referenced measurement
+procedure. A missing or contradictory join, verifier result or required use
+evidence is unqualified for the relevant comparison measure; this measurement
+rule never changes Sprintctl's own acceptance state.
+
+Use the existing `CaseSet` and `ExperimentComparison` described in
+[accepted-outcome learning](../architecture/accepted-outcome-learning.md#two-arm-comparison-over-a-committed-case-set).
+Both arm records must retain the exact registered population and case IDs,
+share the task group and revision field while naming different revisions, and
+have no run IDs in common. Run the comparison only after both records and source
+qualifications are complete. Missing, failed, rejected, pending and unavailable
+cases stay visible in the denominator. If the configured minimums suppress the
+overall comparison or a measure, report its reason and leave it inconclusive;
+do not rank an arm from partial or incomparable observations.
+
+The 5–10 issue cohort and 30–50 decision replay are exploratory. Report exact
+counts, paired deltas, unknowns and the registered policy; make no
+statistical-significance, causal-superiority, universal supplier ranking or
+default-selection claim from these samples. No result in this plan changes
+owner state, provider routing, grants or production configuration.
+
 ## VU-ME4 — optional personal operator is a *consumer* [AE-07]
 
 Experiment with an independent, event-triggered, read-only personal narrative
