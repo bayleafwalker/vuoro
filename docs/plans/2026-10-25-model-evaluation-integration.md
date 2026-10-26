@@ -134,8 +134,10 @@ unknown/unallocated, never zero. Keep currencies separate.
 For VU-ME1, start every model on the same registered issue inputs and clean
 worktree at the same commit, with identical instructions, tool permissions,
 tests and acceptance oracle. Randomize the arm order. Do not share patches,
-intermediate model output or history between arms. Keep the harness and every
-non-model factor fixed; if provider, harness or profile changes together, label
+intermediate model output or history between arms. Give outputs arm-neutral IDs;
+where practical, lock independent-checker dispositions before revealing model
+identity, and record any identity exposure as a limitation. Keep the harness
+and every non-model factor fixed; if provider, harness or profile changes together, label
 the arm as a full-stack comparison and do not attribute its result to model
 identity alone. Treat Gemini's separate task cohort as a distinct study, not
 a head-to-head arm.
