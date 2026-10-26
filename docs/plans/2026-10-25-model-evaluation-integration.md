@@ -108,8 +108,9 @@ successful session cannot enter `accepted` by itself.
 
 ### Freeze before the first run
 
-Register a committed `CaseSet` from the existing work and decision references,
-with inclusion/exclusion criteria and a pinned digest. For each comparison,
+Register separate committed `CaseSet`s for the work cohort and decision
+replay, using existing work and decision references, with inclusion/exclusion
+criteria and a pinned digest. For each comparison,
 predeclare its task group, the one revision field being compared (for example,
 `model_id` or a digest of the full observed profile), exact case IDs, initial
 revision, acceptance/checking criteria, reviewer, `review_policy_ref`,
