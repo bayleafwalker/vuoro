@@ -237,6 +237,8 @@ jobs:
             'httpx>=0.27,<1'
           /tmp/vuoro-served-conformance/bin/python \
             scripts/validate_served_conformance.py
+      - name: Validate candidate workflow distribution references
+        run: python scripts/validate_workflow_distribution.py
       # Native compiler/SDK tests run with their exact qualified tools in
       # contracts-production-toolchain; this job retains all ordinary tests.
       - run: >-
