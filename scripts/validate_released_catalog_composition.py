@@ -12,13 +12,13 @@ from vuoro_workspace import FsObjectStore
 from vuoro_workspace.vuoro_adapter import KnowledgeApplication, register_knowledge_catalog
 
 
-EXPECTED_TOTAL = 144
-EXPECTED_REVISION = "29544721a52ed3e3f824213074354a0473932cba74c0c11946e12b8c248743aa"
-EXPECTED_DOMAIN_COUNTS = {"work": 121, "audit": 5, "knowledge": 18}
+EXPECTED_TOTAL = 145
+EXPECTED_REVISION = "81fa77e93a8137e3bd58776e915fe5208258cf88a752422f265b5e673758a281"
+EXPECTED_DOMAIN_COUNTS = {"work": 122, "audit": 5, "knowledge": 18}
 
 
 class WorkStub:
-    store = SimpleNamespace(remote_schema_version=28)
+    store = SimpleNamespace(remote_schema_version=29)
 
     @staticmethod
     def maintenance_resource_schema_available() -> bool:

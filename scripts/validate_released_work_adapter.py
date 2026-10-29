@@ -28,9 +28,9 @@ _EXPECTED_ADAPTER_KIT = (
     "https://github.com/bayleafwalker/vuoro/releases/download/"
     "vuoro-adapter-kit-v0.2.2/vuoro_adapter_kit-0.2.2-py3-none-any.whl"
 )
-_EXPECTED_WORK_OPERATION_COUNT = 118
+_EXPECTED_WORK_OPERATION_COUNT = 119
 _EXPECTED_WORK_METADATA_SHA256 = (
-    "c7628ba21ba468c72bab93c75a082588618f7cea27d826a50b9a101247a66116"
+    "945b904437318cf63a9dcd49aac9914db7fddd30043e423e91d2f32f3281c6e9"
 )
 
 
@@ -124,11 +124,11 @@ async def _exercise() -> None:
         )
         # The production service seeds this from its read-only schema
         # handshake before registration. The disposable owner fixture is
-        # explicitly at the composition's schema 28 minimum.
+        # explicitly at the composition's schema 29 minimum.
         class SchemaQualifiedStore:
             def __init__(self, store):
                 self._store = store
-                self.remote_schema_version = 28
+                self.remote_schema_version = 29
 
             def __getattr__(self, name):
                 return getattr(self._store, name)

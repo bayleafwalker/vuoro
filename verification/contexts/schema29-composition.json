@@ -1,0 +1,117 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.schema29-composition",
+  "owner_repo": "vuoro",
+  "subject": "Released schema27 and schema28 closures to the pinned Sprintctl0.25/schema29 composition",
+  "contract_ref": {
+    "doc_id": "vuoro-service-upgrade",
+    "revision": "sha256:0dcaa37617119f52fef4ef2584aeb35396d3b23b2d250350b9d937d09bb141c2"
+  },
+  "source_of_truth": "immutable release locks, owner migration CLI, PostgreSQL owner rows and runtime catalog",
+  "depth": 2,
+  "backends": [
+    "installed immutable wheel closure",
+    "disposable PostgreSQL16",
+    "disposable PostgreSQL17"
+  ],
+  "actors": [
+    "old released owner",
+    "migration operator",
+    "runtime role",
+    "reporting principal"
+  ],
+  "initial_state": [
+    "actual service0.1.97/Sprintctl0.22 schema27 closure",
+    "actual service0.1.99/Sprintctl0.24 schema28 closure",
+    "separate nonprivileged migration/runtime roles for all three domains",
+    "no production state or endpoint"
+  ],
+  "operations": [
+    {
+      "name": "refuse old schema at new factory without migration",
+      "actors": [
+        "runtime role"
+      ]
+    },
+    {
+      "name": "explicit owner CLI migration and idempotent replay",
+      "actors": [
+        "migration operator"
+      ]
+    },
+    {
+      "name": "serve preserved rows and refuse old closure and runtime DDL",
+      "actors": [
+        "runtime role",
+        "old released owner"
+      ]
+    },
+    {
+      "name": "report outcome on actual old schema28 lease",
+      "actors": [
+        "reporting principal"
+      ]
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "release identity, preserved rows, least privilege and settlement basis"
+  },
+  "assumptions": {
+    "isolation": "sequential API history in separately owned disposable PostgreSQL schemas",
+    "clock": "wall clock; no expiry waits",
+    "fairness": "none"
+  },
+  "bounds": {
+    "source_schemas": [
+      27,
+      28
+    ],
+    "target_schema": 29,
+    "work_catalog_operations": 122,
+    "audit_catalog_operations": 5,
+    "knowledge_catalog_operations": 18,
+    "postgresql_majors": [
+      16,
+      17
+    ]
+  },
+  "invariants": [
+    "installed owner/shared artifacts match release locks",
+    "new startup refuses old schemas without DDL",
+    "only explicit migration-role CLI advances schema",
+    "every old column of every preexisting work row is preserved; new lease basis fields remain null",
+    "audit rows unchanged across work migration",
+    "runtime role cannot DDL or assume migration role",
+    "old owner and old service refuse schema29",
+    "actual old lease outcome is retained as rejected and creates no decision"
+  ],
+  "faults": [
+    "old schema at startup",
+    "migration retry",
+    "runtime DDL attempt",
+    "old closure after migration",
+    "libpq routing override",
+    "legacy lease outcome without basis",
+    "owner connection loss followed by recovery"
+  ],
+  "oracles": [
+    "test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_denial",
+    "exact metadata and catalog fingerprints",
+    "installed closure attestation",
+    "existing cold HTTP conformance"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-service/README.md",
+    "packages/vuoro-service/composition/adapter-pins.json",
+    "packages/vuoro-service/tests/conformance/test_schema28_composition_migration.py",
+    "packages/vuoro-service/tests/fixtures/schema28-adapter-pins.json",
+    "packages/vuoro-service/tests/fixtures/schema28-service.json",
+    "scripts/prepare_schema21_upgrade_fixture.py",
+    ".github/workflows/ci.yml"
+  ],
+  "expansions": [
+    "semantic-doc",
+    "fault-scenario"
+  ]
+}

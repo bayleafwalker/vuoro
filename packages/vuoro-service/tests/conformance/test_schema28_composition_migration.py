@@ -1,9 +1,10 @@
-"""Real schema28 owner closure -> explicit CLI migration28 -> runtime-only factory.
+"""Real schema27 owner closure -> explicit CLI migration29 -> runtime-only factory.
 
-The old closure is the released vuoro-service 0.1.97 with Sprintctl 0.22.0
-(work schema 27), the composition vuoro-shared runs before this upgrade. The
+The old closure is either released service 0.1.97 / Sprintctl 0.22.0 (schema
+27) or released service 0.1.99 / Sprintctl 0.24.0 (schema 28). Both upgrade
+paths use the actual hash-pinned old wheels. The
 runner supplies isolated migration/runtime DSNs and a hash-verified old owner
-interpreter. The new composition's startup must refuse the schema-27 store,
+interpreter. The new composition's startup must refuse the old store,
 the migration runs only through the released owner's explicit
 ``sprintctl remote-schema migrate`` command, and startup then succeeds with
 the agent directory and inbox operations served. No configured production
@@ -33,8 +34,10 @@ from .test_bound_proposal_http import assert_installed_composition
 
 pytestmark = pytest.mark.essential_safety
 
-CATALOG_REVISION = '3995d4f88ef28f8aea71f836420e13b435f1af5e164d344b495c423eb6676cab'
-CATALOG_TOTAL = 144
+# Runtime catalog includes compatibility-derived owner features; the registration-only
+# catalog gate has a separate revision.
+CATALOG_REVISION = '6b463846dee08f4158bdcdd486a878675a23f68b50afa3f67d52d5db21dfaa8e'
+CATALOG_TOTAL = 145
 INBOX_OPERATIONS = ('work.agent.register-v1', 'work.agent.observe-v1', 'work.agent.retire-v1',
                     'work.agent.list-v1', 'work.agent.describe-v1', 'work.message.send-v1',
                     'work.message.read-v1', 'work.message.status-v1', 'work.message.receipt-v1',
@@ -89,10 +92,11 @@ def test_fixture_guard_refuses_libpq_overrides_before_connection(query):
 OLD_SETUP = '''import json,os
 from importlib.metadata import version
 from sprintctl import pg,pg_migrations
-assert version('sprintctl')=='0.22.0'
+source_schema=int(os.environ.get('VUORO_UPGRADE_SOURCE_SCHEMA','27'))
+assert version('sprintctl')=={27:'0.22.0',28:'0.24.0'}[source_schema]
 s=pg.get_connection(os.environ['SCHEMA27_PROOF_DSN']);s.repo_id='agentops'
 result=pg_migrations.migrate_schema(s)
-assert result['to_version']==27
+assert result['to_version']==source_schema
 sprint=pg.create_sprint(s,'Preserved schema27','fixture','2026-01-01','2026-12-31','active')
 track=pg.get_or_create_track(s,sprint,'fixture')
 item=pg.create_work_item(s,sprint,track,'Preserve this actual old-owner row')
@@ -133,9 +137,18 @@ attempt_id=opened['authorization']['attempt_id']
 redeemed=app.invoke('work.effect.attempt-redeem-v1',{'attempt_id':attempt_id,
  'authorization_digest':opened['authorization_digest'],'idempotency_key':uuid.uuid4().hex},applier)
 assert redeemed['dispatch_permitted'] is True
+lease_id=None
+if source_schema==28:
+ lease_item=pg.create_work_item(s,sprint,track,'Preserve actual schema28 active lease')
+ lease_context=context('fixture:lease:0',{'work:evidence','work:claim','work:read'})
+ lease_run=app.invoke('work.run.register-v1',{'harness_id':'fixture','harness_build':'old-wheel',
+  'model_id':'scripted','recipe_id':'schema28-lease/v1','observed_profile':{'instruction_digest':'sha256:'+'a'*64,'skill_digests':[]},
+  'idempotency_key':uuid.uuid4().hex},lease_context)['run']['run_id']
+ lease_id=app.invoke('work.lease.acquire-v1',{'item_id':lease_item,'run_id':lease_run,
+  'idempotency_key':uuid.uuid4().hex},lease_context)['lease']['lease_id']
 s.conn.commit()
 s.conn.close()
-print(json.dumps({'attempt_id':attempt_id}))
+print(json.dumps({'attempt_id':attempt_id,'lease_id':lease_id,'lease_run':lease_run if source_schema==28 else None}))
 '''
 
 OLD_FACTORY = '''import json,os
@@ -153,7 +166,7 @@ else:
  with TestClient(app) as client:
   assert client.get('/health/ready').status_code==200
   handshake=client.get('/api/meta/v1/handshake').json()
-  assert handshake['service_version']=='0.1.97'
+  assert handshake['service_version']=={27:'0.1.97',28:'0.1.99'}[int(os.environ.get('VUORO_UPGRADE_SOURCE_SCHEMA','27'))]
   assert handshake['compatibility']['state']=='compatible'
 '''
 
@@ -162,12 +175,12 @@ from sprintctl import pg,pg_migrations
 s=pg.get_connection(os.environ['SCHEMA27_PROOF_DSN'])
 try:pg_migrations.require_compatible_schema(s)
 except pg_migrations.RemoteSchemaCompatibilityError:pass
-else:raise SystemExit('old owner accepted schema28')
+else:raise SystemExit('old owner accepted schema29')
 finally:s.conn.close()
 '''
 
 
-def test_actual_schema28_refusal_explicit28_cli_migration_and_runtime_ddl_denial(
+def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_denial(
     tmp_path, monkeypatch,
 ):
     if not all(os.environ.get(x) for x in NAMES):
@@ -175,6 +188,8 @@ def test_actual_schema28_refusal_explicit28_cli_migration_and_runtime_ddl_denial
             pytest.fail('mandatory schema28 upgrade fixture is incompletely configured')
         pytest.skip('requires separately provisioned disposable schema28 migration/runtime fixture')
     assert_installed_composition()
+    source_schema = int(os.environ.get('VUORO_UPGRADE_SOURCE_SCHEMA', '27'))
+    assert source_schema in (27, 28)
     (migration, runtime, old_python, manifest, wheels, attestation, audit_migration, audit_runtime,
      old_manifest, old_wheels, old_attestation, knowledge_migration, knowledge_runtime) = (
         os.environ[x] for x in NAMES)
@@ -194,7 +209,8 @@ def test_actual_schema28_refusal_explicit28_cli_migration_and_runtime_ddl_denial
         'old released owner fixture initialization refused: '
         f'stdout={result.stdout[-2000:]!r}, stderr={result.stderr[-2000:]!r}'
     )
-    attempt_id = json.loads(result.stdout.strip().splitlines()[-1])['attempt_id']
+    old_state = json.loads(result.stdout.strip().splitlines()[-1])
+    attempt_id = old_state['attempt_id']
 
     from auditctl.central_schema import migrate as audit_migrate
     runtime_role = urlsplit(runtime).username
@@ -248,7 +264,13 @@ def test_actual_schema28_refusal_explicit28_cli_migration_and_runtime_ddl_denial
                 if table in ('schema_version', *NEW_TABLES):
                     continue
                 values = conn.execute(sql.SQL('SELECT to_jsonb(t) FROM {} t').format(sql.Identifier(table))).fetchall()
-                rows[table] = sorted((r[0] for r in values), key=lambda v: json.dumps(v, sort_keys=True))
+                projected = [r[0] for r in values]
+                if table == 'work_lease':
+                    # Schema29 adds nullable basis fields; preserve every old column.
+                    for row in projected:
+                        row.pop('basis_item_revision', None)
+                        row.pop('basis_release_digest', None)
+                rows[table] = sorted(projected, key=lambda v: json.dumps(v, sort_keys=True))
             return rows
 
     def remote_schema(command, url):
@@ -262,6 +284,9 @@ def test_actual_schema28_refusal_explicit28_cli_migration_and_runtime_ddl_denial
     assert before['work_effect_attempt'] and before['work_effect_attempt_event']
     identity = tmp_path / 'identities.json'
     identity.write_text(json.dumps({'schema_version': 'vuoro-identities/v1', 'identities': {
+        'l' * 40: {'actor': 'fixture-lease', 'principal_id': 'fixture:lease:0', 'environment': 'schema28-fixture',
+                   'workspace_id': 'schema28-fixture', 'authorities': ['work:read', 'work:claim', 'work:evidence'],
+                   'repo_ids': ['agentops']},
         'x' * 40: {'actor': 'fixture-reader', 'principal_id': 'fixture:reader:0', 'environment': 'schema28-fixture',
                    'workspace_id': 'schema28-fixture', 'authorities': ['work:read'],
                    'repo_ids': ['agentops']},
@@ -303,24 +328,30 @@ def test_actual_schema28_refusal_explicit28_cli_migration_and_runtime_ddl_denial
     assert json.loads(checked.stdout)['compatible'] is False, checked.stderr
     assert legacy_rows() == before
     with psycopg.connect(migration) as conn:
-        assert conn.execute('SELECT version FROM schema_version').fetchone()[0] == 27
-        for table in NEW_TABLES:
-            assert conn.execute('SELECT to_regclass(%s)', (table,)).fetchone()[0] is None
+        assert conn.execute('SELECT version FROM schema_version').fetchone()[0] == source_schema
+        if source_schema == 27:
+            for table in NEW_TABLES:
+                assert conn.execute('SELECT to_regclass(%s)', (table,)).fetchone()[0] is None
 
     # Explicit, separately invoked owner migration with the migration-role credential.
     migrated = remote_schema('migrate', migration)
     assert migrated.returncode == 0, 'explicit remote-schema migrate refused'
     migrated = json.loads(migrated.stdout)
-    assert migrated['from_version'] == 27 and migrated['to_version'] == 28
-    assert migrated['applied_versions'] == [28]
+    assert migrated['from_version'] == source_schema and migrated['to_version'] == 29
+    assert migrated['applied_versions'] == list(range(source_schema + 1, 30))
     again = remote_schema('migrate', migration)
     assert again.returncode == 0 and json.loads(again.stdout)['applied_versions'] == []
     grants()
     checked = remote_schema('check', runtime)
     assert checked.returncode == 0 and json.loads(checked.stdout)['compatible'] is True
     assert legacy_rows() == before
+    if source_schema == 28:
+        assert old_state['lease_id']
+        with psycopg.connect(migration) as conn:
+            assert conn.execute('SELECT basis_item_revision,basis_release_digest FROM work_lease '
+                                'WHERE lease_id=%s', (old_state['lease_id'],)).fetchone() == (None, None)
 
-    # Capture the exact released Sprintctl 0.24 root application constructed by
+    # Capture the exact released Sprintctl 0.25 root application constructed by
     # the service composition. This lets the HTTP readiness path exercise its
     # reconnect hook and then prove that a later repository-scoped invocation
     # uses the refreshed root connection.
@@ -346,7 +377,7 @@ def test_actual_schema28_refusal_explicit28_cli_migration_and_runtime_ddl_denial
         response = client.get('/api/meta/v1/handshake', headers={'X-Vuoro-Client-Protocol': '1'})
         assert response.status_code == 200, response.json()
         handshake = response.json()
-        assert handshake['service_version'] == '0.1.99' and handshake['compatibility']['state'] == 'compatible'
+        assert handshake['service_version'] == '0.1.100' and handshake['compatibility']['state'] == 'compatible'
         assert all(x['state'] == 'compatible' for x in handshake['compatibility']['domains'].values())
         catalog = client.get('/api/catalog/v1', headers={'X-Vuoro-Client-Protocol': '1'}).json()
         assert len(catalog['operations']) == CATALOG_TOTAL
@@ -407,7 +438,7 @@ def test_actual_schema28_refusal_explicit28_cli_migration_and_runtime_ddl_denial
                             'FROM pg_roles WHERE rolname=current_user').fetchone()
         assert not any(role)
         assert not conn.execute("SELECT pg_has_role(current_user,%s,'MEMBER')", (migration_role,)).fetchone()[0]
-        assert conn.execute('SELECT version FROM schema_version').fetchone()[0] == 28
+        assert conn.execute('SELECT version FROM schema_version').fetchone()[0] == 29
         assert not conn.execute("SELECT has_schema_privilege(current_user,'work','CREATE')").fetchone()[0]
         for table in NEW_TABLES:
             assert conn.execute('SELECT has_table_privilege(current_user,%s,%s)',
@@ -449,7 +480,7 @@ def test_actual_schema28_refusal_explicit28_cli_migration_and_runtime_ddl_denial
         request_page = invoke('work.request.list-v1', {'limit': 20}, 'x' * 40)
         assert request_page['requests'] == [] and request_page['next_after_request_id'] is None
 
-        # Exercise the released 0.24.0 owner through the composed service with
+        # Exercise the released 0.25.0 owner through the composed service with
         # only the separately provisioned DML runtime role. Byte-limited pages
         # may be short but each cursor must advance to the last returned note.
         parent = invoke('work.run.register-v1', {
@@ -529,6 +560,33 @@ def test_actual_schema28_refusal_explicit28_cli_migration_and_runtime_ddl_denial
                             (instance_id,)).fetchone()[0] == 1
     child_env['SCHEMA27_PROOF_DSN'] = runtime
     result = subprocess.run([old_python, '-I', '-c', OLD_REFUSAL], env=child_env, capture_output=True, text=True)
-    assert result.returncode == 0, 'old owner did not refuse postmigration schema28'
+    assert result.returncode == 0, 'old owner did not refuse postmigration schema29'
     assert legacy_rows() == after
     assert audit_rows() == audit_before
+
+    if source_schema == 28:
+        # A real lease acquired by 0.24 has no recorded basis. The new HTTP
+        # composition must retain the rejection, release it, and never settle.
+        with TestClient(factory()) as client:
+            response = client.post('/api/invoke/v1', headers={
+                'X-Vuoro-Client-Protocol': '1', 'Authorization': 'Bearer ' + 'l' * 40,
+            }, json={
+                'schema_version': 'invocation/v1', 'request_id': uuid.uuid4().hex,
+                'repo_id': 'agentops', 'catalog_revision': CATALOG_REVISION,
+                'operation': 'work.lease.report-outcome-v1', 'arguments': {
+                    'lease_id': old_state['lease_id'], 'run_id': old_state['lease_run'],
+                    'outcome': 'succeeded', 'summary': 'legacy closure result',
+                    'payload': {'result': 'ok'}, 'checks': [{'name': 'tests', 'status': 'passed'}],
+                    'idempotency_key': 'old-closure-lease-result',
+                },
+            })
+            assert response.status_code == 409, response.json()
+            assert response.json()['error']['code'] == 'lease-basis-unavailable'
+        with psycopg.connect(runtime) as conn:
+            assert conn.execute('SELECT state,end_reason FROM work_lease WHERE lease_id=%s',
+                                (old_state['lease_id'],)).fetchone() == ('released', 'lease-basis-unavailable')
+            assert conn.execute('SELECT disposition,reason_code,decision_id FROM work_outcome_report '
+                                'WHERE lease_id=%s', (old_state['lease_id'],)).fetchone() == (
+                                    'rejected', 'lease-basis-unavailable', None)
+            assert conn.execute('SELECT count(*) FROM work_decision WHERE work_item_id=(SELECT work_item_id FROM work_lease WHERE lease_id=%s)',
+                                (old_state['lease_id'],)).fetchone()[0] == 0
