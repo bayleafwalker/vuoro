@@ -70,6 +70,9 @@ def test_operator_request_methods_are_thin_catalog_invocations():
                 packet={"schema": "operator-request/v1"}, idempotency_key="supersede-request-1",
                 repo_id="project-a",
             )
+            await client.get_operator_request_continuation(
+                "req_01JBC3D4E5F6G7H8J9K0MNPQRS", repo_id="project-a"
+            )
         finally:
             await client.aclose()
 
@@ -88,6 +91,7 @@ def test_operator_request_methods_are_thin_catalog_invocations():
         "work.request.attest-v1",
         "work.request.decline-v1",
         "work.request.supersede-v1",
+        "work.request.continuation-v1",
     ]
     assert all(call[2] == {"repo_id": "project-a"} for call in calls)
     assert calls[0][1]["idempotency_key"] == "publish-request-1"
@@ -101,3 +105,4 @@ def test_operator_request_methods_are_thin_catalog_invocations():
     assert calls[9][1]["performed_at"] == "2026-10-24T10:30:00Z"
     assert calls[10][1]["reason"] == "The proposed procedure is no longer appropriate."
     assert calls[11][1]["replacement_request_id"] == "req_01JBC3D4E5F6G7H8J9K0MNPQRT"
+    assert calls[12][1] == {"request_id": "req_01JBC3D4E5F6G7H8J9K0MNPQRS"}

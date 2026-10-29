@@ -289,6 +289,14 @@ class AsyncVuoroClient:
             "work.request.get-v1", {"request_id": request_id}, repo_id=repo_id
         )
 
+    async def get_operator_request_continuation(
+        self, request_id: str, *, repo_id: str | None = None
+    ) -> dict[str, Any]:
+        """Read one owner continuation snapshot without waking or acknowledging."""
+        return await self.invoke(
+            "work.request.continuation-v1", {"request_id": request_id}, repo_id=repo_id
+        )
+
     async def list_operator_requests(
         self,
         *,
