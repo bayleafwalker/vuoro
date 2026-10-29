@@ -4,6 +4,7 @@ Root supplies locked tools and exact executable environment variables. No skip,
 installer, network fallback or alternate experiment checkout is used. F2 real
 owner/state acceptance remains separate from this offline transport boundary.
 """
+from copy import deepcopy
 from hashlib import sha256
 import importlib.util
 import json
@@ -13,6 +14,8 @@ import shutil
 import subprocess
 
 import pytest
+from jsonschema import Draft202012Validator, FormatChecker
+from referencing import Registry, Resource
 from vuoro_contracts import ContractBundle, ContractError, validate_bundle
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -363,3 +366,65 @@ def test_typescript_emitted_sdk_and_attachment_typecheck(generated, tmp_path):
     path = tmp_path / "tsconfig.json"
     path.write_text(json.dumps(config))
     run([executable("VUORO_CONTRACT_NODE"), str(compiler), "--project", str(path)])
+
+
+@pytest.fixture(scope="module")
+def continuation_validator(tmp_path_factory):
+    stage = tmp_path_factory.mktemp("compiled-continuation")
+    source = stage / "authored"
+    shutil.copytree(TOOLS / "fixtures/probe", source)
+    main = source / "main.tsp"
+    main.write_text('import "@vuoro/contracts/operator-requests";\n' + main.read_text())
+    node = Path(os.environ["VUORO_CONTRACT_NODE"])
+    python = Path(os.environ["VUORO_CONTRACT_PYTHON"])
+    generator._verify_tools(TOOLS, node, python)
+    snapshot = generator._snapshot_project(source, ROOT / "contracts", TOOLS, stage, node)
+    generator._compile(snapshot / "owner", stage, TOOLS, node)
+    paths = list((stage / "compiled").rglob("contract.schema.json"))
+    assert len(paths) == 1
+    bundle = json.loads(paths[0].read_bytes())
+    registry = Registry().with_resources(
+        (value["$id"], Resource.from_contents(value))
+        for value in bundle["$defs"].values() if "$id" in value
+    )
+    return Draft202012Validator(bundle["$defs"]["RequestContinuationReady"],
+                               registry=registry, format_checker=FormatChecker())
+
+
+def _continuation_packet():
+    return {
+        "schema": "operator-request-continuation-ready/v1",
+        "owner": {"repo_id": "example", "read_operation": "work.request.continuation-v1"},
+        "request_id": "req_01JZZZZZZZZZZZZZZZZZZZZZZZ", "request_revision": 3,
+        "resolution": {"event_revision": 3, "basis": "human-attestation",
+                       "event_recorded_at": "2026-10-29T10:00:00Z"},
+        "dependants": [{"work_item_id": 9007199254740991, "session_id": "previous-session",
+                        "work_revision": "item:example@status:pending",
+                        "current_work_revision": "item:example@status:pending",
+                        "state": "continuation-ready"}],
+    }
+
+
+def test_compiled_continuation_accepts_integer_identity_and_nullable_current_basis(continuation_validator):
+    value = _continuation_packet()
+    # JSON Schema format is an annotation; the native consumer validates timestamps.
+    assert continuation_validator.schema["$defs"]["ContinuationResolution"]["properties"]["event_recorded_at"]["format"] == "date-time"
+    continuation_validator.validate(value)
+    value["dependants"][0].update(current_work_revision=None, state="needs-refresh")
+    continuation_validator.validate(value)
+
+
+@pytest.mark.parametrize("change", ["string-id", "unsafe-id", "empty-basis", "unsupported-basis", "extra-field"])
+def test_compiled_continuation_rejects_wire_drift(continuation_validator, change):
+    value = deepcopy(_continuation_packet())
+    if change == "string-id":
+        value["dependants"][0]["work_item_id"] = "55"
+    elif change == "unsafe-id":
+        value["dependants"][0]["work_item_id"] = 9007199254740992
+    elif change == "empty-basis":
+        value["dependants"][0]["work_revision"] = ""
+    elif change == "unsupported-basis":
+        value["resolution"]["basis"] = "caller-verified"
+    else:
+        value["protected_effect_authorized"] = True
+    assert list(continuation_validator.iter_errors(value))

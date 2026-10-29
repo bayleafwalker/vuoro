@@ -240,3 +240,44 @@ model ListRequestEventsResult {
   events: RequestEvent[];
   next_after_revision: int32;
 }
+
+model ContinuationOwner {
+  @minLength(1)
+  repo_id: string;
+  read_operation: "work.request.continuation-v1";
+}
+
+model ContinuationResolution {
+  @minValue(1)
+  event_revision: int32;
+  basis: "human-attestation";
+  event_recorded_at: utcDateTime;
+}
+
+@minLength(1)
+scalar ContinuationWorkRevision extends string;
+
+model ContinuationDependant {
+  @minValue(1)
+  @maxValue(9007199254740991)
+  work_item_id: safeint;
+  @minLength(1)
+  @maxLength(256)
+  session_id: string;
+  work_revision: ContinuationWorkRevision;
+  current_work_revision: ContinuationWorkRevision | null;
+  state: "continuation-ready" | "needs-refresh";
+}
+
+/** One owner snapshot; reading neither acknowledges delivery nor wakes a runtime. */
+@jsonSchema
+model RequestContinuationReady {
+  schema: "operator-request-continuation-ready/v1";
+  owner: ContinuationOwner;
+  request_id: RequestId;
+  @minValue(1)
+  request_revision: int32;
+  resolution: ContinuationResolution;
+  @maxItems(128)
+  dependants: ContinuationDependant[];
+}

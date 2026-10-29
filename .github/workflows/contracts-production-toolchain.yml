@@ -108,7 +108,7 @@ jobs:
           skipped = sum(case.find("skipped") is not None for case in cases)
           failed = sum(case.find("failure") is not None for case in cases)
           errors = sum(case.find("error") is not None for case in cases)
-          assert (len(cases), skipped, failed, errors) == (257, 0, 0, 0), (len(cases), skipped, failed, errors)
+          assert (len(cases), skipped, failed, errors) == (263, 0, 0, 0), (len(cases), skipped, failed, errors)
           PY
       - name: Run MCP definition-only projection gate
         shell: bash

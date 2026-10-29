@@ -71,6 +71,17 @@ explicitly. AgentOps' continuation-ready packet reads the owner resolution
 event and current work links; it neither wakes a runtime nor acknowledges
 delivery or authorizes a protected effect.
 
+`work.request.continuation-v1` supplies that metadata-only successor packet in
+one owner read. A schema29-capable owner may advertise this operation; the
+schema number alone does not prove the operation is available. The request,
+exact human-attestation event and active dependant work revisions share one
+read-only repeatable-read snapshot. Expired blocker freshness or changed work
+produces `needs-refresh`. Unresolved reports and unsupported completion bases
+are refused. A consumer must report an unavailable capability instead of
+assembling a claimed current packet from separate request and event reads.
+Separate calls can observe later work changes, so this read does not authorize
+the successor's effects. Release and environment adoption are separate gates.
+
 ## Access and storage
 
 Reads require the existing `work:read` grant; request publication and
