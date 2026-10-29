@@ -1,0 +1,100 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.request-continuation-composition",
+  "owner_repo": "vuoro",
+  "subject": "Immutable Sprintctl26 owner in candidate service101/client6 continuation composition",
+  "contract_ref": {
+    "doc_id": "request-continuation-composition",
+    "revision": "sha256:899196cd6394e76edbd25581697d6268a452ec5c8ab14c156eca34f5bbd8ce66"
+  },
+  "source_of_truth": "published owner wheel, installed module and manifest identity, owner transaction and real HTTPS invocation",
+  "depth": 2,
+  "backends": [
+    "isolated candidate wheel installation",
+    "disposable PostgreSQL16"
+  ],
+  "actors": [
+    "requesting principal",
+    "human reviewer",
+    "read-only transport client",
+    "foreign or revoked principal"
+  ],
+  "initial_state": [
+    "schema29 disposable owner",
+    "released Sprintctl26 and four existing owner/shared wheels",
+    "candidate service101/client6 wheels",
+    "no shared production data"
+  ],
+  "operations": [
+    {
+      "name": "read before and after human attestation",
+      "actors": [
+        "read-only transport client"
+      ]
+    },
+    {
+      "name": "read after dependant work change or withdrawal",
+      "actors": [
+        "read-only transport client"
+      ]
+    },
+    {
+      "name": "read with foreign, denied or revoked identity",
+      "actors": [
+        "read-only transport client"
+      ]
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "single authoritative read, current immutable basis and installed closure"
+  },
+  "assumptions": {
+    "isolation": "verified loopback TLS, disposable PostgreSQL and explicit owner fixtures",
+    "clock": "current fixture time with bounded synthetic future freshness",
+    "fairness": "none"
+  },
+  "bounds": {
+    "continuation_tls_checks": 15,
+    "work_schema": 29,
+    "source_schema_upgrade_inputs": [
+      27,
+      28
+    ]
+  },
+  "invariants": [
+    "owner/module bytes match pinned published wheel",
+    "client contains no database or authority implementation",
+    "read uses one owner invocation and creates no event or delivery effect",
+    "foreign or revoked identities cannot read request",
+    "changed or withdrawn dependants cannot become ready implicitly",
+    "startup does not migrate; runtime roles cannot DDL"
+  ],
+  "faults": [
+    "unready request",
+    "foreign workspace",
+    "missing authority",
+    "revoked identity",
+    "string work ID",
+    "changed dependant basis",
+    "withdrawn dependant",
+    "legacy source schema"
+  ],
+  "oracles": [
+    "tests/test_distribution_boundaries.py",
+    "packages/vuoro-client/tests/test_operator_request_transport.py",
+    "packages/vuoro-service/tests/test_composition.py",
+    "packages/vuoro-service/tests/conformance/test_schema28_composition_migration.py",
+    "compiled RequestContinuationReady schema and real TLS owner snapshot"
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-service/composition/adapter-pins.json",
+    "packages/vuoro-client/src/vuoro_client/client.py",
+    "deploy/reference-distribution.toml",
+    "docs/plans/2026-10-29-request-continuation-composition.md"
+  ],
+  "expansions": [
+    "semantic-doc",
+    "fault-scenario"
+  ]
+}
