@@ -1188,3 +1188,20 @@ Run the existing `transport_failure_checks.py`, `watch_replay_checks.py` and
 `versioned_native_checks.py` commands in the pinned Nix environment above.
 Missing pinned runtimes fail instead of skipping. Historical IDL, generated
 clients, locks, OwnerOracle and the unknown-value fixtures remain unchanged.
+
+### Parked Rust SDK boundary candidate (29 October 2026)
+
+`rust_predispatch_checks.py` and the `predispatch` Rust binary are an unqualified
+continuation candidate. They are intended to poll a generated v2 request into
+reqwest's custom DNS resolver before cancellation or expiry of its await budget,
+then release the resolver and compare independent persisted owner rows. A real
+admitted-call control must trip the no-effect oracle; an unpolled-future control
+must fail the transport-entry oracle. No generated schema or owner changes.
+
+Execution stopped before compilation: restoring the whole locked shell with
+`--offline` hit a fixed-output TinyCC source hash mismatch. The exact locked
+Cargo/Rust Nix artifacts subsequently restored from the configured cache and
+report Cargo 1.98.0 and Rust 1.98.1; no pin was changed. The new Rust binary has
+not compiled or run and the earlier missing qualification remains open. Resume
+with the pinned toolchain and explicitly run `rust_predispatch_checks.py`;
+ordinary source CI alone is not evidence that this new check ran.
