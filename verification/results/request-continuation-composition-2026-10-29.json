@@ -1,0 +1,100 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.request-continuation-composition",
+  "contract_ref": {
+    "doc_id": "request-continuation-composition",
+    "revision": "sha256:899196cd6394e76edbd25581697d6268a452ec5c8ab14c156eca34f5bbd8ce66"
+  },
+  "implementation_sha": "56b859f818fd25d9186c17476337cb7f11b3339f",
+  "depth": 2,
+  "environment": {
+    "backend": "published Sprintctl0.26.0 and four pinned owner/shared wheels; candidate service0.1.101/client0.1.6 installed wheels; disposable PostgreSQL16.15 and verified loopback HTTPS",
+    "isolation": "cold virtual environment, unprivileged disposable owner role, separately owned migration/runtime upgrade roles; no production state",
+    "tool_versions": {
+      "python": "3.12.14",
+      "postgresql": "16.15",
+      "qualified_compiler_node": "24.21.0",
+      "qualified_compiler_python": "3.13.16"
+    }
+  },
+  "execution": {
+    "seed": null,
+    "histories": 3,
+    "bounds": {
+      "published_owner_installed_tests": 59,
+      "cold_existing_http_cases": 48,
+      "schema27_to29_cases": 8,
+      "schema28_to29_cases": 8,
+      "cold_tls_continuation_checks": 15,
+      "targeted_release_catalog_oracle_checks": 209,
+      "distribution_reference_api_checks": 36,
+      "qualified_mcp_projection_checks": 10,
+      "raw_work_metadata_operations": 120
+    },
+    "faults_exercised": [
+      "unready request",
+      "foreign workspace",
+      "missing authority",
+      "revoked identity",
+      "string work ID",
+      "changed dependant basis",
+      "withdrawn dependant",
+      "legacy source schema",
+      "runtime DDL attempt",
+      "old binary on new schema",
+      "connection loss and recovery",
+      "old catalog count and fingerprint"
+    ]
+  },
+  "claims": [
+    {
+      "property": "Published Sprintctl26 wheel attestation binds exact release workflow/source; cold installed owner and candidate service/client packages retain wheel module identity and exact manifest owner/shared pins",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/composition/adapter-pins.json",
+        "scripts/attest_installed_composition.py"
+      ]
+    },
+    {
+      "property": "Continuation owner read over verified TLS uses one authoritative invocation, matches compiled wire schema, refuses foreign/denied/revoked identities and creates no event or delivery effect",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-client/src/vuoro_client/client.py",
+        "packages/vuoro-client/tests/test_operator_request_transport.py",
+        "docs/plans/2026-10-29-request-continuation-composition.md"
+      ]
+    },
+    {
+      "property": "Installed candidate preserves old schema27/28 upgrade, DDL refusal, old binary refusal, legacy lease basis and connection recovery behavior",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/tests/conformance/test_schema28_composition_migration.py"
+      ]
+    },
+    {
+      "property": "Registration catalog adds only work.request.continuation-v1; all145 prior operations are unchanged, counts123work/5audit/18knowledge and strict fingerprints agree",
+      "result": "example-tested",
+      "evidence": [
+        "scripts/validate_released_catalog_composition.py",
+        "packages/vuoro-service/tests/conformance/test_schema28_composition_migration.py"
+      ]
+    },
+    {
+      "property": "Native source/publisher qualification, published service101/client6, live adoption, native wake or human pilot acceptance",
+      "result": "unknown",
+      "evidence": [
+        "docs/plans/2026-10-29-request-continuation-composition.md"
+      ]
+    }
+  ],
+  "counterexamples": [],
+  "notes": [
+    "Local installed candidate evidence is distinct from native publication or deployed identity. Service/client tags have not been created.",
+    "Initial local upgrade trial refused the stale145-operation oracle; independent old/new installed catalog comparison proved exactly one new read operation and no changed existing operations before updating both strict fingerprints.",
+    "An initial generic compiler case ran without its required toolchain and refused; its separate exact-executable MCP gate passed10cases. A changed client-version oracle required its authenticated test-file hash to advance; the publisher workflow hash is unchanged.",
+    "The image installation follows the documented hash-locked third-party plus explicit composition-wheel sequence and passes dependency checking. Source-project overrides are excluded from the cold install.",
+    "Private field artifacts are not part of this record; host-persistent synthetic qualification evidence hashes below bind local records.",
+    "Local evidence SHA256: {\"continuation-cold-https-qualified.json\": \"fe1005770aa535e14158282cea9eda2e2960d95a25ca5bf966ab298c9393f6f3\", \"sprintctl26-published-attestation.json\": \"38acd4bef883215a4b87501a3bef5d233ecd9e602c2ff33b7b7e419cb3e53ad9\", \"sprintctl26-published-cold-qualified.json\": \"f32a8f9decf5bf483202ad116078f2ff86cfca64648b6987d6fc7551fa9e456d\", \"vuoro101-catalog-delta-verified.json\": \"ec224d6c6991262e31c2550e92a7162cd4c4cb7a2179bd707b90f51c054e8790\", \"vuoro101-cold-conformance.log\": \"280533f8d92d0a4620559683a27d6e07f468b9d9fdb1c18e13d18274a445f84a\", \"vuoro101-cold-upgrade-final.log\": \"6601752613c8f0bb2a1d0241403f0cc61cb69be5d815aefe1fe153d2e2c32cfd\"}",
+    "First native candidate40934879710 passed11jobs and the3416-case generic suite, then refused a remaining raw-owner119-operation fingerprint. Independent installed old/new raw metadata comparison proved exactly the continuation addition; the strict120-operation and0254ad7e metadata fingerprint gate now passes against the actual cold owner. Native rerun remains required."
+  ]
+}

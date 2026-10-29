@@ -3,7 +3,9 @@
 Modular HTTP and process shell that composes immutable, released owner
 adapters. Domain state machines and migrations remain in their owner packages.
 
-Service 0.1.100 pins Sprintctl 0.25.0 and requires work schema 29. Startup
+Service 0.1.101 pins Sprintctl 0.26.0 and requires work schema 29. It adds
+the authoritative read-only request continuation snapshot without a new
+schema migration. Client 0.1.6 provides its transport method. Startup
 checks compatibility without migrating. Run the released owner's explicit
 migration command with a migration role before starting the new composition;
 the serving runtime role remains unable to execute DDL.

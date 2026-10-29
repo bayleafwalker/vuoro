@@ -198,9 +198,9 @@ def test_client_release_candidate_uses_fresh_version_after_failed_immutable_tag(
     project = tomllib.loads((ROOT / "packages/vuoro-client/pyproject.toml").read_text())["project"]
     lock = tomllib.loads((ROOT / "uv.lock").read_text())
     locked = [package for package in lock["package"] if package["name"] == "vuoro-client"]
-    assert project["version"] == "0.1.5"
-    assert len(locked) == 1 and locked[0]["version"] == "0.1.5"
-    assert '__version__ = "0.1.5"' in (ROOT / "packages/vuoro-client/src/vuoro_client/__init__.py").read_text()
+    assert project["version"] == "0.1.6"
+    assert len(locked) == 1 and locked[0]["version"] == "0.1.6"
+    assert '__version__ = "0.1.6"' in (ROOT / "packages/vuoro-client/src/vuoro_client/__init__.py").read_text()
     recovery = (ROOT / "docs/plans/2026-10-25-vuoro-client-0.1.5-release-recovery.md").read_text()
     assert "Neither immutable tag is retagged" in recovery
     assert "0.1.4" in recovery and "40209690209" in recovery

@@ -36,8 +36,8 @@ pytestmark = pytest.mark.essential_safety
 
 # Runtime catalog includes compatibility-derived owner features; the registration-only
 # catalog gate has a separate revision.
-CATALOG_REVISION = '6b463846dee08f4158bdcdd486a878675a23f68b50afa3f67d52d5db21dfaa8e'
-CATALOG_TOTAL = 145
+CATALOG_REVISION = '7b73e270744a349d59f4fc65c458e60ff160e10cb522cbf856f392758fcafc19'
+CATALOG_TOTAL = 146
 INBOX_OPERATIONS = ('work.agent.register-v1', 'work.agent.observe-v1', 'work.agent.retire-v1',
                     'work.agent.list-v1', 'work.agent.describe-v1', 'work.message.send-v1',
                     'work.message.read-v1', 'work.message.status-v1', 'work.message.receipt-v1',
@@ -351,7 +351,7 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
             assert conn.execute('SELECT basis_item_revision,basis_release_digest FROM work_lease '
                                 'WHERE lease_id=%s', (old_state['lease_id'],)).fetchone() == (None, None)
 
-    # Capture the exact released Sprintctl 0.25 root application constructed by
+    # Capture the exact released Sprintctl 0.26 root application constructed by
     # the service composition. This lets the HTTP readiness path exercise its
     # reconnect hook and then prove that a later repository-scoped invocation
     # uses the refreshed root connection.
@@ -377,7 +377,7 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
         response = client.get('/api/meta/v1/handshake', headers={'X-Vuoro-Client-Protocol': '1'})
         assert response.status_code == 200, response.json()
         handshake = response.json()
-        assert handshake['service_version'] == '0.1.100' and handshake['compatibility']['state'] == 'compatible'
+        assert handshake['service_version'] == '0.1.101' and handshake['compatibility']['state'] == 'compatible'
         assert all(x['state'] == 'compatible' for x in handshake['compatibility']['domains'].values())
         catalog = client.get('/api/catalog/v1', headers={'X-Vuoro-Client-Protocol': '1'}).json()
         assert len(catalog['operations']) == CATALOG_TOTAL
@@ -386,6 +386,7 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
         assert set(INBOX_OPERATIONS) <= served
         assert {
             'work.request.publish-v1', 'work.request.get-v1', 'work.request.list-v1',
+            'work.request.continuation-v1',
             'work.request.revise-v1', 'work.request.dependent-add-v1',
             'work.request.dependent-withdraw-v1', 'work.request.events-v1',
             'work.request.progress-v1', 'work.request.report-performed-v1',
@@ -480,7 +481,7 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
         request_page = invoke('work.request.list-v1', {'limit': 20}, 'x' * 40)
         assert request_page['requests'] == [] and request_page['next_after_request_id'] is None
 
-        # Exercise the released 0.25.0 owner through the composed service with
+        # Exercise the released 0.26.0 owner through the composed service with
         # only the separately provisioned DML runtime role. Byte-limited pages
         # may be short but each cursor must advance to the last returned note.
         parent = invoke('work.run.register-v1', {
