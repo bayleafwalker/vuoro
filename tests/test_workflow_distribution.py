@@ -2,13 +2,13 @@
 import copy
 import json
 from pathlib import Path
+import runpy
 import tomllib
 
 import pytest
 
-from scripts.validate_workflow_distribution import validate
-
 ROOT = Path(__file__).resolve().parents[1]
+validate = runpy.run_path(str(ROOT / 'scripts/validate_workflow_distribution.py'))['validate']
 
 
 def inputs():
