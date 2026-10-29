@@ -110,7 +110,7 @@ def assert_reusable(flow: dict) -> None:
     assert full.count("uv build --package vuoro-contracts ") == 1
     for token in ("20261001/cpython-3.13.16%2B20261001-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz", "ffcb50e716789d1a6e1db5e745d4d194ac8ed9b015ccf5eabcaccb179a25e4a8", "f8188f8dec8f4ae9865dc6789323327c50bb275a5a301373d675464fdbbf933f", 'sha256sum --check', 'node --version', 'v24.21.0', '11.19.0', '--locked', '--ignore-scripts --no-audit --no-fund', '--python "$qualified_python"'):
         assert token in restore["run"]
-    for token in ("VUORO_CONTRACT_NODE", "VUORO_CONTRACT_PYTHON", "VUORO_CONTRACT_DECODER", "PYTHONDONTWRITEBYTECODE", "tool-artifacts.json", "assert actual == expected", "packages/vuoro-contracts/tests", "packages/vuoro-client/tests/test_generated_contract_boundary.py", "packages/vuoro-service/tests/test_generated_contract_foundation.py", '(257, 0, 0, 0)', '--junitxml="$RUNNER_TEMP/contracts-pytest.xml"'):
+    for token in ("VUORO_CONTRACT_NODE", "VUORO_CONTRACT_PYTHON", "VUORO_CONTRACT_DECODER", "PYTHONDONTWRITEBYTECODE", "tool-artifacts.json", "assert actual == expected", "packages/vuoro-contracts/tests", "packages/vuoro-client/tests/test_generated_contract_boundary.py", "packages/vuoro-service/tests/test_generated_contract_foundation.py", '(263, 0, 0, 0)', '--junitxml="$RUNNER_TEMP/contracts-pytest.xml"'):
         assert token in production["run"]
     for token in ("VUORO_CONTRACT_NODE", "VUORO_CONTRACT_PYTHON", "VUORO_CONTRACT_DECODER", "test_mcp_projection.py", '(10, 0, 0, 0)', '--junitxml="$RUNNER_TEMP/contracts-mcp-projection.xml"'):
         assert token in mcp_projection["run"]
@@ -220,7 +220,7 @@ def test_producer_oracle_rejects_incomplete_qualification(case: str) -> None:
     if case == "conditional-production":
         production["if"] = "${{ inputs.run-repository-suite }}"
     elif case == "short-corpus":
-        production["run"] = production["run"].replace("(257, 0, 0, 0)", "(1, 0, 0, 0)")
+        production["run"] = production["run"].replace("(263, 0, 0, 0)", "(1, 0, 0, 0)")
     elif case == "missing-decoder":
         production["run"] = production["run"].replace("VUORO_CONTRACT_DECODER", "IGNORED_DECODER")
     elif case == "unqualified-python":
