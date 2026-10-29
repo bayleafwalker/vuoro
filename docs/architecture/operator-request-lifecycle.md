@@ -1,11 +1,14 @@
 # Durable operator request lifecycle v1
 
-Status: candidate source contract for OA-01/OA-04, 24 October 2026. This
-increment defines the packet, API shapes, and ownership boundary. Durable
-owner storage, service composition, native publication, and continuation
-delivery remain unimplemented. Nothing is released or deployed, and this
-contract is not an authority to perform or authorize an effect. Wire models
-are in `contracts/operator-requests/main.tsp`.
+Status: OA-01/OA-04 source contract, reconciled 29 October 2026. Sprintctl's
+schema-28 owner implements durable request records and lifecycle operations;
+Vuoro supplies thin client calls and schema-28 composition conformance tests.
+AgentOps supplies local CLI/stdio MCP publication, an offline publish outbox
+and a read-only continuation-ready fallback. Source-observed completion,
+per-dependant delivery acknowledgements, native wake/resume and the human pilot
+remain open. Environment adoption is established separately by actual owner
+readback. This contract grants no effect authority. Wire models are in
+`contracts/operator-requests/main.tsp`.
 
 ## Ownership
 
@@ -57,18 +60,23 @@ Missing or inaccessible source evidence is `unknown`. Only explicit
 owner-observed completion or a separately labeled human attestation can
 resolve a request. A `reported-performed` state is not verified completion.
 
-The first owner increment implements publication, lookup/list, revision,
-dependant attachment, and per-dependant withdrawal. Verification, resolution
-delivery, and native wake remain separate OA-04 work. Until those qualified
-interfaces are available, consumers must present unsupported continuation
-modes explicitly and may expose only a continuation-ready packet.
+The owner implements publication, lookup/list, revision, dependant attachment
+and withdrawal, procedure progress, performed/partial/uncertain reports,
+separately labeled human attestation, decline and supersession. Material
+procedure updates to a live request return it to `open` and invalidate its
+earlier report as a basis for attestation; terminal requests stay terminal.
+Source-observed verification, resolution delivery and native wake remain
+separate OA-04 work. Consumers must present unsupported continuation modes
+explicitly. AgentOps' continuation-ready packet reads the owner resolution
+event and current work links; it neither wakes a runtime nor acknowledges
+delivery or authorizes a protected effect.
 
 ## Access and storage
 
 Reads require the existing `work:read` grant; request publication and
 maintenance require the existing `work:evidence` grant. No default grant is
-expanded. Operator completion controls require a future separately qualified
-operator entitlement; this v1 does not add one. All reads are scoped by the
+expanded. Human attestation and decline require the separate existing
+`work:approve` entitlement; it grants no protected-effect authority. All reads are scoped by the
 authenticated workspace and repository. Outages are errors, never an empty
 request list.
 
