@@ -1,0 +1,94 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.schema29-composition",
+  "contract_ref": {
+    "doc_id": "vuoro-service-upgrade",
+    "revision": "sha256:0dcaa37617119f52fef4ef2584aeb35396d3b23b2d250350b9d937d09bb141c2"
+  },
+  "implementation_sha": "a6e91429247d8ed83ca33dc6e8afbf643cd3fec5",
+  "depth": 2,
+  "environment": {
+    "backend": "actual released owner/shared wheels and local service0.1.100 wheel; actual released old service closures; disposable PostgreSQL16 and17",
+    "isolation": "loopback separate nonprivileged migration/runtime roles and disposable databases; sequential upgrade histories",
+    "tool_versions": {
+      "python": "3.12.14 and3.13.16",
+      "pytest": "8.4.2",
+      "postgresql": "16.15 and17.10"
+    }
+  },
+  "execution": {
+    "seed": null,
+    "histories": 4,
+    "bounds": {
+      "schema27_to29_pg16_passed": 8,
+      "schema28_to29_pg16_passed": 8,
+      "schema27_to29_pg17_passed": 8,
+      "schema28_to29_pg17_passed": 8,
+      "installed_http_passed": 48,
+      "source_conformance_passed": 152,
+      "source_conformance_skipped": 2,
+      "service_unit_passed": 427,
+      "distribution_boundary_and_reference_passed": 10,
+      "ordinary_suite_passed": 3380,
+      "ordinary_suite_initial_failed": 7,
+      "ordinary_suite_skipped": 227
+    },
+    "faults_exercised": [
+      "old schema at startup",
+      "migration retry",
+      "runtime DDL attempt",
+      "old closure after migration",
+      "libpq routing override",
+      "legacy lease outcome without basis",
+      "owner connection loss followed by recovery"
+    ]
+  },
+  "claims": [
+    {
+      "property": "Both actual old release closures refuse the new schema after explicit migration; new composition refuses old schemas without DDL and becomes ready after idempotent migration29",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/tests/conformance/test_schema28_composition_migration.py"
+      ]
+    },
+    {
+      "property": "Every preexisting work column and audit row is preserved through migration; runtime roles cannot DDL or assume migration roles",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/tests/conformance/test_schema28_composition_migration.py"
+      ]
+    },
+    {
+      "property": "Actual schema28 legacy lease retains null basis and reports through HTTP as rejected/lease-basis-unavailable with no decision",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/tests/conformance/test_schema28_composition_migration.py"
+      ]
+    },
+    {
+      "property": "Five installed owner/shared distributions match pinned versions, wheel hashes and installed-record attestation; catalog metadata corresponds to Sprintctl0.25 including completion assessment and lease basis results",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-service/composition/adapter-pins.json",
+        "scripts/attest_installed_composition.py",
+        "scripts/validate_released_work_adapter.py",
+        "scripts/validate_released_catalog_composition.py"
+      ]
+    },
+    {
+      "property": "Production migration, deployed service0.1.100, native wake or human pilot acceptance",
+      "result": "unknown",
+      "evidence": [
+        "packages/vuoro-service/README.md"
+      ]
+    }
+  ],
+  "counterexamples": [],
+  "notes": [
+    "Implementation SHA identifies source/context; this result is an evidence-only follow-up. Native exact-source CI remains the landing gate.",
+    "Initial ordinary suite had five missing prebuild artifacts and two stale reference version pins. After building all five wheels and aligning the reference pins, all10 affected boundary/reference tests passed. The ordinary full suite was not rerun locally.",
+    "The two source conformance skips require the isolated installed release composition and an explicitly configured delegation owner source. The installed-release HTTP suite ran separately and passed48cases; no independent delegation-owner source proof is claimed.",
+    "Ordinary-suite227skips are explicitly unconfigured optional/disposable integrations. The schema27/28 to29 proofs ran separately on both PostgreSQL majors without skips.",
+    "Historical result files and failed local checks are preserved; no production or owner terminal acceptance is claimed."
+  ]
+}
