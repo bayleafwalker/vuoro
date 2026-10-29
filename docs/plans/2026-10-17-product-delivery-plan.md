@@ -19,6 +19,18 @@ The concrete setup/identity/workflow implementation sequence is in the
 read-only artifact workflow starts delivery without closing the protected-operation
 gate in B.
 
+## 29 October 2026 direction update
+
+The accepted agentic service architecture expands the target to complete hosted
+workflows, managed isolated execution and storage, workbenches and disposable
+labs, and a locally authoritative resource gateway. The first target is a hybrid
+profile; a self-hosted reference remains in scope. The older dependency chain and
+G's separate-owner-decision requirement do not defer design or implementation of
+hosted tenancy and gateway capabilities. Independent work may proceed in parallel;
+external admission and support claims still require their applicable isolation,
+recovery, authority and qualification evidence. No existing qualification or
+observed deployment follows from this direction update.
+
 ## Product outcome
 
 Carry a human objective across agents, sessions, providers and environments through an operation that the responsible authority accepts, retaining the work identity, authority, evidence, knowledge and recovery information needed to explain and continue it. The operating outcome is reliable household services with declining operator effort. Vuoro supplies the portable contracts and operated workflow; domain products own their domain experience and truth.

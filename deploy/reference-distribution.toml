@@ -92,7 +92,7 @@ operation = "export-and-import"
 source_status = "partial-owner-contracts"
 procedure = ["docs/architecture/knowledge-workspace-composition.md"]
 qualification = "requires-ee-10-and-ee-11"
-boundary = "Workspace export/import does not establish portability for every external owner record or the whole installed distribution."
+boundary = "Workspace export/import is an operator/store API capability, not served knowledge.* bundle transfer; it does not establish portability for every external owner record or the whole installed distribution."
 
 [[lifecycle]]
 operation = "diagnostics"
@@ -126,3 +126,37 @@ reference_workflow = "not-qualified"
 restore_export = "not-qualified"
 support_response = "not-defined"
 cost_and_adoption = "not-measured"
+
+# These records describe target packaging, not an installed or qualified workflow.
+[[workflow_package]]
+id = "repository-delivery"
+revision = "unreleased"
+implementation_owner = "agentops"
+source = "unreleased-project-adapter"
+entrypoint = "unresolved"
+required_capabilities = ["work", "audit", "knowledge"]
+unsupported_requirements = ["admitted-repository-execution", "independent-verification", "resource-domain-gateway"]
+environment_profiles = ["managed-workbench", "clean-acceptance-lab"]
+acceptance_profile = "project-owned-revision-unresolved"
+evidence = ["source-and-candidate-digests", "observed-runtime-identity", "verification-receipts", "owner-disposition"]
+authority = "requirements-only-no-grant"
+qualification = "not-qualified"
+
+[[support_matrix]]
+id = "hybrid-repository-delivery-candidate"
+profile = "hybrid"
+composition_manifest = "packages/vuoro-service/composition/adapter-pins.json"
+component_lock_ids = ["work-adapter", "audit-adapter", "knowledge-adapter"]
+workflow_packages = ["repository-delivery"]
+native_runtimes = ["unknown"]
+operating_systems = ["unknown"]
+databases = ["unknown"]
+gateway_apis = ["unknown"]
+storage_backends = ["unknown"]
+qualification = "not-qualified"
+qualification_references = ["EE-02", "EE-03", "EE-10", "EE-11"]
+limits = ["source-only; no installed composition or workflow has been qualified"]
+upgrade_lifecycle = "upgrade-and-migrate"
+restore_lifecycle = "backup-and-restore"
+maintenance = "not-committed"
+end_of_support = "not-committed"

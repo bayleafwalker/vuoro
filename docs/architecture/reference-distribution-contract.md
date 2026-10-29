@@ -32,6 +32,25 @@ schema labels are owner-facing compatibility labels, not independent guarantees
 about every behavior a user might expect. The pinned version is exposed for
 inspection but remains subordinate to the immutable artifact URL and digest.
 
+## Workflow package and support matrix
+
+The manifest now records a candidate `repository-delivery` package owned by
+AgentOps and a hybrid support-matrix entry tied to the exact composed runtime
+locks. Its released project adapter and entrypoint have yet to be selected;
+execution, verification and gateway requirements are explicitly unsupported by
+this composition. The package describes requirements and evidence; it does not
+create a grant or override work, execution, acceptance or resource-owner policy.
+The managed workbench and clean acceptance lab are target environment profiles,
+not provisioned environments.
+
+The matrix records unknown runtime, OS, database, gateway and storage details and
+open qualification references. It does not assert support. Run
+`python scripts/validate_workflow_distribution.py` to check package references,
+composition lock coverage, lifecycle links and source-only status. This is a
+consistency diagnostic, not an installer, a compatibility check or qualification.
+A future qualification contract must explicitly define evidence and validation
+before changing these fail-closed `not-qualified` records.
+
 ## Lifecycle boundary
 
 The TOML contract gives each lifecycle operation a source status, procedure,
@@ -51,8 +70,9 @@ qualification state and explicit limit:
 - **Backup and restore:** the application contract does not own infrastructure
   backup cadence, object retention, recovery-only credentials or a restore
   target. Those remain installation duties and require EE-03 evidence.
-- **Export and import:** Workspace's contract covers its own data. That does
-  not yet prove a complete export/import of the service plus every external
+- **Export and import:** Workspace's operator/store API covers its own data;
+  export/import is not a served `knowledge.*` bundle-transfer capability. That
+  does not yet prove a complete export/import of the service plus every external
   owner's records; EE-10 and EE-11 remain gates.
 - **Diagnostics:** `vuoro-ops` exposes structured read-only checks. A source
   checkout without the installed composition attestation reports that absence

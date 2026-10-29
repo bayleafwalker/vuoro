@@ -8,6 +8,31 @@ Status: **accepted operator direction**, supplied by the owner on 2026-10-15. Th
 
 The promise stays: use the agents and tools you choose, keep work connected, understand what happened, decide what autonomy to grant. The method is a provisioning ledger. Every capability in the environment has one of four states: provision as-is, provision with an adapter, build, or defer. A capability already shipped by a supplier is a provisioning decision, not a build order. The reference distribution uses open-source foundations where suitable; commercial execution and identity products are replaceable integrations. One supported distribution can span coordination services, native clients and protected services without combining their trust boundaries.
 
+## 29 October 2026 accepted service architecture amendment
+
+The accepted Vuoro Agentic Service Architecture extends this product direction:
+Vuoro delivers independently useful components, a qualified distribution of
+compatible components and workflow packages, and an operated vuoro.cloud service
+that commissions complete workflows. Cloud owns managed workspace lifecycle,
+isolated execution and storage, persistent workbenches, disposable acceptance
+labs, recovery and support. A resource-owner gateway admits operations against
+local cluster and LAN resources under current local authority. The first target
+profile is hybrid; a self-hosted reference and managed hosting are also target
+profiles. None is qualified merely by this decision.
+
+This amendment extends operated-service obligations beyond the earlier
+customer-operated execution and storage boundary. Hosted tenancy and
+resource-domain design are now implementation work, and the first complete
+workflow can use managed execution without depending on a personal workstation.
+The earlier handoff remains a useful supported scenario. The four portable
+contract domains and the rule to provision supplier capabilities rather than
+rebuild native runtimes remain binding. External-user admission
+still requires demonstrated isolation, identity, operational capacity and the
+appropriate authority. The four portable contract domains, native execution,
+supplier sourcing, domain ownership and protected acceptance principles remain
+in force. A gateway package declaration grants no authority. Source composition,
+release, deployment and workflow qualification remain separate facts.
+
 ## Governing principles
 
 **Coordination without custody.** vuoro.cloud coordinates. The customer-controlled protected horizon holds authority and executes effects. Nothing originating in the coordination plane becomes an effect merely because the coordination plane says it should. There is no public-initiated service path into the protected horizon. A protected-side consumer may pull proposals and artifacts, evaluate current local authority and publish receipts. A proposal never supplies its own execution authority.
