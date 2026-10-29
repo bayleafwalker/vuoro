@@ -20,11 +20,13 @@ local cluster and LAN resources under current local authority. The first target
 profile is hybrid; a self-hosted reference and managed hosting are also target
 profiles. None is qualified merely by this decision.
 
-This amendment supersedes the older restriction of Vuoro's product scope to a
-provisioning ledger plus four contracts, the deferral of hosted multi-tenant
-service and cross-organization design, and the first-use-case restriction to a
-hosted-to-workstation handoff. Those passages below remain historical sourcing
-and proof context, not limits on the accepted target. External-user admission
+This amendment extends operated-service obligations beyond the earlier
+customer-operated execution and storage boundary. Hosted tenancy and
+resource-domain design are now implementation work, and the first complete
+workflow can use managed execution without depending on a personal workstation.
+The earlier handoff remains a useful supported scenario. The four portable
+contract domains and the rule to provision supplier capabilities rather than
+rebuild native runtimes remain binding. External-user admission
 still requires demonstrated isolation, identity, operational capacity and the
 appropriate authority. The four portable contract domains, native execution,
 supplier sourcing, domain ownership and protected acceptance principles remain

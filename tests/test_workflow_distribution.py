@@ -28,6 +28,16 @@ def test_candidate_matrix_matches_composition_and_workflow():
     lambda c: c['support_matrix'][0].update(qualification='qualified'),
     lambda c: c['support_matrix'][0].update(workflow_packages=[]),
     lambda c: c['workflow_package'].append(copy.deepcopy(c['workflow_package'][0])),
+    lambda c: c['support_matrix'][0].update(native_runtimes='unknown'),
+    lambda c: c['support_matrix'][0]['component_lock_ids'].append('work-adapter'),
+    lambda c: c['support_matrix'][0].update(qualification_references=['FABRICATED']),
+    lambda c: c['support_matrix'][0].update(qualification_references=['']),
+    lambda c: c['workflow_package'][0].update(unsupported_requirements=['']),
+    lambda c: c['workflow_package'][0].update(evidence=['']),
+    lambda c: c['workflow_package'][0].update(environment_profiles=['']),
+    lambda c: c['workflow_package'][0].update(id=4),
+    lambda c: c['support_matrix'][0].update(profile='made-up'),
+    lambda c: c.update(workflow_package='repository-delivery'),
 ])
 def test_rejects_inconsistent_or_premature_claims(mutation):
     contract, composition = inputs()

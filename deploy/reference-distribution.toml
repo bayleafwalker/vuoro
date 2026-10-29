@@ -92,7 +92,7 @@ operation = "export-and-import"
 source_status = "partial-owner-contracts"
 procedure = ["docs/architecture/knowledge-workspace-composition.md"]
 qualification = "requires-ee-10-and-ee-11"
-boundary = "Workspace export/import does not establish portability for every external owner record or the whole installed distribution."
+boundary = "Workspace export/import is an operator/store API capability, not served knowledge.* bundle transfer; it does not establish portability for every external owner record or the whole installed distribution."
 
 [[lifecycle]]
 operation = "diagnostics"

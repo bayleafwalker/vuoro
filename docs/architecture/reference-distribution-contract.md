@@ -70,8 +70,9 @@ qualification state and explicit limit:
 - **Backup and restore:** the application contract does not own infrastructure
   backup cadence, object retention, recovery-only credentials or a restore
   target. Those remain installation duties and require EE-03 evidence.
-- **Export and import:** Workspace's contract covers its own data. That does
-  not yet prove a complete export/import of the service plus every external
+- **Export and import:** Workspace's operator/store API covers its own data;
+  export/import is not a served `knowledge.*` bundle-transfer capability. That
+  does not yet prove a complete export/import of the service plus every external
   owner's records; EE-10 and EE-11 remain gates.
 - **Diagnostics:** `vuoro-ops` exposes structured read-only checks. A source
   checkout without the installed composition attestation reports that absence

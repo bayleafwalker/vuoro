@@ -8,38 +8,280 @@ import tomllib
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _require_text(value, message):
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(message)
+    return value
+
+
+def _require_text_list(value, message):
+    if not isinstance(value, list) or not value:
+        raise ValueError(message)
+    for item in value:
+        _require_text(item, message)
+    if len(value) != len(set(value)):
+        raise ValueError(message)
+    return value
+
+
+def _require_records(value, message):
+    if not isinstance(value, list) or not value:
+        raise ValueError(message)
+    for entry in value:
+        if not isinstance(entry, dict):
+            raise ValueError(message)
+    return value
+
+
+def _require_unique_field(entries, field, message):
+    values = [_require_text(entry.get(field), message) for entry in entries]
+    if len(values) != len(set(values)):
+        raise ValueError(message)
+    return values
+
+
 def validate(contract, composition):
     def require(condition, message):
         if not condition:
             raise ValueError(message)
 
-    packages = contract.get("workflow_package", [])
-    matrix = contract.get("support_matrix", [])
-    require(packages and matrix, "workflow packages and support matrix must be present")
-    ids = [p.get("id") for p in packages]
-    require(all(ids) and len(ids) == len(set(ids)), "workflow package IDs must be unique")
-    matrix_ids = [m.get("id") for m in matrix]
-    require(all(matrix_ids) and len(matrix_ids) == len(set(matrix_ids)), "matrix IDs must be unique")
-    domains = {c["domain"] for c in contract["capability"]}
-    locks = {p["lock_id"] for p in composition["release_locks"]}
-    runtime_locks = {d["lock_id"] for d in composition["runtime_descriptors"]}
-    operations = {item["operation"] for item in contract["lifecycle"]}
+    if not isinstance(contract, dict):
+        raise ValueError("distribution contract must be a mapping")
+    if not isinstance(composition, dict):
+        raise ValueError("composition manifest must be a mapping")
+
+    packages = _require_records(
+        contract.get("workflow_package"),
+        "workflow_package must be a nonempty list of records",
+    )
+    matrix = _require_records(
+        contract.get("support_matrix"),
+        "support_matrix must be a nonempty list of records",
+    )
+    capabilities = _require_records(
+        contract.get("capability"),
+        "capability must be a nonempty list of records",
+    )
+    lifecycle = _require_records(
+        contract.get("lifecycle"),
+        "lifecycle must be a nonempty list of records",
+    )
+    release_locks = _require_records(
+        composition.get("release_locks"),
+        "release_locks must be a nonempty list of records",
+    )
+    runtime_descriptors = _require_records(
+        composition.get("runtime_descriptors"),
+        "runtime_descriptors must be a nonempty list of records",
+    )
+
+    ids = _require_unique_field(
+        packages, "id", "workflow package IDs must be unique nonempty strings"
+    )
+    _require_unique_field(
+        matrix, "id", "matrix IDs must be unique nonempty strings"
+    )
+    _require_unique_field(
+        capabilities, "domain", "capability domains must be unique nonempty strings"
+    )
+    _require_unique_field(
+        capabilities, "lock_id", "capability lock IDs must be unique nonempty strings"
+    )
+    _require_unique_field(
+        lifecycle, "operation", "lifecycle operations must be unique nonempty strings"
+    )
+    _require_unique_field(
+        release_locks, "lock_id", "release lock IDs must be unique nonempty strings"
+    )
+    _require_unique_field(
+        runtime_descriptors,
+        "lock_id",
+        "runtime descriptor lock IDs must be unique nonempty strings",
+    )
+
+    for capability in capabilities:
+        for field in (
+            "distribution",
+            "pinned_version",
+            "api_version",
+            "schema_version",
+            "capability_summary",
+            "pin_maturity",
+            "composition_maturity",
+            "deployment_maturity",
+            "user_qualification",
+        ):
+            _require_text(
+                capability.get(field),
+                f"capability {field} must be a nonempty string",
+            )
+
+    for entry in lifecycle:
+        for field in ("source_status", "qualification", "boundary"):
+            _require_text(
+                entry.get(field), f"lifecycle {field} must be a nonempty string"
+            )
+        _require_text_list(
+            entry.get("procedure"),
+            "lifecycle procedure must be a nonempty list of unique strings",
+        )
+
+    for lock in release_locks:
+        for field in (
+            "lock_kind",
+            "source_repository",
+            "source_revision",
+            "artifact_url",
+            "artifact_sha256",
+            "distribution",
+            "distribution_version",
+        ):
+            _require_text(
+                lock.get(field), f"release lock {field} must be a nonempty string"
+            )
+
+    for descriptor in runtime_descriptors:
+        for field in (
+            "domain",
+            "adapter_module",
+            "register",
+            "api_version",
+            "schema_version",
+        ):
+            _require_text(
+                descriptor.get(field),
+                f"runtime descriptor {field} must be a nonempty string",
+            )
+        _require_text_list(
+            descriptor.get("dependency_lock_ids"),
+            "runtime descriptor dependency_lock_ids must be a nonempty list of "
+            "unique strings",
+        )
+
+    qualification = contract.get("qualification")
+    if not isinstance(qualification, dict):
+        raise ValueError("qualification must be a mapping")
+    required_evidence = _require_text_list(
+        qualification.get("required_evidence"),
+        "qualification required_evidence must be a nonempty list of unique strings",
+    )
+    evidence_refs = set(required_evidence)
+    contract_manifest = _require_text(
+        contract.get("composition_manifest"),
+        "composition manifest reference must be a nonempty string",
+    )
+
+    domains = {c["domain"] for c in capabilities}
+    locks = {p["lock_id"] for p in release_locks}
+    runtime_locks = {d["lock_id"] for d in runtime_descriptors}
+    operations = {item["operation"] for item in lifecycle}
+
     for package in packages:
-        require(package.get("implementation_owner") and package.get("revision") and package.get("source") and package.get("entrypoint"), "workflow identity incomplete")
-        require(package.get("required_capabilities") and set(package["required_capabilities"]) <= domains, "unknown required composed capability")
-        require(package.get("unsupported_requirements"), "unresolved owner requirements must be explicit")
-        require(package.get("environment_profiles") and package.get("acceptance_profile") and package.get("evidence"), "workflow requirements incomplete")
-        require(package.get("authority") == "requirements-only-no-grant", "workflow package cannot grant authority")
-        require(package.get("qualification") == "not-qualified", "workflow qualification is not established")
+        for field in (
+            "revision",
+            "implementation_owner",
+            "source",
+            "entrypoint",
+            "acceptance_profile",
+        ):
+            _require_text(
+                package.get(field), f"workflow {field} must be a nonempty string"
+            )
+        required = _require_text_list(
+            package.get("required_capabilities"),
+            "workflow required_capabilities must be a nonempty list of "
+            "unique strings",
+        )
+        require(set(required) <= domains, "unknown required composed capability")
+        _require_text_list(
+            package.get("unsupported_requirements"),
+            "unresolved owner requirements must be explicit",
+        )
+        _require_text_list(
+            package.get("environment_profiles"),
+            "workflow environment_profiles must be a nonempty list of "
+            "unique strings",
+        )
+        _require_text_list(
+            package.get("evidence"),
+            "workflow evidence must be a nonempty list of unique strings",
+        )
+        require(
+            package.get("authority") == "requirements-only-no-grant",
+            "workflow package cannot grant authority",
+        )
+        require(
+            package.get("qualification") == "not-qualified",
+            "workflow qualification is not established",
+        )
+
     for entry in matrix:
-        require(entry.get("profile") and entry.get("composition_manifest") == contract["composition_manifest"], "matrix composition or profile mismatch")
-        require(entry.get("component_lock_ids") and set(entry["component_lock_ids"]) == runtime_locks and runtime_locks <= locks, "matrix must reference exact composed locks")
-        require(entry.get("workflow_packages") and set(entry["workflow_packages"]) <= set(ids), "unknown or missing workflow package")
-        for field in ("native_runtimes", "operating_systems", "databases", "gateway_apis", "storage_backends", "qualification_references", "limits"):
-            require(entry.get(field), f"matrix {field} must be explicit")
-        require(entry.get("upgrade_lifecycle") in operations and entry.get("restore_lifecycle") in operations, "unknown lifecycle reference")
-        require(entry.get("maintenance") and entry.get("end_of_support"), "maintenance status must be explicit")
-        require(entry.get("qualification") == "not-qualified", "matrix qualification is not established")
+        profile = _require_text(
+            entry.get("profile"), "matrix profile must be a nonempty string"
+        )
+        require(
+            profile in {"hybrid", "managed-hosted", "self-hosted-reference"},
+            "matrix profile is not supported",
+        )
+        require(
+            entry.get("composition_manifest") == contract_manifest,
+            "matrix composition or profile mismatch",
+        )
+        component_locks = _require_text_list(
+            entry.get("component_lock_ids"),
+            "matrix component_lock_ids must be a nonempty list of unique strings",
+        )
+        require(
+            set(component_locks) == runtime_locks and runtime_locks <= locks,
+            "matrix must reference exact composed locks",
+        )
+        workflow_packages = _require_text_list(
+            entry.get("workflow_packages"),
+            "matrix workflow_packages must be a nonempty list of unique strings",
+        )
+        require(
+            set(workflow_packages) <= set(ids),
+            "unknown or missing workflow package",
+        )
+        for field in (
+            "native_runtimes",
+            "operating_systems",
+            "databases",
+            "gateway_apis",
+            "storage_backends",
+            "qualification_references",
+            "limits",
+        ):
+            _require_text_list(
+                entry.get(field),
+                f"matrix {field} must be a nonempty list of unique strings",
+            )
+        require(
+            set(entry["qualification_references"]) <= evidence_refs,
+            "matrix qualification reference is not required evidence",
+        )
+        upgrade = _require_text(
+            entry.get("upgrade_lifecycle"),
+            "matrix upgrade_lifecycle must be a nonempty string",
+        )
+        restore = _require_text(
+            entry.get("restore_lifecycle"),
+            "matrix restore_lifecycle must be a nonempty string",
+        )
+        require(
+            upgrade in operations and restore in operations,
+            "unknown lifecycle reference",
+        )
+        _require_text(
+            entry.get("maintenance"), "maintenance status must be explicit"
+        )
+        _require_text(
+            entry.get("end_of_support"), "maintenance status must be explicit"
+        )
+        require(
+            entry.get("qualification") == "not-qualified",
+            "matrix qualification is not established",
+        )
 
 
 def main():
