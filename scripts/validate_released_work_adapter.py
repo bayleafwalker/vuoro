@@ -28,9 +28,9 @@ _EXPECTED_ADAPTER_KIT = (
     "https://github.com/bayleafwalker/vuoro/releases/download/"
     "vuoro-adapter-kit-v0.2.2/vuoro_adapter_kit-0.2.2-py3-none-any.whl"
 )
-_EXPECTED_WORK_OPERATION_COUNT = 119
+_EXPECTED_WORK_OPERATION_COUNT = 120
 _EXPECTED_WORK_METADATA_SHA256 = (
-    "945b904437318cf63a9dcd49aac9914db7fddd30043e423e91d2f32f3281c6e9"
+    "0254ad7ee5e11c123cf3b057687e142a2f14503524bd4a4b8d9494efc71de394"
 )
 
 
@@ -74,6 +74,10 @@ def _assert_owner_metadata() -> None:
         "work.request.progress-v1", "work.request.report-performed-v1",
         "work.request.attest-v1", "work.request.decline-v1", "work.request.supersede-v1",
     } <= operations.keys()
+    continuation = operations["work.request.continuation-v1"]
+    assert continuation["required_authority"] == "work:read"
+    assert continuation["execution_semantics"] == "read"
+    assert continuation["idempotency"] == "not-allowed"
     encoded = json.dumps(specs, sort_keys=True, separators=(",", ":")).encode()
     assert hashlib.sha256(encoded).hexdigest() == _EXPECTED_WORK_METADATA_SHA256
 
