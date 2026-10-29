@@ -2,10 +2,20 @@
 """Check source workflow/matrix references; this never establishes qualification."""
 import json
 from pathlib import Path
+import re
 import sys
 import tomllib
+from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
+
+_SOURCE_REVISION = re.compile(r"[0-9a-f]{40}")
+_ARTIFACT_SHA256 = re.compile(r"[0-9a-f]{64}")
+_WHEEL_TAGS = re.compile(r"[A-Za-z0-9_.]+-[A-Za-z0-9_.]+-[A-Za-z0-9_.]+\.whl")
+
+
+def _normalized_distribution(value):
+    return re.sub(r"[-_.]+", "_", value).lower()
 
 
 def _require_text(value, message):
@@ -49,6 +59,23 @@ def validate(contract, composition):
         raise ValueError("distribution contract must be a mapping")
     if not isinstance(composition, dict):
         raise ValueError("composition manifest must be a mapping")
+
+    require(
+        contract.get("contract_status") == "candidate",
+        "source contract status must remain candidate",
+    )
+    require(
+        contract.get("supported_distribution") is False,
+        "source contract must not advertise a supported distribution",
+    )
+    require(
+        contract.get("qualification_status") == "pending",
+        "source contract qualification must remain pending",
+    )
+    require(
+        contract.get("deployment_status") == "unknown",
+        "source contract deployment status must remain unknown",
+    )
 
     packages = _require_records(
         contract.get("workflow_package"),
@@ -98,6 +125,11 @@ def validate(contract, composition):
         "lock_id",
         "runtime descriptor lock IDs must be unique nonempty strings",
     )
+    _require_unique_field(
+        runtime_descriptors,
+        "domain",
+        "runtime descriptor domains must be unique nonempty strings",
+    )
 
     for capability in capabilities:
         for field in (
@@ -139,6 +171,35 @@ def validate(contract, composition):
             _require_text(
                 lock.get(field), f"release lock {field} must be a nonempty string"
             )
+        lock_id = lock["lock_id"]
+        if not _SOURCE_REVISION.fullmatch(lock["source_revision"]):
+            raise ValueError(
+                f"release lock {lock_id} source_revision must be 40 lowercase "
+                "hex characters"
+            )
+        if not _ARTIFACT_SHA256.fullmatch(lock["artifact_sha256"]):
+            raise ValueError(
+                f"release lock {lock_id} artifact_sha256 must be 64 lowercase "
+                "hex characters"
+            )
+        parsed = urlsplit(lock["artifact_url"])
+        if parsed.scheme != "https" or not parsed.netloc:
+            raise ValueError(
+                f"release lock {lock_id} artifact_url must be an HTTPS URL"
+            )
+        filename = unquote(parsed.path.rsplit("/", 1)[-1])
+        prefix = (
+            f"{_normalized_distribution(lock['distribution'])}-"
+            f"{lock['distribution_version']}-"
+        )
+        if (
+            not filename.startswith(prefix)
+            or not _WHEEL_TAGS.fullmatch(filename[len(prefix):])
+        ):
+            raise ValueError(
+                f"release lock {lock_id} artifact_url must name the declared "
+                "distribution, version, and wheel tags"
+            )
 
     for descriptor in runtime_descriptors:
         for field in (
@@ -174,7 +235,54 @@ def validate(contract, composition):
     domains = {c["domain"] for c in capabilities}
     locks = {p["lock_id"] for p in release_locks}
     runtime_locks = {d["lock_id"] for d in runtime_descriptors}
+    runtime_domains = {d["domain"] for d in runtime_descriptors}
     operations = {item["operation"] for item in lifecycle}
+
+    require(
+        domains == runtime_domains,
+        "capabilities must cover exactly the composed runtime domains",
+    )
+    release_by_lock = {lock["lock_id"]: lock for lock in release_locks}
+    descriptor_by_domain = {
+        descriptor["domain"]: descriptor for descriptor in runtime_descriptors
+    }
+    for capability in capabilities:
+        domain = capability["domain"]
+        descriptor = descriptor_by_domain[domain]
+        lock_id = capability["lock_id"]
+        require(
+            descriptor["lock_id"] == lock_id,
+            f"capability {domain} lock does not match its runtime descriptor",
+        )
+        require(
+            lock_id in release_by_lock,
+            f"capability {domain} references an unknown release lock",
+        )
+        lock = release_by_lock[lock_id]
+        require(
+            capability["distribution"] == lock["distribution"],
+            f"capability {domain} distribution does not match its release lock",
+        )
+        require(
+            capability["pinned_version"] == lock["distribution_version"],
+            f"capability {domain} pinned version does not match its release lock",
+        )
+        require(
+            capability["api_version"] == descriptor["api_version"],
+            f"capability {domain} API version does not match its runtime descriptor",
+        )
+        require(
+            capability["schema_version"] == descriptor["schema_version"],
+            f"capability {domain} schema version does not match its runtime descriptor",
+        )
+        require(
+            capability["user_qualification"] == "not-qualified",
+            f"capability {domain} user qualification is not established",
+        )
+        require(
+            capability["deployment_maturity"] == "unknown",
+            f"capability {domain} deployment maturity must remain unknown",
+        )
 
     for package in packages:
         for field in (

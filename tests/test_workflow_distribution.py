@@ -38,9 +38,28 @@ def test_candidate_matrix_matches_composition_and_workflow():
     lambda c: c['workflow_package'][0].update(id=4),
     lambda c: c['support_matrix'][0].update(profile='made-up'),
     lambda c: c.update(workflow_package='repository-delivery'),
+    lambda c: c['capability'][0].update(pinned_version='99.99.99'),
+    lambda c: c['capability'][0].update(distribution='fabricated-package'),
+    lambda c: c.update(supported_distribution=True),
+    lambda c: c.update(qualification_status='qualified'),
+    lambda c: c.update(deployment_status='deployed'),
+    lambda c: c['capability'][0].update(user_qualification='qualified'),
 ])
 def test_rejects_inconsistent_or_premature_claims(mutation):
     contract, composition = inputs()
     mutation(contract)
+    with pytest.raises(ValueError):
+        validate(contract, composition)
+
+
+@pytest.mark.parametrize('mutation', [
+    lambda c: c['release_locks'][0].update(artifact_sha256='not-a-digest'),
+    lambda c: c['release_locks'][0].update(source_revision='branch-main'),
+    lambda c: c['release_locks'][0].update(distribution_version='99.99.99'),
+    lambda c: c['runtime_descriptors'][0].update(api_version='invented/v1'),
+])
+def test_rejects_corrupted_composition_tuple(mutation):
+    contract, composition = inputs()
+    mutation(composition)
     with pytest.raises(ValueError):
         validate(contract, composition)
