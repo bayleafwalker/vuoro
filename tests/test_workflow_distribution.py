@@ -57,6 +57,7 @@ def test_rejects_inconsistent_or_premature_claims(mutation):
     lambda c: c['release_locks'][0].update(source_revision='branch-main'),
     lambda c: c['release_locks'][0].update(distribution_version='99.99.99'),
     lambda c: c['runtime_descriptors'][0].update(api_version='invented/v1'),
+    lambda c: c['runtime_descriptors'][0].update(dependency_lock_ids=['fabricated-lock']),
 ])
 def test_rejects_corrupted_composition_tuple(mutation):
     contract, composition = inputs()

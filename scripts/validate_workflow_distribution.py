@@ -237,6 +237,11 @@ def validate(contract, composition):
     runtime_locks = {d["lock_id"] for d in runtime_descriptors}
     runtime_domains = {d["domain"] for d in runtime_descriptors}
     operations = {item["operation"] for item in lifecycle}
+    for descriptor in runtime_descriptors:
+        require(
+            set(descriptor["dependency_lock_ids"]) <= locks,
+            "runtime descriptor references an unknown dependency lock",
+        )
 
     require(
         domains == runtime_domains,
