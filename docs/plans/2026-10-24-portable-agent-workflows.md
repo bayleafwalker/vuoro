@@ -69,3 +69,39 @@ old-attempt results as evidence without settling current work. Demonstrate clean
 host continuation with no workstation archive, and failure explanations for
 unavailable provider capabilities. Do not call qualification complete on fake
 poller tests or installed declarations alone.
+
+## October 30 refinement: capture and handoff integrity
+
+The [substrate integration plan](2026-10-30-agent-substrate-integration.md)
+adds the following requirements to VU-PW1/2/3/5. They are implementation work,
+not changed wire semantics or a claim of released coverage.
+
+- **VU-PW1/2:** the authorized successor packet joins existing work basis,
+  semantic note, immutable candidate/effect evidence and source-specific capture
+  limits. Native transcript formats stay with their adapters. Restricted raw
+  capture and sanitized export have different digests and access decisions;
+  a digest does not grant access or guarantee continued availability.
+- **VU-PW3:** preserve transport delivery, inbox handling, execution admission,
+  process state, observed effect, authorized output release and work settlement
+  independently. Present provider/harness switches and cost basis from owner
+  observations, including unavailable sources and unknown cost. Missing capture
+  cannot be promoted to completeness by a successful provider exit.
+- **VU-PW5:** qualify two real native harnesses and a successor on a clean host.
+  With the original transcript unavailable, the note and owner evidence must
+  expose verified state, unresolved effects and the next checks. Same-provider
+  native resume and portable successor continuation are separate capabilities.
+
+The [inbox v1 contract](../architecture/agent-directory-and-inbox.md) already
+defines message-wide accepted/refused handling. It has no per-instance timed
+offer/reoffer state. Capacity-aware preflight belongs in the consumer before
+handling acceptance, with bounded deferral for transient unavailability and
+fresh owner checks at execution admission. A future renewable offer protocol
+requires a versioned owner contract; existing receipts cannot be reinterpreted.
+No existing narrow successor grant gains repository-execution scope.
+
+Add conformance histories for concurrent receivers, busy-instance deferral,
+lost acknowledgments, an alive predecessor after lease expiry, incomplete
+capture, unavailable artifact bytes, changed export destinations and late
+reports. Preserve owner CAS/fences and reconcile unknown effects before retry.
+Rollback optional observation/projection adapters independently; retain old
+read compatibility, owner Decisions and evidence limitations.

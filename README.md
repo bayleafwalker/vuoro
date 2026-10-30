@@ -19,6 +19,12 @@ and evidence.
 
 ## Project status
 
+Current implementation follow-through:
+[capture, continuation and bounded decision experiments](docs/plans/2026-10-30-agent-substrate-integration.md)
+maps the October 30 tooling review into existing AgentOps, Sovite, Sprintctl
+and Vuoro work packages. It is a contract/plan refinement, with explicit
+qualification and recovery cases; runtime and deployment status remain below.
+
 | | Status |
 | --- | --- |
 | **What it is** | A coordination and settlement substrate: leases, takeover, stale-result rejection with evidence retention, restart, and dependency release, served over a public MCP route. Domain authority stays with the owner repositories. |
