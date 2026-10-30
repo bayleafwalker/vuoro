@@ -78,6 +78,29 @@ the account/API permissions, model IDs and payload are verified*. Record
 abstentions and calibrate per choice/error class. Model confidence is not a
 Grant or truth status.
 
+### October 30 refinement: local typed classifiers
+
+Include one locally runnable encoder classifier only when its exact weights,
+license, tokenizer and runtime are available and the input class permits it.
+The model family or a copied model card is insufficient qualification; no Hanzo,
+Laya, Jev or other hosted endpoint is selected by this plan. Keep provider-native
+execution and the existing deterministic policy as the operational baseline.
+
+Freeze legal labels, state projection, abstention rule and asymmetric error
+costs before replay. Keep training/calibration and test cases disjoint; record
+their source/digests and leakage limitations. Measure per-class mistakes,
+abstention/coverage, calibration, latency and total review/compute burden.
+Valid typed output measures format reliability, not correct judgment. A small
+or unrepresentative corpus reports uncertainty rather than a universal threshold.
+
+Record model/ruleset revision, supplied evidence refs, proposed label,
+confidence, abstention and the eventual owner outcome through the existing
+evidence path. A confidence score neither authorizes an action nor lowers a
+data class. Initially use shadow/advisory results. Any later operational use
+requires the existing policy's authorized change path and an explicit rollback
+configuration; it adds no mandatory per-decision human step. Model absence,
+failure or drift leaves the existing deterministic/native workflow available.
+
 **Two-evening stop rule:** the initial integration experiment does not expand
 into a new router. If the current baseline wins or label effort dwarfs
 benefit, close with evidence and retain no production dependency. An explicit
@@ -125,6 +148,40 @@ attention/notification and personalization evaluation; replay after model
 replacement yields the same factual claims even if the voice differs.
 Kill the experiment if it hallucinates accomplishments or costs more
 supervision than it removes.
+
+## VU-ME5 — bounded verifier-first repair [AE-05 / D3]
+
+Compare the same small repair cohort under the ordinary native workflow and
+an optional bounded search before inference. The execution step belongs to the
+existing isolated native/CI lab; Vuoro only compares supplied owner evidence.
+This is an experiment within
+[AgentOps' existing development-efficiency work](https://github.com/bayleafwalker/agentops/blob/main/docs/plans/agentops/2026-10-25-evidence-guided-agent-workflows.md),
+not a new repair service or model router.
+
+Each case freezes its starting artifact, allowed edit space, verifier/test
+revision, independent acceptance criteria and candidate/time/compute limits.
+Evaluate every candidate from the same clean isolated baseline. The search
+cannot weaken the verifier, change expected answers, broaden permissions or
+publish a passing patch. Preserve failed trials, candidate digests and verifier
+results. A passing candidate enters the ordinary verification/acceptance path.
+Exhaustion or no improvement ends the search; any model fallback follows the
+already permitted native policy, with actual provider/attempt and quota cause
+recorded. An unresolved external effect is reconciled before any retry.
+
+Register the entire cohort before observing results. Report search-resolved,
+model-assisted, unresolved and invalid-baseline cases separately, alongside the
+whole-cohort acceptance and independently verified result counts. Record local
+CPU/test time, inference, failures, review and recovery; zero model calls is not
+zero cost. No headline speedup from trivial repairs stands in for the model-
+assisted subset. Use the existing comparison record without excluding failed or
+missing cases.
+
+**Acceptance:** replay a successful small repair, unchanged/invalid baseline,
+verifier failure, exhausted budget and no-improvement case. Mutating the oracle
+must invalidate the trial; search cannot make a denied effect permitted. The
+optional step earns retention only if matched accepted outcomes improve total
+burden under a predeclared criterion. Rollback disables it, preserves evidence
+and returns to the prior native workflow.
 
 ## Rejection and recovery cases
 
