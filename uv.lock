@@ -1174,7 +1174,7 @@ provides-extras = ["test"]
 
 [[package]]
 name = "vuoro-workspace"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/vuoro-workspace" }
 dependencies = [
     { name = "psycopg", extra = ["binary"] },

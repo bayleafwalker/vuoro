@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "vuoro-workspace"
-version = "0.1.0"
+version = "0.1.1"
 description = "Knowledge workspace store: workspace collections with reviewed revisions, versioned artifacts and publication state in the PostgreSQL knowledge schema plus a pluggable object store (docs/plans/2026-10-14-knowledge-workspace-phase0.md)."
 readme = "README.md"
 requires-python = ">=3.12"

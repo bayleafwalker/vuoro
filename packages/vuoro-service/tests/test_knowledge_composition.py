@@ -108,6 +108,13 @@ def _pin(tmp_path: Path, **descriptor: str) -> AdapterPin:
     pytest.importorskip("vuoro_workspace", reason="needs the vuoro-workspace workspace package")
     raw = _three_domain()
     [d for d in raw["runtime_descriptors"] if d["domain"] == "knowledge"][0].update(descriptor)
+    # Exercise the source workspace package. The checked-in distribution pins
+    # remain the previously released composition until explicit adoption.
+    from importlib.metadata import version
+    lock = next(lock for lock in raw["release_locks"] if lock["lock_id"] == "knowledge-adapter")
+    installed = version("vuoro-workspace")
+    lock["artifact_url"] = lock["artifact_url"].replace(lock["distribution_version"], installed)
+    lock["distribution_version"] = installed
     return _load(tmp_path, raw).pin("knowledge")
 
 
@@ -125,7 +132,8 @@ def test_compose_knowledge_registers_the_owner_operations_and_gates_the_schema(t
     registry = CatalogRegistry()
     state = _compose_knowledge(_pin(tmp_path), registry, _environ(tmp_path))
     names = [op.name for op in registry.catalog().operations]
-    assert len(names) == 18 and all(name.startswith("knowledge.") for name in names)
+    assert len(names) == 19 and "knowledge.workspace.identity-v1" in names
+    assert all(name.startswith("knowledge.") for name in names)
     assert state.state == "incompatible"
     assert state.api_version == "vuoro-workspace/v1"
     assert "unavailable" in (state.reason or "")
