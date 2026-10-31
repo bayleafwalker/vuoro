@@ -28,9 +28,9 @@ _EXPECTED_ADAPTER_KIT = (
     "https://github.com/bayleafwalker/vuoro/releases/download/"
     "vuoro-adapter-kit-v0.2.2/vuoro_adapter_kit-0.2.2-py3-none-any.whl"
 )
-_EXPECTED_WORK_OPERATION_COUNT = 121
+_EXPECTED_WORK_OPERATION_COUNT = 123
 _EXPECTED_WORK_METADATA_SHA256 = (
-    "4823bb8a96820f137a73e0cff40e31ebed1de468750bd7e6dbe05bf3b8f31e9c"
+    "d69ca4966b223270dde55c5b1a909d9965e86ccac1590d38086a9987bbd01b2c"
 )
 
 
@@ -82,6 +82,12 @@ def _assert_owner_metadata() -> None:
     assert receipt["required_authority"] == "work:write"
     assert receipt["execution_semantics"] == "write"
     assert receipt["idempotency"] == "not-allowed"
+    currentness = operations["work.lease.currentness-v1"]
+    assert (currentness["required_authority"], currentness["execution_semantics"], currentness["idempotency"]) == ("work:read", "read", "not-allowed")
+    assert currentness["result_schema"]["properties"]["currentness"]["properties"]["authorizes_effect"] == {"const": False}
+    outcome = operations["work.lease.report-outcome-v2"]
+    assert (outcome["required_authority"], outcome["execution_semantics"], outcome["idempotency"]) == ("work:claim", "write", "not-allowed")
+    assert "checkpoint" in outcome["input_schema"]["required"]
     encoded = json.dumps(specs, sort_keys=True, separators=(",", ":")).encode()
     assert hashlib.sha256(encoded).hexdigest() == _EXPECTED_WORK_METADATA_SHA256
 
@@ -132,11 +138,11 @@ async def _exercise() -> None:
         )
         # The production service seeds this from its read-only schema
         # handshake before registration. The disposable owner fixture is
-        # explicitly at the composition's schema 30 minimum.
+        # explicitly at the composition's schema 31 minimum.
         class SchemaQualifiedStore:
             def __init__(self, store):
                 self._store = store
-                self.remote_schema_version = 30
+                self.remote_schema_version = 31
 
             def __getattr__(self, name):
                 return getattr(self._store, name)

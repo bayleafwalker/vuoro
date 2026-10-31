@@ -36,8 +36,8 @@ pytestmark = pytest.mark.essential_safety
 
 # Runtime catalog includes compatibility-derived owner features; the registration-only
 # catalog gate has a separate revision.
-CATALOG_REVISION = '215490cf4786226afd9f9488356ecbc1f5bad66184d34082fc931014a41929c2'
-CATALOG_TOTAL = 148
+CATALOG_REVISION = 'f1ced0795fad1ef55b30805d80955fb8a04d2554c9adaea52a2794441a01fd26'
+CATALOG_TOTAL = 150
 INBOX_OPERATIONS = ('work.agent.register-v1', 'work.agent.observe-v1', 'work.agent.retire-v1',
                     'work.agent.list-v1', 'work.agent.describe-v1', 'work.message.send-v1',
                     'work.message.read-v1', 'work.message.status-v1', 'work.message.receipt-v1',
@@ -175,12 +175,12 @@ from sprintctl import pg,pg_migrations
 s=pg.get_connection(os.environ['SCHEMA27_PROOF_DSN'])
 try:pg_migrations.require_compatible_schema(s)
 except pg_migrations.RemoteSchemaCompatibilityError:pass
-else:raise SystemExit('old owner accepted schema30')
+else:raise SystemExit('old owner accepted schema31')
 finally:s.conn.close()
 '''
 
 
-def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_denial(
+def test_actual_old_closure_refusal_explicit31_cli_migration_and_runtime_ddl_denial(
     tmp_path, monkeypatch,
 ):
     if not all(os.environ.get(x) for x in NAMES):
@@ -340,8 +340,8 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
     migrated = remote_schema('migrate', migration)
     assert migrated.returncode == 0, 'explicit remote-schema migrate refused'
     migrated = json.loads(migrated.stdout)
-    assert migrated['from_version'] == source_schema and migrated['to_version'] == 30
-    assert migrated['applied_versions'] == list(range(source_schema + 1, 31))
+    assert migrated['from_version'] == source_schema and migrated['to_version'] == 31
+    assert migrated['applied_versions'] == list(range(source_schema + 1, 32))
     again = remote_schema('migrate', migration)
     assert again.returncode == 0 and json.loads(again.stdout)['applied_versions'] == []
     grants()
@@ -380,7 +380,7 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
         response = client.get('/api/meta/v1/handshake', headers={'X-Vuoro-Client-Protocol': '1'})
         assert response.status_code == 200, response.json()
         handshake = response.json()
-        assert handshake['service_version'] == '0.1.102' and handshake['compatibility']['state'] == 'compatible'
+        assert handshake['service_version'] == '0.1.103' and handshake['compatibility']['state'] == 'compatible'
         assert all(x['state'] == 'compatible' for x in handshake['compatibility']['domains'].values())
         catalog = client.get('/api/catalog/v1', headers={'X-Vuoro-Client-Protocol': '1'}).json()
         assert len(catalog['operations']) == CATALOG_TOTAL
@@ -442,7 +442,7 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
                             'FROM pg_roles WHERE rolname=current_user').fetchone()
         assert not any(role)
         assert not conn.execute("SELECT pg_has_role(current_user,%s,'MEMBER')", (migration_role,)).fetchone()[0]
-        assert conn.execute('SELECT version FROM schema_version').fetchone()[0] == 30
+        assert conn.execute('SELECT version FROM schema_version').fetchone()[0] == 31
         assert not conn.execute("SELECT has_schema_privilege(current_user,'work','CREATE')").fetchone()[0]
         for table in NEW_TABLES[:-1]:
             assert conn.execute('SELECT has_table_privilege(current_user,%s,%s)',
@@ -490,7 +490,7 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
         request_page = invoke('work.request.list-v1', {'limit': 20}, 'x' * 40)
         assert request_page['requests'] == [] and request_page['next_after_request_id'] is None
 
-        # Exercise the released 0.27.0 owner through the composed service with
+        # Exercise the released 0.28.0 owner through the composed service with
         # only the separately provisioned DML runtime role. Byte-limited pages
         # may be short but each cursor must advance to the last returned note.
         parent = invoke('work.run.register-v1', {
@@ -570,7 +570,7 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
                             (instance_id,)).fetchone()[0] == 1
     child_env['SCHEMA27_PROOF_DSN'] = runtime
     result = subprocess.run([old_python, '-I', '-c', OLD_REFUSAL], env=child_env, capture_output=True, text=True)
-    assert result.returncode == 0, 'old owner did not refuse postmigration schema30'
+    assert result.returncode == 0, 'old owner did not refuse postmigration schema31'
     assert legacy_rows() == after
     assert audit_rows() == audit_before
 
