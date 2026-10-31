@@ -50,8 +50,9 @@ EVERY = ("knowledge:read", "knowledge:contribute", "knowledge:review", "knowledg
 
 #: Pinned so any change to a knowledge operation's served contract is a
 #: deliberate, reviewed catalog revision change.
-KNOWLEDGE_CATALOG_REVISION = "e651dd978f73772e520f28f5ab9b6f46b77578ecc459d171d01eb4c204e75e49"
+KNOWLEDGE_CATALOG_REVISION = "57ae01d17cc05d088184c2e13c3138571da6d7dee0ace3464d59329ca3fc00a8"
 EXPECTED_OPERATIONS = {
+    "knowledge.workspace.identity-v1": ("knowledge:read", "read", "not-allowed"),
     "knowledge.workspace.create-v1": ("knowledge:admin", "write", "required"),
     "knowledge.member.set-v1": ("knowledge:admin", "write", "required"),
     "knowledge.item.create-v1": ("knowledge:contribute", "write", "required"),
@@ -702,3 +703,28 @@ def test_a_store_released_after_close_is_closed_not_pooled(served) -> None:
         app.close()
         conn = store.conn
     assert app._idle == [] and conn.closed
+
+
+def test_identity_is_current_membership_and_begin_guard_is_atomic(served):
+    s = served
+    args = {"workspace_id": s.ws}
+    who = s.ok("t-agent", "knowledge.workspace.identity-v1", args)
+    assert who == {"workspace_id": s.ws, "principal_id": "test:agent:0",
+                   "role": "reviewer", "is_agent": True,
+                   "effective_authorities": ["knowledge:contribute", "knowledge:read"]}
+    assert s.code("t-outsider", "knowledge.workspace.identity-v1", args) == (403, "knowledge-forbidden")
+    assert s.code("t-noknow", "knowledge.workspace.identity-v1", args) == (403, "authority-required")
+    begin = {**args, "name": "candidate.json", "expected_sha256": hashlib.sha256(b"{}").hexdigest(),
+             "expected_size": 2, "media_type": "application/json"}
+    first = s.ok("t-contrib", "knowledge.artifact.begin-v1", begin, key="lost-begin-0001")
+    guarded = {**begin, "expected_principal_id": "test:contrib:0"}
+    assert s.ok("t-contrib", "knowledge.artifact.begin-v1", guarded, key="lost-begin-0001") == first
+    # A replacement credential has the same effective role but a different
+    # identity. It must neither replay nor allocate under that key.
+    assert s.code("t-agent", "knowledge.artifact.begin-v1", guarded, key="lost-begin-0001") == (403, "knowledge-forbidden")
+    import psycopg
+    with psycopg.connect(s.dsn, autocommit=True) as conn:
+        assert conn.execute(f'SELECT count(*) FROM "{s.schema}".artifact_version').fetchone()[0] == 1
+    s.ok("t-admin", "knowledge.member.set-v1", {**args, "principal_id": "test:contrib:0", "role": None})
+    assert s.code("t-contrib", "knowledge.workspace.identity-v1", args) == (403, "knowledge-forbidden")
+    assert s.code("t-contrib", "knowledge.artifact.begin-v1", guarded, key="lost-begin-0001") == (403, "knowledge-forbidden")

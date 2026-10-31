@@ -293,6 +293,18 @@ class WorkspaceStore:
             (ws, actor, actor, now),
         )
 
+    def workspace_identity(self, p: Principal, ws: str) -> dict[str, Any]:
+        """Observe current authenticated identity and effective membership, never a grant.
+
+        Recovery callers must also bind subsequent begin calls with
+        expected_principal_id: credentials can change after this read.
+        """
+        with self.conn.transaction(), self.conn.cursor() as cur:
+            access = self._authorize(cur, p, ws, READ)
+            return {"workspace_id": ws, "principal_id": p.principal_id,
+                    "role": access.role, "is_agent": access.is_agent,
+                    "effective_authorities": sorted(access.effective)}
+
     def member_set(self, p: Principal, ws: str, principal_id: str, role: str | None, *,
                    is_agent: bool | None = None, idempotency_key: str | None = None) -> dict[str, Any]:
         """Add, change (``role``) or remove (``role=None``) a member.
@@ -582,8 +594,14 @@ class WorkspaceStore:
 
     def artifact_begin(self, p: Principal, ws: str, *, expected_sha256: str, expected_size: int, media_type: str,
                        name: str | None = None, artifact_id: str | None = None,
-                       relations: Sequence[Mapping[str, Any]] = (), idempotency_key: str | None = None) -> dict[str, Any]:
+                       relations: Sequence[Mapping[str, Any]] = (), idempotency_key: str | None = None,
+                       expected_principal_id: str | None = None) -> dict[str, Any]:
         """Reserve a new artifact version (new artifact unless ``artifact_id`` is given)."""
+        # Check before ledger lookup as well as allocation. The expectation is
+        # a precondition, not part of the normalized artifact request: an older
+        # same-principal begin can be recovered by adding this guard.
+        if expected_principal_id is not None and expected_principal_id != p.principal_id:
+            raise WorkspaceError(E.FORBIDDEN, "authenticated principal changed")
         if not isinstance(expected_sha256, str) or not SHA256_RE.fullmatch(expected_sha256):
             raise WorkspaceError(E.INVALID, "expected_sha256 must be 64 lowercase hex characters")
         if not isinstance(expected_size, int) or isinstance(expected_size, bool) or not 0 <= expected_size <= self.max_artifact_bytes:

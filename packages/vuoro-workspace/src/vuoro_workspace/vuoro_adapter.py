@@ -268,6 +268,14 @@ def _spec(
 _W, _R = "write", "read"
 _OPERATIONS: tuple[dict[str, Any], ...] = (
     _spec(
+        "knowledge.workspace.identity-v1", authority=READ, semantics=_R, idempotency="not-allowed",
+        input_schema=_obj(_WS, ("workspace_id",)),
+        result_schema=_result({**_WS, "principal_id": _PRINCIPAL,
+                               "role": {"enum": list(ROLES)}, "is_agent": {"type": "boolean"},
+                               "effective_authorities": {"type": "array", "items": {"enum": sorted(KNOWLEDGE_AUTHORITIES)}}}),
+        handler="workspace_identity",
+    ),
+    _spec(
         "knowledge.workspace.create-v1", authority=ADMIN, semantics=_W, idempotency="required",
         input_schema=_obj({"name": _TEXT}, ("name",)),
         result_schema=_result({"workspace_id": _ULID, "name": {"type": "string"},
@@ -331,7 +339,8 @@ _OPERATIONS: tuple[dict[str, Any], ...] = (
         input_schema=_obj({**_WS, "expected_sha256": _SHA256,
                            "expected_size": {"type": "integer", "minimum": 0, "maximum": MAX_UPLOAD_BYTES},
                            "media_type": {"type": "string", "minLength": 3, "maxLength": 255},
-                           "name": _TEXT, "artifact_id": _ULID, "relations": _RELATIONS},
+                           "name": _TEXT, "artifact_id": _ULID, "relations": _RELATIONS,
+                           "expected_principal_id": _PRINCIPAL},
                           ("workspace_id", "expected_sha256", "expected_size", "media_type")),
         result_schema=_result({"artifact_id": _ULID, "version_id": _ULID, "processing_state": {"const": "reserved"},
                                "expires_at": _TIMESTAMP}),
@@ -772,6 +781,9 @@ class KnowledgeApplication:
     def workspace_create(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
         return self._call(ctx, lambda s, p: s.workspace_create(p, a["name"], idempotency_key=store_idempotency_key(ctx)))
 
+    def workspace_identity(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
+        return self._call(ctx, lambda s, p: s.workspace_identity(p, a["workspace_id"]))
+
     def member_set(self, a: dict[str, Any], ctx: Any) -> dict[str, Any]:
         extra = {"is_agent": a["is_agent"]} if "is_agent" in a else {}
         return self._call(ctx, lambda s, p: s.member_set(p, a["workspace_id"], a["principal_id"], a["role"],
@@ -807,7 +819,8 @@ class KnowledgeApplication:
             result = s.artifact_begin(
                 p, a["workspace_id"], expected_sha256=a["expected_sha256"], expected_size=a["expected_size"],
                 media_type=a["media_type"], name=a.get("name"), artifact_id=a.get("artifact_id"),
-                relations=a.get("relations", []), idempotency_key=store_idempotency_key(ctx))
+                relations=a.get("relations", []), idempotency_key=store_idempotency_key(ctx),
+                expected_principal_id=a.get("expected_principal_id"))
             return result
 
         return self._call(ctx, run)

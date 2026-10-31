@@ -89,3 +89,25 @@ VUORO_WORKSPACE_TEST_PG_BIN=/usr/lib/postgresql/16/bin \
 `VUORO_WORKSPACE_TEST_PG_BIN` creates a throwaway cluster on a private socket;
 `VUORO_WORKSPACE_TEST_DSN` points at a disposable server instead. Without
 either, database tests skip.
+
+### Principal-bound artifact recovery
+
+`knowledge.workspace.identity-v1` reads the authenticated principal and current
+membership/credential intersection for one workspace. It is an observation,
+not a reusable authorization grant. Outsiders receive the ordinary membership
+refusal; agent role caps still apply.
+
+Before `knowledge.artifact.begin-v1`, a publisher persists the exact normalized
+request, stable idempotency key and observed principal outside its disposable
+worker. Pass that principal as `expected_principal_id` on every begin retry.
+The store checks it before allocation and replay, so replacement credentials
+cannot silently allocate a second version under a different principal's key.
+The optional precondition does not alter the artifact request digest: existing
+same-principal reservations can be recovered by adding the guard. Membership
+and credential authority are still checked on every invocation. Neither a
+profile filename nor a credential reference establishes principal continuity.
+
+After a lost finalize response, retry finalize for the exact known version
+before attempting upload. Current contributors may download a ready unreviewed
+version under ordinary membership semantics; mere readers require approval.
+This transport authorization grants no model clearance or new destination.
