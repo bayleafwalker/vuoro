@@ -73,6 +73,14 @@ def test_operator_request_methods_are_thin_catalog_invocations():
             await client.get_operator_request_continuation(
                 "req_01JBC3D4E5F6G7H8J9K0MNPQRS", repo_id="project-a"
             )
+            await client.record_operator_request_continuation_receipt(
+                request_id="req_01JBC3D4E5F6G7H8J9K0MNPQRS",
+                resolution_event_revision=10,
+                work_item_id=17,
+                expected_work_revision="item:example@status:pending",
+                idempotency_key="receipt-request-1",
+                repo_id="project-a",
+            )
         finally:
             await client.aclose()
 
@@ -92,6 +100,7 @@ def test_operator_request_methods_are_thin_catalog_invocations():
         "work.request.decline-v1",
         "work.request.supersede-v1",
         "work.request.continuation-v1",
+        "work.request.continuation-receipt-v1",
     ]
     assert all(call[2] == {"repo_id": "project-a"} for call in calls)
     assert calls[0][1]["idempotency_key"] == "publish-request-1"
@@ -106,3 +115,10 @@ def test_operator_request_methods_are_thin_catalog_invocations():
     assert calls[10][1]["reason"] == "The proposed procedure is no longer appropriate."
     assert calls[11][1]["replacement_request_id"] == "req_01JBC3D4E5F6G7H8J9K0MNPQRT"
     assert calls[12][1] == {"request_id": "req_01JBC3D4E5F6G7H8J9K0MNPQRS"}
+    assert calls[13][1] == {
+        "request_id": "req_01JBC3D4E5F6G7H8J9K0MNPQRS",
+        "resolution_event_revision": 10,
+        "work_item_id": 17,
+        "expected_work_revision": "item:example@status:pending",
+        "idempotency_key": "receipt-request-1",
+    }

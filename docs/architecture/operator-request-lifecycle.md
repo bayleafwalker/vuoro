@@ -82,6 +82,23 @@ assembling a claimed current packet from separate request and event reads.
 Separate calls can observe later work changes, so this read does not authorize
 the successor's effects. Release and environment adoption are separate gates.
 
+The schema-30 owner candidate adds `work.request.continuation-receipt-v1`.
+Client 0.1.7 forwards the request ID, exact resolution-event revision, work ID,
+expected work-status revision and idempotency key. Only the authenticated
+request publisher with `work:write` may record receipt. The owner derives the
+active session routing metadata; the caller supplies no session identity.
+The receipt lives in its own append-only relation and leaves v1 request and
+resolution revisions unchanged. Same-key replay is a historical receipt,
+not evidence that work remains current; a new key rechecks freshness and work.
+Work revisions here are the owner's status-derived tokens. Returning to an
+earlier status recreates its token, and description edits do not change it;
+matching a token does not prove an unchanged work history or material content.
+This is a principal's assertion of receipt, not independent observation that
+the principal read the packet. It does not establish native-session
+consumption, effect execution, source-observed completion or wake. Those OA-04
+boundaries and the human pilot remain open. Deployment needs the explicit
+schema-29 to schema-30 migration and a composition advertising the operation.
+
 ## Access and storage
 
 Reads require the existing `work:read` grant; request publication and

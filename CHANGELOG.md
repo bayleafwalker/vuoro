@@ -5,6 +5,13 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-client 0.1.7 adds a thin invocation for a publisher-principal
+  continuation-packet receipt, with matching compiled TypeSpec request/result
+  models. The operation requires an explicitly advertising schema-30 owner.
+  The owner chooses session routing metadata; a receipt proves neither native
+  session consumption nor wake and grants no effect authority. Existing
+  continuation reads keep their v1 shape and semantics.
+
 - vuoro-service 0.1.99 / vuoro-mcp-edge 0.1.9: pin Sprintctl 0.24.0 for
   the bounded session-note write and predecessor-context contracts. PostgreSQL
   schema 28 is unchanged; no migration is required.

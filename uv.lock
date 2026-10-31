@@ -967,7 +967,7 @@ provides-extras = ["test"]
 
 [[package]]
 name = "vuoro-client"
-version = "0.1.6"
+version = "0.1.7"
 source = { editable = "packages/vuoro-client" }
 dependencies = [
     { name = "httpx" },

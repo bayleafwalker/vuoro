@@ -234,7 +234,7 @@ def _receipt_shape(receipt: dict) -> None:
         fail("candidate qualification fields are invalid")
     if any(type(value) is not int for value in qualification.values()):
         fail("candidate qualification counts must be integers")
-    if qualification != {"tests": 263, "skipped": 0, "failures": 0, "errors": 0}:
+    if qualification != {"tests": 279, "skipped": 0, "failures": 0, "errors": 0}:
         fail("candidate qualification did not pass")
 
 
@@ -248,8 +248,8 @@ def create(args) -> dict:
     finally:
         os.close(fd)
     junit = _junit(_read_path(args.junit, MAX_JUNIT))
-    if junit != {"tests": 263, "skipped": 0, "failures": 0, "errors": 0}:
-        fail("production JUnit report must contain exactly 263 passing cases")
+    if junit != {"tests": 279, "skipped": 0, "failures": 0, "errors": 0}:
+        fail("production JUnit report must contain exactly 279 passing cases")
     return {
         "schema_version": "vuoro-contracts-release-candidate/v1",
         "distribution": "vuoro-contracts", "version": version,

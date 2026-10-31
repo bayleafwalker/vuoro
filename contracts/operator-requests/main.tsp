@@ -281,3 +281,53 @@ model RequestContinuationReady {
   @maxItems(128)
   dependants: ContinuationDependant[];
 }
+
+/** Publisher-principal packet receipt. Session metadata is selected by the owner. */
+@jsonSchema
+model RecordContinuationReceipt {
+  @minLength(30)
+  @maxLength(30)
+  request_id: RequestId;
+  @minValue(1)
+  resolution_event_revision: int32;
+  @minValue(1)
+  @maxValue(9007199254740991)
+  work_item_id: safeint;
+  @minLength(1)
+  @maxLength(512)
+  @pattern("^(?=[\\s\\S]*\\S)[^\\u0000]*(?![\\s\\S])")
+  expected_work_revision: string;
+  @pattern("^[A-Za-z0-9._:-]{8,128}(?![\\s\\S])")
+  idempotency_key: string;
+}
+
+/** A historical receipt grants no effect authority and proves no runtime wake. */
+@jsonSchema
+model ContinuationReceipt {
+  @minLength(30)
+  @maxLength(30)
+  request_id: RequestId;
+  @minValue(1)
+  resolution_event_revision: int32;
+  @minValue(1)
+  @maxValue(9007199254740991)
+  work_item_id: safeint;
+  @minLength(1)
+  @maxLength(512)
+  @pattern("^(?=[\\s\\S]*\\S)[^\\u0000]*(?![\\s\\S])")
+  work_revision: string;
+  @minValue(1)
+  material_revision: int32;
+  @pattern("^[a-f0-9]{64}$")
+  @minLength(64)
+  @maxLength(64)
+  packet_digest: string;
+  @minItems(1)
+  sessions: ReceiptRoutingSession[];
+  recorded_at: utcDateTime;
+  replayed: boolean;
+}
+
+@minLength(1)
+@maxLength(256)
+scalar ReceiptRoutingSession extends string;

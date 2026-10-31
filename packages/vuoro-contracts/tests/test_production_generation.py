@@ -369,7 +369,7 @@ def test_typescript_emitted_sdk_and_attachment_typecheck(generated, tmp_path):
 
 
 @pytest.fixture(scope="module")
-def continuation_validator(tmp_path_factory):
+def operator_request_schemas(tmp_path_factory):
     stage = tmp_path_factory.mktemp("compiled-continuation")
     source = stage / "authored"
     shutil.copytree(TOOLS / "fixtures/probe", source)
@@ -387,8 +387,90 @@ def continuation_validator(tmp_path_factory):
         (value["$id"], Resource.from_contents(value))
         for value in bundle["$defs"].values() if "$id" in value
     )
+    return bundle, registry
+
+
+@pytest.fixture(scope="module")
+def continuation_validator(operator_request_schemas):
+    bundle, registry = operator_request_schemas
     return Draft202012Validator(bundle["$defs"]["RequestContinuationReady"],
                                registry=registry, format_checker=FormatChecker())
+
+
+@pytest.fixture(scope="module")
+def receipt_validators(operator_request_schemas):
+    bundle, registry = operator_request_schemas
+    return tuple(Draft202012Validator(bundle["$defs"][name], registry=registry,
+                                     format_checker=FormatChecker())
+                 for name in ("RecordContinuationReceipt", "ContinuationReceipt"))
+
+
+def _receipt_arguments():
+    return {"request_id": "req_01JZZZZZZZZZZZZZZZZZZZZZZZ", "resolution_event_revision": 3,
+            "work_item_id": 9007199254740991, "expected_work_revision": "item:example@status:pending",
+            "idempotency_key": "receipt-key-1"}
+
+
+def _receipt_result():
+    return {"request_id": "req_01JZZZZZZZZZZZZZZZZZZZZZZZ", "resolution_event_revision": 3,
+            "work_item_id": 9007199254740991, "work_revision": "item:example@status:pending",
+            "material_revision": 1, "packet_digest": "a" * 64, "sessions": ["previous-session"],
+            "recorded_at": "2026-10-31T10:00:00Z", "replayed": False}
+
+
+def test_compiled_receipt_contract_preserves_publisher_receipt_fields(receipt_validators):
+    arguments, result = receipt_validators
+    # Date-time is a wire annotation; semantic timestamp checks belong to consumers.
+    assert result.schema["properties"]["recorded_at"]["format"] == "date-time"
+    arguments.validate(_receipt_arguments())
+    value = _receipt_result()
+    result.validate(value)
+    value["replayed"] = True
+    result.validate(value)
+
+
+@pytest.mark.parametrize("change", ["caller-session", "unsafe-work", "string-work", "zero-resolution",
+                                  "empty-work-revision", "idempotency-newline", "empty-sessions",
+                                  "digest-newline", "nonstring-time", "effect-authority", "newline-request",
+                                  "nul-work-revision", "blank-work-revision", "result-newline-request",
+                                  "empty-routing-session"])
+def test_compiled_receipt_refuses_wire_and_authority_drift(receipt_validators, change):
+    arguments, result = receipt_validators
+    value = _receipt_arguments()
+    validator = arguments
+    if change == "caller-session":
+        value["session_id"] = "caller-selected-session"
+    elif change == "unsafe-work":
+        value["work_item_id"] = 9007199254740992
+    elif change == "string-work":
+        value["work_item_id"] = "17"
+    elif change == "zero-resolution":
+        value["resolution_event_revision"] = 0
+    elif change == "empty-work-revision":
+        value["expected_work_revision"] = ""
+    elif change == "idempotency-newline":
+        value["idempotency_key"] += "\n"
+    elif change == "newline-request":
+        value["request_id"] += "\n"
+    elif change == "nul-work-revision":
+        value["expected_work_revision"] = "item:example\x00@status:pending"
+    elif change == "blank-work-revision":
+        value["expected_work_revision"] = " \t\n"
+    else:
+        value, validator = _receipt_result(), result
+        if change == "empty-sessions":
+            value["sessions"] = []
+        elif change == "digest-newline":
+            value["packet_digest"] += "\n"
+        elif change == "nonstring-time":
+            value["recorded_at"] = 42
+        elif change == "result-newline-request":
+            value["request_id"] += "\n"
+        elif change == "empty-routing-session":
+            value["sessions"] = [""]
+        else:
+            value["protected_effect_authorized"] = True
+    assert list(validator.iter_errors(value))
 
 
 def _continuation_packet():
