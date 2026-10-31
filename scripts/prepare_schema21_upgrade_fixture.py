@@ -13,7 +13,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
     parser.add_argument("--artifact-cache", type=Path)
-    parser.add_argument("--closure", choices=("schema21", "schema22", "schema25", "schema27", "schema28"), default="schema21",
+    parser.add_argument("--closure", choices=("schema21", "schema22", "schema25", "schema27", "schema28", "schema29"), default="schema21",
                         help="old closure fixture pair under packages/vuoro-service/tests/fixtures")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]

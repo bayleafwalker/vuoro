@@ -194,9 +194,9 @@ def test_checked_in_adapter_artifact_urls_are_source_named_or_exact_semver_relea
         assert pin.source_revision[:7] in tag or exact_owner_semver
 
 
-def test_checked_in_work_pin_is_the_schema29_continuation_release() -> None:
-    # Sprintctl 0.26.0 adds authoritative continuation reads while preserving
-    # schema29 and lease-basis checks. Source, wheel URL and digest advance together.
+def test_checked_in_work_pin_is_the_schema30_receipt_release() -> None:
+    # Sprintctl 0.27.0 adds principal receipts under schema30.
+    # Source, wheel URL and digest advance together.
     pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("work")
     assert (
         pin.source_revision,
@@ -204,16 +204,16 @@ def test_checked_in_work_pin_is_the_schema29_continuation_release() -> None:
         pin.api_version,
         pin.schema_version,
     ) == (
-        "bb6e83790e54a25b2367bff2eacd70cb4e8db611",
-        "0.26.0",
+        "a4faa63e8de45afa0efdc500b617126a65808d27",
+        "0.27.0",
         "work-api/v1",
         "work-schema/v1",
     )
     assert pin.artifact_url.endswith(
-        "/v0.26.0/sprintctl-0.26.0-py3-none-any.whl"
+        "/v0.27.0/sprintctl-0.27.0-py3-none-any.whl"
     )
     assert pin.artifact_sha256 == (
-        "77f2ef442bea00dbd1c3993e05fbd8b45c379106e3df8725f8f0766ca233e37a"
+        "ed865d2ad4048de04856f0169fa8f020fa1edeec9aa467f8a9a91a97e6407bc7"
     )
     assert [
         (item.lock_id, item.lock_kind, item.distribution, item.distribution_version)
@@ -225,7 +225,7 @@ def test_checked_in_work_pin_is_the_schema29_continuation_release() -> None:
     )
 
 
-def test_checked_in_knowledge_pin_is_vuoro_workspace_010_release() -> None:
+def test_checked_in_knowledge_pin_is_vuoro_workspace_011_release() -> None:
     manifest = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json")
     pin = manifest.pin("knowledge")
     assert (
@@ -237,11 +237,11 @@ def test_checked_in_knowledge_pin_is_vuoro_workspace_010_release() -> None:
         pin.artifact_sha256,
     ) == (
         "https://github.com/bayleafwalker/vuoro",
-        "b3397927fedc453b034ede00aa6e28804a773908",
+        "9f0e9b4ad650a896d52645878036f3c8a7fdbc05",
         "vuoro-workspace",
-        "0.1.0",
-        "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-workspace-v0.1.0/vuoro_workspace-0.1.0-py3-none-any.whl",
-        "b563f5bfdda15d97ae1e89533fe9b0e906c5d2cd50edee371b1d3fc336e7b22f",
+        "0.1.1",
+        "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-workspace-v0.1.1/vuoro_workspace-0.1.1-py3-none-any.whl",
+        "f9c67ec2a731c64bef03821d3e656699f7a6530080b70a1273bd59c688d135f9",
     )
     assert (pin.adapter_module, pin.register, pin.api_version, pin.schema_version) == (
         "vuoro_workspace.vuoro_adapter",
@@ -665,7 +665,7 @@ def test_load_and_verify_accept_a_shared_filename_with_an_identical_digest(tmp_p
 
     source = ROOT / "composition" / "adapter-pins.json"
     raw = json.loads(source.read_text(encoding="utf-8"))
-    artifact = tmp_path / "sprintctl-0.26.0-py3-none-any.whl"
+    artifact = tmp_path / "sprintctl-0.27.0-py3-none-any.whl"
     artifact.write_bytes(b"same-filename-same-digest")
     digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
     work_lock = next(lock for lock in raw["release_locks"] if lock["lock_id"] == "work-adapter")
@@ -682,7 +682,7 @@ def test_load_and_verify_accept_a_shared_filename_with_an_identical_digest(tmp_p
     manifest = CompositionManifest.load(path)
     filenames = {lock.artifact_url.rsplit("/", 1)[-1] for lock in manifest.release_locks
                  if lock.lock_id in ("work-adapter", "work-adapter-dup")}
-    assert filenames == {"sprintctl-0.26.0-py3-none-any.whl"}
+    assert filenames == {"sprintctl-0.27.0-py3-none-any.whl"}
 
     # verify_adapter_artifacts checks every lock in the manifest, so isolate
     # the two colliding locks (rather than staging real wheels for the whole
@@ -701,7 +701,7 @@ def test_load_and_verify_reject_a_shared_filename_with_a_differing_digest(tmp_pa
 
     source = ROOT / "composition" / "adapter-pins.json"
     raw = json.loads(source.read_text(encoding="utf-8"))
-    artifact = tmp_path / "sprintctl-0.26.0-py3-none-any.whl"
+    artifact = tmp_path / "sprintctl-0.27.0-py3-none-any.whl"
     artifact.write_bytes(b"same-filename-differing-digest")
     digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
     work_lock = next(lock for lock in raw["release_locks"] if lock["lock_id"] == "work-adapter")

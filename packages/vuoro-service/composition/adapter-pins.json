@@ -5,11 +5,11 @@
       "lock_id": "work-adapter",
       "lock_kind": "adapter",
       "source_repository": "https://github.com/bayleafwalker/sprintctl",
-      "source_revision": "bb6e83790e54a25b2367bff2eacd70cb4e8db611",
-      "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/v0.26.0/sprintctl-0.26.0-py3-none-any.whl",
-      "artifact_sha256": "77f2ef442bea00dbd1c3993e05fbd8b45c379106e3df8725f8f0766ca233e37a",
+      "source_revision": "a4faa63e8de45afa0efdc500b617126a65808d27",
+      "artifact_url": "https://github.com/bayleafwalker/sprintctl/releases/download/v0.27.0/sprintctl-0.27.0-py3-none-any.whl",
+      "artifact_sha256": "ed865d2ad4048de04856f0169fa8f020fa1edeec9aa467f8a9a91a97e6407bc7",
       "distribution": "sprintctl",
-      "distribution_version": "0.26.0"
+      "distribution_version": "0.27.0"
     },
     {
       "lock_id": "vuoro-adapter-kit",
@@ -45,11 +45,11 @@
       "lock_id": "knowledge-adapter",
       "lock_kind": "adapter",
       "source_repository": "https://github.com/bayleafwalker/vuoro",
-      "source_revision": "b3397927fedc453b034ede00aa6e28804a773908",
-      "artifact_url": "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-workspace-v0.1.0/vuoro_workspace-0.1.0-py3-none-any.whl",
-      "artifact_sha256": "b563f5bfdda15d97ae1e89533fe9b0e906c5d2cd50edee371b1d3fc336e7b22f",
+      "source_revision": "9f0e9b4ad650a896d52645878036f3c8a7fdbc05",
+      "artifact_url": "https://github.com/bayleafwalker/vuoro/releases/download/vuoro-workspace-v0.1.1/vuoro_workspace-0.1.1-py3-none-any.whl",
+      "artifact_sha256": "f9c67ec2a731c64bef03821d3e656699f7a6530080b70a1273bd59c688d135f9",
       "distribution": "vuoro-workspace",
-      "distribution_version": "0.1.0"
+      "distribution_version": "0.1.1"
     }
   ],
   "runtime_descriptors": [

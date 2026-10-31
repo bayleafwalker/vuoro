@@ -36,14 +36,14 @@ pytestmark = pytest.mark.essential_safety
 
 # Runtime catalog includes compatibility-derived owner features; the registration-only
 # catalog gate has a separate revision.
-CATALOG_REVISION = '7b73e270744a349d59f4fc65c458e60ff160e10cb522cbf856f392758fcafc19'
-CATALOG_TOTAL = 146
+CATALOG_REVISION = '215490cf4786226afd9f9488356ecbc1f5bad66184d34082fc931014a41929c2'
+CATALOG_TOTAL = 148
 INBOX_OPERATIONS = ('work.agent.register-v1', 'work.agent.observe-v1', 'work.agent.retire-v1',
                     'work.agent.list-v1', 'work.agent.describe-v1', 'work.message.send-v1',
                     'work.message.read-v1', 'work.message.status-v1', 'work.message.receipt-v1',
                     'work.message.cancel-v1')
 # New owner request tables introduced in schema 28; compare every preexisting row.
-NEW_TABLES = ('operator_request', 'operator_request_dependant', 'operator_request_event')
+NEW_TABLES = ('operator_request', 'operator_request_dependant', 'operator_request_event', 'operator_continuation_receipt')
 NAMES = ('VUORO_SCHEMA27_MIGRATION_PG_URL', 'VUORO_SCHEMA27_RUNTIME_PG_URL',
          'VUORO_SCHEMA27_OWNER_PYTHON', 'VUORO_SCHEMA28_MANIFEST', 'VUORO_SCHEMA28_WHEEL_DIR',
          'VUORO_SCHEMA28_ATTESTATION', 'VUORO_SCHEMA27_AUDIT_MIGRATION_PG_URL',
@@ -93,7 +93,7 @@ OLD_SETUP = '''import json,os
 from importlib.metadata import version
 from sprintctl import pg,pg_migrations
 source_schema=int(os.environ.get('VUORO_UPGRADE_SOURCE_SCHEMA','27'))
-assert version('sprintctl')=={27:'0.22.0',28:'0.24.0'}[source_schema]
+assert version('sprintctl')=={27:'0.22.0',28:'0.24.0',29:'0.26.0'}[source_schema]
 s=pg.get_connection(os.environ['SCHEMA27_PROOF_DSN']);s.repo_id='agentops'
 result=pg_migrations.migrate_schema(s)
 assert result['to_version']==source_schema
@@ -138,7 +138,7 @@ redeemed=app.invoke('work.effect.attempt-redeem-v1',{'attempt_id':attempt_id,
  'authorization_digest':opened['authorization_digest'],'idempotency_key':uuid.uuid4().hex},applier)
 assert redeemed['dispatch_permitted'] is True
 lease_id=None
-if source_schema==28:
+if source_schema>=28:
  lease_item=pg.create_work_item(s,sprint,track,'Preserve actual schema28 active lease')
  lease_context=context('fixture:lease:0',{'work:evidence','work:claim','work:read'})
  lease_run=app.invoke('work.run.register-v1',{'harness_id':'fixture','harness_build':'old-wheel',
@@ -148,7 +148,7 @@ if source_schema==28:
   'idempotency_key':uuid.uuid4().hex},lease_context)['lease']['lease_id']
 s.conn.commit()
 s.conn.close()
-print(json.dumps({'attempt_id':attempt_id,'lease_id':lease_id,'lease_run':lease_run if source_schema==28 else None}))
+print(json.dumps({'attempt_id':attempt_id,'lease_id':lease_id,'lease_run':lease_run if source_schema>=28 else None}))
 '''
 
 OLD_FACTORY = '''import json,os
@@ -166,7 +166,7 @@ else:
  with TestClient(app) as client:
   assert client.get('/health/ready').status_code==200
   handshake=client.get('/api/meta/v1/handshake').json()
-  assert handshake['service_version']=={27:'0.1.97',28:'0.1.99'}[int(os.environ.get('VUORO_UPGRADE_SOURCE_SCHEMA','27'))]
+  assert handshake['service_version']=={27:'0.1.97',28:'0.1.99',29:'0.1.101'}[int(os.environ.get('VUORO_UPGRADE_SOURCE_SCHEMA','27'))]
   assert handshake['compatibility']['state']=='compatible'
 '''
 
@@ -175,7 +175,7 @@ from sprintctl import pg,pg_migrations
 s=pg.get_connection(os.environ['SCHEMA27_PROOF_DSN'])
 try:pg_migrations.require_compatible_schema(s)
 except pg_migrations.RemoteSchemaCompatibilityError:pass
-else:raise SystemExit('old owner accepted schema29')
+else:raise SystemExit('old owner accepted schema30')
 finally:s.conn.close()
 '''
 
@@ -189,7 +189,7 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
         pytest.skip('requires separately provisioned disposable schema28 migration/runtime fixture')
     assert_installed_composition()
     source_schema = int(os.environ.get('VUORO_UPGRADE_SOURCE_SCHEMA', '27'))
-    assert source_schema in (27, 28)
+    assert source_schema in (27, 28, 29)
     (migration, runtime, old_python, manifest, wheels, attestation, audit_migration, audit_runtime,
      old_manifest, old_wheels, old_attestation, knowledge_migration, knowledge_runtime) = (
         os.environ[x] for x in NAMES)
@@ -261,11 +261,11 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
                 "SELECT tablename FROM pg_tables WHERE schemaname='work' ORDER BY tablename")]
             rows = {}
             for table in tables:
-                if table in ('schema_version', *NEW_TABLES):
+                if table in ('schema_version', 'operator_continuation_receipt') or (source_schema == 27 and table in NEW_TABLES):
                     continue
                 values = conn.execute(sql.SQL('SELECT to_jsonb(t) FROM {} t').format(sql.Identifier(table))).fetchall()
                 projected = [r[0] for r in values]
-                if table == 'work_lease':
+                if table == 'work_lease' and source_schema == 28:
                     # Schema29 adds nullable basis fields; preserve every old column.
                     for row in projected:
                         row.pop('basis_item_revision', None)
@@ -337,8 +337,8 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
     migrated = remote_schema('migrate', migration)
     assert migrated.returncode == 0, 'explicit remote-schema migrate refused'
     migrated = json.loads(migrated.stdout)
-    assert migrated['from_version'] == source_schema and migrated['to_version'] == 29
-    assert migrated['applied_versions'] == list(range(source_schema + 1, 30))
+    assert migrated['from_version'] == source_schema and migrated['to_version'] == 30
+    assert migrated['applied_versions'] == list(range(source_schema + 1, 31))
     again = remote_schema('migrate', migration)
     assert again.returncode == 0 and json.loads(again.stdout)['applied_versions'] == []
     grants()
@@ -351,7 +351,7 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
             assert conn.execute('SELECT basis_item_revision,basis_release_digest FROM work_lease '
                                 'WHERE lease_id=%s', (old_state['lease_id'],)).fetchone() == (None, None)
 
-    # Capture the exact released Sprintctl 0.26 root application constructed by
+    # Capture the exact released Sprintctl 0.27 root application constructed by
     # the service composition. This lets the HTTP readiness path exercise its
     # reconnect hook and then prove that a later repository-scoped invocation
     # uses the refreshed root connection.
@@ -377,7 +377,7 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
         response = client.get('/api/meta/v1/handshake', headers={'X-Vuoro-Client-Protocol': '1'})
         assert response.status_code == 200, response.json()
         handshake = response.json()
-        assert handshake['service_version'] == '0.1.101' and handshake['compatibility']['state'] == 'compatible'
+        assert handshake['service_version'] == '0.1.102' and handshake['compatibility']['state'] == 'compatible'
         assert all(x['state'] == 'compatible' for x in handshake['compatibility']['domains'].values())
         catalog = client.get('/api/catalog/v1', headers={'X-Vuoro-Client-Protocol': '1'}).json()
         assert len(catalog['operations']) == CATALOG_TOTAL
@@ -386,7 +386,7 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
         assert set(INBOX_OPERATIONS) <= served
         assert {
             'work.request.publish-v1', 'work.request.get-v1', 'work.request.list-v1',
-            'work.request.continuation-v1',
+            'work.request.continuation-v1', 'work.request.continuation-receipt-v1',
             'work.request.revise-v1', 'work.request.dependent-add-v1',
             'work.request.dependent-withdraw-v1', 'work.request.events-v1',
             'work.request.progress-v1', 'work.request.report-performed-v1',
@@ -439,7 +439,7 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
                             'FROM pg_roles WHERE rolname=current_user').fetchone()
         assert not any(role)
         assert not conn.execute("SELECT pg_has_role(current_user,%s,'MEMBER')", (migration_role,)).fetchone()[0]
-        assert conn.execute('SELECT version FROM schema_version').fetchone()[0] == 29
+        assert conn.execute('SELECT version FROM schema_version').fetchone()[0] == 30
         assert not conn.execute("SELECT has_schema_privilege(current_user,'work','CREATE')").fetchone()[0]
         for table in NEW_TABLES:
             assert conn.execute('SELECT has_table_privilege(current_user,%s,%s)',
@@ -481,7 +481,7 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
         request_page = invoke('work.request.list-v1', {'limit': 20}, 'x' * 40)
         assert request_page['requests'] == [] and request_page['next_after_request_id'] is None
 
-        # Exercise the released 0.26.0 owner through the composed service with
+        # Exercise the released 0.27.0 owner through the composed service with
         # only the separately provisioned DML runtime role. Byte-limited pages
         # may be short but each cursor must advance to the last returned note.
         parent = invoke('work.run.register-v1', {
@@ -561,7 +561,7 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
                             (instance_id,)).fetchone()[0] == 1
     child_env['SCHEMA27_PROOF_DSN'] = runtime
     result = subprocess.run([old_python, '-I', '-c', OLD_REFUSAL], env=child_env, capture_output=True, text=True)
-    assert result.returncode == 0, 'old owner did not refuse postmigration schema29'
+    assert result.returncode == 0, 'old owner did not refuse postmigration schema30'
     assert legacy_rows() == after
     assert audit_rows() == audit_before
 

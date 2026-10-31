@@ -28,9 +28,9 @@ _EXPECTED_ADAPTER_KIT = (
     "https://github.com/bayleafwalker/vuoro/releases/download/"
     "vuoro-adapter-kit-v0.2.2/vuoro_adapter_kit-0.2.2-py3-none-any.whl"
 )
-_EXPECTED_WORK_OPERATION_COUNT = 120
+_EXPECTED_WORK_OPERATION_COUNT = 121
 _EXPECTED_WORK_METADATA_SHA256 = (
-    "0254ad7ee5e11c123cf3b057687e142a2f14503524bd4a4b8d9494efc71de394"
+    "4823bb8a96820f137a73e0cff40e31ebed1de468750bd7e6dbe05bf3b8f31e9c"
 )
 
 
@@ -78,6 +78,10 @@ def _assert_owner_metadata() -> None:
     assert continuation["required_authority"] == "work:read"
     assert continuation["execution_semantics"] == "read"
     assert continuation["idempotency"] == "not-allowed"
+    receipt = operations["work.request.continuation-receipt-v1"]
+    assert receipt["required_authority"] == "work:write"
+    assert receipt["execution_semantics"] == "write"
+    assert receipt["idempotency"] == "not-allowed"
     encoded = json.dumps(specs, sort_keys=True, separators=(",", ":")).encode()
     assert hashlib.sha256(encoded).hexdigest() == _EXPECTED_WORK_METADATA_SHA256
 
@@ -128,11 +132,11 @@ async def _exercise() -> None:
         )
         # The production service seeds this from its read-only schema
         # handshake before registration. The disposable owner fixture is
-        # explicitly at the composition's schema 29 minimum.
+        # explicitly at the composition's schema 30 minimum.
         class SchemaQualifiedStore:
             def __init__(self, store):
                 self._store = store
-                self.remote_schema_version = 29
+                self.remote_schema_version = 30
 
             def __getattr__(self, name):
                 return getattr(self._store, name)
