@@ -5,7 +5,7 @@
     "doc_id": "docs/architecture/operator-request-lifecycle.md",
     "revision": "sha256:04e13186027bba2e2690353c5ba9ea842cfaad7a67b8edd5290f65d5573d4432"
   },
-  "implementation_sha": "11e93287f917f5b6e75fcd2990e4ce4c68c08021",
+  "implementation_sha": "38bef3caa967c1f509a2c1478ca1ece5068aad65",
   "depth": 1,
   "environment": {
     "backend": "exact pinned TypeSpec compiler and real JSON Schema2020-12 outputs; Python transport client and built wheels",
@@ -73,11 +73,17 @@
       ]
     }
   ],
-  "counterexamples": [],
+  "counterexamples": [
+    {
+      "summary": "Fresh native tool install refused the stale authenticated hash for the deliberately changed local shared operator-request TypeSpec source. Cached local install retained old package bytes; fresh npm ci reproduced refusal.",
+      "trace_ref": "https://github.com/bayleafwalker/vuoro/actions/runs/41192310181/job/124511405860"
+    }
+  ],
   "notes": [
     "The receipt is a publisher assertion; routing metadata is not runtime identity. Status-derived work tokens can repeat and do not cover description edits.",
     "Date-time is an emitted wire annotation; these tests establish string representation, not semantic timestamp validation by a consumer.",
     "Independent review found and corrected source-version fallback and receipt-specific newline/NUL bounds. Shared legacy RequestId scalar is unchanged.",
-    "Private synthetic logs are host-persistent; source and this result are Git-replicated only after publication. Log SHA256: {\"receipt-client-final-build.log\": \"685e8dddc7916a871e89a88c923c0cd2ea01b9026e5332eab987f22ae1031cb6\", \"receipt-client-rebased.log\": \"04c6a39a3a953f6d054f2f1d00f742c985ee9a98496205320df922a9eff3b2cc\", \"receipt-production-rebased.log\": \"dd1c65bc93cdb59222fd27fa7c42bd35c28877daf770ae980f0bbc60df41498c\", \"receipt-production-rebased.xml\": \"472855192a0513722375e9c969fa2d01bbc98682628bbb8a71e4e9983f8a2e10\"}"
+    "Private synthetic logs are host-persistent; source and this result are Git-replicated only after publication. Log SHA256: {\"receipt-client-final-build.log\": \"685e8dddc7916a871e89a88c923c0cd2ea01b9026e5332eab987f22ae1031cb6\", \"receipt-client-rebased.log\": \"04c6a39a3a953f6d054f2f1d00f742c985ee9a98496205320df922a9eff3b2cc\", \"receipt-production-rebased.log\": \"dd1c65bc93cdb59222fd27fa7c42bd35c28877daf770ae980f0bbc60df41498c\", \"receipt-production-rebased.xml\": \"472855192a0513722375e9c969fa2d01bbc98682628bbb8a71e4e9983f8a2e10\"}",
+    "Clean locked npm installation differed in exactly the authored @vuoro/contracts/operator-requests/main.tsp entry; independently reviewed updated hash plus its transitive qualified-input hash. Every executable and external package hash stayed unchanged. Fresh complete gate passed279 with zero skips/errors. Fresh log SHA256: 7e50078de7260c1f1e39b7877c53bdd8681f60ce690db10ea524fa02cfa646e1"
   ]
 }
