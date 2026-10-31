@@ -34,7 +34,8 @@ POST21_TABLES = ('work_effect_attempt', 'work_effect_attempt_event',
                  'agent_instance', 'agent_declaration_revision', 'agent_observation',
                  'agent_inbox_counter', 'agent_message', 'agent_message_receipt',
                  'work_approval', 'work_run_delegation', 'operator_request',
-                 'operator_request_dependant', 'operator_request_event')
+                 'operator_request_dependant', 'operator_request_event',
+                 'operator_continuation_receipt')
 
 
 def validate_fixture_urls(urls):
@@ -231,7 +232,7 @@ else:
     store=pg.get_connection(migration);store.repo_id='agentops'
     try:
         migrated=pg_migrations.migrate_schema(store)
-        assert migrated['from_version']==21 and migrated['to_version']==29 and migrated['applied_versions']==[22,23,24,25,26,27,28,29]
+        assert migrated['from_version']==21 and migrated['to_version']==30 and migrated['applied_versions']==[22,23,24,25,26,27,28,29,30]
         assert pg_migrations.migrate_schema(store)['applied_versions']==[]
     finally:store.conn.close()
     grants()
@@ -240,7 +241,7 @@ else:
         response=client.get('/api/meta/v1/handshake',headers={'X-Vuoro-Client-Protocol':'1'})
         assert response.status_code==200,response.json()
         handshake=response.json()
-        assert handshake['service_version']=='0.1.101' and handshake['compatibility']['state']=='compatible'
+        assert handshake['service_version']=='0.1.102' and handshake['compatibility']['state']=='compatible'
         assert all(x['state']=='compatible' for x in handshake['compatibility']['domains'].values())
         catalog=client.get('/api/catalog/v1',headers={'X-Vuoro-Client-Protocol':'1'}).json()
         assert len(catalog['operations'])==CATALOG_TOTAL
@@ -251,7 +252,7 @@ else:
         role=conn.execute('SELECT rolsuper,rolcreatedb,rolcreaterole,rolreplication,rolbypassrls FROM pg_roles WHERE rolname=current_user').fetchone()
         assert not any(role)
         assert not conn.execute("SELECT pg_has_role(current_user,%s,'MEMBER')",(migration_role,)).fetchone()[0]
-        assert conn.execute('SELECT version FROM schema_version').fetchone()[0]==29
+        assert conn.execute('SELECT version FROM schema_version').fetchone()[0]==30
         assert not conn.execute("SELECT has_schema_privilege(current_user,'work','CREATE')").fetchone()[0]
         for table in ('work_effect_attempt','work_effect_attempt_event'):
             assert conn.execute('SELECT has_table_privilege(current_user,%s,%s)',(table,'SELECT,INSERT,UPDATE,DELETE')).fetchone()[0]

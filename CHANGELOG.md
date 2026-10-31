@@ -5,6 +5,12 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service 0.1.102 candidate pins released Sprintctl 0.27.0 and
+  vuoro-workspace 0.1.1. It requires explicit work schema 30 migration;
+  knowledge schema remains 1. It exposes the owner principal receipt and
+  workspace identity operations without claiming session delivery, source
+  verification, work-to-workspace provenance, or field deployment.
+
 - vuoro-client 0.1.7 adds a thin invocation for a publisher-principal
   continuation-packet receipt, with matching compiled TypeSpec request/result
   models. The operation requires an explicitly advertising schema-30 owner.

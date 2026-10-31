@@ -1,6 +1,6 @@
 """The knowledge domain (vuoro-workspace) is a required composition domain.
 
-The checked-in manifest pins the released vuoro-workspace 0.1.0 owner. These
+The checked-in manifest pins the released vuoro-workspace 0.1.1 owner. These
 tests prove that the runtime gate, the fetcher and the attester all require
 exactly work, audit and knowledge and refuse anything else. The served
 knowledge operations themselves are exercised end to end in
@@ -67,7 +67,7 @@ def test_runtime_fetcher_and_attester_accept_the_three_domain_manifest(tmp_path:
     assert pin.distribution == "vuoro-workspace"
     assert {dep.distribution for dep in pin.dependencies} == {"vuoro-adapter-kit", "vuoro-schema-runtime"}
     fetched = {pin["artifact_url"].rsplit("/", 1)[-1] for _, pin in _script("fetch_pinned_adapters").artifact_pins(raw)}
-    assert "vuoro_workspace-0.1.0-py3-none-any.whl" in fetched
+    assert "vuoro_workspace-0.1.1-py3-none-any.whl" in fetched
     assert {entry["distribution"] for entry in _script("attest_installed_composition")._pinned(raw)} >= {
         "vuoro-workspace"
     }
@@ -167,7 +167,7 @@ def test_compose_knowledge_refuses_a_version_other_than_the_pin(tmp_path: Path) 
     raw = _three_domain()
     lock = [lock for lock in raw["release_locks"] if lock["lock_id"] == "knowledge-adapter"][0]
     lock["distribution_version"] = "9.9.9"
-    lock["artifact_url"] = lock["artifact_url"].replace("0.1.0", "9.9.9")
+    lock["artifact_url"] = lock["artifact_url"].replace("0.1.1", "9.9.9")
     pin = _load(tmp_path, raw).pin("knowledge")
     with pytest.raises(CompositionError, match="installed distribution version"):
         _compose_knowledge(pin, CatalogRegistry(), _environ(tmp_path))

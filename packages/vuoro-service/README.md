@@ -3,12 +3,15 @@
 Modular HTTP and process shell that composes immutable, released owner
 adapters. Domain state machines and migrations remain in their owner packages.
 
-Service 0.1.101 pins Sprintctl 0.26.0 and requires work schema 29. It adds
-the authoritative read-only request continuation snapshot without a new
-schema migration. Client 0.1.6 provides its transport method. Startup
-checks compatibility without migrating. Run the released owner's explicit
-migration command with a migration role before starting the new composition;
-the serving runtime role remains unable to execute DDL.
+Service 0.1.102 is a source candidate pinning Sprintctl 0.27.0 and
+vuoro-workspace 0.1.1. Sprintctl requires work schema 30; the workspace owner
+keeps knowledge schema 1. The composition adds principal continuation receipt
+assertions and workspace identity reads. A receipt does not prove native session
+delivery, source verification or work-to-workspace provenance. Startup checks
+compatibility without migrating. Run the released owner's explicit migration
+command with a migration role before starting the new composition; the serving
+runtime role remains unable to execute DDL. No deployment or field acceptance
+is established by this source candidate.
 
 Schema 29 preserves existing leases with an unknown settlement basis. An
 outcome reported for such a lease is retained as rejected with

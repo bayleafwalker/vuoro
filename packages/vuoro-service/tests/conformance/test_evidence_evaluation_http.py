@@ -30,7 +30,7 @@ def evaluation_owner(request):
         assert_installed_composition()
     from importlib.metadata import version
 
-    assert version("sprintctl") == "0.26.0"
+    assert version("sprintctl") == "0.27.0"
     from sprintctl.vuoro_adapter import register_work_catalog, catalog_operation_specs
 
     enabled = {
