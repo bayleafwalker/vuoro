@@ -1196,15 +1196,16 @@ the resolver and compares independent persisted owner rows. The explicit check
 passed with the exact locked Nix Cargo, Rust, GCC wrapper and protoc outputs;
 Cargo reports 1.98.0 and Rust 1.98.1. An admitted generated call changed owner
 rows and failed the no-effect assertion when applied to it; an unpolled future
-failed the transport-entry assertion. The Python pre-dispatch regression also
-passed. CI now invokes the Rust check explicitly. No generated schema or owner
-changes are involved.
+failed the transport-entry assertion. The four-test multilingual transport
+failure regression also passed using the locked Go output and npm dependencies.
+CI now invokes the Rust check explicitly. No generated schema or owner changes
+are involved.
 
 The complete locked shell still failed offline on a fixed-output TinyCC source
 hash mismatch; the individual locked build outputs were used without changing
-the pin or hash. The broader multi-language transport regression was interrupted
-after TypeScript cases failed because this checkout lacked its npm dependencies;
-the pinned Go output was also absent. The Rust observation is limited to this
-loopback barrier and does not establish owner rollback, native wake, production
-ingress behavior, or an architecture decision. Owner acceptance and the other
-EC-00 gates remain open.
+the pin or hash. An initial broader regression was interrupted after TypeScript
+cases failed with npm dependencies absent and the pinned Go output missing; after
+restoring both, the full regression passed. The Rust observation is limited to
+this loopback barrier and does not establish owner rollback, native wake,
+production ingress behavior, or an architecture decision. Owner acceptance and
+the other EC-00 gates remain open.
