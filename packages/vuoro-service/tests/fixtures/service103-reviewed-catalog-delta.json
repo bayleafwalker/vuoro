@@ -1,0 +1,32 @@
+{
+  "added": {
+    "work.lease.currentness-v1": "77af19c5dbab81ce533c7bf96ba4111955b14dedbe8aa8165906322b55150efa",
+    "work.lease.report-outcome-v2": "cf0ec2f8b96de5aef297f3d2be856eb26f9bfbd7149714eae1c6094da69aa4af"
+  },
+  "changed": {
+    "work.run.continuation-delta-v1": {
+      "new_sha256": "3b3805fc5bdfefd69eb45919450e36856d51700fa226bfc8de4aa0dfb22952bb",
+      "old_sha256": "843aca10caeda87b5540152856988fbd8a9eee4c76fdb11e9f65a9802d7c668d"
+    },
+    "work.run.delegate-v1": {
+      "new_sha256": "72652883a93038add2b0167bc408ac6c771d9997eab436b3b17da38084f89f54",
+      "old_sha256": "90e417ddb180360e6d48080d6f13deca60d4d06a740ad60dd3100219a8d5145b"
+    },
+    "work.run.delegation-get-v1": {
+      "new_sha256": "eaaf5f2b029b67b6507d34a382748ab4c59a9995f698b5a4d5d592a610cc3a0d",
+      "old_sha256": "6bb5f97cff2066ef5cdb876bfd0c820e1e391166acae7c096dc340cfcd6c9c50"
+    },
+    "work.run.delegation-revoke-v1": {
+      "new_sha256": "a65e4b70f747115d529227b01583dc020dbc035c7e0b5287b488244215528e37",
+      "old_sha256": "121d3d44111315013d4790210b7adb23b210c2c8d412b2cffe85749e077de9a0"
+    }
+  },
+  "review": {
+    "delegation": "Add only currentness to the closed delegation operation enum; no delegation receives it implicitly.",
+    "work.lease.currentness-v1": "Read-only work:read observation; authorizes_effect is always false.",
+    "work.lease.report-outcome-v2": "work:claim write; settlement uses an explicit continuation checkpoint. Stale or expired reports can be recorded as rejected without settlement.",
+    "work.run.continuation-delta-v1": "Remove nested $schema; tighten current.repo_id to minLength 1. Empty-repo run registration refused in both 0.27 and 0.28; named global succeeds in both. This is a wire schema narrowing."
+  },
+  "schema": "vuoro-service103-reviewed-catalog-delta/v1",
+  "source": "published Sprintctl 0.28.0 owner / service 0.1.103 registration catalog, schema31"
+}

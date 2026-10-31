@@ -21,7 +21,7 @@ def owner(request):
     if url is None:
         pytest.skip("requires configured disposable PostgreSQL owner")
     from importlib.metadata import version
-    assert version("sprintctl") == "0.27.0"
+    assert version("sprintctl") == "0.28.0"
     owner = SprintctlProvider(url)
     try:
         yield owner

@@ -467,7 +467,7 @@ jobs:
           export VUORO_SCHEMA22_ATTESTATION=/tmp/vuoro-schema22-installed.json
           /tmp/vuoro-bound-released-composition/bin/python -m pytest --import-mode=importlib \
             packages/vuoro-service/tests/conformance/test_schema22_composition_migration.py -q
-      - name: Actual schema-27 closure (service 0.1.97) to explicit schema-30 CLI migration
+      - name: Actual schema-27 closure (service 0.1.97) to explicit schema-31 CLI migration
         shell: bash
         env:
           PGPASSWORD: m14-ci-only
@@ -507,7 +507,7 @@ jobs:
           export VUORO_SCHEMA28_ATTESTATION=/tmp/vuoro-schema28-installed.json
           /tmp/vuoro-bound-released-composition/bin/python -m pytest --import-mode=importlib \
             packages/vuoro-service/tests/conformance/test_schema28_composition_migration.py -q
-      - name: Actual schema-28 closure (service 0.1.99) to explicit schema-30 CLI migration
+      - name: Actual schema-28 closure (service 0.1.99) to explicit schema-31 CLI migration
         shell: bash
         env:
           PGPASSWORD: m14-ci-only
@@ -542,7 +542,7 @@ jobs:
           export VUORO_SCHEMA28_ATTESTATION=/tmp/vuoro-schema28-installed.json
           /tmp/vuoro-bound-released-composition/bin/python -m pytest --import-mode=importlib \
             packages/vuoro-service/tests/conformance/test_schema28_composition_migration.py -q
-      - name: Actual schema-29 closure to explicit schema-30 migration
+      - name: Actual schema-29 closure to explicit schema-31 migration
         shell: bash
         env:
           PGPASSWORD: m14-ci-only
@@ -572,8 +572,8 @@ jobs:
           export VUORO_SCHEMA28_MANIFEST="$PWD/packages/vuoro-service/composition/adapter-pins.json"
           export VUORO_SCHEMA28_WHEEL_DIR="$PWD/dist/adapters"
           /tmp/vuoro-bound-released-composition/bin/python -I scripts/attest_installed_composition.py \
-            packages/vuoro-service/composition/adapter-pins.json dist/adapters /tmp/vuoro-schema30-installed.json
-          export VUORO_SCHEMA28_ATTESTATION=/tmp/vuoro-schema30-installed.json
+            packages/vuoro-service/composition/adapter-pins.json dist/adapters /tmp/vuoro-schema31-installed.json
+          export VUORO_SCHEMA28_ATTESTATION=/tmp/vuoro-schema31-installed.json
           /tmp/vuoro-bound-released-composition/bin/python -m pytest --import-mode=importlib \
             packages/vuoro-service/tests/conformance/test_schema28_composition_migration.py -q
       - name: Schema-30 owner CLI preserves schema-29 rows and privileges
@@ -585,8 +585,8 @@ jobs:
           VUORO_SCHEMA30_RUNTIME_DSN: postgresql://schema27_work_runtime:schema27-ci-only@127.0.0.1:5432/schema30_conformance_ci?options=-csearch_path%3Dwork%2Cpg_catalog
           VUORO_SCHEMA29_PYTHON: /tmp/vuoro-schema29-upgrade/venv/bin/python
           VUORO_SCHEMA29_CLI: /tmp/vuoro-schema29-upgrade/venv/bin/sprintctl
-          VUORO_SCHEMA30_CLI: /tmp/vuoro-bound-released-composition/bin/sprintctl
-          VUORO_SCHEMA30_OWNER_PREFIX: /tmp/vuoro-bound-released-composition
+          VUORO_SCHEMA30_CLI: /tmp/vuoro-schema30-upgrade/venv/bin/sprintctl
+          VUORO_SCHEMA30_OWNER_PREFIX: /tmp/vuoro-schema30-upgrade/venv
         run: |
           set -euo pipefail
           psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U m14 -d m14_scenario <<'SQL'
@@ -600,8 +600,69 @@ jobs:
           ALTER DEFAULT PRIVILEGES FOR ROLE schema27_work_migration IN SCHEMA work GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO schema27_work_runtime;
           ALTER DEFAULT PRIVILEGES FOR ROLE schema27_work_migration IN SCHEMA work GRANT USAGE,SELECT ON SEQUENCES TO schema27_work_runtime;
           SQL
-          env -u PGPASSWORD /tmp/vuoro-bound-released-composition/bin/python -m pytest --import-mode=importlib \
+          python scripts/prepare_schema21_upgrade_fixture.py --closure schema30 /tmp/vuoro-schema30-upgrade
+          uv pip install --python /tmp/vuoro-schema30-upgrade/venv/bin/python 'pytest>=8.3,<9'
+          env -u PGPASSWORD /tmp/vuoro-schema30-upgrade/venv/bin/python -m pytest --import-mode=importlib \
             packages/vuoro-service/tests/conformance/test_schema30_owner_migration.py -q
+      - name: Schema-31 published owner CLI preserves schema-29 rows and privileges
+        shell: bash
+        env:
+          PGPASSWORD: m14-ci-only
+          VUORO_SCHEMA31_PROOF: "1"
+          VUORO_SCHEMA31_MIGRATION_DSN: postgresql://schema27_work_migration:schema27-ci-only@127.0.0.1:5432/schema31_conformance_ci?options=-csearch_path%3Dwork%2Cpg_catalog
+          VUORO_SCHEMA31_RUNTIME_DSN: postgresql://schema27_work_runtime:schema27-ci-only@127.0.0.1:5432/schema31_conformance_ci?options=-csearch_path%3Dwork%2Cpg_catalog
+          VUORO_SCHEMA29_PYTHON: /tmp/vuoro-schema29-upgrade/venv/bin/python
+          VUORO_SCHEMA29_CLI: /tmp/vuoro-schema29-upgrade/venv/bin/sprintctl
+          VUORO_SCHEMA31_CLI: /tmp/vuoro-bound-released-composition/bin/sprintctl
+          VUORO_SCHEMA31_OWNER_PREFIX: /tmp/vuoro-bound-released-composition
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U m14 -d m14_scenario <<'SQL'
+          CREATE DATABASE schema31_conformance_ci OWNER schema27_work_migration;
+          COMMENT ON DATABASE schema31_conformance_ci IS 'schema31:disposable-conformance';
+          GRANT CONNECT ON DATABASE schema31_conformance_ci TO schema27_work_runtime;
+          SQL
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U m14 -d schema31_conformance_ci <<'SQL'
+          CREATE SCHEMA work AUTHORIZATION schema27_work_migration;
+          GRANT USAGE ON SCHEMA work TO schema27_work_runtime;
+          ALTER DEFAULT PRIVILEGES FOR ROLE schema27_work_migration IN SCHEMA work GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO schema27_work_runtime;
+          ALTER DEFAULT PRIVILEGES FOR ROLE schema27_work_migration IN SCHEMA work GRANT USAGE,SELECT ON SEQUENCES TO schema27_work_runtime;
+          SQL
+          env -u PGPASSWORD /tmp/vuoro-bound-released-composition/bin/python -m pytest --import-mode=importlib \
+            packages/vuoro-service/tests/conformance/test_schema31_owner_migration.py -q
+      - name: Published currentness and reviewed outcome through installed composition
+        shell: bash
+        env:
+          PGPASSWORD: m14-ci-only
+          VUORO_103_PROOF: "1"
+          VUORO_103_WORK_MIGRATION: postgresql://schema27_work_migration:schema27-ci-only@127.0.0.1:5432/lease_conformance_schema28_currentness_ci?options=-csearch_path%3Dwork%2Cpg_catalog
+          VUORO_103_WORK_RUNTIME: postgresql://schema27_work_runtime:schema27-ci-only@127.0.0.1:5432/lease_conformance_schema28_currentness_ci?options=-csearch_path%3Dwork%2Cpg_catalog
+          VUORO_103_AUDIT_MIGRATION: postgresql://schema27_audit_migration:schema27-ci-only@127.0.0.1:5432/lease_conformance_schema28_currentness_ci
+          VUORO_103_AUDIT_RUNTIME: postgresql://schema27_audit_runtime:schema27-ci-only@127.0.0.1:5432/lease_conformance_schema28_currentness_ci
+          VUORO_103_KNOWLEDGE_MIGRATION: postgresql://schema27_knowledge_migration:schema27-ci-only@127.0.0.1:5432/lease_conformance_schema28_currentness_ci
+          VUORO_103_KNOWLEDGE_RUNTIME: postgresql://schema27_knowledge_runtime:schema27-ci-only@127.0.0.1:5432/lease_conformance_schema28_currentness_ci
+          VUORO_103_MANIFEST: ${{ github.workspace }}/packages/vuoro-service/composition/adapter-pins.json
+          VUORO_103_WHEELS: ${{ github.workspace }}/dist/adapters
+          VUORO_103_ATTESTATION: /tmp/vuoro-schema31-installed.json
+          VUORO_103_OWNER_PREFIX: /tmp/vuoro-bound-released-composition
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U m14 -d m14_scenario <<'SQL'
+          CREATE DATABASE lease_conformance_schema28_currentness_ci;
+          GRANT CONNECT,CREATE ON DATABASE lease_conformance_schema28_currentness_ci TO schema27_work_migration,schema27_audit_migration,schema27_knowledge_migration;
+          GRANT CONNECT ON DATABASE lease_conformance_schema28_currentness_ci TO schema27_work_runtime,schema27_audit_runtime,schema27_knowledge_runtime;
+          SQL
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U m14 -d lease_conformance_schema28_currentness_ci -c 'CREATE SCHEMA work AUTHORIZATION schema27_work_migration'
+          env -u PGPASSWORD /tmp/vuoro-bound-released-composition/bin/sprintctl remote-schema migrate --url "$VUORO_103_WORK_MIGRATION" --json
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U m14 -d lease_conformance_schema28_currentness_ci <<'SQL'
+          GRANT USAGE ON SCHEMA work TO schema27_work_runtime;
+          GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA work TO schema27_work_runtime;
+          REVOKE UPDATE,DELETE,TRUNCATE ON work.operator_continuation_receipt FROM schema27_work_runtime;
+          GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA work TO schema27_work_runtime;
+          GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA work TO schema27_work_runtime;
+          SQL
+          env -u PGPASSWORD /tmp/vuoro-bound-released-composition/bin/python -m pytest --import-mode=importlib \
+            packages/vuoro-service/tests/conformance/test_service103_currentness_installed.py -q -rs
       - name: Protected effect binding on the released schema-21 owner
         env:
           PGPASSWORD: m14-ci-only
