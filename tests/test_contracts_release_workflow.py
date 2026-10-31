@@ -110,7 +110,7 @@ def assert_reusable(flow: dict) -> None:
     assert full.count("uv build --package vuoro-contracts ") == 1
     for token in ("20261001/cpython-3.13.16%2B20261001-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz", "ffcb50e716789d1a6e1db5e745d4d194ac8ed9b015ccf5eabcaccb179a25e4a8", "f8188f8dec8f4ae9865dc6789323327c50bb275a5a301373d675464fdbbf933f", 'sha256sum --check', 'node --version', 'v24.21.0', '11.19.0', '--locked', '--ignore-scripts --no-audit --no-fund', '--python "$qualified_python"'):
         assert token in restore["run"]
-    for token in ("VUORO_CONTRACT_NODE", "VUORO_CONTRACT_PYTHON", "VUORO_CONTRACT_DECODER", "PYTHONDONTWRITEBYTECODE", "tool-artifacts.json", "assert actual == expected", "packages/vuoro-contracts/tests", "packages/vuoro-client/tests/test_generated_contract_boundary.py", "packages/vuoro-service/tests/test_generated_contract_foundation.py", '(263, 0, 0, 0)', '--junitxml="$RUNNER_TEMP/contracts-pytest.xml"'):
+    for token in ("VUORO_CONTRACT_NODE", "VUORO_CONTRACT_PYTHON", "VUORO_CONTRACT_DECODER", "PYTHONDONTWRITEBYTECODE", "tool-artifacts.json", "assert actual == expected", "packages/vuoro-contracts/tests", "packages/vuoro-client/tests/test_generated_contract_boundary.py", "packages/vuoro-service/tests/test_generated_contract_foundation.py", '(279, 0, 0, 0)', '--junitxml="$RUNNER_TEMP/contracts-pytest.xml"'):
         assert token in production["run"]
     for token in ("VUORO_CONTRACT_NODE", "VUORO_CONTRACT_PYTHON", "VUORO_CONTRACT_DECODER", "test_mcp_projection.py", '(10, 0, 0, 0)', '--junitxml="$RUNNER_TEMP/contracts-mcp-projection.xml"'):
         assert token in mcp_projection["run"]
@@ -155,7 +155,7 @@ def test_ci_calls_same_source_reusable_without_duplicate_producer() -> None:
 
 
 def test_reviewed_contract_aware_publisher_successor_and_its_oracle_are_pinned() -> None:
-    expected = {".github/workflows/publish-python-packages.yaml": "4af72c872e613ff0039cdb399e86cef40a0df3d6209d1696197b3e9ba3ddee4a", "tests/test_release_workflow.py": "2acdb301bd7d4277812ed5a15026ac0c2495221244fd9dc057780f36307317a0"}
+    expected = {".github/workflows/publish-python-packages.yaml": "4af72c872e613ff0039cdb399e86cef40a0df3d6209d1696197b3e9ba3ddee4a", "tests/test_release_workflow.py": "c7318d4e3a85cc8e16a80f13f815c2d2d7e28fc57bf45a5bafb5849954334159"}
     for path, digest in expected.items():
         assert hashlib.sha256((ROOT / path).read_bytes()).hexdigest() == digest
     recovery = (ROOT / "docs/plans/2026-10-25-vuoro-client-0.1.5-release-recovery.md").read_text()
@@ -220,7 +220,7 @@ def test_producer_oracle_rejects_incomplete_qualification(case: str) -> None:
     if case == "conditional-production":
         production["if"] = "${{ inputs.run-repository-suite }}"
     elif case == "short-corpus":
-        production["run"] = production["run"].replace("(263, 0, 0, 0)", "(1, 0, 0, 0)")
+        production["run"] = production["run"].replace("(279, 0, 0, 0)", "(1, 0, 0, 0)")
     elif case == "missing-decoder":
         production["run"] = production["run"].replace("VUORO_CONTRACT_DECODER", "IGNORED_DECODER")
     elif case == "unqualified-python":

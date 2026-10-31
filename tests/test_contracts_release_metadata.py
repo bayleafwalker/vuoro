@@ -112,7 +112,7 @@ def candidate(tmp_path: Path) -> tuple[Path, Path, dict]:
         "schema_version": "vuoro-contracts-release-candidate/v1", "distribution": "vuoro-contracts", "version": "0.1.0",
         "wheel_basename": selected.name, "wheel_sha256": hashlib.sha256(selected.read_bytes()).hexdigest(),
         "source_sha": SOURCE, "run_id": RUN, "run_attempt": ATTEMPT, "artifact_name": ARTIFACT,
-        "qualification": {"tests": 263, "skipped": 0, "failures": 0, "errors": 0},
+        "qualification": {"tests": 279, "skipped": 0, "failures": 0, "errors": 0},
         **{key: hashlib.sha256((ROOT / "tools/contracts/toolchain" / file).read_bytes()).hexdigest() for key, file in PINS.items()},
     }
     (folder / "candidate.json").write_text(json.dumps(receipt))
@@ -206,7 +206,7 @@ def test_create_uses_actual_junit_and_exact_pins_with_no_write(tmp_path: Path) -
     folder = tmp_path / "build"
     selected = wheel(folder)
     junit = tmp_path / "tests.xml"
-    junit.write_text('<testsuite>' + '<testcase name="case"/>' * 263 + '</testsuite>')
+    junit.write_text('<testsuite>' + '<testcase name="case"/>' * 279 + '</testsuite>')
     args = ["create", "--wheel-dir", str(folder), "--source-sha", SOURCE, "--run-id", RUN, "--run-attempt", ATTEMPT, "--junit", str(junit)]
     before = snapshot(tmp_path)
     result = invoke(*args)
@@ -216,7 +216,7 @@ def test_create_uses_actual_junit_and_exact_pins_with_no_write(tmp_path: Path) -
     assert receipt["artifact_name"] == ARTIFACT and receipt["source_sha"] == SOURCE
     assert receipt["wheel_basename"] == selected.name
     assert receipt["wheel_sha256"] == hashlib.sha256(selected.read_bytes()).hexdigest()
-    assert receipt["qualification"] == {"tests": 263, "skipped": 0, "failures": 0, "errors": 0}
+    assert receipt["qualification"] == {"tests": 279, "skipped": 0, "failures": 0, "errors": 0}
     for key, name in PINS.items():
         assert receipt[key] == hashlib.sha256((ROOT / "tools/contracts/toolchain" / name).read_bytes()).hexdigest()
     assert snapshot(tmp_path) == before
@@ -225,8 +225,20 @@ def test_create_uses_actual_junit_and_exact_pins_with_no_write(tmp_path: Path) -
     assert checked.returncode == 0, checked.stderr
 
 
-@pytest.mark.parametrize("xml", ['<testsuite/>', '<testsuite>' + '<testcase/>' * 257 + '</testsuite>', '<testsuite>' + '<testcase/>' * 262 + '</testsuite>', '<testsuite>' + '<testcase/>' * 262 + '<testcase><skipped/></testcase></testsuite>', '<testsuite>' + '<testcase/>' * 262 + '<testcase><failure/></testcase></testsuite>', '<testsuite>' + '<testcase/>' * 262 + '<testcase><error/></testcase></testsuite>', '<!invalid>'], ids=["empty", "old-corpus", "short", "skip", "failure", "error", "malformed"])
+@pytest.mark.parametrize("xml", [
+    '<testsuite/>',
+    '<testsuite>' + '<testcase/>' * 257 + '</testsuite>',
+    '<testsuite>' + '<testcase/>' * 263 + '</testsuite>',
+    '<testsuite>' + '<testcase/>' * 278 + '</testsuite>',
+    '<testsuite>' + '<testcase/>' * 278 + '<testcase><skipped/></testcase></testsuite>',
+    '<testsuite>' + '<testcase/>' * 278 + '<testcase><failure/></testcase></testsuite>',
+    '<testsuite>' + '<testcase/>' * 278 + '<testcase><error/></testcase></testsuite>',
+    '<!invalid>',
+], ids=["empty", "original-corpus", "previous-corpus", "short", "skip", "failure", "error", "malformed"])
 def test_create_cannot_convert_bad_production_junit_into_success(tmp_path: Path, xml: str) -> None:
+    if any(marker in xml for marker in ('<skipped', '<failure', '<error')):
+        # These faults must fail independently of the accepted corpus count.
+        assert xml.count('<testcase') == 279
     wheel(tmp_path / "build")
     junit = tmp_path / "tests.xml"
     junit.write_text(xml)
@@ -239,7 +251,7 @@ def test_create_is_not_a_generic_writer_or_unqualified_selector(tmp_path: Path, 
     folder = tmp_path / "build"
     selected = wheel(folder, "vuoro-client" if case == "wrong-package" else "vuoro-contracts", "0.1.0.dev1" if case == "mutable-version" else "0.1.0")
     junit = tmp_path / "tests.xml"
-    junit.write_text('<testsuite>' + '<testcase/>' * 263 + '</testsuite>')
+    junit.write_text('<testsuite>' + '<testcase/>' * 279 + '</testsuite>')
     args = ["create", "--wheel-dir", str(folder), "--source-sha", SOURCE, "--run-id", RUN, "--run-attempt", ATTEMPT, "--junit", str(junit)]
     if case == "two-wheels":
         wheel(folder, version="0.1.1")
