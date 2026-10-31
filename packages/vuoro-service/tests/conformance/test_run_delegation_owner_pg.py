@@ -17,3 +17,16 @@ def test_real_owner_digest_projection_and_cached_context_revocation():
         "--owner-commit", os.environ["VUORO_DELEGATION_OWNER_COMMIT"]], capture_output=True, text=True, timeout=120)
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert "cached-context revocation conformance passed" in completed.stdout
+
+
+@pytest.mark.skipif(not all(os.environ.get(key) for key in (
+    "VUORO_CURRENTNESS_OWNER_SOURCE", "VUORO_CURRENTNESS_OWNER_COMMIT", "SPRINTCTL_TEST_PG_URL")),
+    reason="explicit clean currentness owner source/commit and guarded disposable PG database required")
+def test_real_owner_currentness_read_only_scope():
+    root = Path(__file__).resolve().parents[4]
+    completed = subprocess.run([sys.executable, "-I", str(root / "scripts/qualify_run_delegation_owner.py"),
+        "--owner-source", os.environ["VUORO_CURRENTNESS_OWNER_SOURCE"],
+        "--owner-commit", os.environ["VUORO_CURRENTNESS_OWNER_COMMIT"], "--currentness"],
+        capture_output=True, text=True, timeout=120)
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert "currentness HTTP exact scope, stale basis, lost reply and cached-context revocation conformance passed" in completed.stdout

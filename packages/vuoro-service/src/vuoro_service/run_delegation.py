@@ -17,7 +17,7 @@ from fastapi import Request
 
 from .identity import Identity, IdentityResolutionError, IdentityResolver
 
-_ALLOWED = frozenset({"work.run.resolve-v1", "work.run.predecessor-context-v1",
+_ALLOWED = frozenset({"work.lease.currentness-v1", "work.run.resolve-v1", "work.run.predecessor-context-v1",
                       "work.session-note.write-v1", "work.evidence.append-v1"})
 _AUTHORITIES = frozenset({"work:read", "work:evidence"})
 _TOKEN = re.compile(r"vrd_[A-Z2-7]{52}")

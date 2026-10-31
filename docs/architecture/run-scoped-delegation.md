@@ -261,3 +261,28 @@ the migrated store. Schema27 cannot be rolled back to service0.1.95 by changing
 the image alone; recovery needs a compatible forward release or coordinated
 restore. These are disposable qualification results, not production rollout
 or host-launch acceptance.
+
+## 8. Source-only currentness read edge
+
+The service allowlist also recognizes exactly `work.lease.currentness-v1` when
+the actual Work owner issues that operation in a run-scoped credential. This
+does not add it to an existing credential, broaden the authority intersection,
+or compose a new owner release. Sprintctl source PR214 publishes the read and
+requires schema31; its migration changes only the existing closed delegation
+operation CHECK. Production adapter pins, startup check-only behavior, token
+storage and revocation remain owned by their existing components.
+
+The read returns an exact owned run/lease/ContinuationBasis snapshot and
+`authorizes_effect: false`. It is a condition for a separately installed
+project guard, not paid/resource permission. A guard must use a fresh read for
+each applicable active admission and bound its monotonic authorization and
+watchdog intervals. Historical access and cancellation use their own owner
+authorization; a response cannot undo an already admitted network effect.
+
+`currentness-source.yml` pins clean Sprintctl source commit
+`3bccfaca020c2effb68430f9251b8c9857500fbf` solely for disposable source
+conformance. The actual HTTP service and PostgreSQL owner prove exact run/repo
+scope, denial of all other operations, read-only lost replies, stale basis
+refusal and live owner revocation even with a cached authentication projection.
+Release composition, schema31 migration and installation require their separate
+deployment-owner qualification; this source edge performs none of them.
