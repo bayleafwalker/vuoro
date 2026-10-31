@@ -297,6 +297,29 @@ class AsyncVuoroClient:
             "work.request.continuation-v1", {"request_id": request_id}, repo_id=repo_id
         )
 
+    async def record_operator_request_continuation_receipt(
+        self,
+        *,
+        request_id: str,
+        resolution_event_revision: int,
+        work_item_id: int,
+        expected_work_revision: str,
+        idempotency_key: str,
+        repo_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Record the publisher's packet receipt without claiming runtime delivery."""
+        return await self.invoke(
+            "work.request.continuation-receipt-v1",
+            {
+                "request_id": request_id,
+                "resolution_event_revision": resolution_event_revision,
+                "work_item_id": work_item_id,
+                "expected_work_revision": expected_work_revision,
+                "idempotency_key": idempotency_key,
+            },
+            repo_id=repo_id,
+        )
+
     async def list_operator_requests(
         self,
         *,

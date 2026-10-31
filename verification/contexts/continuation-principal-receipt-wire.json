@@ -1,0 +1,84 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.continuation-principal-receipt-wire",
+  "owner_repo": "vuoro",
+  "subject": "Compiled principal packet-receipt contract and transport-only client invocation; no native session delivery proof",
+  "contract_ref": {
+    "doc_id": "docs/architecture/operator-request-lifecycle.md",
+    "revision": "sha256:04e13186027bba2e2690353c5ba9ea842cfaad7a67b8edd5290f65d5573d4432"
+  },
+  "source_of_truth": "Authored TypeSpec models, emitted JSON Schema, advertised owner operation and its independent owner tests",
+  "depth": 1,
+  "backends": [
+    "exact pinned TypeSpec compiler",
+    "JSON Schema2020-12 validator",
+    "Python client and built wheels"
+  ],
+  "actors": [
+    "publisher principal",
+    "transport client",
+    "schema30 owner candidate"
+  ],
+  "initial_state": [
+    "Existing continuation-v1 unchanged",
+    "New principal receipt owner source candidate remains separately released and migrated",
+    "No production state or credentials"
+  ],
+  "operations": [
+    {
+      "name": "compile request/result and forward one catalog invocation",
+      "actors": [
+        "transport client",
+        "schema30 owner candidate"
+      ]
+    },
+    {
+      "name": "reject malformed wire fields and caller-added authority/session",
+      "actors": [
+        "publisher principal"
+      ]
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "typed wire admission and transport-only ownership boundary"
+  },
+  "bounds": {
+    "production_cases": 279,
+    "client_cases": 68,
+    "distribution_cases": 7,
+    "live_mutations": false
+  },
+  "invariants": [
+    "Client forwards without owner semantics or caller-invented session identity",
+    "Prior continuation schema remains unchanged",
+    "Receipt models seal wire fields, safe work identifiers and exact immutable coordinate types",
+    "Receipt is an assertion with no native delivery/wake/read/effect proof"
+  ],
+  "faults": [
+    "caller-selected session",
+    "unsafe or string work ID",
+    "zero resolution",
+    "empty or NUL or blank work token",
+    "newline idempotency key",
+    "newline request ID",
+    "empty routing metadata",
+    "bad digest length",
+    "nonstring timestamp",
+    "caller-added effect authority"
+  ],
+  "oracles": [
+    "packages/vuoro-contracts/tests/test_production_generation.py",
+    "packages/vuoro-client/tests/test_operator_request_transport.py",
+    "tests/test_distribution_boundaries.py"
+  ],
+  "implementation_anchors": [
+    "contracts/operator-requests/main.tsp",
+    "packages/vuoro-client/src/vuoro_client/client.py",
+    "packages/vuoro-contracts/tests/test_production_generation.py"
+  ],
+  "expansions": [
+    "semantic-doc",
+    "fault-scenario"
+  ]
+}
