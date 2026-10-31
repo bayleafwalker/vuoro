@@ -135,6 +135,12 @@ jobs:
           uv run --project tests/experiments/ec00/candidates --locked
           python -m unittest discover -s tests/experiments/ec00
           -p transport_failure_checks.py -v
+      - name: Qualify Rust generated SDK pre-dispatch cancellation
+        run: >-
+          nix develop ./tests/experiments/ec00/candidates/toolchain --command
+          uv run --project tests/experiments/ec00/candidates --locked
+          python -m unittest discover -s tests/experiments/ec00
+          -p rust_predispatch_checks.py -v
       - name: Compare unary watch replay, reconnect and refusal semantics
         run: >-
           nix develop ./tests/experiments/ec00/candidates/toolchain --command

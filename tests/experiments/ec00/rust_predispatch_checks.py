@@ -60,6 +60,8 @@ class RustPredispatchTests(unittest.TestCase):
                     )
                     self.assertEqual(0, result.returncode, result.stderr[-5000:])
                     row = json.loads(result.stdout)
+                    self.assertEqual("rust", row["language"])
+                    self.assertEqual(mode, row["mode"])
                     # The process releases its resolver before exit. Wait for
                     # any accepted fixture connection to finish as well.
                     deadline = time.monotonic() + 3
