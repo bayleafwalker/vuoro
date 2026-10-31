@@ -1,0 +1,83 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro.continuation-principal-receipt-wire",
+  "contract_ref": {
+    "doc_id": "docs/architecture/operator-request-lifecycle.md",
+    "revision": "sha256:04e13186027bba2e2690353c5ba9ea842cfaad7a67b8edd5290f65d5573d4432"
+  },
+  "implementation_sha": "11e93287f917f5b6e75fcd2990e4ce4c68c08021",
+  "depth": 1,
+  "environment": {
+    "backend": "exact pinned TypeSpec compiler and real JSON Schema2020-12 outputs; Python transport client and built wheels",
+    "isolation": "isolated candidate checkout and test fixtures; no production state or credentials",
+    "tool_versions": {
+      "python": "3.12.14",
+      "compiler_python": "3.13.16",
+      "node": "24.21.0",
+      "ruff": "0.16.2"
+    }
+  },
+  "execution": {
+    "seed": null,
+    "histories": 0,
+    "bounds": {
+      "production_cases": 279,
+      "client_cases": 68,
+      "distribution_cases": 7,
+      "source_base": "4daf6d17797fb66d6f2e5dc3ab078636f91b67b4"
+    },
+    "faults_exercised": [
+      "caller-selected session",
+      "unsafe or string work ID",
+      "zero resolution",
+      "empty or NUL or blank work token",
+      "newline idempotency key",
+      "newline request ID",
+      "empty routing metadata",
+      "bad digest length",
+      "nonstring timestamp",
+      "caller-added effect authority"
+    ]
+  },
+  "claims": [
+    {
+      "property": "Emitted receipt models accept owner-shaped fields and refuse unsafe work IDs, caller session/effect fields, newline identifiers and idempotency keys, NUL or blank work revisions, empty routing metadata and malformed digest representation",
+      "result": "example-tested",
+      "evidence": [
+        "contracts/operator-requests/main.tsp",
+        "packages/vuoro-contracts/tests/test_production_generation.py"
+      ]
+    },
+    {
+      "property": "Original263 production cases remain present; gate now279 cases with zero skips/errors/failures, including unchanged continuation-v1 examples",
+      "result": "example-tested",
+      "evidence": [
+        ".github/workflows/contracts-production-toolchain.yml",
+        "packages/vuoro-contracts/tests/test_production_generation.py"
+      ]
+    },
+    {
+      "property": "Client forwards one advertised operation without storing owner state, fabricating a session, waking a runtime or assigning effect authority; transport and installed distribution boundaries pass",
+      "result": "example-tested",
+      "evidence": [
+        "packages/vuoro-client/src/vuoro_client/client.py",
+        "packages/vuoro-client/tests/test_operator_request_transport.py",
+        "tests/test_distribution_boundaries.py"
+      ]
+    },
+    {
+      "property": "Native CI/publication, schema30 owner composition and migration, principal read observation, runtime/session consumption or wake and source-observed completion",
+      "result": "unknown",
+      "evidence": [
+        "docs/architecture/operator-request-lifecycle.md"
+      ]
+    }
+  ],
+  "counterexamples": [],
+  "notes": [
+    "The receipt is a publisher assertion; routing metadata is not runtime identity. Status-derived work tokens can repeat and do not cover description edits.",
+    "Date-time is an emitted wire annotation; these tests establish string representation, not semantic timestamp validation by a consumer.",
+    "Independent review found and corrected source-version fallback and receipt-specific newline/NUL bounds. Shared legacy RequestId scalar is unchanged.",
+    "Private synthetic logs are host-persistent; source and this result are Git-replicated only after publication. Log SHA256: {\"receipt-client-final-build.log\": \"685e8dddc7916a871e89a88c923c0cd2ea01b9026e5332eab987f22ae1031cb6\", \"receipt-client-rebased.log\": \"04c6a39a3a953f6d054f2f1d00f742c985ee9a98496205320df922a9eff3b2cc\", \"receipt-production-rebased.log\": \"dd1c65bc93cdb59222fd27fa7c42bd35c28877daf770ae980f0bbc60df41498c\", \"receipt-production-rebased.xml\": \"472855192a0513722375e9c969fa2d01bbc98682628bbb8a71e4e9983f8a2e10\"}"
+  ]
+}
