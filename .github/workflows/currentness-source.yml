@@ -23,13 +23,13 @@ jobs:
     env:
       SPRINTCTL_TEST_PG_URL: postgresql://sprintctl_test_currentness:currentness-test-ci-only@127.0.0.1:5432/sprintctl_test_currentness
       VUORO_CURRENTNESS_OWNER_SOURCE: ${{ github.workspace }}/_owners/sprintctl
-      VUORO_CURRENTNESS_OWNER_COMMIT: d3ba2d81528343dc7601213a2d6a9da02834ce77
+      VUORO_CURRENTNESS_OWNER_COMMIT: 8fb8224fbf75e8b7d81643a18a457cffa52f97b0
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
           repository: bayleafwalker/sprintctl
-          ref: d3ba2d81528343dc7601213a2d6a9da02834ce77
+          ref: 8fb8224fbf75e8b7d81643a18a457cffa52f97b0
           path: _owners/sprintctl
       - uses: actions/setup-python@v5
         with:
