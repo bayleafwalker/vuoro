@@ -232,7 +232,7 @@ else:
     store=pg.get_connection(migration);store.repo_id='agentops'
     try:
         migrated=pg_migrations.migrate_schema(store)
-        assert migrated['from_version']==21 and migrated['to_version']==30 and migrated['applied_versions']==[22,23,24,25,26,27,28,29,30]
+        assert migrated['from_version']==21 and migrated['to_version']==31 and migrated['applied_versions']==[22,23,24,25,26,27,28,29,30,31]
         assert pg_migrations.migrate_schema(store)['applied_versions']==[]
     finally:store.conn.close()
     grants()
@@ -252,7 +252,7 @@ else:
         role=conn.execute('SELECT rolsuper,rolcreatedb,rolcreaterole,rolreplication,rolbypassrls FROM pg_roles WHERE rolname=current_user').fetchone()
         assert not any(role)
         assert not conn.execute("SELECT pg_has_role(current_user,%s,'MEMBER')",(migration_role,)).fetchone()[0]
-        assert conn.execute('SELECT version FROM schema_version').fetchone()[0]==30
+        assert conn.execute('SELECT version FROM schema_version').fetchone()[0]==31
         assert not conn.execute("SELECT has_schema_privilege(current_user,'work','CREATE')").fetchone()[0]
         for table in ('work_effect_attempt','work_effect_attempt_event'):
             assert conn.execute('SELECT has_table_privilege(current_user,%s,%s)',(table,'SELECT,INSERT,UPDATE,DELETE')).fetchone()[0]
