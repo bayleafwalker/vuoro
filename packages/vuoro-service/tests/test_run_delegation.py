@@ -103,7 +103,7 @@ async def test_invalid_owner_projection_fails_closed(overrides):
 def service(owner_lookup):
     calls = []
     registry = CatalogRegistry()
-    for operation in (OP, "work.message.send-v1", "work.run.delegate-v1"):
+    for operation in (OP, "work.lease.currentness-v1", "work.message.send-v1", "work.run.delegate-v1"):
         registry.register(OperationDefinition(
             name=operation, owning_domain="work", input_schema={"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object"},
             result_schema={"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object"}, required_authority="work:read",
@@ -156,3 +156,26 @@ async def test_hosted_resolver_cannot_cross_workspace_or_project_repo_boundary()
             expected_workspace_id="ws-a", allowed_repo_ids=frozenset({"repo-a"}))
         with pytest.raises(DelegatedCredentialInvalid):
             await resolver(request())
+
+
+@pytest.mark.anyio
+async def test_only_exact_owner_currentness_read_is_added_to_delegated_surface():
+    operation="work.lease.currentness-v1"
+    owner=resolved(delegation=Scope(operations=(operation,)),authorities=frozenset({"work:read"}))
+    app,calls=service(lambda _:owner)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url="http://test",
+                                 headers={"Authorization":"Bearer "+TOKEN,"X-Vuoro-Client-Protocol":"1"}) as client:
+        for name,run in ((operation,"run_fixture"),(OP,"run_fixture"),
+                         ("work.run.delegate-v1","run_fixture"),(operation,"run_other")):
+            response=await client.post('/api/invoke/v1',json={"schema_version":"invocation/v1","request_id":"fixture-currentness","operation":name,
+                "arguments":{"run_id":run},"repo_id":"repo-a"})
+            assert response.status_code==(200 if name==operation and run=="run_fixture" else 403)
+        assert len(calls)==1
+        assert calls[0].identity.delegation is owner.delegation
+        assert calls[0].identity.authorities==frozenset({"work:read"})
+    old,calls=service(lambda _:resolved())
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=old),base_url="http://test",
+                                 headers={"Authorization":"Bearer "+TOKEN,"X-Vuoro-Client-Protocol":"1"}) as client:
+        response=await client.post('/api/invoke/v1',json={"schema_version":"invocation/v1","request_id":"fixture-currentness-old","operation":operation,
+            "arguments":{"run_id":"run_fixture"},"repo_id":"repo-a"})
+        assert response.status_code==403 and not calls
