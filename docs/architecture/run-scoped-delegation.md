@@ -280,7 +280,7 @@ watchdog intervals. Historical access and cancellation use their own owner
 authorization; a response cannot undo an already admitted network effect.
 
 `currentness-source.yml` pins clean Sprintctl source commit
-`8fb8224fbf75e8b7d81643a18a457cffa52f97b0` solely for disposable source
+`3bccfaca020c2effb68430f9251b8c9857500fbf` solely for disposable source
 conformance. The actual HTTP service and PostgreSQL owner prove exact run/repo
 scope, denial of all other operations, read-only lost replies, stale basis
 refusal and live owner revocation even with a cached authentication projection.
