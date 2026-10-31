@@ -32,7 +32,7 @@ _QUALIFIED_INPUT_SHA256 = {
     "tools/contracts/pyproject.toml": "cf6acd87c346aac3ed1bec6fd111436af93b113fcf79ff709205b93aa8e6b418",
     "tools/contracts/uv.lock": "74cd467bf25ff11fa74096e35edbb62d3bb0baeb0957fd2b5f3ea5c71b870175",
     "tools/contracts/toolchain/source-pins.json": "0c181359c6777ee1920909ff5a16b6c60a7451cfdf63be90dca0cf682032444c",
-    "tools/contracts/toolchain/tool-artifacts.json": "07d46c0261c25162a4036c8890c99ae267cda52ba7dff2b4783fe878121a6326",
+    "tools/contracts/toolchain/tool-artifacts.json": "54f96bcb60cfd67f1068ff0ab61c4d9a7795f5e3ba5a6b173d8d82b42b28a608",
     "tools/contracts/toolchain/flake.lock": "27ee4fbd30db0101fea9d69cbe4028d7ccdebf5ffdc4f3cf538bcf4fb3de8578",
     "tools/contracts/toolchain/flake.nix": "93bdb4acbdb3acd1232793b7e0f3f381568d29a202ff277ae5de79b7f4019f68",
     "tools/contracts/openapi-python-client.yaml": "59dbde8f0e28cddd825cb5bb83fb6e21db9083551806eeb2f7e1177728f1be80",

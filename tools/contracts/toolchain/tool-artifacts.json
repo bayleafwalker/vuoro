@@ -5289,7 +5289,7 @@
         "@typespec/openapi3/package.json": "738cf26ebae5bf4618be5d619de3858bb3ef51be9d977f7cf7713dda423233dc",
         "@vuoro/contracts/http/main.tsp": "c84a51fdfefee88c9dcd738fcb7d7d3d9b3fdb971cc9912bc7e8138e7712c688",
         "@vuoro/contracts/main.tsp": "b543eb8bc5eb1cd8ea2f04aa2f06f222cc865490beeca9d45a5ded651b2abc02",
-        "@vuoro/contracts/operator-requests/main.tsp": "e021d8f97cd2a49904a0e678d45b322a9db023963f31b1b37b5cffe9ec52c5d3",
+        "@vuoro/contracts/operator-requests/main.tsp": "f6fca834d0eb50775ac9e06777e4c0717c58e9e97a409960432ec828380a8ad0",
         "@vuoro/contracts/package.json": "ea36a9dd4b36f3d014a06c798f4f6950af727b757c0c8b933488ee72311c5878",
         "@vuoro/contracts/primitives/main.tsp": "cf96550faf4474ee840b3554726128a5e8cffc0b4da18bfd8dfd5ededb1c3291",
         "ajv-draft-04/LICENSE": "6e737548e1fc84ae35ef356774ab1f764674f9e0f35b80e77dc2e158d5104fa3",
