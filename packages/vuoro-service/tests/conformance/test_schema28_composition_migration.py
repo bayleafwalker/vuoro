@@ -250,6 +250,9 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
             conn.execute(sql.SQL('GRANT USAGE ON SCHEMA work TO {}').format(sql.Identifier(runtime_role)))
             conn.execute(sql.SQL('GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA work TO {}').format(
                 sql.Identifier(runtime_role)))
+            if conn.execute("SELECT to_regclass('work.operator_continuation_receipt')").fetchone()[0]:
+                conn.execute(sql.SQL('REVOKE UPDATE, DELETE, TRUNCATE ON work.operator_continuation_receipt FROM {}').format(
+                    sql.Identifier(runtime_role)))
             conn.execute(sql.SQL('GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA work TO {}').format(
                 sql.Identifier(runtime_role)))
             conn.execute(sql.SQL('GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA work TO {}').format(
@@ -441,9 +444,15 @@ def test_actual_old_closure_refusal_explicit29_cli_migration_and_runtime_ddl_den
         assert not conn.execute("SELECT pg_has_role(current_user,%s,'MEMBER')", (migration_role,)).fetchone()[0]
         assert conn.execute('SELECT version FROM schema_version').fetchone()[0] == 30
         assert not conn.execute("SELECT has_schema_privilege(current_user,'work','CREATE')").fetchone()[0]
-        for table in NEW_TABLES:
+        for table in NEW_TABLES[:-1]:
             assert conn.execute('SELECT has_table_privilege(current_user,%s,%s)',
                                 (table, 'SELECT,INSERT,UPDATE,DELETE')).fetchone()[0]
+        for privilege in ('SELECT', 'INSERT'):
+            assert conn.execute('SELECT has_table_privilege(current_user,%s,%s)',
+                                (NEW_TABLES[-1], privilege)).fetchone()[0]
+        for privilege in ('UPDATE', 'DELETE', 'TRUNCATE'):
+            assert not conn.execute('SELECT has_table_privilege(current_user,%s,%s)',
+                                    (NEW_TABLES[-1], privilege)).fetchone()[0]
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             with conn.transaction():
                 conn.execute('CREATE TABLE work.must_refuse_schema28_fixture(id integer)')

@@ -8,7 +8,7 @@ import subprocess
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-if os.environ.get('VUUORO_SCHEMA30_PROOF') == '1':
+if os.environ.get('VUORO_SCHEMA30_PROOF') == '1':
     import psycopg
 else:
     psycopg = pytest.importorskip('psycopg')
