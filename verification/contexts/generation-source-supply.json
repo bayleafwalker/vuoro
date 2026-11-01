@@ -5,7 +5,7 @@
   "subject": "Read-only source supply projection and exact restoration fixture; no installed or upgraded compiler qualification",
   "contract_ref": {
     "doc_id": "tools/contracts/SUPPLY.md",
-    "revision": "sha256:90b5558b30d5f554d9f7289bb6bf4acafc9cd54775136fc4b8de9b633b0c9a45"
+    "revision": "sha256:54cdf9dff8081b47d3c4c3eb83d25cf1c5f5dee937c640c5cfccfb6252ba6d66"
   },
   "source_of_truth": "Existing generator-qualified source hashes, npm and uv locks, and local shared TypeSpec source; inventory is only a projection",
   "depth": 1,
@@ -80,12 +80,12 @@
     "changed or missing caller-held inventory"
   ],
   "oracles": [
-    "packages/vuoro-contracts/tests/test_supply_inventory.py"
+    "tests/test_generation_supply_inventory.py"
   ],
   "implementation_anchors": [
     "scripts/contracts/supply_inventory.py",
     "scripts/contracts/generate.py",
-    "packages/vuoro-contracts/tests/test_supply_inventory.py"
+    "tests/test_generation_supply_inventory.py"
   ],
   "expansions": [
     "semantic-doc",

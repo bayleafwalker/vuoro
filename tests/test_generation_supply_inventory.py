@@ -11,7 +11,7 @@ import unittest
 from copy import deepcopy
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/contracts/supply_inventory.py"
 spec = importlib.util.spec_from_file_location("supply_inventory", SCRIPT)
 supply = importlib.util.module_from_spec(spec)

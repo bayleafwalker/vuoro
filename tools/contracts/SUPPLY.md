@@ -22,7 +22,7 @@ Capture an inventory and compare it without rewriting either file:
 ```bash
 python3 scripts/contracts/supply_inventory.py > /tmp/generation-source-supply.json
 python3 scripts/contracts/supply_inventory.py --check /tmp/generation-source-supply.json
-python3 -m unittest discover -s packages/vuoro-contracts/tests -p test_supply_inventory.py
+python3 -m unittest discover -s tests -p test_generation_supply_inventory.py
 ```
 
 The command constructs the complete result before writing stdout. A refusal
@@ -48,3 +48,6 @@ establish licence compatibility, provenance authenticity, support lifecycle,
 or legal permission. Support, cold bootstrap, actual installed artifact
 verification, paid-service requirements, and generation-chain upgrade/rollback
 remain explicitly unestablished. Q3 and the broader EC-00 acceptance stay open.
+
+The inventory cases run in the ordinary repository test suite. They remain
+separate from the original 279-case production generation qualification corpus.
