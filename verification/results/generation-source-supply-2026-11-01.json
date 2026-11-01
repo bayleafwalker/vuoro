@@ -3,9 +3,9 @@
   "context_id": "vuoro.generation-source-supply",
   "contract_ref": {
     "doc_id": "tools/contracts/SUPPLY.md",
-    "revision": "sha256:90b5558b30d5f554d9f7289bb6bf4acafc9cd54775136fc4b8de9b633b0c9a45"
+    "revision": "sha256:54cdf9dff8081b47d3c4c3eb83d25cf1c5f5dee937c640c5cfccfb6252ba6d66"
   },
-  "implementation_sha": "e36b2f6a261c17a4fbaec02bf70e4662969183d8",
+  "implementation_sha": "04a835e28f4144f79afc1990660f5cb9011951c9",
   "depth": 1,
   "environment": {
     "backend": "standard-library read-only source reader; copied isolated fixtures",
@@ -57,21 +57,21 @@
       "result": "example-tested",
       "evidence": [
         "scripts/contracts/supply_inventory.py",
-        "packages/vuoro-contracts/tests/test_supply_inventory.py"
+        "tests/test_generation_supply_inventory.py"
       ]
     },
     {
       "property": "Changed compiler lock refuses without inventory stdout; restoring exact original source bytes recovers identical inventory. Missing inputs/hashes, version mismatches, duplicate identities and symlinks refuse in fixtures",
       "result": "example-tested",
       "evidence": [
-        "packages/vuoro-contracts/tests/test_supply_inventory.py"
+        "tests/test_generation_supply_inventory.py"
       ]
     },
     {
       "property": "13 source inventory cases pass on system3.14.8 and generation3.13.16; all13 plus7 repository distribution boundaries pass on3.12.14 after offline wheel builds",
       "result": "example-tested",
       "evidence": [
-        "packages/vuoro-contracts/tests/test_supply_inventory.py",
+        "tests/test_generation_supply_inventory.py",
         "tests/test_distribution_boundaries.py"
       ]
     },
@@ -90,6 +90,7 @@
     "The actual generation chain was not upgraded. The changed compiler version is a refusal fixture only; Q3 and EC00 remain open.",
     "Initial boundary invocation passed20 but pytest reported cleanup warnings for unrelated preexisting default-base garbage directories. Original log retained; rerun with the explicitly owned base directory passed20 without warnings. No manual cleanup of foreign paths performed.",
     "Ruff exact executable SHA256 matched the existing tool-artifacts manifest; check and format checks passed.",
-    "Private log and inventory captures are host-persistent, not replicated; source/result become cross-host-replicated only after publication. Capture SHA256: {\"q3-pytest-boundaries-original.log\": \"d6dfdcb36ff0ed44108c018adcdbee55bed6c4b19af59064e7fc01b2736d4305\", \"q3-pytest-boundaries.log\": \"908375461a38e9887f07288e2a017dd573a87f60d8b03d7990f00fcc6890affe\", \"q3-python313-tests.log\": \"dd26d39940521afb1d9d937bb4c51b946a80049e7a6005577540f26c699934e3\", \"q3-python314-tests.log\": \"56ef31f5aac0adf358b78436c2363c60f6ab3ae52c582a3811cfc64cce9efe26\", \"q3-source-inventory.json\": \"2bfd831886a227c5aa4840127aa366c3dcd26b722889396179e80709f68cc021\"}"
+    "Private log and inventory captures are host-persistent, not replicated; source/result become cross-host-replicated only after publication. Capture SHA256: {\"q3-pytest-boundaries-original.log\": \"d6dfdcb36ff0ed44108c018adcdbee55bed6c4b19af59064e7fc01b2736d4305\", \"q3-pytest-boundaries.log\": \"908375461a38e9887f07288e2a017dd573a87f60d8b03d7990f00fcc6890affe\", \"q3-python313-tests.log\": \"dd26d39940521afb1d9d937bb4c51b946a80049e7a6005577540f26c699934e3\", \"q3-python314-tests.log\": \"56ef31f5aac0adf358b78436c2363c60f6ab3ae52c582a3811cfc64cce9efe26\", \"q3-source-inventory.json\": \"2bfd831886a227c5aa4840127aa366c3dcd26b722889396179e80709f68cc021\"}",
+    "Initial native CI passed all292 cases but refused the unchanged exact279 production-corpus count. The13 supply cases were moved to ordinary repository tests, preserving the original production gate unchanged. Moved cases pass locally; fresh native qualification is pending."
   ]
 }
