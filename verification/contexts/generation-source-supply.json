@@ -1,0 +1,94 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro.generation-source-supply",
+  "owner_repo": "vuoro",
+  "subject": "Read-only source supply projection and exact restoration fixture; no installed or upgraded compiler qualification",
+  "contract_ref": {
+    "doc_id": "tools/contracts/SUPPLY.md",
+    "revision": "sha256:54cdf9dff8081b47d3c4c3eb83d25cf1c5f5dee937c640c5cfccfb6252ba6d66"
+  },
+  "source_of_truth": "Existing generator-qualified source hashes, npm and uv locks, and local shared TypeSpec source; inventory is only a projection",
+  "depth": 1,
+  "backends": [
+    "stdlib Python source reader",
+    "isolated copied source fixtures"
+  ],
+  "actors": [
+    "source inventory reader",
+    "fixture source mutator"
+  ],
+  "initial_state": [
+    "Canonical be4ad5f qualified generation source inputs unchanged",
+    "No production state, network, installers, generation tool execution or credentials"
+  ],
+  "operations": [
+    {
+      "name": "inventory current qualified source locks",
+      "actors": [
+        "source inventory reader"
+      ]
+    },
+    {
+      "name": "alter or remove source, observe refusal, restore exact source bytes",
+      "actors": [
+        "fixture source mutator",
+        "source inventory reader"
+      ]
+    },
+    {
+      "name": "compare exact inventory bytes to caller-held baseline",
+      "actors": [
+        "source inventory reader"
+      ]
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "Complete deterministic source metadata projection after qualified input digest verification"
+  },
+  "bounds": {
+    "cases": 13,
+    "npm_locations": 175,
+    "python_registry_packages": 29,
+    "local_source_files": 5,
+    "max_source_file_bytes": 16777216,
+    "network_or_live_mutations": false
+  },
+  "invariants": [
+    "Generation-qualified input pins and source files remain unchanged",
+    "Refusal emits no inventory and fixed diagnostic only",
+    "Exact source restoration yields byte-identical inventory",
+    "Licence declaration is metadata only; support and actual upgrade qualification stay unknown"
+  ],
+  "faults": [
+    "changed qualified compiler lock",
+    "missing qualified input",
+    "source symlink",
+    "local source directory symlink",
+    "local package version mismatch",
+    "npm project lock mismatch",
+    "missing npm dependency",
+    "npm version mismatch",
+    "missing or invalid npm artifact integrity",
+    "non-HTTPS npm artifact source",
+    "missing or invalid Python artifact hash",
+    "missing Python artifact",
+    "duplicate Python package identity",
+    "Python direct version mismatch",
+    "Python interpreter lock mismatch",
+    "duplicate JSON key",
+    "changed or missing caller-held inventory"
+  ],
+  "oracles": [
+    "tests/test_generation_supply_inventory.py"
+  ],
+  "implementation_anchors": [
+    "scripts/contracts/supply_inventory.py",
+    "scripts/contracts/generate.py",
+    "tests/test_generation_supply_inventory.py"
+  ],
+  "expansions": [
+    "semantic-doc",
+    "fault-scenario"
+  ]
+}
