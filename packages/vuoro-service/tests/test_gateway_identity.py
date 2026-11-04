@@ -145,6 +145,38 @@ def test_gateway_assertion_resolver_accepts_cloud_contract(tmp_path: Path) -> No
     assert not identity.authorizes_repo("repo-c")
 
 
+
+def test_optional_verified_oauth_scope_and_resource_provenance(tmp_path: Path) -> None:
+    path, private = _key_file(tmp_path)
+    identity = _resolver(path)(_request(_token(private, client_id="client", grant_id="grant",
+        oauth_scopes=["vuoro:work.read", "vuoro:work.claim"], oauth_resource="https://cloud.example/mcp")))
+    assert identity.oauth_scopes == frozenset({"vuoro:work.read", "vuoro:work.claim"})
+    assert identity.oauth_resource == "https://cloud.example/mcp"
+    assert identity.authorities == frozenset({"work:read", "work:write"})
+
+
+@pytest.mark.parametrize("extra", [
+    {"oauth_scopes": ["vuoro:work.read"]},
+    {"oauth_resource": "https://cloud.example/mcp"},
+    {"oauth_scopes": ["vuoro:work.read", "vuoro:work.read"], "oauth_resource": "https://cloud.example/mcp"},
+    {"oauth_scopes": [], "oauth_resource": "https://cloud.example/mcp"},
+    {"oauth_scopes": ["vuoro:work.read"], "oauth_resource": "https://cloud.example/mcp"},
+])
+def test_incomplete_or_invalid_oauth_provenance_refuses(tmp_path: Path, extra: dict) -> None:
+    path, private = _key_file(tmp_path)
+    with pytest.raises(IdentityResolutionError):
+        _resolver(path)(_request(_token(private, **extra)))
+
+
+def test_malformed_oauth_provenance_does_not_consume_replay_entry(tmp_path: Path) -> None:
+    path, private = _key_file(tmp_path)
+    resolver = _resolver(path)
+    common = {"client_id": "client", "grant_id": "grant", "oauth_resource": "https://cloud.example/mcp"}
+    with pytest.raises(IdentityResolutionError):
+        resolver(_request(_token(private, **common, oauth_scopes=[f"scope-{i}" for i in range(33)])))
+    identity = resolver(_request(_token(private, **common, oauth_scopes=["vuoro:work.read"])))
+    assert identity.oauth_scopes == frozenset({"vuoro:work.read"})
+
 def test_gateway_provenance_uses_verified_claims_not_extra_fields(tmp_path: Path) -> None:
     path, private = _key_file(tmp_path)
     issuer = "https://cloud.example:8443"

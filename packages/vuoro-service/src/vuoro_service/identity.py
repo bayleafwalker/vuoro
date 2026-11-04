@@ -87,6 +87,9 @@ class Identity:
     #: Source provenance only; these fields do not authenticate or grant scope.
     gateway_issuer: str | None = None
     gateway_subject: str | None = None
+    #: Original OAuth resource/scopes only when verified in a gateway assertion.
+    oauth_resource: str | None = None
+    oauth_scopes: frozenset[str] | None = None
 
     def __post_init__(self) -> None:
         if self.expires_at is not None and (
@@ -126,6 +129,22 @@ class Identity:
                 != f"{self.gateway_issuer}:{self.gateway_subject}:{self.principal_epoch}"
             ):
                 raise IdentityResolutionError("invalid gateway principal provenance")
+
+        if self.oauth_resource is not None or self.oauth_scopes is not None:
+            if (
+                self.gateway_issuer is None or self.gateway_subject is None
+                or not isinstance(self.client_id, str) or not self.client_id
+                or not isinstance(self.grant_id, str) or not self.grant_id
+                or not isinstance(self.oauth_resource, str)
+                or not 1 <= len(self.oauth_resource) <= 2048
+                or re.fullmatch(r"[\x21-\x7e]+", self.oauth_resource) is None
+                or not isinstance(self.oauth_scopes, frozenset)
+                or not 1 <= len(self.oauth_scopes) <= 32
+                or any(not isinstance(scope, str) or not 1 <= len(scope) <= 128
+                       or re.fullmatch(r"[\x21\x23-\x5b\x5d-\x7e]+", scope) is None
+                       for scope in self.oauth_scopes)
+            ):
+                raise IdentityResolutionError("invalid gateway OAuth provenance")
 
     @property
     def authorized_repositories(self) -> tuple[str, ...]:
