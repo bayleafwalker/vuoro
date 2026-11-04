@@ -93,7 +93,7 @@ def _decode_part(part: str) -> bytes:
 
 
 def _json_part(part: str) -> dict[str, object]:
-    value = json.loads(_decode_part(part), object_pairs_hook=_object, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+    value = json.loads(_decode_part(part).decode("utf-8"), object_pairs_hook=_object, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
     if not isinstance(value, dict):
         raise ValueError("object")
     return value

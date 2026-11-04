@@ -114,6 +114,24 @@ def test_duplicate_json_claims_and_headers_and_malformed_token(setup):
             verify(candidate)
 
 
+@pytest.mark.parametrize("non_utf8_part", ["header", "payload"])
+def test_signed_non_utf8_json_refuses(non_utf8_part):
+    private = Ed25519PrivateKey.generate()
+    header = json.dumps({"alg": "EdDSA", "typ": "JWT", "kid": "key"})
+    claims = dict(asdict(BINDING), iss="issuer", aud=AUDIENCE, jti="id",
+                  iat=995, exp=1025, authority_read_start=990, authority_read_end=994)
+    payload = json.dumps(claims)
+    def encode(data):
+        return base64.urlsafe_b64encode(data).decode().rstrip("=")
+    h = encode(header.encode("utf-16" if non_utf8_part == "header" else "utf-8"))
+    p = encode(payload.encode("utf-16" if non_utf8_part == "payload" else "utf-8"))
+    signed = f"{h}.{p}"
+    token = f"{signed}.{encode(private.sign(signed.encode('ascii')))}"
+    with pytest.raises(AdmissionVerificationError):
+        verify_recipient_admission(token, keys={"key": private.public_key()},
+            issuer="issuer", audience=AUDIENCE, expected=BINDING, now=NOW)
+
+
 def test_cloud_scope_set_and_internal_ceiling_are_distinct(setup):
     claims, sign, verify = setup
     for scopes in (["work:read", "work:evidence"],
