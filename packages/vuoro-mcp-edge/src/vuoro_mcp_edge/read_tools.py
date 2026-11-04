@@ -20,6 +20,7 @@ from .work_source import ForwardedIdentity, ShellWorkSource
 
 ACCEPTANCE_SNAPSHOT = "work.effect.acceptance-snapshot-v1"
 CONTINUATION_DELTA = "work.run.continuation-delta-v1"
+EFFECT_PREVIEW = "work.effect.preview-v1"
 HEX = re.compile(r"^[0-9a-f]{64}$")
 SHA = re.compile(r"^sha256:[0-9a-f]{64}$")
 RUN_ID = re.compile(r"^run_[0-9A-HJKMNP-TV-Z]{26}$")
@@ -27,6 +28,72 @@ MAX_PAGE = 64
 
 _READ_ONLY = {"readOnlyHint": True, "destructiveHint": False,
               "idempotentHint": True, "openWorldHint": False}
+
+_EFFECT_PREVIEW = {
+    "name": "preview_effect", "title": "Preview declared effect",
+    "description": "Read a redacted static declaration for one intent. This does not authorize acceptance or execution.",
+    "inputSchema": {"type": "object", "properties": {
+        "intent_id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,128}$"}},
+        "required": ["intent_id"], "additionalProperties": False},
+    "annotations": _READ_ONLY,
+}
+
+
+def _parse_effect_preview(args: dict[str, Any]) -> dict[str, Any]:
+    if (set(args) != {"intent_id"} or type(args.get("intent_id")) is not str
+            or re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", args["intent_id"]) is None):
+        raise ToolFailure("invalid-arguments", "give one explicit intent id")
+    return {"intent_id": args["intent_id"], "disclose_paths": False}
+
+
+def _effect_projection(value: dict[str, Any], intent_id: str) -> dict[str, Any]:
+    def obj(v: Any, keys: str) -> bool:
+        return type(v) is dict and set(v) == set(keys.split())
+
+    def digest(v: Any) -> bool:
+        return type(v) is str and HEX.fullmatch(v) is not None
+
+    def identifier(v: Any) -> bool:
+        return type(v) is str and re.fullmatch(r"intent_[0-9A-HJKMNP-TV-Z]{26}", v) is not None
+
+    try:
+        b, c, d, r = (value[k] for k in ("basis", "declared_changes", "duplicate_relation", "receipt_source"))
+        valid = (obj(value, "schema basis unified_diff_sha256 declared_changes resources protected_policy external_consequences duplicate_relation receipt_source authorization")
+            and obj(b, "intent_id revision canonical_intent_digest state item_id repository base_commit release_digest")
+            and identifier(b["intent_id"]) and b["intent_id"] == intent_id
+            and _positive(b["revision"]) and _positive(b["item_id"])
+            and digest(b["canonical_intent_digest"]) and (b["release_digest"] is None or digest(b["release_digest"]))
+            and b["state"] in ("proposed", "accepted", "rejected", "applied")
+            and type(b["repository"]) is str and 1 <= len(b["repository"]) <= 200
+            and "\x00" not in b["repository"]
+            and not any(0xD800 <= ord(ch) <= 0xDFFF for ch in b["repository"])
+            and type(b["base_commit"]) is str and re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", b["base_commit"]) is not None
+            and digest(value["unified_diff_sha256"])
+            and obj(c, "status path_count paths redacted truncated")
+            and c["status"] in ("parsed", "unsupported", "unavailable")
+            and ((c["status"] == "parsed" and type(c["path_count"]) is int and 0 <= c["path_count"] <= 1000000)
+                 or (c["status"] != "parsed" and c["path_count"] is None))
+            and c["paths"] == [] and c["redacted"] is True and c["truncated"] is False
+            and value["resources"] == {"status": "not-declared"}
+            and value["protected_policy"] == {"status": "unknown"}
+            and value["external_consequences"] == {"status": "unknown"}
+            and obj(d, "status candidate_intent_ids complete scope")
+            and d["status"] in ("observed", "unknown") and type(d["complete"]) is bool
+            and d["scope"] == "authorized proposed intents, same repository/item/release/content"
+            and type(d["candidate_intent_ids"]) is list and len(d["candidate_intent_ids"]) <= 200
+            and all(identifier(x) for x in d["candidate_intent_ids"])
+            and (d["status"] != "unknown" or (not d["candidate_intent_ids"] and not d["complete"]))
+            and obj(r, "operation acceptance application") and r["operation"] == "work.effect.get-v1"
+            and r["acceptance"] in ("observed", "missing") and r["application"] in ("observed", "missing")
+            and value["authorization"] == "none; owner acceptance and execution checks remain required")
+    except (KeyError, TypeError):
+        valid = False
+    if not valid:
+        raise ToolFailure("owner-response-invalid", "the work owner returned an inconsistent read")
+    # The owner may include other intent IDs for a caller with list authority.
+    # This narrow tool is not an enumeration surface.
+    return {**{k: v for k, v in value.items() if k != "duplicate_relation"},
+            "basis": {k: v for k, v in b.items() if k != "repository"}}
 
 _PREVIEW = {
     "name": "preview_acceptance", "title": "Preview exact-artifact acceptance evidence",
@@ -168,10 +235,20 @@ class _OwnerReads:
                 self._retry_at = time.monotonic() + 3.0
         return self._advertised is not None and operation in self._advertised
 
-    async def invoke(self, operation: str, args: dict[str, Any], caller: ForwardedIdentity,
-                     result_key: str, expected_schema: str) -> dict[str, Any]:
+    async def available_read(self, operation: str) -> bool:
         try:
-            value = await self.source._invoke(operation, args, caller)
+            await asyncio.wait_for(self.source._ensure_catalog(), 1.0)
+        except (WorkSourceUnavailable, asyncio.TimeoutError):
+            return False
+        return operation in self.source._read_operations
+
+    async def invoke(self, operation: str, args: dict[str, Any], caller: ForwardedIdentity,
+                     result_key: str, expected_schema: str, *, require_read: bool = False) -> dict[str, Any]:
+        try:
+            if require_read:
+                value = await self.source._invoke(operation, args, caller, require_read=True)
+            else:
+                value = await self.source._invoke(operation, args, caller)
         except WorkSourceUnavailable as error:
             if error.code == "authority-required":
                 raise ToolFailure("authority-required", "the current caller lacks an owner read authority") from error
@@ -181,6 +258,7 @@ class _OwnerReads:
                 raise ToolFailure("stale-cursor", "owner facts changed; restart this bounded read") from error
             raise ToolFailure("owner-read-unavailable", "the work owner could not supply this read") from error
         if (type(value) is not dict or value.get("repo_id") != caller.repo_id
+                or (require_read and set(value) != {"repo_id", result_key})
                 or type(value.get(result_key)) is not dict
                 or value[result_key].get("schema") != expected_schema):
             raise ToolFailure("owner-response-invalid", "the work owner returned an inconsistent read")
@@ -196,6 +274,14 @@ def build_toolset(context: ToolsetContext) -> ToolSet:
     async def describe_delta():
         return _DELTA if await owner.available(CONTINUATION_DELTA) else None
 
+    async def describe_effect_preview():
+        return _EFFECT_PREVIEW if await owner.available_read(EFFECT_PREVIEW) else None
+
+    async def effect_preview(args: dict[str, Any], caller: ForwardedIdentity) -> dict[str, Any]:
+        value = await owner.invoke(EFFECT_PREVIEW, args, caller, "preview",
+                                   "sprintctl-declared-effect-preview/v1", require_read=True)
+        return _effect_projection(value, args["intent_id"])
+
     async def preview(args: dict[str, Any], caller: ForwardedIdentity) -> dict[str, Any]:
         return await owner.invoke(ACCEPTANCE_SNAPSHOT, args, caller, "snapshot",
                                   "sprintctl-effect-acceptance-snapshot/v1")
@@ -206,6 +292,9 @@ def build_toolset(context: ToolsetContext) -> ToolSet:
 
     return ToolSet("owner-read-projections", (
         build_explanation_spec(context.work_source),
+        ToolSpec("preview_effect", "effect-read", _EFFECT_PREVIEW, _parse_effect_preview, effect_preview,
+                 describe=describe_effect_preview,
+                 required_authorities=frozenset({"work:read", "work.effect.get"})),
         ToolSpec("preview_acceptance", "effect-read", _PREVIEW, _parse_preview, preview,
                  describe=describe_preview,
                  required_authorities=frozenset({"work:read", "work.effect.get"})),
