@@ -13,7 +13,7 @@ from vuoro_service.gateway_identity import (
     GatewayAssertionConfigurationError,
     GatewayAssertionIdentityResolver,
 )
-from vuoro_service.identity import IdentityResolutionError
+from vuoro_service.identity import Identity, IdentityResolutionError
 
 WORKSPACE_ID = "01K11111111111111111111111"
 ENVIRONMENT = "vuoro-cloud-ws-01k111111111"
@@ -136,10 +136,57 @@ def test_gateway_assertion_resolver_accepts_cloud_contract(tmp_path: Path) -> No
     assert identity.environment == ENVIRONMENT
     assert identity.workspace_id == WORKSPACE_ID
     assert identity.principal_epoch == 0
+    assert identity.gateway_issuer == CLOUD_ISSUER
+    assert identity.gateway_subject == USER_SUBJECT
+    assert identity.principal_id == f"{CLOUD_ISSUER}:{USER_SUBJECT}:0"
     assert identity.authorities == frozenset({"work:read", "work:write"})
     assert identity.invocation_id is None and identity.attempt_id is None
     assert identity.authorizes_repo("repo-a")
     assert not identity.authorizes_repo("repo-c")
+
+
+def test_gateway_provenance_uses_verified_claims_not_extra_fields(tmp_path: Path) -> None:
+    path, private = _key_file(tmp_path)
+    issuer = "https://cloud.example:8443"
+    resolver = GatewayAssertionIdentityResolver.from_file(
+        path, issuer=issuer, environment=ENVIRONMENT, expected_workspace_id=WORKSPACE_ID,
+        allowed_repo_ids=frozenset({"repo-a"}),
+    )
+    identity = resolver(_request(_token(
+        private, iss=issuer, subject="opaque-42", principal_epoch=7,
+        gateway_issuer="forged", gateway_subject="forged", principal_id="forged:other:7",
+    )))
+    assert (identity.gateway_issuer, identity.gateway_subject) == (issuer, "opaque-42")
+    assert identity.principal_id == f"{issuer}:opaque-42:7"
+    assert identity.principal_epoch == 7
+    assert identity.authorities == frozenset({"work:read", "work:write"})
+
+
+@pytest.mark.parametrize("overrides", [
+    {"gateway_issuer": "issuer"},
+    {"gateway_subject": "subject"},
+    {"gateway_issuer": "", "gateway_subject": "subject"},
+    {"gateway_issuer": " issuer", "gateway_subject": "subject"},
+    {"gateway_issuer": "issuer", "gateway_subject": ""},
+    {"gateway_issuer": "issuer", "gateway_subject": "a:b"},
+    {"gateway_issuer": 1, "gateway_subject": "subject"},
+    {"gateway_issuer": "issuer", "gateway_subject": 1},
+    {"gateway_issuer": "other", "gateway_subject": "subject"},
+    {"gateway_issuer": "issuer", "gateway_subject": "other"},
+    {"gateway_issuer": "issuer", "gateway_subject": "subject", "principal_epoch": None},
+    {"gateway_issuer": "issuer", "gateway_subject": "subject", "principal_id": None},
+    {"gateway_issuer": "issuer", "gateway_subject": "subject", "principal_id": "issuer:subject:1"},
+])
+def test_identity_rejects_invalid_gateway_provenance(overrides: dict) -> None:
+    fields = {"principal_id": "issuer:subject:0", "principal_epoch": 0}
+    fields.update(overrides)
+    with pytest.raises(IdentityResolutionError):
+        Identity(actor="actor", environment="test", **fields)
+
+
+def test_identity_without_gateway_provenance_has_no_source_pair() -> None:
+    identity = Identity(actor="actor", environment="test", principal_id="issuer:subject:0")
+    assert identity.gateway_issuer is None and identity.gateway_subject is None
 
 
 @pytest.mark.parametrize(

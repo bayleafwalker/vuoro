@@ -471,6 +471,8 @@ class GatewayAssertionIdentityResolver:
             workspace_id=workspace_id,
             principal_id=f"{self._issuer}:{subject}:{epoch}",
             principal_epoch=epoch,
+            gateway_issuer=self._issuer,
+            gateway_subject=subject,
             client_id=client_id,
             grant_id=grant_id,
             invocation_id=invocation_id,

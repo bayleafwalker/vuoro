@@ -27,6 +27,7 @@ PRINCIPAL_ID = re.compile(r"^.+:[^:\s]+:(?:0|[1-9][0-9]*)$")
 #: purpose is to be a fixed literal that makes machine-written changes
 #: distinguishable from a person's.
 SYSTEM_PRINCIPAL_ID = re.compile(r"^[a-z][a-z0-9-]*/v[1-9][0-9]*$")
+_GATEWAY_SUBJECT = re.compile(r"^[A-Za-z0-9._-]+$")
 
 #: An identity's ``repo_ids`` containing this sentinel is authorized for
 #: every repository, not an enumerated set. Matches how the two production
@@ -83,6 +84,9 @@ class Identity:
     #: Verified parent credential expiry, when supplied by its authenticator.
     #: Domain owners use this bound when minting narrower child credentials.
     expires_at: datetime | None = None
+    #: Source provenance only; these fields do not authenticate or grant scope.
+    gateway_issuer: str | None = None
+    gateway_subject: str | None = None
 
     def __post_init__(self) -> None:
         if self.expires_at is not None and (
@@ -110,6 +114,18 @@ class Identity:
             or not self.principal_id.endswith(f":{self.principal_epoch}")
         ):
             raise IdentityResolutionError("principal_epoch disagrees with principal_id")
+        if self.gateway_issuer is not None or self.gateway_subject is not None:
+            if (
+                not isinstance(self.gateway_issuer, str)
+                or not self.gateway_issuer
+                or self.gateway_issuer != self.gateway_issuer.strip()
+                or not isinstance(self.gateway_subject, str)
+                or not _GATEWAY_SUBJECT.fullmatch(self.gateway_subject)
+                or self.principal_epoch is None
+                or self.principal_id
+                != f"{self.gateway_issuer}:{self.gateway_subject}:{self.principal_epoch}"
+            ):
+                raise IdentityResolutionError("invalid gateway principal provenance")
 
     @property
     def authorized_repositories(self) -> tuple[str, ...]:
