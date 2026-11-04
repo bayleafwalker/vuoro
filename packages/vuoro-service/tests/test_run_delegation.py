@@ -49,7 +49,7 @@ def primary():
 @pytest.mark.anyio
 async def test_only_owner_digest_is_sent_and_identity_keeps_exact_binding():
     digests = []
-    owner = resolved()
+    owner = resolved(gateway_issuer="untrusted", gateway_subject="untrusted")
     resolver = DelegatedBearerIdentityResolver(primary(), environment="dev",
         lookup=lambda digest: digests.append(digest) or owner)
     identity = await resolver(request())
@@ -58,6 +58,7 @@ async def test_only_owner_digest_is_sent_and_identity_keeps_exact_binding():
     assert identity.delegation is owner.delegation
     assert identity.repo_ids == frozenset({"repo-a"})
     assert identity.authorities == frozenset({"work:read", "work:evidence"})
+    assert identity.gateway_issuer is None and identity.gateway_subject is None
     assert (identity.principal_id, identity.workspace_id, identity.client_id, identity.grant_id) == (
         "test:parent:0", "ws-a", "client-a", "grant-a")
 

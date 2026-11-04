@@ -27,6 +27,7 @@ PRINCIPAL_ID = re.compile(r"^.+:[^:\s]+:(?:0|[1-9][0-9]*)$")
 #: purpose is to be a fixed literal that makes machine-written changes
 #: distinguishable from a person's.
 SYSTEM_PRINCIPAL_ID = re.compile(r"^[a-z][a-z0-9-]*/v[1-9][0-9]*$")
+_GATEWAY_SUBJECT = re.compile(r"^[A-Za-z0-9._-]+$")
 
 #: An identity's ``repo_ids`` containing this sentinel is authorized for
 #: every repository, not an enumerated set. Matches how the two production
@@ -83,6 +84,12 @@ class Identity:
     #: Verified parent credential expiry, when supplied by its authenticator.
     #: Domain owners use this bound when minting narrower child credentials.
     expires_at: datetime | None = None
+    #: Source provenance only; these fields do not authenticate or grant scope.
+    gateway_issuer: str | None = None
+    gateway_subject: str | None = None
+    #: Original OAuth resource/scopes only when verified in a gateway assertion.
+    oauth_resource: str | None = None
+    oauth_scopes: frozenset[str] | None = None
 
     def __post_init__(self) -> None:
         if self.expires_at is not None and (
@@ -110,6 +117,34 @@ class Identity:
             or not self.principal_id.endswith(f":{self.principal_epoch}")
         ):
             raise IdentityResolutionError("principal_epoch disagrees with principal_id")
+        if self.gateway_issuer is not None or self.gateway_subject is not None:
+            if (
+                not isinstance(self.gateway_issuer, str)
+                or not self.gateway_issuer
+                or self.gateway_issuer != self.gateway_issuer.strip()
+                or not isinstance(self.gateway_subject, str)
+                or not _GATEWAY_SUBJECT.fullmatch(self.gateway_subject)
+                or self.principal_epoch is None
+                or self.principal_id
+                != f"{self.gateway_issuer}:{self.gateway_subject}:{self.principal_epoch}"
+            ):
+                raise IdentityResolutionError("invalid gateway principal provenance")
+
+        if self.oauth_resource is not None or self.oauth_scopes is not None:
+            if (
+                self.gateway_issuer is None or self.gateway_subject is None
+                or not isinstance(self.client_id, str) or not self.client_id
+                or not isinstance(self.grant_id, str) or not self.grant_id
+                or not isinstance(self.oauth_resource, str)
+                or not 1 <= len(self.oauth_resource) <= 2048
+                or re.fullmatch(r"[\x21-\x7e]+", self.oauth_resource) is None
+                or not isinstance(self.oauth_scopes, frozenset)
+                or not 1 <= len(self.oauth_scopes) <= 32
+                or any(not isinstance(scope, str) or not 1 <= len(scope) <= 128
+                       or re.fullmatch(r"[\x21\x23-\x5b\x5d-\x7e]+", scope) is None
+                       for scope in self.oauth_scopes)
+            ):
+                raise IdentityResolutionError("invalid gateway OAuth provenance")
 
     @property
     def authorized_repositories(self) -> tuple[str, ...]:

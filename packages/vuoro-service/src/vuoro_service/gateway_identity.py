@@ -389,6 +389,22 @@ class GatewayAssertionIdentityResolver:
         # run handles bind to them.
         client_id = _optional_text(claims.get("client_id"), "client_id")
         grant_id = _optional_text(claims.get("grant_id"), "grant_id")
+        oauth_scopes = None
+        oauth_resource = None
+        if "oauth_scopes" in claims or "oauth_resource" in claims:
+            if "oauth_scopes" not in claims or "oauth_resource" not in claims:
+                raise IdentityResolutionError("gateway OAuth provenance must be paired")
+            oauth_scopes = frozenset(_bounded_strings(claims["oauth_scopes"], "oauth_scopes"))
+            oauth_resource = _required_text(claims["oauth_resource"], "oauth_resource")
+            if (
+                client_id is None or grant_id is None
+                or len(oauth_scopes) > 32
+                or any(len(scope) > 128 or re.fullmatch(r"[\x21\x23-\x5b\x5d-\x7e]+", scope) is None
+                       for scope in oauth_scopes)
+                or len(oauth_resource) > 2048
+                or re.fullmatch(r"[\x21-\x7e]+", oauth_resource) is None
+            ):
+                raise IdentityResolutionError("gateway OAuth provenance is invalid")
         invocation_present = "invocation_id" in claims
         attempt_present = "attempt_id" in claims
         if invocation_present != attempt_present:
@@ -471,6 +487,10 @@ class GatewayAssertionIdentityResolver:
             workspace_id=workspace_id,
             principal_id=f"{self._issuer}:{subject}:{epoch}",
             principal_epoch=epoch,
+            gateway_issuer=self._issuer,
+            gateway_subject=subject,
+            oauth_resource=oauth_resource,
+            oauth_scopes=oauth_scopes,
             client_id=client_id,
             grant_id=grant_id,
             invocation_id=invocation_id,
