@@ -122,6 +122,20 @@ def test_signed_and_expected_bindings_must_compose_recipient(setup, field, value
                expected=replace(BINDING, **{field: value}))
 
 
+@pytest.mark.parametrize("subject", ["name:part", "naïve"])
+def test_signed_and_expected_subjects_must_match_gateway_syntax(setup, subject):
+    claims, sign, verify = setup
+    invalid = replace(BINDING, subject=subject, recipient_principal=f"gateway:{subject}:1")
+    claims.update(subject=subject, recipient_principal=invalid.recipient_principal)
+    invalid_token = sign()
+    for expected in (BINDING, invalid):
+        with pytest.raises(AdmissionVerificationError):
+            verify(invalid_token, expected=expected)
+    claims.update(asdict(BINDING))
+    with pytest.raises(AdmissionVerificationError):
+        verify(sign(), expected=invalid)
+
+
 def test_duplicate_json_claims_and_headers_and_malformed_token(setup):
     claims, sign, verify = setup
     token = sign()
