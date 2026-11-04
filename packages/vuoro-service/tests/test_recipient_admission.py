@@ -14,7 +14,7 @@ from vuoro_service.recipient_admission import (
 NOW = 1000
 BINDING = AdmissionBinding(
     operation=OPERATION, caller="caller", request="request", resolution="resolution",
-    work="work", binding="binding", recipient_principal="recipient",
+    work="work", binding="binding", recipient_principal="gateway:subject:1",
     recipient_instance="instance", workspace="workspace", repo="repo",
     gateway_issuer="gateway", subject="subject", grant="grant", client="client",
     epoch=1, resource="resource", scopes=("vuoro:work.read", "vuoro:evidence.record"),
@@ -100,6 +100,28 @@ def test_trust_inputs_and_old_assertions_fail(setup):
             verify(sign(data))
 
 
+@pytest.mark.parametrize("field,value", [
+    ("gateway_issuer", "other-gateway"),
+    ("subject", "other-subject"),
+    ("epoch", 2),
+    ("recipient_principal", "gateway:subject:2"),
+])
+def test_signed_and_expected_bindings_must_compose_recipient(setup, field, value):
+    claims, sign, verify = setup
+    claims[field] = value
+    token = sign()
+    # A matching trusted tuple must not legitimize an internally inconsistent
+    # signed assertion; a valid trusted tuple must also reject the assertion.
+    for expected in (replace(BINDING, **{field: value}), BINDING):
+        with pytest.raises(AdmissionVerificationError):
+            verify(token, expected=expected)
+    # The trusted binding is independently required to be internally valid.
+    with pytest.raises(AdmissionVerificationError):
+        verify(sign(dict(asdict(BINDING), iss="issuer", aud=AUDIENCE, jti="unique-id",
+                         iat=995, exp=1025, authority_read_start=990, authority_read_end=994)),
+               expected=replace(BINDING, **{field: value}))
+
+
 def test_duplicate_json_claims_and_headers_and_malformed_token(setup):
     claims, sign, verify = setup
     token = sign()
@@ -156,4 +178,6 @@ def test_read_must_end_before_assertion_expiry(setup):
 def test_gateway_text_is_not_artificially_truncated(setup):
     claims, sign, verify = setup
     claims["subject"] = "a" * 513
-    assert verify(sign(), expected=replace(BINDING, subject=claims["subject"])).binding.subject == claims["subject"]
+    claims["recipient_principal"] = f"gateway:{claims['subject']}:1"
+    expected = replace(BINDING, subject=claims["subject"], recipient_principal=claims["recipient_principal"])
+    assert verify(sign(), expected=expected).binding.subject == claims["subject"]

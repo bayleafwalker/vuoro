@@ -114,6 +114,7 @@ def _valid_binding(binding: AdmissionBinding) -> bool:
         elif not _text(value):
             return False
     return (binding.operation == OPERATION and binding.effective_scope == "work:read"
+            and binding.recipient_principal == f"{binding.gateway_issuer}:{binding.subject}:{binding.epoch}"
             and set(binding.scopes) <= _CLOUD_SCOPES
             and {"vuoro:work.read", "vuoro:evidence.record"} <= set(binding.scopes))
 
