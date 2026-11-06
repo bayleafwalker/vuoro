@@ -18,7 +18,7 @@ BOUND = 'work.effect.propose-bound-v1'
 
 
 def assert_installed_composition():
-    expected = {'vuoro-service': ('vuoro_service','0.1.103'),
+    expected = {'vuoro-service': ('vuoro_service','0.1.104'),
                 'sprintctl': ('sprintctl','0.28.0'),
                 'vuoro-adapter-kit': ('vuoro_adapter_kit','0.2.2'),
                 'vuoro-schema-runtime': ('vuoro_schema_runtime','0.1.0'),

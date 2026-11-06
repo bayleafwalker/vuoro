@@ -3,7 +3,7 @@
 Modular HTTP and process shell that composes immutable, released owner
 adapters. Domain state machines and migrations remain in their owner packages.
 
-Service 0.1.103 is a source candidate pinning Sprintctl 0.28.0 and
+Service 0.1.104 is a source candidate pinning Sprintctl 0.28.0 and
 vuoro-workspace 0.1.1. Sprintctl requires work schema 31; the workspace owner
 keeps knowledge schema 1. The published owner also exposes an outcome-report
 write operation and read-only lease currentness; currentness reports
