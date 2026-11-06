@@ -643,17 +643,31 @@ jobs:
           VUORO_103_KNOWLEDGE_RUNTIME: postgresql://schema27_knowledge_runtime:schema27-ci-only@127.0.0.1:5432/lease_conformance_schema28_currentness_ci
           VUORO_103_MANIFEST: ${{ github.workspace }}/packages/vuoro-service/composition/adapter-pins.json
           VUORO_103_WHEELS: ${{ github.workspace }}/dist/adapters
-          VUORO_103_ATTESTATION: /tmp/vuoro-schema31-installed.json
-          VUORO_103_OWNER_PREFIX: /tmp/vuoro-bound-released-composition
+          VUORO_103_ATTESTATION: /tmp/vuoro-service103-installed.json
+          VUORO_103_OWNER_PREFIX: /tmp/vuoro-service103-composition
         run: |
           set -euo pipefail
+          # Preserve the published 0.1.103 claim independently of the candidate wheel.
+          mkdir -p /tmp/vuoro-service103-wheel
+          curl --fail --location --silent --show-error \
+            https://github.com/bayleafwalker/vuoro/releases/download/vuoro-service-v0.1.103/vuoro_service-0.1.103-py3-none-any.whl \
+            --output /tmp/vuoro-service103-wheel/vuoro_service-0.1.103-py3-none-any.whl
+          echo '951438d5fed53969136cb448212149e0b5adbd28aef3d85aaab2e95862f5a4df  /tmp/vuoro-service103-wheel/vuoro_service-0.1.103-py3-none-any.whl' | sha256sum --check
+          uv venv --python 3.12 "$VUORO_103_OWNER_PREFIX"
+          uv pip install --no-config --python "$VUORO_103_OWNER_PREFIX/bin/python" \
+            /tmp/vuoro-service103-wheel/vuoro_service-0.1.103-py3-none-any.whl \
+            'httpx>=0.27,<1' 'pytest>=8.3,<9' 'psycopg[binary]>=3.1,<4' 'click>=8.1'
+          uv pip install --no-config --python "$VUORO_103_OWNER_PREFIX/bin/python" --no-deps dist/adapters/*.whl
+          uv pip check --python "$VUORO_103_OWNER_PREFIX/bin/python"
+          "$VUORO_103_OWNER_PREFIX/bin/python" -I scripts/attest_installed_composition.py \
+            packages/vuoro-service/composition/adapter-pins.json dist/adapters "$VUORO_103_ATTESTATION"
           psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U m14 -d m14_scenario <<'SQL'
           CREATE DATABASE lease_conformance_schema28_currentness_ci;
           GRANT CONNECT,CREATE ON DATABASE lease_conformance_schema28_currentness_ci TO schema27_work_migration,schema27_audit_migration,schema27_knowledge_migration;
           GRANT CONNECT ON DATABASE lease_conformance_schema28_currentness_ci TO schema27_work_runtime,schema27_audit_runtime,schema27_knowledge_runtime;
           SQL
           psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U m14 -d lease_conformance_schema28_currentness_ci -c 'CREATE SCHEMA work AUTHORIZATION schema27_work_migration'
-          env -u PGPASSWORD /tmp/vuoro-bound-released-composition/bin/sprintctl remote-schema migrate --url "$VUORO_103_WORK_MIGRATION" --json
+          env -u PGPASSWORD "$VUORO_103_OWNER_PREFIX/bin/sprintctl" remote-schema migrate --url "$VUORO_103_WORK_MIGRATION" --json
           psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U m14 -d lease_conformance_schema28_currentness_ci <<'SQL'
           GRANT USAGE ON SCHEMA work TO schema27_work_runtime;
           GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA work TO schema27_work_runtime;
@@ -661,7 +675,7 @@ jobs:
           GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA work TO schema27_work_runtime;
           GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA work TO schema27_work_runtime;
           SQL
-          env -u PGPASSWORD /tmp/vuoro-bound-released-composition/bin/python -m pytest --import-mode=importlib \
+          env -u PGPASSWORD "$VUORO_103_OWNER_PREFIX/bin/python" -m pytest --import-mode=importlib \
             packages/vuoro-service/tests/conformance/test_service103_currentness_installed.py -q -rs
       - name: Protected effect binding on the released schema-21 owner
         env:
