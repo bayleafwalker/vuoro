@@ -60,6 +60,15 @@ Record a fresh, timestamped register for Vuoro and Cloud: source commit, signed 
 
 **Owner:** Vuoro product/technical owner with the owning domain repositories. **Depends on:** A; current release composition; a safe test workspace and a named protected operation with a recoverable effect.
 
+The [6 November outcome-settlement proposal](2026-11-06-outcome-settlement-proposal.md)
+specifies a bounded candidate for this gate: publish one analytics partition in a
+disposable lab, lose the response after the target commits, and have a separately
+authorized successor reconcile without reapplying. It separates effect
+authorization, target evidence and work acceptance, reuses the existing owners,
+and supplies owner plans and falsification cases. The proposal is planning scope,
+not qualification evidence or a replacement for C/C2, the hosted-to-native
+scenario, or the 29 October managed-service amendment.
+
 Choose and document one real household-service improvement from objective through operation. Specify the objective and stopping conditions; work item and dependencies; knowledge and artifact inputs; each agent/session/attempt identity; delegated scope; required evidence and verification profile; reviewer decision; protected execution authority; target acknowledgement; independent outcome observation; and recovery behavior. Select the household outcome and measurement before implementation.
 
 Run the workflow through the actual supported route. Interrupt it at a point where effect status may be uncertain; recover by querying the target and reconciling before retry. Include a second agent or provider continuing from durable records without private predecessor chat. Preserve rejected or superseded reports as evidence without allowing them to settle current work.
