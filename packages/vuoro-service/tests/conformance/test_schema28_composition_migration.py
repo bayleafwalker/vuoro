@@ -44,6 +44,8 @@ INBOX_OPERATIONS = ('work.agent.register-v1', 'work.agent.observe-v1', 'work.age
                     'work.message.cancel-v1')
 # New owner request tables introduced in schema 28; compare every preexisting row.
 NEW_TABLES = ('operator_request', 'operator_request_dependant', 'operator_request_event', 'operator_continuation_receipt')
+SCHEMA32_34_TABLES = ('operator_request_recipient_binding', 'operator_request_delivery',
+                      'operator_request_delivery_key', 'agent_capability_revision')
 NAMES = ('VUORO_SCHEMA27_MIGRATION_PG_URL', 'VUORO_SCHEMA27_RUNTIME_PG_URL',
          'VUORO_SCHEMA27_OWNER_PYTHON', 'VUORO_SCHEMA28_MANIFEST', 'VUORO_SCHEMA28_WHEEL_DIR',
          'VUORO_SCHEMA28_ATTESTATION', 'VUORO_SCHEMA27_AUDIT_MIGRATION_PG_URL',
@@ -264,7 +266,7 @@ def test_actual_old_closure_refusal_explicit34_cli_migration_and_runtime_ddl_den
                 "SELECT tablename FROM pg_tables WHERE schemaname='work' ORDER BY tablename")]
             rows = {}
             for table in tables:
-                if table in ('schema_version', 'operator_continuation_receipt') or (source_schema == 27 and table in NEW_TABLES):
+                if table in ('schema_version', 'operator_continuation_receipt', *SCHEMA32_34_TABLES) or (source_schema == 27 and table in NEW_TABLES):
                     continue
                 values = conn.execute(sql.SQL('SELECT to_jsonb(t) FROM {} t').format(sql.Identifier(table))).fetchall()
                 projected = [r[0] for r in values]
@@ -348,6 +350,12 @@ def test_actual_old_closure_refusal_explicit34_cli_migration_and_runtime_ddl_den
     checked = remote_schema('check', runtime)
     assert checked.returncode == 0 and json.loads(checked.stdout)['compatible'] is True
     assert legacy_rows() == before
+    added_tables = set(SCHEMA32_34_TABLES) | ({*NEW_TABLES} if source_schema == 27 else {'operator_continuation_receipt'})
+    with psycopg.connect(migration) as conn:
+        tables = {r[0] for r in conn.execute("SELECT tablename FROM pg_tables WHERE schemaname='work'")}
+        assert tables == set(before) | added_tables | {'schema_version'}
+        for table in SCHEMA32_34_TABLES:
+            assert conn.execute(sql.SQL('SELECT count(*) FROM {}').format(sql.Identifier('work', table))).fetchone()[0] == 0
     if source_schema == 28:
         assert old_state['lease_id']
         with psycopg.connect(migration) as conn:
