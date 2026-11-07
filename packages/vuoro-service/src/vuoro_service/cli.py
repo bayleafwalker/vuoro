@@ -36,6 +36,35 @@ def build_parser() -> argparse.ArgumentParser:
 MCP_APP_FACTORY = "vuoro_mcp_edge.composition:create_app_from_environment"
 
 
+def serve_private_delivery_app(app) -> None:
+    """Run a precomposed owner-only app on pod loopback with no proxy rewriting.
+
+    This is an explicit hosting-composition API, not a CLI flag. The caller
+    must first build the app with a process-owned ingress guard. It cannot
+    expose owner routes on the general shell listener at port 8080.
+    """
+    import uvicorn
+
+    expected_routes = {
+        "/internal/operator-request-delivery/v1",
+        "/internal/operator-request-delivery/v1/resolve",
+        "/internal/operator-request-delivery/v1/receipts",
+    }
+    routes = {
+        route.path for route in getattr(app, "routes", ()) if hasattr(route, "path")
+    }
+    if routes != expected_routes:
+        raise ValueError("private listener requires the exact owner-only route set")
+
+    uvicorn.run(
+        app,
+        host="127.0.0.1",
+        port=8082,
+        proxy_headers=False,
+        workers=1,
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
