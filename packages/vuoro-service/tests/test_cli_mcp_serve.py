@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 import vuoro_service
+from fastapi import FastAPI
 from vuoro_service import cli
 
 SRC = Path(vuoro_service.__file__).parent
@@ -36,6 +37,41 @@ def test_mcp_serve_runs_the_edge_factory(monkeypatch) -> None:
     ((args, kwargs),) = calls
     assert args == ("vuoro_mcp_edge.composition:create_app_from_environment",)
     assert kwargs == {"factory": True, "host": "127.0.0.1", "port": 8081, "workers": 1}
+
+
+def test_private_owner_listener_is_loopback_only_without_proxy_rewriting(monkeypatch):
+    import uvicorn
+    from vuoro_service.cli import serve_private_delivery_app
+
+    app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None)
+    for path in (
+        "/internal/operator-request-delivery/v1",
+        "/internal/operator-request-delivery/v1/resolve",
+        "/internal/operator-request-delivery/v1/receipts",
+    ):
+        app.add_api_route(path, lambda: {"ok": True}, methods=["POST"])
+    calls: list[tuple[object, dict]] = []
+    monkeypatch.setattr(uvicorn, "run", lambda target, **kwargs: calls.append((target, kwargs)))
+    serve_private_delivery_app(app)
+    [(target, kwargs)] = calls
+    assert target is app
+    assert kwargs == {
+        "host": "127.0.0.1",
+        "port": 8082,
+        "proxy_headers": False,
+        "workers": 1,
+    }
+
+
+def test_private_owner_listener_refuses_non_owner_routes(monkeypatch):
+    import uvicorn
+    from vuoro_service.cli import serve_private_delivery_app
+
+    app = FastAPI()
+    app.get("/health/live")(lambda: {"ok": True})
+    monkeypatch.setattr(uvicorn, "run", lambda *_args, **_kwargs: pytest.fail("must not start"))
+    with pytest.raises(ValueError, match="exact owner-only route set"):
+        serve_private_delivery_app(app)
 
 
 @pytest.mark.parametrize("command", ["serve", "mcp-serve"])

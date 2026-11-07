@@ -7,20 +7,27 @@ registry, but cannot add, replace, or remove catalog operations.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass, fields
+import base64
+import binascii
 import hashlib
 import importlib
-from importlib.metadata import PackageNotFoundError, distribution, version
 import json
-from pathlib import Path
 import re
 import time
-from typing import Any, Callable
+from collections.abc import Callable, Mapping
+from contextlib import contextmanager
+from dataclasses import dataclass, fields
+from importlib.metadata import PackageNotFoundError, distribution, version
+from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from vuoro_service.app import ServiceSettings, create_app
 from vuoro_service.catalog import CatalogRegistry
+from vuoro_service.cloud_service_identity import load_cloud_service_assertion_verifier
 from vuoro_service.contracts import DomainCompatibility
 from vuoro_service.edge_proof import (
     EdgeProofConfigurationError,
@@ -45,7 +52,6 @@ from vuoro_service.project_binding import (
     compose_authorized_project_application,
     load_project_bindings,
 )
-
 
 #: Every deployable composition pins exactly these domains. ``knowledge`` is
 #: the released vuoro-workspace owner adapter
@@ -949,6 +955,159 @@ def _compatibility(domain: str, record: Mapping[str, Any], pin: AdapterPin) -> D
     )
 
 
+def _load_recipient_admission_keys(path: Path) -> dict[str, Ed25519PublicKey]:
+    """Load only a bounded, exact public keyset; never accept private material."""
+    try:
+        if path.stat().st_size > 16_384:
+            raise ValueError
+        document = json.loads(
+            path.read_text(encoding="utf-8"),
+            object_pairs_hook=_json_object_without_duplicates,
+        )
+        if (
+            not isinstance(document, dict)
+            or set(document) != {"schema", "keys"}
+            or document["schema"] != "vuoro-recipient-admission-public-keys/v1"
+            or not isinstance(document["keys"], dict)
+            or not 1 <= len(document["keys"]) <= 16
+        ):
+            raise ValueError
+        result = {}
+        for kid, encoded in document["keys"].items():
+            if (
+                not isinstance(kid, str)
+                or not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", kid)
+                or not isinstance(encoded, str)
+                or not encoded
+            ):
+                raise ValueError
+            raw = base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4))
+            if len(raw) != 32 or base64.urlsafe_b64encode(raw).decode().rstrip("=") != encoded:
+                raise ValueError
+            result[kid] = Ed25519PublicKey.from_public_bytes(raw)
+        return result
+    except (OSError, ValueError, TypeError, UnicodeError, binascii.Error) as error:
+        raise CompositionError("recipient-admission public keyset is unavailable") from error
+
+
+def _json_object_without_duplicates(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    value = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError("duplicate JSON member")
+        value[key] = item
+    return value
+
+
+def _mount_private_recipient_delivery(
+    app: Any,
+    *,
+    environ: Mapping[str, str],
+    work_pg: Any,
+    work_dsn: str,
+    workspace_id: str,
+    repository_ids: frozenset[str],
+    environment_name: str,
+    gateway_public_key_file: str | None,
+    private_ingress_guard: Callable[[], bool] | None,
+) -> bool:
+    """Mount owner routers only after explicit, complete deployment config."""
+    enabled = environ.get("VUORO_OPERATOR_REQUEST_DELIVERY_ENABLED", "false")
+    if enabled == "false":
+        return False
+    if enabled != "true":
+        raise CompositionError("operator request delivery enable flag is invalid")
+    if gateway_public_key_file is None:
+        raise CompositionError("operator request delivery requires gateway identity trust")
+    if not callable(private_ingress_guard):
+        raise CompositionError("operator request delivery has no trusted private ingress guard")
+    try:
+        issuer = _runtime_env("VUORO_GATEWAY_ASSERTION_ISSUER", environ)
+        gateway_key_id = environ.get("VUORO_GATEWAY_ASSERTION_KEY_ID", "gateway-2026-01")
+        admission_keyset = Path(environ["VUORO_RECIPIENT_ADMISSION_PUBLIC_KEYSET_FILE"])
+        admission_issuer = environ["VUORO_RECIPIENT_ADMISSION_ISSUER"]
+    except (KeyError, ValueError) as error:
+        raise CompositionError("operator request delivery trust configuration is incomplete") from error
+    admission_keys = _load_recipient_admission_keys(admission_keyset)
+    try:
+        gateway_public_key = serialization.load_pem_public_key(
+            Path(gateway_public_key_file).read_bytes()
+        )
+    except (OSError, ValueError) as error:
+        raise CompositionError("gateway verification key is unavailable") from error
+    if not isinstance(gateway_public_key, Ed25519PublicKey):
+        raise CompositionError("gateway verification key must be Ed25519")
+    service_verifier = load_cloud_service_assertion_verifier(
+        dict(environ),
+        workspace_id=workspace_id,
+        forbidden_public_keys=(gateway_public_key, *admission_keys.values()),
+    )
+
+    try:
+        from sprintctl.recipient_delivery_read_receiver import (
+            PrivateDeliveryReadConfig,
+            create_private_delivery_read_router,
+        )
+        from sprintctl.recipient_delivery_receiver import (
+            PrivateDeliveryReceiverConfig,
+            create_private_delivery_router,
+        )
+    except ImportError as error:
+        raise CompositionError(
+            "pinned Sprintctl adapter does not include private delivery routes"
+        ) from error
+
+    @contextmanager
+    def store_lease_for_repo(repo_id: str):
+        if repo_id not in repository_ids:
+            raise ValueError("private delivery repo is outside the hosted binding")
+        store = work_pg.get_connection(work_dsn)
+        store.repo_id = repo_id
+        try:
+            yield store
+        finally:
+            store.conn.close()
+
+    # The hosting composition must inject its trusted network guard. This
+    # runtime has no data-plane primitive that can prove a Kubernetes
+    # NetworkPolicy decision from HTTP request metadata.
+    replay_not_before = time.time() - 1
+    gateway_common = {
+        "gateway_public_key_file": Path(gateway_public_key_file),
+        "gateway_issuer": issuer,
+        "gateway_environment": environment_name,
+        "expected_workspace_id": workspace_id,
+        "allowed_repo_ids": repository_ids,
+        "gateway_key_id": gateway_key_id,
+        "replay_not_before": replay_not_before,
+        "private_ingress_guard": private_ingress_guard,
+        "trusted_cloud_adapter_guard": service_verifier,
+        "store_lease_for_repo": store_lease_for_repo,
+    }
+    delivery_config = PrivateDeliveryReceiverConfig(
+        enabled=True,
+        admission_keys=admission_keys,
+        admission_issuer=admission_issuer,
+        **gateway_common,
+    )
+    read_config = PrivateDeliveryReadConfig(enabled=True, **gateway_common)
+    app.include_router(create_private_delivery_router(delivery_config))
+    app.include_router(create_private_delivery_read_router(read_config))
+    return True
+
+
+def _attach_private_delivery_state(
+    app: Any,
+    *,
+    private_app: Any,
+    work_store: Any,
+    mounted: bool,
+) -> None:
+    """Retain the bootstrap connection until the owner-only app is extracted."""
+    app.state.private_delivery_app = private_app if mounted else None
+    app.state.private_delivery_bootstrap_store = work_store
+
+
 def _load_function(pin: AdapterPin) -> Callable[..., Any]:
     for dependency in pin.dependencies:
         try:
@@ -1038,6 +1197,7 @@ def create_composed_app(
     project_bindings_path: Path | None = None,
     environ: Mapping[str, str] | None = None,
     work_resource_observation_authorizer: WorkResourceObservationAuthorizer | None = None,
+    private_delivery_ingress_guard: Callable[[], bool] | None = None,
 ):
     """Create the only deployable service application: the pinned composition."""
 
@@ -1263,7 +1423,7 @@ def create_composed_app(
         ),
         allowed_repo_ids=(frozenset(project_binding.repo_ids) if gateway_key_value is not None else None),
     )
-    return create_app(
+    app = create_app(
         settings=ServiceSettings(
             environment_name=environment_name,
             environment_class=environment_class,
@@ -1276,6 +1436,67 @@ def create_composed_app(
         identity_resolver=resolver,
         readiness_check=work_application.served_runtime_ready,
     )
+    from fastapi import FastAPI
+
+    private_delivery_app = FastAPI(
+        openapi_url=None, docs_url=None, redoc_url=None
+    )
+    private_delivery_mounted = _mount_private_recipient_delivery(
+        private_delivery_app,
+        environ=environ,
+        work_pg=work_pg,
+        work_dsn=work_dsn,
+        workspace_id=(
+            _runtime_env("VUORO_WORKSPACE_ID", environ)
+            if gateway_key_value is not None
+            else ""
+        ),
+        repository_ids=(
+            frozenset(project_binding.repo_ids)
+            if project_binding.environment is not None
+            else frozenset()
+        ),
+        environment_name=environment_name,
+        gateway_public_key_file=gateway_key_value,
+        private_ingress_guard=private_delivery_ingress_guard,
+    )
+    # The private-app factory discards this general shell after extracting the
+    # private child. Keep the bootstrap handle even when the private route is
+    # disabled so that factory can close it on its fail-closed exit too.
+    _attach_private_delivery_state(
+        app,
+        private_app=private_delivery_app,
+        work_store=work_store,
+        mounted=private_delivery_mounted,
+    )
+    return app
+
+
+def create_private_delivery_app(
+    *, private_delivery_ingress_guard: Callable[[], bool] | None = None
+):
+    """Build the owner-only ASGI app; host it on an isolated loopback listener."""
+    app = create_composed_app(
+        private_delivery_ingress_guard=private_delivery_ingress_guard
+    )
+    private_app = getattr(app.state, "private_delivery_app", None)
+    bootstrap_store = getattr(app.state, "private_delivery_bootstrap_store", None)
+    try:
+        if private_app is None:
+            raise CompositionError("private owner listener is disabled")
+        if bootstrap_store is None:
+            raise CompositionError(
+                "private owner listener bootstrap store is unavailable"
+            )
+        return private_app
+    finally:
+        # The base composition opened this connection to verify owner
+        # compatibility and construct the ordinary shell. The private app
+        # performs owner work through fresh leases, so close the bootstrap
+        # connection before discarding the general shell app, on success or
+        # failure.
+        if bootstrap_store is not None:
+            bootstrap_store.conn.close()
 
 
 __all__ = [
@@ -1285,6 +1506,7 @@ __all__ = [
     "ReleaseLock",
     "RuntimeAdapterDescriptor",
     "create_composed_app",
+    "create_private_delivery_app",
     "load_development_identities",
     "load_edge_proof_key",
     "load_gateway_assertion_resolver",

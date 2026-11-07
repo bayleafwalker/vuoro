@@ -17,7 +17,6 @@ from pathlib import Path
 
 import vuoro_service.cli as cli_module
 
-
 CLI_SOURCE_PATH = Path(cli_module.__file__)
 REPO_ROOT = Path(__file__).parents[3]
 
@@ -30,6 +29,10 @@ def _find_uvicorn_run_call(tree: ast.AST) -> ast.Call:
             and node.func.attr == "run"
             and isinstance(node.func.value, ast.Name)
             and node.func.value.id == "uvicorn"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and node.args[0].value
+            == "vuoro_service.composition:create_composed_app"
         ):
             return node
     raise AssertionError("expected to find a uvicorn.run(...) call in cli.py")
