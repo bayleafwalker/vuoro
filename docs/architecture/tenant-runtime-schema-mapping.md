@@ -38,9 +38,9 @@ or any change to the public control-plane schema.
 | --- | --- | --- |
 | 0.1.99 | 28 (unchanged) | no |
 | 0.1.102 (candidate) | 30 | yes |
-| 0.1.104 | not stated in this repository's docs | unknown |
+| 0.1.104 (source candidate) | 31 (Sprintctl 0.28.0; source: `packages/vuoro-service/README.md`) | yes |
 
-The 0.1.104 row is a gap to close, not a claim.
+0.1.104 is not in `CHANGELOG.md` yet; the first implementation should reconcile the two sources.
 
 ## Acceptance criteria (cheap checks)
 

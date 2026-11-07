@@ -5,7 +5,7 @@ purpose: proposal
 lifecycle: proposed
 effective: 2026-11-06
 subjects: [product-direction]
-related: [vuoro-outcome-settlement-proposal-2026-11-06, vuoro-product-direction-2026-10-15, vuoro-product-delivery-plan-2026-10-17, vuoro-agent-substrate-integration-2026-10-30]
+related: [vuoro-outcome-settlement-proposal-2026-11-06, vuoro-product-delivery-plan-2026-10-17, vuoro-agent-substrate-integration-2026-10-30]
 ---
 
 # Outcome settlement as the product centre
