@@ -20,7 +20,9 @@ EXPECTED_DOMAIN_COUNTS = {"work": 126, "audit": 5, "knowledge": 19}
 
 
 class WorkStub:
-    store = SimpleNamespace(remote_schema_version=31)
+    # Registration-only synthetic fixture. The real PostgreSQL migration and
+    # compatibility handshake are exercised by the schema34 conformance gate.
+    store = SimpleNamespace(remote_schema_version=34)
 
     @staticmethod
     def maintenance_resource_schema_available() -> bool:

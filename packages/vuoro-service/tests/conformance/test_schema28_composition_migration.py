@@ -44,6 +44,8 @@ INBOX_OPERATIONS = ('work.agent.register-v1', 'work.agent.observe-v1', 'work.age
                     'work.message.cancel-v1')
 # New owner request tables introduced in schema 28; compare every preexisting row.
 NEW_TABLES = ('operator_request', 'operator_request_dependant', 'operator_request_event', 'operator_continuation_receipt')
+SCHEMA32_34_TABLES = ('operator_request_recipient_binding', 'operator_request_delivery',
+                      'operator_request_delivery_key', 'agent_capability_revision')
 NAMES = ('VUORO_SCHEMA27_MIGRATION_PG_URL', 'VUORO_SCHEMA27_RUNTIME_PG_URL',
          'VUORO_SCHEMA27_OWNER_PYTHON', 'VUORO_SCHEMA28_MANIFEST', 'VUORO_SCHEMA28_WHEEL_DIR',
          'VUORO_SCHEMA28_ATTESTATION', 'VUORO_SCHEMA27_AUDIT_MIGRATION_PG_URL',
@@ -175,12 +177,12 @@ from sprintctl import pg,pg_migrations
 s=pg.get_connection(os.environ['SCHEMA27_PROOF_DSN'])
 try:pg_migrations.require_compatible_schema(s)
 except pg_migrations.RemoteSchemaCompatibilityError:pass
-else:raise SystemExit('old owner accepted schema31')
+else:raise SystemExit('old owner accepted schema34')
 finally:s.conn.close()
 '''
 
 
-def test_actual_old_closure_refusal_explicit31_cli_migration_and_runtime_ddl_denial(
+def test_actual_old_closure_refusal_explicit34_cli_migration_and_runtime_ddl_denial(
     tmp_path, monkeypatch,
 ):
     if not all(os.environ.get(x) for x in NAMES):
@@ -264,7 +266,7 @@ def test_actual_old_closure_refusal_explicit31_cli_migration_and_runtime_ddl_den
                 "SELECT tablename FROM pg_tables WHERE schemaname='work' ORDER BY tablename")]
             rows = {}
             for table in tables:
-                if table in ('schema_version', 'operator_continuation_receipt') or (source_schema == 27 and table in NEW_TABLES):
+                if table in ('schema_version', 'operator_continuation_receipt', *SCHEMA32_34_TABLES) or (source_schema == 27 and table in NEW_TABLES):
                     continue
                 values = conn.execute(sql.SQL('SELECT to_jsonb(t) FROM {} t').format(sql.Identifier(table))).fetchall()
                 projected = [r[0] for r in values]
@@ -340,14 +342,20 @@ def test_actual_old_closure_refusal_explicit31_cli_migration_and_runtime_ddl_den
     migrated = remote_schema('migrate', migration)
     assert migrated.returncode == 0, 'explicit remote-schema migrate refused'
     migrated = json.loads(migrated.stdout)
-    assert migrated['from_version'] == source_schema and migrated['to_version'] == 31
-    assert migrated['applied_versions'] == list(range(source_schema + 1, 32))
+    assert migrated['from_version'] == source_schema and migrated['to_version'] == 34
+    assert migrated['applied_versions'] == list(range(source_schema + 1, 35))
     again = remote_schema('migrate', migration)
     assert again.returncode == 0 and json.loads(again.stdout)['applied_versions'] == []
     grants()
     checked = remote_schema('check', runtime)
     assert checked.returncode == 0 and json.loads(checked.stdout)['compatible'] is True
     assert legacy_rows() == before
+    added_tables = set(SCHEMA32_34_TABLES) | ({*NEW_TABLES} if source_schema == 27 else {'operator_continuation_receipt'})
+    with psycopg.connect(migration) as conn:
+        tables = {r[0] for r in conn.execute("SELECT tablename FROM pg_tables WHERE schemaname='work'")}
+        assert tables == set(before) | added_tables | {'schema_version'}
+        for table in SCHEMA32_34_TABLES:
+            assert conn.execute(sql.SQL('SELECT count(*) FROM {}').format(sql.Identifier('work', table))).fetchone()[0] == 0
     if source_schema == 28:
         assert old_state['lease_id']
         with psycopg.connect(migration) as conn:
@@ -380,7 +388,7 @@ def test_actual_old_closure_refusal_explicit31_cli_migration_and_runtime_ddl_den
         response = client.get('/api/meta/v1/handshake', headers={'X-Vuoro-Client-Protocol': '1'})
         assert response.status_code == 200, response.json()
         handshake = response.json()
-        assert handshake['service_version'] == '0.1.104' and handshake['compatibility']['state'] == 'compatible'
+        assert handshake['service_version'] == '0.1.105' and handshake['compatibility']['state'] == 'compatible'
         assert all(x['state'] == 'compatible' for x in handshake['compatibility']['domains'].values())
         catalog = client.get('/api/catalog/v1', headers={'X-Vuoro-Client-Protocol': '1'}).json()
         assert len(catalog['operations']) == CATALOG_TOTAL
@@ -442,7 +450,7 @@ def test_actual_old_closure_refusal_explicit31_cli_migration_and_runtime_ddl_den
                             'FROM pg_roles WHERE rolname=current_user').fetchone()
         assert not any(role)
         assert not conn.execute("SELECT pg_has_role(current_user,%s,'MEMBER')", (migration_role,)).fetchone()[0]
-        assert conn.execute('SELECT version FROM schema_version').fetchone()[0] == 31
+        assert conn.execute('SELECT version FROM schema_version').fetchone()[0] == 34
         assert not conn.execute("SELECT has_schema_privilege(current_user,'work','CREATE')").fetchone()[0]
         for table in NEW_TABLES[:-1]:
             assert conn.execute('SELECT has_table_privilege(current_user,%s,%s)',
@@ -490,7 +498,7 @@ def test_actual_old_closure_refusal_explicit31_cli_migration_and_runtime_ddl_den
         request_page = invoke('work.request.list-v1', {'limit': 20}, 'x' * 40)
         assert request_page['requests'] == [] and request_page['next_after_request_id'] is None
 
-        # Exercise the released 0.28.0 owner through the composed service with
+        # Exercise the released 0.28.1 owner through the composed service with
         # only the separately provisioned DML runtime role. Byte-limited pages
         # may be short but each cursor must advance to the last returned note.
         parent = invoke('work.run.register-v1', {
@@ -570,7 +578,7 @@ def test_actual_old_closure_refusal_explicit31_cli_migration_and_runtime_ddl_den
                             (instance_id,)).fetchone()[0] == 1
     child_env['SCHEMA27_PROOF_DSN'] = runtime
     result = subprocess.run([old_python, '-I', '-c', OLD_REFUSAL], env=child_env, capture_output=True, text=True)
-    assert result.returncode == 0, 'old owner did not refuse postmigration schema31'
+    assert result.returncode == 0, 'old owner did not refuse postmigration schema34'
     assert legacy_rows() == after
     assert audit_rows() == audit_before
 

@@ -5,6 +5,16 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service 0.1.105 release-preparation candidate carries the private
+  Cloud service-identity verifier and owner-only loopback app from merged
+  source. The routes remain default-off, no private ingress/TLS issuer is
+  qualified. Its Sprintctl 0.28.1 lock points at the published, attested wheel
+  and recorded source revision. Its owner declares work schema 34 current and schema numbers 32–34 compatible;
+  the exact historical schema32/33 catalogs are not independently qualified here.
+  Migration from schema 31 to 34 is explicit.
+  Disposable PostgreSQL qualification covers schema29→34; this remains source/package
+  preparation only, not a deployment or field acceptance.
+
 - vuoro-service 0.1.102 candidate pins released Sprintctl 0.27.0 and
   vuoro-workspace 0.1.1. It requires explicit work schema 30 migration;
   knowledge schema remains 1. It exposes the owner principal receipt and

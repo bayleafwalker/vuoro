@@ -28,7 +28,8 @@ pytestmark = pytest.mark.essential_safety
 
 # Tables the explicit migration from the schema-21 closure creates: 22 attempt
 # facts, 23 run/invocation correlations, 25 agent directory and inbox, and 28
-# operator requests. The preserved-row comparison covers every preexisting row.
+# operator requests, plus recipient delivery and agent capabilities in 32–34.
+# The preserved-row comparison covers every preexisting row.
 POST21_TABLES = ('work_effect_attempt', 'work_effect_attempt_event',
                  'work_run_invocation_binding', 'work_run_invocation_attempt',
                  'agent_instance', 'agent_declaration_revision', 'agent_observation',
@@ -36,6 +37,8 @@ POST21_TABLES = ('work_effect_attempt', 'work_effect_attempt_event',
                  'work_approval', 'work_run_delegation', 'operator_request',
                  'operator_request_dependant', 'operator_request_event',
                  'operator_continuation_receipt')
+SCHEMA32_34_TABLES = ('operator_request_recipient_binding', 'operator_request_delivery',
+                      'operator_request_delivery_key', 'agent_capability_revision')
 
 
 def validate_fixture_urls(urls):
@@ -172,7 +175,7 @@ s.conn.close()
             tables=[r[0] for r in conn.execute("SELECT tablename FROM pg_tables WHERE schemaname='work' ORDER BY tablename")]
             rows={}
             for table in tables:
-                if table in ('schema_version',*POST21_TABLES):continue
+                if table in ('schema_version',*POST21_TABLES,*SCHEMA32_34_TABLES):continue
                 values=conn.execute(sql.SQL('SELECT to_jsonb(t) FROM {} t').format(sql.Identifier(table))).fetchall()
                 rows[table]=sorted((r[0] for r in values),key=lambda v:json.dumps(v,sort_keys=True))
             return rows
@@ -232,16 +235,21 @@ else:
     store=pg.get_connection(migration);store.repo_id='agentops'
     try:
         migrated=pg_migrations.migrate_schema(store)
-        assert migrated['from_version']==21 and migrated['to_version']==31 and migrated['applied_versions']==[22,23,24,25,26,27,28,29,30,31]
+        assert migrated['from_version']==21 and migrated['to_version']==34 and migrated['applied_versions']==[22,23,24,25,26,27,28,29,30,31,32,33,34]
         assert pg_migrations.migrate_schema(store)['applied_versions']==[]
     finally:store.conn.close()
     grants()
     assert legacy_rows()==before
+    with psycopg.connect(migration) as conn:
+        tables = {r[0] for r in conn.execute("SELECT tablename FROM pg_tables WHERE schemaname='work'")}
+        assert tables == set(before) | set(POST21_TABLES) | set(SCHEMA32_34_TABLES) | {'schema_version'}
+        for table in SCHEMA32_34_TABLES:
+            assert conn.execute(sql.SQL('SELECT count(*) FROM {}').format(sql.Identifier('work', table))).fetchone()[0] == 0
     with TestClient(factory()) as client:
         response=client.get('/api/meta/v1/handshake',headers={'X-Vuoro-Client-Protocol':'1'})
         assert response.status_code==200,response.json()
         handshake=response.json()
-        assert handshake['service_version']=='0.1.104' and handshake['compatibility']['state']=='compatible'
+        assert handshake['service_version']=='0.1.105' and handshake['compatibility']['state']=='compatible'
         assert all(x['state']=='compatible' for x in handshake['compatibility']['domains'].values())
         catalog=client.get('/api/catalog/v1',headers={'X-Vuoro-Client-Protocol':'1'}).json()
         assert len(catalog['operations'])==CATALOG_TOTAL
@@ -252,7 +260,7 @@ else:
         role=conn.execute('SELECT rolsuper,rolcreatedb,rolcreaterole,rolreplication,rolbypassrls FROM pg_roles WHERE rolname=current_user').fetchone()
         assert not any(role)
         assert not conn.execute("SELECT pg_has_role(current_user,%s,'MEMBER')",(migration_role,)).fetchone()[0]
-        assert conn.execute('SELECT version FROM schema_version').fetchone()[0]==31
+        assert conn.execute('SELECT version FROM schema_version').fetchone()[0]==34
         assert not conn.execute("SELECT has_schema_privilege(current_user,'work','CREATE')").fetchone()[0]
         for table in ('work_effect_attempt','work_effect_attempt_event'):
             assert conn.execute('SELECT has_table_privilege(current_user,%s,%s)',(table,'SELECT,INSERT,UPDATE,DELETE')).fetchone()[0]

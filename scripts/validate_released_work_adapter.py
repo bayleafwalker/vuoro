@@ -138,11 +138,11 @@ async def _exercise() -> None:
         )
         # The production service seeds this from its read-only schema
         # handshake before registration. The disposable owner fixture is
-        # explicitly at the composition's schema 31 minimum.
+        # explicitly at the composition's schema 34 current schema.
         class SchemaQualifiedStore:
             def __init__(self, store):
                 self._store = store
-                self.remote_schema_version = 31
+                self.remote_schema_version = 34
 
             def __getattr__(self, name):
                 return getattr(self._store, name)

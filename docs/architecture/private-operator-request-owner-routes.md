@@ -133,14 +133,16 @@ manifests, tenant compatibility pins, or migrations.
 
 ## Source compatibility gate
 
-At this writing, Vuoro `vuoro-service` 0.1.104's immutable adapter lock points
-to Sprintctl source revision `83cf461` (Sprintctl 0.28.0), which predates the
-merged PR225 owner routes and PR226 trusted Cloud service guard (merged
-Sprintctl source `815b63f6a2eed851689738b8887541badb048a86`, pending a
-qualified releasable adapter artifact). Cloud's compatibility manifest still
-pins `vuoro-service` 0.1.94 and tenant schema 2..3. The hooks import the owner
-routers only after explicit enablement and fail closed when those modules are
-absent. A future compatibility update needs a reviewed Sprintctl artifact and
-lock, Vuoro runtime release, Cloud schema qualification and migration gates,
-and verified private ingress/key provisioning. This source scaffold does not
-claim those gates have passed.
+The 0.1.105 release-preparation candidate's immutable adapter lock points to
+the published Sprintctl 0.28.1 wheel at source revision
+`1d68c683edac12dd99368728a5ce931f8d5e11b1`, including the owner routes and
+trusted Cloud service guard. Cloud's compatibility manifest still pins
+`vuoro-service` 0.1.94 and tenant schema 2..3. The new owner routes remain
+default-off, and no private ingress/TLS issuer or deployment has been
+qualified. This candidate does not claim those gates have passed.
+
+
+The pinned published Sprintctl 0.28.1 owner requires schema 32 or newer and
+currently migrates to schema 34. The 0.1.105 candidate therefore needs an
+explicit migration from schema 31; this source contract does not authorize or
+perform a tenant migration.

@@ -9,7 +9,8 @@ deployment changes with this document. It states a contract that
 `vuoro-cloud` verifies a tenant database after a migration and before a tenant
 is declared ready (migration plan phases P5 and P6 in the agentops repository,
 `docs/plans/2026-11-06-vuoro-cloud-migration-plan.md`). To do that it must know
-which work schema version a given `vuoro-service` build expects. Today that
+which work schema range a given `vuoro-service` build supports and the current
+schema its migration targets. Today that
 knowledge exists only as prose in `CHANGELOG.md` (for example, 0.1.99 keeps
 schema 28; the 0.1.102 candidate requires an explicit migration to schema 30),
 and `vuoro-cloud` keeps its own `tenant_schema` range in
@@ -34,13 +35,18 @@ or any change to the public control-plane schema.
 
 ## Seed data (from `CHANGELOG.md`, to be checked by the first implementation)
 
-| `vuoro-service` | Work schema | Explicit migration from previous |
-| --- | --- | --- |
-| 0.1.99 | 28 (unchanged) | no |
-| 0.1.102 (candidate) | 30 | yes |
-| 0.1.104 (source candidate) | 31 (Sprintctl 0.28.0; source: `packages/vuoro-service/README.md`) | yes |
+| `vuoro-service` | Current schema target | Lowest supported | Explicit migration from previous |
+| --- | ---: | ---: | --- |
+| 0.1.99 | 28 | 28 | no |
+| 0.1.102 (candidate) | 30 | 30 | yes |
+| 0.1.104 (source candidate) | 31 (Sprintctl 0.28.0) | 31 | yes |
+| 0.1.105 (release-preparation candidate) | 34 (Sprintctl 0.28.1) | 32 | yes |
 
-0.1.104 is not in `CHANGELOG.md` yet; the first implementation should reconcile the two sources.
+The 0.1.105 source candidate requires explicit owner migration to schema 34;
+the published owner refuses schema 31 and its compatibility check accepts
+version numbers 32–34. Historical schema32/33 catalog shapes are not claimed
+as separately qualified by this candidate. This row is
+source qualification only, not an enablement or deployment claim.
 
 ## Acceptance criteria (cheap checks)
 
