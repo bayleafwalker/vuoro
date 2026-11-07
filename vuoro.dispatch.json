@@ -54,8 +54,8 @@
         "id": "vuoro-agents",
         "path": "AGENTS.md",
         "kind": "AGENTS.md",
-        "digest": "c23ae311e498aeeb8db9886fe6ee2cd4a08137bd4d2d8045aa9a2898a1e5d53c",
-        "source_rev": "git:785786c",
+        "digest": "6148465597c23118da63b9065d11f8823248500355eb6f2cd0454ca8751f8a19",
+        "source_rev": "git:4942cecf108d9df0bab1e9e3ea8c67dc6277d3e1",
         "refs": [],
         "rules": [],
         "hooks": [],
@@ -66,7 +66,7 @@
         "path": "CLAUDE.md",
         "kind": "CLAUDE.md",
         "digest": "ad9ef0da7195b71a060631a1bca61b944adedfe852ffcad8b0b865198001d52b",
-        "source_rev": "git:785786c",
+        "source_rev": "git:45fecb54cf5a1fc98016a87e35d04602e5c85cc2",
         "refs": [],
         "rules": [],
         "hooks": [],
@@ -122,14 +122,14 @@
       }
     ],
     "skill_lock": {
-      "dispatch-plan": "8da2efaaa4f760a468e5b642d2aa47162df594b52b813138e875189726cf34d6",
-      "dispatch-build": "f895830df38ea72b79f13864130fd2e3ffca3488b261d38744c86cfc79995a1f",
+      "dispatch-plan": "e54a1f26aaee065131473adda1ef58aeec0c51df680049d96770f61eeff73bdf",
+      "dispatch-build": "78912b5e58b4e0a7d648305265b98d42b37ecfe1feb1eae01d89e89a7b121602",
       "dispatch-review": "0bf4c6f46b30f8ea33c5e226f90f000919291bbe199e0ae14d39cb1c219ea678",
       "code-change-verification": "da8dca1568f93ca1cb7f73ff88d75849c5c58676c4b3274516069a3197fe13a3",
-      "backlog-refinement": "0a03f2f9ca85fbc1968f1702f0a6d5bd01b55f1d1f99bdda9c8f09df000239f2",
-      "item-done": "441b9b333890d50fc6486f78e60662e8ebbdcefb51c57f34374b44fced32d68d",
-      "verify-state-protocols": "53e405447abb8ff83f35b49fecf0131652bc30f5452d52acebd300960888995c",
-      "reconcile-project-contracts": "3161e7ac4455bfccf20d783a4e9af5ac507c233d4a0afd3acad2857dafccad70"
+      "backlog-refinement": "2ddf2de7f743e8383528b377a3ab639eda9f0fe569a956117de2a0f4599fbd85",
+      "item-done": "701db98e3d27dd9cad1b989e005dadb2d7ad879f8316b64ee31c1de1b7fe1718",
+      "verify-state-protocols": "34c2a8ade7e70b5b8c9d5ecc8f694e090c265ea548633d91d5806275a21dfb88",
+      "reconcile-project-contracts": "06b27e0d4bed83bbc25f95d71e37353a6a98178d2d9438664e257915c25032f5"
     }
   },
   "scope": {
