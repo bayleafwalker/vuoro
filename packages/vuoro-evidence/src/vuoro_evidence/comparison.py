@@ -4,10 +4,11 @@ A `CaseSet` is a versioned, content-addressed list of real tasks with their
 acceptance criteria. An `ExperimentComparison` pairs a baseline and a candidate
 `ExperimentRecord` that both enumerate exactly that case set and differ only in
 the declared revision selector. `compare()` computes per-metric deltas with
-every case kept in the denominator: rejected, pending, unknown and missing
-cases are never dropped. When the case count or paired coverage is below the
-reviewer's declared minimum, the comparison is suppressed with explicit
-reasons and no delta.
+every case kept in the denominator: rejected, pending, unknown, unqualified and
+missing cases are never dropped. Outcome deltas use the same intersection of
+source-qualified pairs in both arms. When the case count, observed-pair coverage
+or source-qualified-pair coverage is below the reviewer's declared minimum, the
+outcome comparison is suppressed with explicit reasons and no delta.
 
 This module neither runs the arms nor accepts work, ranks revisions, records a
 decision or establishes causal attribution. All thresholds are reviewer inputs.
@@ -27,11 +28,11 @@ from typing import Callable
 from .experiment import ExperimentError, ExperimentRecord, OutcomeObservation, _text
 
 CASE_SET_SCHEMA = "vuoro-case-set/v1"
-COMPARISON_SCHEMA = "vuoro-experiment-comparison/v1"
+COMPARISON_SCHEMA = "vuoro-experiment-comparison/v2"
 _NAME = re.compile(r"[a-z0-9][a-z0-9._-]*")
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 _MEASURES = ("acceptance_seconds", "review_seconds", "rework_seconds", "recovery_seconds")
-_STATES = ("accepted", "rejected", "pending", "unknown", "missing")
+_STATES = ("accepted", "rejected", "pending", "unknown", "unqualified", "missing")
 
 
 def _canonical(body: object) -> bytes:
@@ -194,7 +195,25 @@ def load_case_set(path: str | Path, *, expected_digest: str | None = None) -> Ca
 
 
 def _state(observation: OutcomeObservation | None) -> str:
-    return "missing" if observation is None else observation.disposition
+    if observation is None:
+        return "missing"
+    return observation.disposition if observation.comparison_qualified else "unqualified"
+
+
+def _fixed_composition(manifest, revision_kind: str) -> str:
+    """Canonical named run axes that must match outside the selected revision."""
+    dimensions = {
+        "harness_id": manifest.harness_id,
+        "harness_build": manifest.harness_build,
+        "model_id": manifest.model_id,
+        "recipe_id": manifest.recipe_id,
+        "observed_profile": manifest.observed_profile.as_dict(),
+        "workflow_binding": (
+            manifest.workflow_observation.binding_ref.as_dict()
+            if manifest.workflow_observation is not None else None),
+    }
+    dimensions.pop(revision_kind)
+    return _canonical(dimensions).decode("utf-8")
 
 
 def _q(value: Fraction | None) -> str | None:
@@ -209,16 +228,27 @@ class _Cohort:
         self.n = len(case_ids)
         self.base = {c: base.get(c) for c in case_ids}
         self.cand = {c: cand.get(c) for c in case_ids}
-        self.paired = [c for c in case_ids if self.base[c] is not None and self.cand[c] is not None]
+        self.observed_paired = [c for c in case_ids
+                                if self.base[c] is not None and self.cand[c] is not None]
+        self.paired = [c for c in self.observed_paired
+                       if self.base[c].comparison_qualified and self.cand[c].comparison_qualified]
 
-    def gate(self, min_cases: int, min_coverage: Fraction) -> list[str]:
+    def observed_gate(self, min_cases: int, min_coverage: Fraction) -> list[str]:
         reasons = []
         if self.n < min_cases:
             reasons.append("cases_below_minimum")
-        if len(self.paired) < min_cases:
+        if len(self.observed_paired) < min_cases:
             reasons.append("paired_observations_below_minimum")
-        if self.n == 0 or Fraction(len(self.paired), self.n) < min_coverage:
+        if self.n == 0 or Fraction(len(self.observed_paired), self.n) < min_coverage:
             reasons.append("paired_coverage_below_minimum")
+        return reasons
+
+    def gate(self, min_cases: int, min_coverage: Fraction) -> list[str]:
+        reasons = self.observed_gate(min_cases, min_coverage)
+        if len(self.paired) < min_cases:
+            reasons.append("source_qualified_pairs_below_minimum")
+        if self.n == 0 or Fraction(len(self.paired), self.n) < min_coverage:
+            reasons.append("source_qualification_coverage_below_minimum")
         return reasons
 
 
@@ -232,12 +262,14 @@ def _arm(rows: dict) -> dict:
 
 
 def _rate(cohort: _Cohort, reasons: list[str], hit: Callable[[OutcomeObservation], bool],
-          resolved: Callable[[OutcomeObservation], bool]) -> dict:
+          resolved: Callable[[OutcomeObservation], bool], *, paired_cases: list[str]) -> dict:
     n = cohort.n
+    paired = set(paired_cases)
 
     def counts(rows):
-        return {"count": sum(o is not None and hit(o) for o in rows.values()),
-                "unresolved": sum(o is None or not resolved(o) for o in rows.values())}
+        return {"count": sum(c in paired and o is not None and hit(o) for c, o in rows.items()),
+                "unresolved": sum(c not in paired or o is None or not resolved(o)
+                                  for c, o in rows.items())}
 
     base, cand = counts(cohort.base), counts(cohort.cand)
     out = {"denominator": n, "baseline": base, "candidate": cand,
@@ -300,25 +332,67 @@ def _transitions(cohort: _Cohort) -> dict:
 
 def _metrics(cohort: _Cohort, min_cases: int, min_coverage: Fraction) -> dict:
     reasons = cohort.gate(min_cases, min_coverage)
-    disposition_resolved = lambda o: o.disposition in {"accepted", "rejected"}  # noqa: E731
+    observed_reasons = cohort.observed_gate(min_cases, min_coverage)
+    disposition_resolved = lambda o: (o.comparison_qualified
+                                       and o.disposition in {"accepted", "rejected"})  # noqa: E731
     return {
-        "cases": cohort.n, "paired_observed_cases": len(cohort.paired),
-        "paired_coverage": _q(Fraction(len(cohort.paired), cohort.n)) if cohort.n else None,
+        "cases": cohort.n, "paired_observed_cases": len(cohort.observed_paired),
+        "paired_coverage": _q(Fraction(len(cohort.observed_paired), cohort.n)) if cohort.n else None,
+        "source_qualified_paired_cases": len(cohort.paired),
+        "source_qualified_paired_coverage": _q(Fraction(len(cohort.paired), cohort.n)) if cohort.n else None,
         "status": "suppressed" if reasons else "computed", "suppression_reasons": reasons,
         "arms": {"baseline": _arm(cohort.base), "candidate": _arm(cohort.cand)},
         "transitions": _transitions(cohort),
         "metrics": {
-            "acceptance_rate": _rate(cohort, reasons, lambda o: o.disposition == "accepted",
-                                     disposition_resolved),
-            "rejection_rate": _rate(cohort, reasons, lambda o: o.disposition == "rejected",
-                                    disposition_resolved),
-            "capture_rate": _rate(cohort, reasons, lambda o: o.captured is True,
-                                  lambda o: o.captured is not None),
+            "acceptance_rate": _rate(cohort, reasons,
+                                     lambda o: o.comparison_qualified and o.disposition == "accepted",
+                                     disposition_resolved, paired_cases=cohort.paired),
+            "rejection_rate": _rate(cohort, reasons,
+                                    lambda o: o.comparison_qualified and o.disposition == "rejected",
+                                    disposition_resolved, paired_cases=cohort.paired),
+            "capture_rate": _rate(cohort, observed_reasons, lambda o: o.captured is True,
+                                  lambda o: o.captured is not None,
+                                  paired_cases=cohort.observed_paired),
             **{name: _paired(cohort, reasons, min_cases, min_coverage,
                              lambda o, name=name: getattr(o, name), str) for name in _MEASURES},
             "known_cost": _cost(cohort, reasons, min_cases, min_coverage),
         },
     }
+
+
+def _source_qualification(rows: dict[str, OutcomeObservation], case_ids: list[str]) -> dict:
+    cases = []
+    qualified = 0
+    for case_id in case_ids:
+        observation = rows.get(case_id)
+        if observation is None:
+            cases.append({"case_id": case_id, "status": "missing_observation",
+                          "qualified_for_comparison": False,
+                          "reason_codes": ["observation-missing"]})
+            continue
+        qualification = observation.source_qualification
+        is_qualified = observation.comparison_qualified
+        qualified += is_qualified
+        cases.append({"case_id": case_id,
+                      "owner_disposition": observation.disposition,
+                      "status": qualification.status if qualification is not None else "missing",
+                      "qualified_for_comparison": is_qualified,
+                      "reason_codes": list(observation.source_qualification_reasons),
+                      "qualification_ref": qualification.qualification_ref if qualification is not None else None,
+                      "source_snapshot_ref": qualification.source_snapshot_ref if qualification is not None else None,
+                      "source_snapshot_sha256": (
+                          qualification.source_snapshot_sha256 if qualification is not None else None),
+                      "owner_revision_ref": qualification.owner_revision_ref if qualification is not None else None,
+                      "owner_release_digest": observation.owner_release_digest,
+                      "qualification_release_digest": (
+                          qualification.release_digest if qualification is not None else None),
+                      "qualification_reason": qualification.reason if qualification is not None else None,
+                      "independent_verification_ref": (
+                          qualification.independent_verification_ref if qualification is not None else None),
+                      "actual_use_ref": qualification.actual_use_ref if qualification is not None else None})
+    return {"qualified_cases": qualified, "unqualified_cases": len(case_ids) - qualified,
+            "cases": cases, "basis": "caller_supplied",
+            "authentication": "not_performed_by_this_package"}
 
 
 @dataclass(frozen=True)
@@ -358,6 +432,12 @@ class ExperimentComparison:
         base_runs = {r.run_id for r in self.baseline.manifests}
         if base_runs.intersection(r.run_id for r in self.candidate.manifests):
             raise ExperimentError("one run cannot belong to both arms")
+        manifests = self.baseline.manifests + self.candidate.manifests
+        if self.baseline.manifests and self.candidate.manifests:
+            if len({_fixed_composition(manifest, self.baseline.revision_kind)
+                    for manifest in manifests}) != 1:
+                raise ExperimentError(
+                    "arms must match every named run-composition axis outside the selected revision")
 
     def compare(self, *, min_cases: int, min_coverage: Fraction,
                 review_policy_ref: str, reviewer_ref: str) -> dict:
@@ -388,7 +468,9 @@ class ExperimentComparison:
                 groups.setdefault(key(c), []).append(c)
             strata[axis] = {label: _metrics(_Cohort(cases, base, cand), min_cases, min_coverage)
                             for label, cases in sorted(groups.items())}
-        overall = _metrics(_Cohort(ordered, base, cand), min_cases, min_coverage)
+        overall_cohort = _Cohort(ordered, base, cand)
+        overall = _metrics(overall_cohort, min_cases, min_coverage)
+        inconclusive_reasons = list(overall["suppression_reasons"])
 
         def arm(record):
             return {"experiment_id": record.experiment_id, "revision_kind": record.revision_kind,
@@ -406,6 +488,18 @@ class ExperimentComparison:
             "thresholds": {"min_cases": min_cases, "min_coverage": str(min_coverage),
                            "review_policy_ref": review_policy_ref, "reviewer_ref": reviewer_ref,
                            "predeclaration": "not_verified_by_this_package"},
+            "comparison_readiness": "inconclusive" if inconclusive_reasons else "eligible_for_review",
+            "inconclusive_reasons": inconclusive_reasons,
+            "source_qualification": {
+                "baseline": _source_qualification(base, ordered),
+                "candidate": _source_qualification(cand, ordered),
+                "qualified_paired_cases": len(overall_cohort.paired),
+                "qualified_paired_coverage": (
+                    _q(Fraction(len(overall_cohort.paired), overall_cohort.n))
+                    if overall_cohort.n else None),
+                "basis": "caller_supplied",
+                "authentication": "not_performed_by_this_package",
+            },
             **overall,
             "strata": strata,
             "limitations": list(self.limitations) + list(self.case_set.limitations)

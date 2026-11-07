@@ -210,7 +210,9 @@ def intake_owner_outcome(case: Mapping[str, object]) -> OwnerOutcomeIntake:
     scalars, provenance = _measurements(case.get("measurements", {}), disposition, reasons)
     observation = OutcomeObservation(
         case["case_id"], tuple(case["run_ids"]), disposition, case["owner_record_ref"],
-        tuple(case["evidence_refs"]), case["evidence_class"], case["captured"], **scalars)
+        tuple(case["evidence_refs"]), case["evidence_class"], case["captured"],
+        owner_release_digest=release["release_digest"] if release is not None else None,
+        **scalars)
     return OwnerOutcomeIntake(
         observation, "conflicting" if conflicts else "incomplete" if missing else "consistent",
         tuple(dict.fromkeys(reasons)), SOURCE_VERIFICATION, provenance,

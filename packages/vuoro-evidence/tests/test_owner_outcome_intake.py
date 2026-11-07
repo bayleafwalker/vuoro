@@ -45,6 +45,8 @@ def test_structurally_matching_supplied_acceptance_never_authenticates_sources(m
     result = intake_owner_outcome(source)
     assert result.join_status == "consistent"
     assert result.observation.disposition == "accepted"
+    assert result.observation.owner_release_digest == "a" * 64
+    assert result.observation.source_qualification is None
     assert result.source_verification == SOURCE_VERIFICATION == "not_performed_by_this_package"
     assert result.reason_codes == ()
     assert source == original
@@ -205,13 +207,18 @@ def test_mixed_intake_keeps_unknown_cases_capture_cost_and_expected_population_s
                                review_policy_ref="owner:policy@immutable1", reviewer_ref="reviewer:1")
     assert summary["expected_cases"] == 3
     assert summary["observed_cases"] == 2
-    assert summary["accepted_cases"] == 1
+    assert summary["accepted_cases"] == 0
+    assert summary["source_qualified_accepted_cases"] == 0
+    assert summary["owner_reported_accepted_cases"] == 1
+    assert "too_few_accepted_cases" in summary["inconclusive_reasons"]
+    assert "source_qualification_incomplete" in summary["inconclusive_reasons"]
     assert summary["dispositions"]["unknown"] == 1
     assert summary["capture"]["captured_cases"] == 2
     assert summary["capture"]["unknown_cases"] == 1
     assert summary["population_burden"]["cost"] == {
         "known_totals": {"EUR": "0.10", "USD": "0.20"}, "known_cases": 2, "unknown_cases": 1}
-    assert summary["accepted_cost"]["known_totals"] == {"EUR": "0.10"}
+    assert summary["accepted_cost"]["known_totals"] == {}
+    assert summary["owner_reported_accepted_cost"]["known_totals"] == {"EUR": "0.10"}
     assert summary["population_burden"]["effort"]["recovery_seconds"] == {
         "known_total": 300, "known_cases": 1, "unknown_cases": 2}
     assert summary["comparison_readiness"] == "inconclusive"

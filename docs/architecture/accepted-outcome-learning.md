@@ -49,11 +49,22 @@ The reviewer must supply both a minimum accepted-case count and an exact capture
 fraction to `record.summarize(min_accepted_cases=..., min_capture=...)`. These
 values, an immutable policy reference and a reviewer reference are recorded in
 the summary. Threshold predeclaration is explicitly unverified, so these inputs
-remain descriptive until the owning reviewer verifies their pre-run policy. This source sets no global policy for the
-open product threshold decision. Too few accepted cases or insufficient capture
-produces `inconclusive`. Passing those thresholds means `eligible_for_review`,
-with `causal_attribution: not_established`; it never means one revision is better.
-A reviewer must examine task selection, evidence classes and uncertainty.
+remain descriptive until the owning reviewer verifies their pre-run policy.
+`accepted_cases` counts source-qualified acceptance; the raw owner count remains
+available as `owner_reported_accepted_cases`. An accepted observation qualifies
+only when the supplied source report matches its case and owner record, its
+Release digest matches, and it cites an independent verification and actual use.
+`OwnerOutcomeQualification` is a caller-supplied report with an immutable source
+snapshot and current owner revision reference; Vuoro does not resolve or
+authenticate those references. Missing or incomplete qualification leaves the
+owner-reported outcome and its burden visible but excludes it from accepted
+counts, accepted cost and effort, and model-comparison outcome deltas.
+
+Too few qualified accepted cases, incomplete qualification of reported
+acceptances, or insufficient capture produces `inconclusive`. Passing those
+thresholds means `eligible_for_review`, with `causal_attribution:
+not_established`; it never means one revision is better. A reviewer must examine
+task selection, source qualifications, evidence classes and uncertainty.
 
 ```python
 from fractions import Fraction
@@ -132,7 +143,9 @@ learning package's external-source trust contract. It is not authenticated
 acceptance. Missing records produce an incomplete join, contradictory supplied
 facts a conflicting join; both map to unknown. Known independent measurements
 remain usable for population burden. Measurement exclusions do not change the
-owner join status.
+owner join status. The observation retains the supplied `owner_release_digest`
+for later comparison with an owner-side qualification report; intake does not
+create that report.
 
 Reasons include `terminal-decision-missing`, `terminal-decision-id-mismatch`,
 `decision-item-mismatch`, `decision-kind-resolution-mismatch`,
@@ -211,26 +224,54 @@ file that differs from a pinned digest.
 `ExperimentComparison(comparison_id, case_set, baseline, candidate, limitations)`
 requires both records to reference that case set and enumerate exactly its
 cases. They must share a task group and revision selector, name different
-revisions, and share no run. `compare(min_cases=..., min_coverage=...,
-review_policy_ref=..., reviewer_ref=...)` has no default thresholds. It reports
+revisions, and share no run. Every supplied run must also match on the named
+`harness_id`, `harness_build`, nonselected `model_id`, `recipe_id`, observed
+profile, and workflow-binding snapshot. This prevents changing a second named
+run-composition axis alongside the selected revision. Grant/claim IDs and
+workflow receipt references remain run-specific; this package cannot establish
+that their underlying authority or receipt meaning is equivalent, so reviewers
+must verify that context from the owner sources. `compare(min_cases=...,
+min_coverage=..., review_policy_ref=..., reviewer_ref=...)` has no default
+thresholds. It reports
 candidate-minus-baseline deltas as exact fractions:
 
 - Acceptance, rejection and capture rates use all case-set cases as the
-  denominator. Rejected, pending, unknown and missing cases stay in it, and
-  `delta_bounds` shows the range still possible if every unresolved case went
-  either way. `transitions` counts per-case disposition pairs, including
-  `missing`.
+  denominator. Acceptance and rejection counts use only the same source-qualified
+  case pairs in both arms. Rejected, pending, unknown, unqualified and missing
+  cases stay in the denominator, and `delta_bounds` shows the range still
+  possible if every unresolved case went either way. `transitions` counts
+  per-case disposition pairs, including `unqualified` and `missing`.
 - Acceptance, review, rework and recovery seconds, and cost in each currency,
   compare only cases where both arms know the value. Known and unknown counts
   are reported. Pairs in different currencies are counted and never converted.
 
-The comparison is suppressed, with explicit reasons and every delta `null`, when
-the case count or the number of cases observed in both arms is below
-`min_cases`, or when paired coverage is below `min_coverage`. A measure with too
-few known pairs is suppressed on its own while the rest are still computed.
-Strata by case-set `workload`, `observed_on` month and pairwise capture apply
-the same minimums, so thin strata are suppressed too. The output records
-`decision: not_recorded_by_this_package` and `causal_attribution:
-not_established`. It does not run either arm, accept work or change a review
-boundary. `tests/test_comparison.py` uses a synthetic case-set fixture. No real
-case set or ablation result has been qualified by this package.
+`OwnerOutcomeQualification` is a separate caller-supplied report tied to one
+case and `owner_record_ref`. A qualified report cites the qualification record,
+immutable source snapshot and digest, current owner revision and exact Release
+digest. An accepted outcome also needs independent verification and actual-use
+references. The package checks the report's structure and its case, owner and
+Release-digest joins; it does not resolve or authenticate the report. The output
+states `authentication: not_performed_by_this_package`. Missing, stale,
+conflicting or mismatched qualifications make that outcome `unqualified` for
+comparison. A provider completion or the intake adapter's structurally matching
+join cannot supply this qualification.
+
+The comparison's outcome and burden metrics are suppressed, with explicit
+reasons and `null` deltas, when the case count, observed paired count or
+source-qualified paired count is below `min_cases`, or when either observed or
+source-qualified paired coverage is below `min_coverage`. Unqualified outcomes
+remain in the case-set denominator and are reported with their reason codes;
+they cannot contribute to acceptance, rejection, effort or cost deltas. Those
+metrics use only the intersection of cases whose sources qualify in both arms;
+all other cases remain unresolved in each arm's acceptance bounds. Capture
+remains a separate observation and can still be reported when its observed-pair
+gate passes. A measure with too few known source-qualified pairs is suppressed
+on its own while the rest are still computed. Strata by case-set `workload`,
+`observed_on` month and pairwise capture apply the same minimums, so thin strata
+are suppressed too. Summary and comparison outputs use schema v2 and expose an
+explicit `comparison_readiness: inconclusive` plus reasons whenever the
+qualified gates fail. The output records `decision: not_recorded_by_this_package`
+and `causal_attribution: not_established`. It does not run either arm, accept
+work or change a review boundary. `tests/test_comparison.py` uses synthetic
+case-set and qualification fixtures. No real case set or ablation result has
+been qualified by this package.
