@@ -194,8 +194,9 @@ def test_checked_in_adapter_artifact_urls_are_source_named_or_exact_semver_relea
         assert pin.source_revision[:7] in tag or exact_owner_semver
 
 
-def test_checked_in_work_pin_is_the_schema31_currentness_release() -> None:
-    # Sprintctl 0.28.0 adds currentness delegation under schema31.
+def test_checked_in_work_pin_is_the_schema34_currentness_release() -> None:
+    # Sprintctl 0.28.1 retains currentness and adds the private owner routes
+    # and trusted Cloud service guard under schema34.
     # Source, wheel URL and digest advance together.
     pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("work")
     assert (
@@ -204,16 +205,16 @@ def test_checked_in_work_pin_is_the_schema31_currentness_release() -> None:
         pin.api_version,
         pin.schema_version,
     ) == (
-        "83cf46129256b910c6e02b130e93ed3e2f0ff23e",
-        "0.28.0",
+        "1d68c683edac12dd99368728a5ce931f8d5e11b1",
+        "0.28.1",
         "work-api/v1",
         "work-schema/v1",
     )
     assert pin.artifact_url.endswith(
-        "/v0.28.0/sprintctl-0.28.0-py3-none-any.whl"
+        "/v0.28.1/sprintctl-0.28.1-py3-none-any.whl"
     )
     assert pin.artifact_sha256 == (
-        "96378f83cd1c71bec6a7139a6823bbc196fc3da41573abdb82989cd13f015d2f"
+        "2fda3650362db562b08f9fc76d902953c63b1d8a2b11ae7b6b522e93f4921728"
     )
     assert [
         (item.lock_id, item.lock_kind, item.distribution, item.distribution_version)
@@ -665,7 +666,7 @@ def test_load_and_verify_accept_a_shared_filename_with_an_identical_digest(tmp_p
 
     source = ROOT / "composition" / "adapter-pins.json"
     raw = json.loads(source.read_text(encoding="utf-8"))
-    artifact = tmp_path / "sprintctl-0.28.0-py3-none-any.whl"
+    artifact = tmp_path / "sprintctl-0.28.1-py3-none-any.whl"
     artifact.write_bytes(b"same-filename-same-digest")
     digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
     work_lock = next(lock for lock in raw["release_locks"] if lock["lock_id"] == "work-adapter")
@@ -682,7 +683,7 @@ def test_load_and_verify_accept_a_shared_filename_with_an_identical_digest(tmp_p
     manifest = CompositionManifest.load(path)
     filenames = {lock.artifact_url.rsplit("/", 1)[-1] for lock in manifest.release_locks
                  if lock.lock_id in ("work-adapter", "work-adapter-dup")}
-    assert filenames == {"sprintctl-0.28.0-py3-none-any.whl"}
+    assert filenames == {"sprintctl-0.28.1-py3-none-any.whl"}
 
     # verify_adapter_artifacts checks every lock in the manifest, so isolate
     # the two colliding locks (rather than staging real wheels for the whole
@@ -701,7 +702,7 @@ def test_load_and_verify_reject_a_shared_filename_with_a_differing_digest(tmp_pa
 
     source = ROOT / "composition" / "adapter-pins.json"
     raw = json.loads(source.read_text(encoding="utf-8"))
-    artifact = tmp_path / "sprintctl-0.28.0-py3-none-any.whl"
+    artifact = tmp_path / "sprintctl-0.28.1-py3-none-any.whl"
     artifact.write_bytes(b"same-filename-differing-digest")
     digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
     work_lock = next(lock for lock in raw["release_locks"] if lock["lock_id"] == "work-adapter")
