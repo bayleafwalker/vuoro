@@ -5,6 +5,10 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-client 0.1.8 sends each invocation's request ID in both the v1 JSON
+  envelope and `X-Request-ID`, preserving gateway identity correlation for
+  generated and caller-supplied IDs.
+
 - vuoro-service 0.1.105 release-preparation candidate carries the private
   Cloud service-identity verifier and owner-only loopback app from merged
   source. The routes remain default-off, no private ingress/TLS issuer is

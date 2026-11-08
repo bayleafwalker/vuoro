@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from uuid import UUID
 
 import httpx
 import pytest
@@ -21,7 +23,7 @@ CATALOG = {
 }
 
 
-def _run_invoke(*, status_code=200, envelope=None):
+def _run_invoke(*, status_code=200, envelope=None, request_id="request-1"):
     requests: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -45,14 +47,14 @@ def _run_invoke(*, status_code=200, envelope=None):
             lambda _reference: "token",
             transport=httpx.MockTransport(handler),
         ) as client:
-            result = await client.invoke(
-                "work.example",
-                {},
-                request_id="request-1",
-                basis_revision="basis-1",
-                idempotency_key="key-1",
-                repo_id="repo-1",
-            )
+            options = {
+                "basis_revision": "basis-1",
+                "idempotency_key": "key-1",
+                "repo_id": "repo-1",
+            }
+            if request_id is not None:
+                options["request_id"] = request_id
+            result = await client.invoke("work.example", {}, **options)
             return result, client
 
     result, client = asyncio.run(invoke())
@@ -68,9 +70,47 @@ def test_v1_request_bytes_and_endpoint_are_frozen() -> None:
         b'"operation":"work.example","arguments":{},"catalog_revision":"catalog-1",'
         b'"basis_revision":"basis-1","idempotency_key":"key-1","repo_id":"repo-1"}'
     )
+    assert requests[0].headers["x-request-id"] == "request-1"
     # Regression guard: the retired invocation/v2 proof carrier must not
     # reappear on the wire. v1 is the only envelope the client emits.
     assert b"transient_credentials" not in requests[0].content
+
+
+def test_generated_request_id_is_shared_by_header_and_body() -> None:
+    _result, _client, requests = _run_invoke(request_id=None)
+    payload = json.loads(requests[0].content)
+    assert payload["request_id"] == requests[0].headers["x-request-id"]
+    assert UUID(payload["request_id"]).version == 4
+
+
+def test_request_id_header_is_only_added_to_invoke_route() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.url.path == "/api/meta/v1/handshake":
+            return httpx.Response(200, json={
+                "client_protocol": {"minimum": 1, "maximum": 1},
+                "environment": {"name": "dev", "environment_class": "development"},
+                "invocation_schema_versions": ["invocation/v1"],
+            })
+        if request.url.path == "/api/catalog/v1":
+            return httpx.Response(200, json=CATALOG, headers={"etag": "catalog-1"})
+        return httpx.Response(200, json={"status": "accepted", "result": {"ok": True}})
+
+    async def invoke() -> None:
+        async with AsyncVuoroClient(
+            Profile("dev", "https://vuoro.example", "file:/credential", "dev"),
+            lambda _reference: "token",
+            transport=httpx.MockTransport(handler),
+        ) as client:
+            await client.invoke("work.example", {}, request_id="caller-id")
+
+    asyncio.run(invoke())
+    by_path = {request.url.path: request for request in requests}
+    assert "x-request-id" not in by_path["/api/meta/v1/handshake"].headers
+    assert "x-request-id" not in by_path["/api/catalog/v1"].headers
+    assert by_path["/api/invoke/v1"].headers["x-request-id"] == "caller-id"
 
 
 def test_error_mapping_and_stale_catalog_reset() -> None:
