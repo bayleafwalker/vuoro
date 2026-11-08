@@ -108,8 +108,10 @@ def test_request_id_header_is_only_added_to_invoke_route() -> None:
 
     asyncio.run(invoke())
     by_path = {request.url.path: request for request in requests}
-    assert "x-request-id" not in by_path["/api/meta/v1/handshake"].headers
-    assert "x-request-id" not in by_path["/api/catalog/v1"].headers
+    assert "/api/catalog/v1" in by_path
+    for path, request in by_path.items():
+        if path != "/api/invoke/v1":
+            assert "x-request-id" not in request.headers
     assert by_path["/api/invoke/v1"].headers["x-request-id"] == "caller-id"
 
 
