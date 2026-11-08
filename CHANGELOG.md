@@ -6,7 +6,7 @@ recorded here.
 ## Unreleased
 
 - vuoro-client 0.1.8 sends each invocation's request ID in both the v1 JSON
-  envelope and `X-Request-ID`, preserving gateway identity correlation for
+  envelope and `X-Request-ID`, fixing gateway identity correlation for
   generated and caller-supplied IDs.
 
 - vuoro-service 0.1.105 release-preparation candidate carries the private
