@@ -19,8 +19,9 @@ class UnknownServiceVersionError(ValueError):
 def lookup_tenant_schema(version: str) -> dict[str, Any]:
     """Return a release mapping for a semantic version or pinned image identity.
 
-    Raises ``ValueError`` for malformed inputs and ``UnknownServiceVersionError``
-    for well-formed versions absent from the checked-in map.
+    The pinned form's SHA-256 suffix is shape-checked only; it is not bound to
+    an image or wheel digest. Raises ``ValueError`` for malformed inputs and
+    ``UnknownServiceVersionError`` for well-formed versions absent from the map.
     """
     if not isinstance(version, str):
         raise ValueError("service version must be a string")

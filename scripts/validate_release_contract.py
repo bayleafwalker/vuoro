@@ -9,6 +9,8 @@ from pathlib import Path
 import re
 import zipfile
 
+import jsonschema
+
 
 PACKAGE_NAMES = {
     "vuoro-client", "vuoro-service",
@@ -56,8 +58,15 @@ def validate_service_schema_map(path: Path, service_version: str) -> None:
         missing = required - set(archive.namelist())
         if missing:
             raise ValueError(f"{path}: service wheel is missing tenant schema map files: {sorted(missing)}")
-        mapping = json.loads(archive.read("vuoro_service/tenant-runtime-schema-map.json"))
-    versions = [row.get("service_version") for row in mapping.get("releases", [])]
+        try:
+            mapping = json.loads(archive.read("vuoro_service/tenant-runtime-schema-map.json"))
+            schema = json.loads(archive.read("vuoro_service/tenant-runtime-schema-map.schema.json"))
+            jsonschema.validate(mapping, schema)
+        except (json.JSONDecodeError, UnicodeDecodeError, jsonschema.ValidationError, jsonschema.SchemaError, TypeError) as exc:
+            raise ValueError(f"{path}: invalid tenant schema map: {exc}") from exc
+    if not isinstance(mapping, dict) or not isinstance(mapping.get("releases"), list):
+        raise ValueError(f"{path}: tenant schema map releases must be an array")
+    versions = [row["service_version"] for row in mapping["releases"]]
     if service_version not in versions:
         raise ValueError(f"{path}: tenant schema map has no entry for service version {service_version}")
 

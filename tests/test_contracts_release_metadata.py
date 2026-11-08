@@ -44,14 +44,48 @@ def wheel(folder: Path, name: str = "vuoro-contracts", version: str = "0.1.0", *
         archive.writestr(f"{stem}-{version}.dist-info/METADATA", metadata if metadata is not None else f"Metadata-Version: 2.3\nName: {name}\nVersion: {version}\n\n")
         archive.writestr(f"{stem}/__init__.py", "")
         if name == "vuoro-service":
-            archive.writestr("vuoro_service/tenant-runtime-schema-map.json", json.dumps({"releases": [{"service_version": version}]}))
-            archive.writestr("vuoro_service/tenant-runtime-schema-map.schema.json", "{}")
+            source = ROOT / "packages/vuoro-service/src/vuoro_service"
+            mapping = json.loads((source / "tenant-runtime-schema-map.json").read_text())
+            row = dict(mapping["releases"][-1], service_version=version)
+            mapping["releases"].append(row)
+            archive.writestr("vuoro_service/tenant-runtime-schema-map.json", json.dumps(mapping))
+            archive.write(source / "tenant-runtime-schema-map.schema.json", "vuoro_service/tenant-runtime-schema-map.schema.json")
     return path
 
 
 @pytest.mark.parametrize("name", ["vuoro-client", "vuoro-service", "vuoro-schema-runtime", "vuoro-adapter-kit", "vuoro-demo", "vuoro-workspace", "vuoro-contracts"])
 def test_exact_supported_distribution_and_immutable_tag(tmp_path: Path, name: str) -> None:
     validator.validate([wheel(tmp_path, name)], f"{name}-v0.1.0", release=True)
+
+
+def test_service_release_contract_rejects_malformed_and_missing_map_rows(tmp_path: Path) -> None:
+    valid = wheel(tmp_path / "valid", "vuoro-service")
+    broken = tmp_path / "broken.whl"
+    with zipfile.ZipFile(valid) as src, zipfile.ZipFile(broken, "w") as dst:
+        for name in src.namelist():
+            data = src.read(name)
+            if name.endswith("tenant-runtime-schema-map.json"):
+                data = b'{"schema_version":"vuoro-tenant-runtime-schema-map/v1","releases":[null]}'
+            dst.writestr(name, data)
+    with pytest.raises(ValueError, match="invalid tenant schema map"):
+        validator.validate([broken])
+
+    missing = tmp_path / "missing.whl"
+    with zipfile.ZipFile(valid) as src, zipfile.ZipFile(missing, "w") as dst:
+        for name in src.namelist():
+            data = src.read(name)
+            if name.endswith("tenant-runtime-schema-map.json"):
+                obj = json.loads(data)
+                obj["releases"] = [r for r in obj["releases"] if r["service_version"] != "0.1.0"]
+                data = json.dumps(obj).encode()
+            dst.writestr(name, data)
+    with pytest.raises(ValueError, match="has no entry"):
+        validator.validate([missing])
+
+
+def test_service_release_contract_accepts_valid_map_and_required_row(tmp_path: Path) -> None:
+    path = wheel(tmp_path, "vuoro-service")
+    validator.validate([path])
 
 
 @pytest.mark.parametrize("metadata", [
