@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import argparse
 from email.parser import Parser
+import json
 from pathlib import Path
 import re
 import zipfile
+
+import jsonschema
 
 
 PACKAGE_NAMES = {
@@ -46,6 +49,49 @@ def wheel_metadata(path: Path) -> tuple[str, str]:
     return name, version
 
 
+def validate_tenant_schema_map_data(mapping: dict) -> None:
+    """Validate semantic invariants that JSON Schema cannot compare across fields/items."""
+    releases = mapping.get("releases") if isinstance(mapping, dict) else None
+    if not isinstance(releases, list):
+        raise ValueError("tenant schema map releases must be an array")
+    versions = [row.get("service_version") for row in releases]
+    if len(versions) != len(set(versions)):
+        raise ValueError("tenant schema map service_version values must be unique")
+    if versions != sorted(versions, key=lambda value: tuple(map(int, value.split(".")))):
+        raise ValueError("tenant schema map service versions must be strictly ordered")
+    for row in releases:
+        accepted = row["accepted_schema_range"]
+        minimum, maximum = accepted["minimum"], accepted["maximum"]
+        target, lowest = row["work_schema_target"], row["lowest_supported_schema"]
+        if minimum != lowest:
+            raise ValueError(f"{row['service_version']}: accepted range minimum must equal lowest_supported_schema")
+        if not minimum <= target <= maximum:
+            raise ValueError(f"{row['service_version']}: target must be within accepted schema range")
+
+
+def validate_service_schema_map(path: Path, service_version: str) -> None:
+    required = {
+        "vuoro_service/tenant-runtime-schema-map.json",
+        "vuoro_service/tenant-runtime-schema-map.schema.json",
+    }
+    with zipfile.ZipFile(path) as archive:
+        missing = required - set(archive.namelist())
+        if missing:
+            raise ValueError(f"{path}: service wheel is missing tenant schema map files: {sorted(missing)}")
+        try:
+            mapping = json.loads(archive.read("vuoro_service/tenant-runtime-schema-map.json"))
+            schema = json.loads(archive.read("vuoro_service/tenant-runtime-schema-map.schema.json"))
+            jsonschema.validate(mapping, schema)
+            validate_tenant_schema_map_data(mapping)
+        except (json.JSONDecodeError, UnicodeDecodeError, jsonschema.ValidationError, jsonschema.SchemaError, TypeError) as exc:
+            raise ValueError(f"{path}: invalid tenant schema map: {exc}") from exc
+    if not isinstance(mapping, dict) or not isinstance(mapping.get("releases"), list):
+        raise ValueError(f"{path}: tenant schema map releases must be an array")
+    versions = [row["service_version"] for row in mapping["releases"]]
+    if service_version not in versions:
+        raise ValueError(f"{path}: tenant schema map has no entry for service version {service_version}")
+
+
 def validate(paths: list[Path], tag: str | None = None, *, release: bool = False) -> None:
     if not paths:
         raise ValueError("at least one wheel is required")
@@ -54,6 +100,8 @@ def validate(paths: list[Path], tag: str | None = None, *, release: bool = False
         name, version = wheel_metadata(path)
         if name not in PACKAGE_NAMES:
             raise ValueError(f"{path}: unexpected distribution {name!r}")
+        if name == "vuoro-service":
+            validate_service_schema_map(path, version)
         if name in seen:
             raise ValueError(f"duplicate wheel for {name}")
         seen.add(name)

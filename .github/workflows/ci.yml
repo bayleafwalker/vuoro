@@ -356,6 +356,10 @@ jobs:
         run: |
           uv pip install --no-config --no-deps dist/adapters/sprintctl-*.whl
           uv pip install --no-config 'psycopg[binary]>=3.1,<4'
+      - name: Verify tenant schema map against pinned owner
+        env:
+          REQUIRE_PINNED_OWNER: "1"
+        run: uv run --no-sync pytest packages/vuoro-service/tests/test_tenant_schema.py -q
       - name: Create an isolated lease conformance database
         env:
           PGPASSWORD: m14-ci-only

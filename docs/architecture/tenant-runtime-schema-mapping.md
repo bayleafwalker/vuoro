@@ -1,7 +1,11 @@
 # Tenant runtime to work schema mapping
 
-Status: **proposed** (2026-11-07). No implementation, release pin or
-deployment changes with this document. It states a contract that
+Status: **implemented** (2026-11-08). This repository publishes the versioned
+mapping as service package data at
+`packages/vuoro-service/src/vuoro_service/tenant-runtime-schema-map.json`,
+validated by the adjacent JSON Schema and exposed through
+`vuoro_service.tenant_schema.lookup_tenant_schema`. It changes no release pin or
+deployment. It states a contract that
 `vuoro-cloud` needs and this repository must own.
 
 ## Why it is needed
@@ -25,53 +29,56 @@ fact available to a caller before the service runs.
 | Part | Statement |
 | --- | --- |
 | Input | A tenant runtime version: a `vuoro-service` release version such as `0.1.104`, or the pinned form `vuoro-service-v<version>@sha256:<digest>`. |
-| Output | The work schema version that release expects (an integer, for example `28` or `30`), whether reaching it from the previous release needs an explicit migration (`migration_required`: boolean), and the lowest schema version the release still serves, if it serves more than one. For an unknown version the result is `unknown`, never a guess. |
+| Output | The work schema target, accepted range and whether reaching the target from the immediately previous released service version needs an explicit migration (`migration_required_from_previous`: boolean). Unknown well-formed versions raise `UnknownServiceVersionError`. |
 | Owner | This repository (`vuoro`). The value derives from the pinned work owner release in `packages/vuoro-service/composition/adapter-pins.json`, not from a hand-edited second source. |
 | Consumers | `vuoro-cloud` P5 (tenant schema verification after `MIGRATING`) and P6 (restore and retire-dump classification), and the composition qualification that checks a candidate pin. |
-| Form | A machine-readable artifact published with each service release (a JSON file or a field in the release contract), plus the same data in `CHANGELOG.md` wording that already exists. The delivery form is open; the content above is not. |
+| Form | A machine-readable JSON artifact packaged with the service distribution and a checked-in JSON Schema. The pinned identity digest is shape-checked only; it is not bound to an image or wheel SHA-256. |
 
 Not in scope: how `vuoro-cloud` acts on the answer, tenant migration execution,
 or any change to the public control-plane schema.
 
-## Seed data (from `CHANGELOG.md`, to be checked by the first implementation)
+## Released mapping
 
-| `vuoro-service` | Current schema target | Lowest supported | Explicit migration from previous |
-| --- | ---: | ---: | --- |
-| 0.1.99 | 28 | 28 | no |
-| 0.1.102 (candidate) | 30 | 30 | yes |
-| 0.1.104 (source candidate) | 31 (Sprintctl 0.28.0) | 31 | yes |
-| 0.1.105 (release-preparation candidate) | 34 (Sprintctl 0.28.1) | 32 | yes |
+The map contains one row for every released `vuoro-service` version 0.1.94
+through 0.1.105. The floor is 0.1.94: 0.1.93 and earlier are intentionally
+unmapped, so `lookup_tenant_schema` raises `UnknownServiceVersionError` for
+them. `migration_required_from_previous` compares the target schema with the
+immediately previous released service version, including releases whose owner
+pin did not change. Each evidence reference identifies the `adapter-pins.json`
+file at that service tag commit and the Sprintctl `pg_migrations` constants.
+The full verified target/floor/ceiling triples are recorded in the history test
+so they remain checked when historical owner wheels are unavailable.
 
-The 0.1.105 source candidate requires explicit owner migration to schema 34;
-the published owner refuses schema 31 and its compatibility check accepts
-version numbers 32–34. Historical schema32/33 catalog shapes are not claimed
-as separately qualified by this candidate. This row is
-source qualification only, not an enablement or deployment claim.
+The 0.1.96 CHANGELOG entry still names Sprintctl 0.19.0; that text is stale
+relative to the 0.1.96 tag, whose adapter pin selects Sprintctl 0.20.0. The
+0.1.95 CHANGELOG phrase “work schemas 23 to 25” describes migrations added;
+Sprintctl 0.19.0 accepts schema 25 only.
+
+The 0.1.105 owner declares schema 34 current and accepts 32–34; migration from
+0.1.104's schema 31 is explicit. The map does not claim separate qualification
+of historical schema 32/33 catalog shapes. This is source/package contract
+information, not deployment or field acceptance.
+
+A future service release without a mapping row is blocked by
+`scripts/validate_release_contract.py`. The release workflow invokes that
+validator, so the missing row blocks the whole publish workflow by design.
 
 ## Acceptance criteria (cheap checks)
 
-Each criterion is a check of finished work, not an entry gate.
+The repo-local criteria are implemented and covered by
+`packages/vuoro-service/tests/test_tenant_schema.py` and
+`scripts/validate_release_contract.py`.
 
-1. A test loads the published mapping and asserts one entry for every
-   `vuoro-service` version listed in `CHANGELOG.md` from the first version that
-   pins a work owner release onward, and that no entry is missing the schema
-   integer.
-2. A test derives the schema integer for the current pinned work owner release
-   (`adapter-pins.json`) and asserts it equals the mapping's entry for the
-   current service version.
-3. A test asserts an unknown version returns `unknown`, and that `unknown` is
-   distinct from any integer.
-4. A test asserts `migration_required` is true exactly when the schema integer
-   differs from the previous entry's.
-5. A `vuoro-cloud` check (its own repository) compares `config/compatibility.json`
-   `tenant_schema` and the pinned `vuoro-service` version against the mapping and
-   fails on a mismatch. The current skew (cloud pins 0.1.94, `vuoro` is at
-   0.1.104) is the first thing it reports.
+The tests validate JSON Schema conformance, cross-field range invariants, unique
+and ordered service versions, all released triples and adjacent-release migration
+flags, current owner constants, recorded tag pin history, and both lookup forms
+plus unknown/malformed input errors. The release-contract script
+validates the packaged map against its schema, requires the current service row,
+and rejects malformed rows with `ValueError`.
 
-## Open points
-
-- Delivery form: a file attached to the release, a field in the release
-  contract, or a read-only operation on the service. Choose the one `vuoro-cloud`
-  can read without running a tenant.
-- Whether the mapping lists schemas a release can serve in addition to the one it
-  requires (the 0.1.x line has so far required one).
+The consumer integration remains in `vuoro-cloud`: its check must compare
+`config/compatibility.json` `tenant_schema` and the pinned `vuoro-service`
+version against this mapping and fail on a mismatch. Direct release asset
+consumption also requires the service release workflow to attach the map and
+schema (or publish an equivalent release contract asset); no workflow was
+changed here.

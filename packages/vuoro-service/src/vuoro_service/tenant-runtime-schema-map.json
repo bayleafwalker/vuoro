@@ -1,0 +1,221 @@
+{
+  "schema_version": "vuoro-tenant-runtime-schema-map/v1",
+  "releases": [
+    {
+      "service_version": "0.1.94",
+      "work_schema_target": 22,
+      "lowest_supported_schema": 22,
+      "accepted_schema_range": {
+        "minimum": 22,
+        "maximum": 22
+      },
+      "migration_required_from_previous": false,
+      "owner_release": {
+        "distribution": "sprintctl",
+        "version": "0.18.0"
+      },
+      "evidence_source": {
+        "kind": "adapter_pin_and_compatibility_constants",
+        "reference": "packages/vuoro-service/composition/adapter-pins.json at tag commit 202bd989c0f9c9a267d1c696c0adc3edc16c2d33; sprintctl 0.18.0 pg_migrations CURRENT/MINIMUM/MAXIMUM_SCHEMA_VERSION"
+      }
+    },
+    {
+      "service_version": "0.1.95",
+      "work_schema_target": 25,
+      "lowest_supported_schema": 25,
+      "accepted_schema_range": {
+        "minimum": 25,
+        "maximum": 25
+      },
+      "migration_required_from_previous": true,
+      "owner_release": {
+        "distribution": "sprintctl",
+        "version": "0.19.0"
+      },
+      "evidence_source": {
+        "kind": "adapter_pin_and_compatibility_constants",
+        "reference": "packages/vuoro-service/composition/adapter-pins.json at tag commit a8313e40755c2df972b9a13221806da94e9813cb; sprintctl 0.19.0 pg_migrations CURRENT/MINIMUM/MAXIMUM_SCHEMA_VERSION"
+      }
+    },
+    {
+      "service_version": "0.1.96",
+      "work_schema_target": 27,
+      "lowest_supported_schema": 27,
+      "accepted_schema_range": {
+        "minimum": 27,
+        "maximum": 27
+      },
+      "migration_required_from_previous": true,
+      "owner_release": {
+        "distribution": "sprintctl",
+        "version": "0.20.0"
+      },
+      "evidence_source": {
+        "kind": "adapter_pin_and_compatibility_constants",
+        "reference": "packages/vuoro-service/composition/adapter-pins.json at tag commit 17aeffec6d0a2e7058801386d29d4a09712debc8; sprintctl 0.20.0 pg_migrations CURRENT/MINIMUM/MAXIMUM_SCHEMA_VERSION"
+      }
+    },
+    {
+      "service_version": "0.1.97",
+      "work_schema_target": 27,
+      "lowest_supported_schema": 27,
+      "accepted_schema_range": {
+        "minimum": 27,
+        "maximum": 27
+      },
+      "migration_required_from_previous": false,
+      "owner_release": {
+        "distribution": "sprintctl",
+        "version": "0.22.0"
+      },
+      "evidence_source": {
+        "kind": "adapter_pin_and_compatibility_constants",
+        "reference": "packages/vuoro-service/composition/adapter-pins.json at tag commit 48835a29492e57673bf087d0a1d762c7acfbd00a; sprintctl 0.22.0 pg_migrations CURRENT/MINIMUM/MAXIMUM_SCHEMA_VERSION"
+      }
+    },
+    {
+      "service_version": "0.1.98",
+      "work_schema_target": 28,
+      "lowest_supported_schema": 28,
+      "accepted_schema_range": {
+        "minimum": 28,
+        "maximum": 28
+      },
+      "migration_required_from_previous": true,
+      "owner_release": {
+        "distribution": "sprintctl",
+        "version": "0.23.0"
+      },
+      "evidence_source": {
+        "kind": "adapter_pin_and_compatibility_constants",
+        "reference": "packages/vuoro-service/composition/adapter-pins.json at tag commit 41b091ee9b434902c228970970a66157343e9eee; sprintctl 0.23.0 pg_migrations CURRENT/MINIMUM/MAXIMUM_SCHEMA_VERSION"
+      }
+    },
+    {
+      "service_version": "0.1.99",
+      "work_schema_target": 28,
+      "lowest_supported_schema": 28,
+      "accepted_schema_range": {
+        "minimum": 28,
+        "maximum": 28
+      },
+      "migration_required_from_previous": false,
+      "owner_release": {
+        "distribution": "sprintctl",
+        "version": "0.24.0"
+      },
+      "evidence_source": {
+        "kind": "adapter_pin_and_compatibility_constants",
+        "reference": "packages/vuoro-service/composition/adapter-pins.json at tag commit cf7a07292f7df4fabc26fd1f9c839062268c625a; sprintctl 0.24.0 pg_migrations CURRENT/MINIMUM/MAXIMUM_SCHEMA_VERSION"
+      }
+    },
+    {
+      "service_version": "0.1.100",
+      "work_schema_target": 29,
+      "lowest_supported_schema": 29,
+      "accepted_schema_range": {
+        "minimum": 29,
+        "maximum": 29
+      },
+      "migration_required_from_previous": true,
+      "owner_release": {
+        "distribution": "sprintctl",
+        "version": "0.25.0"
+      },
+      "evidence_source": {
+        "kind": "adapter_pin_and_compatibility_constants",
+        "reference": "packages/vuoro-service/composition/adapter-pins.json at tag commit 0497652c7f80575a5237553b715382ef5843e202; sprintctl 0.25.0 pg_migrations CURRENT/MINIMUM/MAXIMUM_SCHEMA_VERSION"
+      }
+    },
+    {
+      "service_version": "0.1.101",
+      "work_schema_target": 29,
+      "lowest_supported_schema": 29,
+      "accepted_schema_range": {
+        "minimum": 29,
+        "maximum": 29
+      },
+      "migration_required_from_previous": false,
+      "owner_release": {
+        "distribution": "sprintctl",
+        "version": "0.26.0"
+      },
+      "evidence_source": {
+        "kind": "adapter_pin_and_compatibility_constants",
+        "reference": "packages/vuoro-service/composition/adapter-pins.json at tag commit 2909daa57b60f9967195e65e00b5d484526c0edd; sprintctl 0.26.0 pg_migrations CURRENT/MINIMUM/MAXIMUM_SCHEMA_VERSION"
+      }
+    },
+    {
+      "service_version": "0.1.102",
+      "work_schema_target": 30,
+      "lowest_supported_schema": 30,
+      "accepted_schema_range": {
+        "minimum": 30,
+        "maximum": 30
+      },
+      "migration_required_from_previous": true,
+      "owner_release": {
+        "distribution": "sprintctl",
+        "version": "0.27.0"
+      },
+      "evidence_source": {
+        "kind": "adapter_pin_and_compatibility_constants",
+        "reference": "packages/vuoro-service/composition/adapter-pins.json at tag commit 6ae6ea6dfc8e1ffc984be5e6ed808c896ddc41bf; sprintctl 0.27.0 pg_migrations CURRENT/MINIMUM/MAXIMUM_SCHEMA_VERSION"
+      }
+    },
+    {
+      "service_version": "0.1.103",
+      "work_schema_target": 31,
+      "lowest_supported_schema": 31,
+      "accepted_schema_range": {
+        "minimum": 31,
+        "maximum": 31
+      },
+      "migration_required_from_previous": true,
+      "owner_release": {
+        "distribution": "sprintctl",
+        "version": "0.28.0"
+      },
+      "evidence_source": {
+        "kind": "adapter_pin_and_compatibility_constants",
+        "reference": "packages/vuoro-service/composition/adapter-pins.json at tag commit be4ad5f032eb344021e3af0c4e4878e9810d3481; sprintctl 0.28.0 pg_migrations CURRENT/MINIMUM/MAXIMUM_SCHEMA_VERSION"
+      }
+    },
+    {
+      "service_version": "0.1.104",
+      "work_schema_target": 31,
+      "lowest_supported_schema": 31,
+      "accepted_schema_range": {
+        "minimum": 31,
+        "maximum": 31
+      },
+      "migration_required_from_previous": false,
+      "owner_release": {
+        "distribution": "sprintctl",
+        "version": "0.28.0"
+      },
+      "evidence_source": {
+        "kind": "adapter_pin_and_compatibility_constants",
+        "reference": "packages/vuoro-service/composition/adapter-pins.json at tag commit 97985f9a34945abf7af004b075315487a9f58883; sprintctl 0.28.0 pg_migrations CURRENT/MINIMUM/MAXIMUM_SCHEMA_VERSION"
+      }
+    },
+    {
+      "service_version": "0.1.105",
+      "work_schema_target": 34,
+      "lowest_supported_schema": 32,
+      "accepted_schema_range": {
+        "minimum": 32,
+        "maximum": 34
+      },
+      "migration_required_from_previous": true,
+      "owner_release": {
+        "distribution": "sprintctl",
+        "version": "0.28.1"
+      },
+      "evidence_source": {
+        "kind": "adapter_pin_and_compatibility_constants",
+        "reference": "packages/vuoro-service/composition/adapter-pins.json at tag commit 20deb706c8de86d94233b4e8c8b854b552036761; sprintctl 0.28.1 pg_migrations CURRENT/MINIMUM/MAXIMUM_SCHEMA_VERSION"
+      }
+    }
+  ]
+}
