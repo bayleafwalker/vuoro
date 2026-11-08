@@ -1,0 +1,101 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "er004-effect-attempt-exact-head",
+  "contract_ref": {
+    "doc_id": "estate-contract-rewrite/ER-004",
+    "revision": "git:a2f670acc7a82efb0608c8609a3cf743a2746504"
+  },
+  "implementation_sha": "2adadd1c512585f7ef82b66efa172aa1c3c87dca",
+  "depth": 0,
+  "environment": {
+    "backend": "disposable loopback PostgreSQL 16; database lease_conformance_er004; non-superuser role; tmpfs container with no volume",
+    "isolation": "PostgreSQL default transaction isolation; one local server; no concurrency claim",
+    "tool_versions": {
+      "python": "3.13.16",
+      "pytest": "8.4.2",
+      "sprintctl": "0.28.1 published wheel, SHA-256 2fda3650362db562b08f9fc76d902953c63b1d8a2b11ae7b6b522e93f4921728",
+      "postgres_image": "postgres:16, postgres@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94",
+      "fastapi": "0.139.2",
+      "httpx": "0.28.1",
+      "jsonschema": "4.26.0",
+      "psycopg": "3.3.8"
+    }
+  },
+  "execution": {
+    "seed": null,
+    "histories": 17,
+    "bounds": {
+      "full_module_test_cases": 17,
+      "new_identity_case": 1,
+      "distinct_operation_kinds": 2,
+      "randomized_sequences": false,
+      "concurrent_operations": 0
+    },
+    "faults_exercised": [
+      "Wrong-repository attempt read denied with HTTP 403; owner row snapshot unchanged.",
+      "Stale release-basis redemption denied with HTTP 409 effect-release-mismatch; owner row snapshot unchanged."
+    ]
+  },
+  "claims": [
+    {
+      "property": "Two distinct attempt rows for one accepted intent retain the same work_item_id while provider_operation changes from push_branch to open_pull_request.",
+      "result": "example-tested",
+      "evidence": [
+        "Exact-head full module rerun: 17 passed, 2 warnings in 12.46s.",
+        "The test asserts distinct attempt IDs, exact operation-kind set and one identical work_item_id in PostgreSQL owner rows."
+      ]
+    },
+    {
+      "property": "Vuoro's repo_scoped HTTP gate rejects the wrong-repository envelope before the operation registry is invoked.",
+      "result": "example-tested",
+      "evidence": [
+        "The executed test observed HTTP 403 for repo_id=foreign-repo.",
+        "packages/vuoro-service/src/vuoro_service/app.py checks Identity.authorizes_repo and returns repo-unauthorized before registry.invoke."
+      ]
+    },
+    {
+      "property": "Sprintctl's owner database independently prevents cross-repository attempt reads or writes when registry invocation does occur.",
+      "result": "unknown",
+      "evidence": [
+        "The wrong-repository case is denied by Vuoro before Sprintctl is invoked; the test does not query a second repository's owner rows or bypass the Vuoro gate."
+      ]
+    },
+    {
+      "property": "The owner denies redemption after the work item release basis becomes stale without modifying attempt owner rows.",
+      "result": "example-tested",
+      "evidence": [
+        "The new test observed HTTP 409 effect-release-mismatch and owner_rows(owner) equality before/after redemption."
+      ]
+    },
+    {
+      "property": "Cross-provider continuation with persisted provider identity and predecessor-attempt lineage.",
+      "result": "unknown",
+      "evidence": [
+        "The tested owner contract records provider_operation, not provider/vendor identity; distinct operation kinds do not establish distinct providers."
+      ]
+    },
+    {
+      "property": "Tenant-collision and wrong-kind typed-ID rejection matrix required by ER-004.",
+      "result": "unknown",
+      "evidence": [
+        "This bounded test uses one fixture repository and does not create colliding tenant/repository IDs or pass wrong-kind typed IDs."
+      ]
+    },
+    {
+      "property": "Depth-2 concurrent histories for simultaneous attempt creation, stale owner fencing, or cross-provider continuation races.",
+      "result": "unknown",
+      "evidence": [
+        "The executed module is sequential example coverage; no independent concurrent clients or deterministic concurrency barriers were used."
+      ]
+    }
+  ],
+  "counterexamples": [],
+  "notes": [
+    "Exact command: PYTHONPATH=/tmp/ec-er004-sprintctl-0281:/home/bayleaf/.local/share/uv/tools/sprintctl/lib/python3.13/site-packages:packages/vuoro-service/src:packages/vuoro-contracts/src PGPASSFILE=/tmp/ec-er004-rerun.pgpass /tmp/ec-279-venv/bin/python -m pytest -q packages/vuoro-service/tests/conformance/test_effect_attempt_http.py --lease-pg-url=postgresql://sprintctl_test_er004@127.0.0.1:32770/lease_conformance_er004",
+    "Captured stdout/stderr: /projects/dev/agentops/_artifacts/agentops/ec-foundation-2026-11-08/er004-owner-attempt-exact-head.log; SHA-256 53bf62dc2ab1d66ac190a7a89a4e4a51d1f0ea38a72567a3a81da0b1531591fb. The exact command record is er004-owner-attempt-exact-head.command.txt with SHA-256 d20812681dce987d03eead7783849cbb2cb4608bce0c5d206e2c7779f99cb44e.",
+    "PGPASSFILE contained only a synthetic temporary credential and was not copied into this packet or the log. Database was marked sprintctl:disposable-integration-test; role had no superuser, database creation, role creation, or inheritance privileges.",
+    "The container was started from the cached image, published only on host loopback, used tmpfs storage, and was removed after execution.",
+    "The wrong-repository GET is refused by Vuoro's outer repo_scoped identity gate before registry.invoke; the test's owner_rows comparison is not a cross-repository database isolation oracle.",
+    "This is bounded owner-backed sequential example evidence, not property/concurrency proof and not ER-004 acceptance. Depth-2 concurrency is explicitly unknown."
+  ]
+}

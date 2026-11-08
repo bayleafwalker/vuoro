@@ -278,3 +278,34 @@ def test_wrong_repo_closed_target_stale_basis_and_wrong_digest_are_no_effects(at
     owner.pg.update_work_item_description(owner.store,item,'same Release digest new full revision')
     before=owner_rows(owner)
     assert invoke(REDEEM,consume).status_code==409 and owner_rows(owner)==before
+
+
+def test_work_identity_survives_distinct_attempts_and_wrong_repository_stale_denials(attempt_owner):
+    owner,item,intent,_,invoke=attempt_owner
+
+    # Model two distinct operation kinds. The owner currently records
+    # operation kinds, not provider/vendor IDs; this checks stable work
+    # identity across attempts without claiming provider identity is persisted.
+    push,push_consume=opened(attempt_owner)
+    pull,pull_consume=opened(attempt_owner,pr=True)
+    attempt_rows=[row for row in owner_rows(owner)['work_effect_attempt']
+                  if row['intent_id']==intent['intent_id']]
+    assert len(attempt_rows)==2
+    assert {row['provider_operation'] for row in attempt_rows}=={'push_branch','open_pull_request'}
+    assert len({row['attempt_id'] for row in attempt_rows})==2
+    assert {row['work_item_id'] for row in attempt_rows}=={item}
+    by_id={row['attempt_id']:row for row in attempt_rows}
+    assert by_id[push['authorization']['attempt_id']]['work_item_id']==item
+    assert by_id[pull['authorization']['attempt_id']]['work_item_id']==item
+
+    before=owner_rows(owner)
+    wrong_repository=invoke(GET,{'attempt_id':push_consume['attempt_id']},repo_id='foreign-repo')
+    assert wrong_repository.status_code==403
+    assert owner_rows(owner)==before
+
+    owner.pg.update_work_item_description(owner.store,item,'stale attempt basis')
+    before=owner_rows(owner)
+    stale=invoke(REDEEM,{**pull_consume,'idempotency_key':uuid.uuid4().hex})
+    assert stale.status_code==409
+    assert stale.json()['error']['code']=='effect-release-mismatch'
+    assert owner_rows(owner)==before

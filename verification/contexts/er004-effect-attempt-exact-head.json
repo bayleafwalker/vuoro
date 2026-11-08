@@ -1,0 +1,84 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "er004-effect-attempt-exact-head",
+  "owner_repo": "vuoro",
+  "subject": "Verify owner persistence of one work_item_id across distinct effect operation attempts, plus the outer Vuoro repository gate and a stale-basis owner refusal.",
+  "contract_ref": {
+    "doc_id": "estate-contract-rewrite/ER-004",
+    "revision": "git:a2f670acc7a82efb0608c8609a3cf743a2746504"
+  },
+  "source_of_truth": "Released Sprintctl PostgreSQL work_effect_attempt rows for attempt/stale-basis facts; Vuoro HTTP identity authorization for the wrong-repository refusal. The latter is an outer service gate, not owner-side cross-repository isolation.",
+  "depth": 0,
+  "backends": [
+    "disposable PostgreSQL 16 container on loopback, database lease_conformance_er004, non-superuser test role"
+  ],
+  "actors": [
+    "fixture proposer",
+    "fixture verifier",
+    "fixture applier",
+    "wrong-repository request context",
+    "owner test fixture"
+  ],
+  "initial_state": [
+    "A disposable PostgreSQL owner database is empty and marked sprintctl:disposable-integration-test.",
+    "The owner fixture creates a unique repo_id, work item, reservation, intent, release evidence and accepted intent.",
+    "The same accepted intent is eligible for the two existing provider_operation kinds: push_branch and open_pull_request."
+  ],
+  "operations": [
+    {
+      "name": "Open push_branch effect attempt",
+      "actors": ["fixture applier"]
+    },
+    {
+      "name": "Open open_pull_request effect attempt for the same accepted intent",
+      "actors": ["fixture applier"]
+    },
+    {
+      "name": "Invoke GET with repo_id set to foreign-repo; Vuoro's repo_scoped gate rejects it before registry.invoke",
+      "actors": ["wrong-repository request context"]
+    },
+    {
+      "name": "Change the work item release basis, then redeem the second attempt",
+      "actors": ["owner test fixture", "fixture applier"]
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "work_effect_attempt and work_effect_attempt_event rows for one repo_id and intent_id"
+  },
+  "assumptions": {
+    "isolation": "Single disposable PostgreSQL 16 server; owner transactions run at the server's configured default isolation.",
+    "clock": "PostgreSQL owner clock; no clock-dependent edge is asserted.",
+    "fairness": "No concurrency or liveness claim."
+  },
+  "bounds": {
+    "full_module_test_cases": 17,
+    "new_identity_case": 1,
+    "distinct_operation_kinds": 2,
+    "repositories_with_test_rows": 1,
+    "randomized_sequences": false
+  },
+  "invariants": [
+    "The two persisted attempt IDs differ.",
+    "Both attempt rows retain the same work_item_id and same accepted intent_id.",
+    "The operation kinds are push_branch and open_pull_request; they are not provider identities.",
+    "Vuoro's repo_scoped authorization branch rejects the wrong-repository envelope with HTTP 403 before invoking the operation registry; this is not a DB-level Sprintctl repository isolation test.",
+    "Stale-basis redemption is denied with HTTP 409 effect-release-mismatch and causes no owner-row changes."
+  ],
+  "faults": [
+    "Wrong-repository read request for an existing attempt.",
+    "Work-item release basis changes after two attempts are opened and before one attempt is redeemed."
+  ],
+  "oracles": [
+    "packages/vuoro-service/tests/conformance/test_effect_attempt_http.py::test_work_identity_survives_distinct_attempts_and_wrong_repository_stale_denials",
+    "owner_rows snapshots compare the fixture repo's effect-attempt, event, intent, release, work-item, run, and idempotency rows before/after the wrong-repository HTTP request and stale-basis owner refusal; only the latter reaches the owner.",
+    "The complete test_effect_attempt_http.py module must pass against the pinned published Sprintctl 0.28.1 wheel."
+  ],
+  "implementation_anchors": [
+    "packages/vuoro-service/tests/conformance/test_effect_attempt_http.py::attempt_owner",
+    "packages/vuoro-service/tests/conformance/test_effect_attempt_http.py::opened",
+    "packages/vuoro-service/tests/conformance/test_effect_attempt_http.py::test_work_identity_survives_distinct_attempts_and_wrong_repository_stale_denials",
+    "packages/vuoro-service/src/vuoro_service/app.py::create_app.invoke repo_scoped authorization branch precedes registry.invoke",
+    "Sprintctl 0.28.1 wheel SHA-256 2fda3650362db562b08f9fc76d902953c63b1d8a2b11ae7b6b522e93f4921728, sprintctl.effect_attempt_pg.open_in_transaction"
+  ]
+}
