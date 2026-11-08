@@ -1,0 +1,41 @@
+{
+  "schema_version": "vuoro-tenant-runtime-schema-map/v1",
+  "releases": [
+    {
+      "service_version": "0.1.99",
+      "work_schema_target": 28,
+      "lowest_supported_schema": 28,
+      "accepted_schema_range": {"minimum": 28, "maximum": 28},
+      "migration_required_from_previous": false,
+      "owner_release": {"distribution": "sprintctl", "version": "0.24.0"},
+      "evidence_source": {"kind": "changelog_prose", "reference": "CHANGELOG.md: vuoro-service 0.1.99"}
+    },
+    {
+      "service_version": "0.1.102",
+      "work_schema_target": 30,
+      "lowest_supported_schema": 30,
+      "accepted_schema_range": {"minimum": 30, "maximum": 30},
+      "migration_required_from_previous": true,
+      "owner_release": {"distribution": "sprintctl", "version": "0.27.0"},
+      "evidence_source": {"kind": "changelog_prose", "reference": "CHANGELOG.md: vuoro-service 0.1.102"}
+    },
+    {
+      "service_version": "0.1.104",
+      "work_schema_target": 31,
+      "lowest_supported_schema": 31,
+      "accepted_schema_range": {"minimum": 31, "maximum": 31},
+      "migration_required_from_previous": true,
+      "owner_release": {"distribution": "sprintctl", "version": "0.28.0"},
+      "evidence_source": {"kind": "architecture_prose", "reference": "docs/architecture/private-operator-request-owner-routes.md: schema-31 source contract"}
+    },
+    {
+      "service_version": "0.1.105",
+      "work_schema_target": 34,
+      "lowest_supported_schema": 32,
+      "accepted_schema_range": {"minimum": 32, "maximum": 34},
+      "migration_required_from_previous": true,
+      "owner_release": {"distribution": "sprintctl", "version": "0.28.1"},
+      "evidence_source": {"kind": "adapter_pin_and_compatibility_constants", "reference": "composition/adapter-pins.json and sprintctl.pg_migrations constants"}
+    }
+  ]
+}

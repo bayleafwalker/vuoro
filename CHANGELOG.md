@@ -5,6 +5,14 @@ recorded here.
 
 ## Unreleased
 
+- vuoro-service publishes a versioned tenant runtime to work schema map as
+  package data, with a checked-in JSON Schema and a pure lookup helper for
+  semantic versions and pinned image identities. Historical entries identify
+  their prose evidence; the current row is drift-checked against the Sprintctl
+  adapter pin and its compatibility constants. The service release workflow
+  still needs to attach the mapping and schema as release assets for direct
+  vuoro-cloud consumption.
+
 - vuoro-client 0.1.8 sends each invocation's request ID in both the v1 JSON
   envelope and `X-Request-ID`, fixing gateway identity correlation for
   generated and caller-supplied IDs.

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vuoro.dev/schemas/tenant-runtime-schema-map/v1",
+  "title": "Vuoro service tenant runtime work schema map",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "releases"],
+  "properties": {
+    "schema_version": {"const": "vuoro-tenant-runtime-schema-map/v1"},
+    "releases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["service_version", "work_schema_target", "lowest_supported_schema", "accepted_schema_range", "migration_required_from_previous", "owner_release", "evidence_source"],
+        "properties": {
+          "service_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+          "work_schema_target": {"type": "integer", "minimum": 1},
+          "lowest_supported_schema": {"type": "integer", "minimum": 1},
+          "accepted_schema_range": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["minimum", "maximum"],
+            "properties": {"minimum": {"type": "integer", "minimum": 1}, "maximum": {"type": "integer", "minimum": 1}}
+          },
+          "migration_required_from_previous": {"type": "boolean"},
+          "owner_release": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["distribution", "version"],
+            "properties": {"distribution": {"const": "sprintctl"}, "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"}}
+          },
+          "evidence_source": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "reference"],
+            "properties": {
+              "kind": {"enum": ["changelog_prose", "architecture_prose", "adapter_pin_and_compatibility_constants"]},
+              "reference": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      }
+    }
+  }
+}

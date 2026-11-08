@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from email.parser import Parser
+import json
 from pathlib import Path
 import re
 import zipfile
@@ -46,6 +47,21 @@ def wheel_metadata(path: Path) -> tuple[str, str]:
     return name, version
 
 
+def validate_service_schema_map(path: Path, service_version: str) -> None:
+    required = {
+        "vuoro_service/tenant-runtime-schema-map.json",
+        "vuoro_service/tenant-runtime-schema-map.schema.json",
+    }
+    with zipfile.ZipFile(path) as archive:
+        missing = required - set(archive.namelist())
+        if missing:
+            raise ValueError(f"{path}: service wheel is missing tenant schema map files: {sorted(missing)}")
+        mapping = json.loads(archive.read("vuoro_service/tenant-runtime-schema-map.json"))
+    versions = [row.get("service_version") for row in mapping.get("releases", [])]
+    if service_version not in versions:
+        raise ValueError(f"{path}: tenant schema map has no entry for service version {service_version}")
+
+
 def validate(paths: list[Path], tag: str | None = None, *, release: bool = False) -> None:
     if not paths:
         raise ValueError("at least one wheel is required")
@@ -54,6 +70,8 @@ def validate(paths: list[Path], tag: str | None = None, *, release: bool = False
         name, version = wheel_metadata(path)
         if name not in PACKAGE_NAMES:
             raise ValueError(f"{path}: unexpected distribution {name!r}")
+        if name == "vuoro-service":
+            validate_service_schema_map(path, version)
         if name in seen:
             raise ValueError(f"duplicate wheel for {name}")
         seen.add(name)
