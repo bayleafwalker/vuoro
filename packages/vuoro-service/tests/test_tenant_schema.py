@@ -41,6 +41,10 @@ def test_current_row_tracks_adapter_pin_and_pinned_owner_compatibility_constants
     row = lookup_tenant_schema("0.1.105")
 
     assert row["owner_release"] == {"distribution": "sprintctl", "version": work_lock["distribution_version"]}
+    # The comparison against the owner's own constants needs the pinned owner
+    # wheel installed (CI jobs that install dist/adapters/sprintctl-*.whl run it);
+    # the adapter-pin comparison above always runs.
+    pytest.importorskip("sprintctl", reason="pinned work owner wheel not installed")
     assert version("sprintctl") == work_lock["distribution_version"]
     from sprintctl import pg_migrations
 

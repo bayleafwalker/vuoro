@@ -43,6 +43,9 @@ def wheel(folder: Path, name: str = "vuoro-contracts", version: str = "0.1.0", *
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr(f"{stem}-{version}.dist-info/METADATA", metadata if metadata is not None else f"Metadata-Version: 2.3\nName: {name}\nVersion: {version}\n\n")
         archive.writestr(f"{stem}/__init__.py", "")
+        if name == "vuoro-service":
+            archive.writestr("vuoro_service/tenant-runtime-schema-map.json", json.dumps({"releases": [{"service_version": version}]}))
+            archive.writestr("vuoro_service/tenant-runtime-schema-map.schema.json", "{}")
     return path
 
 
