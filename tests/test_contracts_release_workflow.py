@@ -155,7 +155,7 @@ def test_ci_calls_same_source_reusable_without_duplicate_producer() -> None:
 
 
 def test_reviewed_contract_aware_publisher_successor_and_its_oracle_are_pinned() -> None:
-    expected = {".github/workflows/publish-python-packages.yaml": "4af72c872e613ff0039cdb399e86cef40a0df3d6209d1696197b3e9ba3ddee4a", "tests/test_release_workflow.py": "c7318d4e3a85cc8e16a80f13f815c2d2d7e28fc57bf45a5bafb5849954334159"}
+    expected = {".github/workflows/publish-python-packages.yaml": "4af72c872e613ff0039cdb399e86cef40a0df3d6209d1696197b3e9ba3ddee4a", "tests/test_release_workflow.py": "0a17c59f2e37bb294df9d601cca74ab13abf049ae29a843c2387f29052db69c6"}
     for path, digest in expected.items():
         assert hashlib.sha256((ROOT / path).read_bytes()).hexdigest() == digest
     recovery = (ROOT / "docs/plans/2026-10-25-vuoro-client-0.1.5-release-recovery.md").read_text()

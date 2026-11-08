@@ -219,9 +219,10 @@ class AsyncVuoroClient:
     ) -> Any:
         catalog, operation = await self._operation(operation_name)
         Draft202012Validator(operation["input_schema"]).validate(arguments)
+        invocation_request_id = request_id or str(uuid4())
         payload = {
             "schema_version": "invocation/v1",
-            "request_id": request_id or str(uuid4()),
+            "request_id": invocation_request_id,
             "operation": operation_name,
             "arguments": arguments,
             "catalog_revision": catalog["revision"],
@@ -231,7 +232,8 @@ class AsyncVuoroClient:
         }
         response = await self._http.post(
             "/api/invoke/v1",
-            headers=self._headers(authenticated=True),
+            headers=self._headers(authenticated=True)
+            | {"X-Request-ID": invocation_request_id},
             json=payload,
         )
         envelope = response.json()

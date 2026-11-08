@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
 import jwt
 import pytest
@@ -405,6 +406,29 @@ def test_gateway_assertion_resolver_rejects_missing_invocation_request_binding(
     with pytest.raises(IdentityResolutionError):
         _resolver(path)(
             _request(_token(private), invocation_request_id="different-body-id")
+        )
+
+
+def test_gateway_assertion_correlates_uuid_request_header_and_body(
+    tmp_path: Path,
+) -> None:
+    path, private = _key_file(tmp_path)
+    request_id = str(uuid4())
+    resolver = _resolver(path)
+    token = _token(private, request_id=request_id, jti="independent-replay-id")
+
+    identity = resolver(
+        _request(token, request_id=request_id, invocation_request_id=request_id)
+    )
+    assert identity.actor == "github:123"
+
+    with pytest.raises(IdentityResolutionError, match="request correlation failed"):
+        resolver(
+            _request(
+                _token(private, request_id=request_id, jti="different-replay-id"),
+                request_id=request_id,
+                invocation_request_id=str(uuid4()),
+            )
         )
 
 
