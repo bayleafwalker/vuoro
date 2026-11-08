@@ -40,14 +40,19 @@ or any change to the public control-plane schema.
 ## Released mapping
 
 The map contains one row for every released `vuoro-service` version 0.1.94
-through 0.1.105. `migration_required_from_previous` compares the target schema
-with the immediately previous released service version, including releases
-whose owner pin did not change. Pin and owner constant rows identify the adapter
-pin history and Sprintctl `pg_migrations` constants. Rows supported only by
-`changelog_prose` are not represented as wheel-constant verification. For
-0.1.96 the local pin history establishes Sprintctl 0.20.0 but neither a local
-wheel nor changelog establishes its schema triple; those fields are null and
-its migration flag is unknown rather than inferred.
+through 0.1.105. The floor is 0.1.94: 0.1.93 and earlier are intentionally
+unmapped, so `lookup_tenant_schema` raises `UnknownServiceVersionError` for
+them. `migration_required_from_previous` compares the target schema with the
+immediately previous released service version, including releases whose owner
+pin did not change. Each evidence reference identifies the `adapter-pins.json`
+file at that service tag commit and the Sprintctl `pg_migrations` constants.
+The full verified target/floor/ceiling triples are recorded in the history test
+so they remain checked when historical owner wheels are unavailable.
+
+The 0.1.96 CHANGELOG entry still names Sprintctl 0.19.0; that text is stale
+relative to the 0.1.96 tag, whose adapter pin selects Sprintctl 0.20.0. The
+0.1.95 CHANGELOG phrase “work schemas 23 to 25” describes migrations added;
+Sprintctl 0.19.0 accepts schema 25 only.
 
 The 0.1.105 owner declares schema 34 current and accepts 32–34; migration from
 0.1.104's schema 31 is explicit. The map does not claim separate qualification
@@ -64,9 +69,10 @@ The repo-local criteria are implemented and covered by
 `packages/vuoro-service/tests/test_tenant_schema.py` and
 `scripts/validate_release_contract.py`.
 
-The tests validate JSON Schema conformance, all released rows and adjacent-release
-migration flags, current owner constants, available pin history, and both
-lookup forms plus unknown/malformed input errors. The release-contract script
+The tests validate JSON Schema conformance, cross-field range invariants, unique
+and ordered service versions, all released triples and adjacent-release migration
+flags, current owner constants, recorded tag pin history, and both lookup forms
+plus unknown/malformed input errors. The release-contract script
 validates the packaged map against its schema, requires the current service row,
 and rejects malformed rows with `ValueError`.
 

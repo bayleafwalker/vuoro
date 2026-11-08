@@ -47,7 +47,7 @@ def wheel(folder: Path, name: str = "vuoro-contracts", version: str = "0.1.0", *
             source = ROOT / "packages/vuoro-service/src/vuoro_service"
             mapping = json.loads((source / "tenant-runtime-schema-map.json").read_text())
             row = dict(mapping["releases"][-1], service_version=version)
-            mapping["releases"].append(row)
+            mapping["releases"].insert(0, row)
             archive.writestr("vuoro_service/tenant-runtime-schema-map.json", json.dumps(mapping))
             archive.write(source / "tenant-runtime-schema-map.schema.json", "vuoro_service/tenant-runtime-schema-map.schema.json")
     return path

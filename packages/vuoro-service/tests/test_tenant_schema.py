@@ -4,6 +4,7 @@ from importlib.resources import files
 from pathlib import Path
 import os
 import subprocess
+import sys
 
 import jsonschema
 import pytest
@@ -12,6 +13,7 @@ from vuoro_service.tenant_schema import UnknownServiceVersionError, lookup_tenan
 
 PACKAGE = files("vuoro_service")
 ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
 
 def _mapping():
     return json.loads(PACKAGE.joinpath("tenant-runtime-schema-map.json").read_text(encoding="utf-8"))
@@ -59,37 +61,62 @@ def test_current_service_row_matches_installed_pinned_owner():
     assert (row["work_schema_target"], row["lowest_supported_schema"], row["accepted_schema_range"]["maximum"]) == expected
 
 def test_historic_rows_match_adapter_pin_history_where_available():
-    # These triples were independently verified from the released owner wheels;
-    # adapter-pins history below verifies that each service release selected that owner.
+    # Full triples independently verified from the released owner wheels.
     verified = {
+        "0.1.94": (22, 22, 22), "0.1.95": (25, 25, 25),
+        "0.1.96": (27, 27, 27), "0.1.97": (27, 27, 27),
         "0.1.98": (28, 28, 28), "0.1.99": (28, 28, 28),
         "0.1.100": (29, 29, 29), "0.1.101": (29, 29, 29),
         "0.1.102": (30, 30, 30), "0.1.103": (31, 31, 31),
         "0.1.104": (31, 31, 31), "0.1.105": (34, 32, 34),
     }
     rows = {row["service_version"]: row for row in _mapping()["releases"]}
-    for release, triple in verified.items():
+    for release, (target, minimum, maximum) in verified.items():
         row = rows[release]
-        assert (row["work_schema_target"], row["lowest_supported_schema"], row["accepted_schema_range"]["maximum"]) == triple
+        assert (row["work_schema_target"], row["lowest_supported_schema"], row["accepted_schema_range"]["minimum"], row["accepted_schema_range"]["maximum"]) == (target, minimum, minimum, maximum)
     if not (ROOT / ".git").exists():
-        pytest.skip("not a git checkout")
+        pytest.skip("not a git checkout; adapter pin history is unavailable")
     for row in _mapping()["releases"]:
-        ref = row["evidence_source"]["reference"]
-        if row["evidence_source"]["kind"] != "adapter_pin_and_compatibility_constants":
-            continue
-        proc = subprocess.run(["git", "log", "--all", "--format=%H", "--", "packages/vuoro-service/composition/adapter-pins.json"], cwd=ROOT, text=True, capture_output=True)
-        if proc.returncode:
-            pytest.skip("git history unavailable")
-        # Pin commits are preserved in evidence references; inspect the exact service tag snapshot.
-        tag = "vuoro-service-v" + row["service_version"]
-        raw = subprocess.run(["git", "show", f"{tag}:packages/vuoro-service/composition/adapter-pins.json"], cwd=ROOT, text=True, capture_output=True)
-        if raw.returncode:
-            continue
+        reference = row["evidence_source"]["reference"]
+        commit = reference.split("tag commit ", 1)[1].split(";", 1)[0]
+        path = "packages/vuoro-service/composition/adapter-pins.json"
+        exists = subprocess.run(["git", "cat-file", "-e", f"{commit}:{path}"], cwd=ROOT, capture_output=True)
+        if exists.returncode:
+            pytest.skip(f"tag commit {commit} for {row['service_version']} is absent from this shallow checkout; pin history assertion skipped")
+        raw = subprocess.run(["git", "show", f"{commit}:{path}"], cwd=ROOT, text=True, capture_output=True, check=True)
         pins = json.loads(raw.stdout)
         lock = next(x for x in pins["release_locks"] if x["lock_id"] == "work-adapter")
-        assert lock["distribution_version"] == row["owner_release"]["version"], ref
-        # Historical owner constants are independently established by the recorded release review.
-        # Without local wheel bytes, retain this comparison at pin identity only.
+        assert lock["distribution_version"] == row["owner_release"]["version"], reference
+
+
+@pytest.mark.parametrize("mutate, message", [
+    (lambda row: row["accepted_schema_range"].update(minimum=23), "minimum must equal"),
+    (lambda row: row.update(work_schema_target=21), "target must be within"),
+    (lambda row: row["accepted_schema_range"].update(maximum=21), "target must be within"),
+    (lambda row: (row.update(lowest_supported_schema=23), row["accepted_schema_range"].update(minimum=23, maximum=24)), "target must be within"),
+])
+def test_schema_map_semantic_range_invariants(mutate, message):
+    from scripts.validate_release_contract import validate_tenant_schema_map_data
+    mapping = _mapping()
+    mutate(mapping["releases"][0])
+    with pytest.raises(ValueError, match=message):
+        validate_tenant_schema_map_data(mapping)
+
+
+def test_schema_map_rejects_duplicate_service_versions():
+    from scripts.validate_release_contract import validate_tenant_schema_map_data
+    mapping = _mapping()
+    mapping["releases"][1]["service_version"] = mapping["releases"][0]["service_version"]
+    with pytest.raises(ValueError, match="must be unique"):
+        validate_tenant_schema_map_data(mapping)
+
+
+def test_schema_map_rejects_unordered_service_versions():
+    from scripts.validate_release_contract import validate_tenant_schema_map_data
+    mapping = _mapping()
+    mapping["releases"][0], mapping["releases"][1] = mapping["releases"][1], mapping["releases"][0]
+    with pytest.raises(ValueError, match="strictly ordered"):
+        validate_tenant_schema_map_data(mapping)
 
 @pytest.mark.parametrize("bad", [{}, {"schema_version":"vuoro-tenant-runtime-schema-map/v1","releases":[None]}])
 def test_malformed_maps_fail_schema_validation(bad):
