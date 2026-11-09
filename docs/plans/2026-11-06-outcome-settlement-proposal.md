@@ -231,6 +231,24 @@ coarse status does not automatically lower classification. The initial fixture
 is C0. A private-data extension must use an authorized destination in the same
 class or separately qualify a new cross-class release contract.
 
+## 9 November 2026 correctness and sourcing clarification
+
+The [decision-record and lane-feedback plan](2026-11-09-decision-records-and-lane-feedback.md)
+uses this workflow as correctness qualification, not an efficiency intervention
+whose repetition depends on a statistical benefit. Fault cases qualify the
+named installed composition; safe reconciliation then remains required within
+that scope. Recovery effort is a separate efficiency observation. Other
+decision, allocation and rediscovery work proceeds concurrently.
+
+The Sovite owner plan already selects a disposable PostgreSQL target with the
+publication pointer and journal in one transaction. Reuse native transaction,
+deduplication and conditional-write primitives. A future Delta adapter would
+bind existing transaction identifiers and retention limits; Git content identity
+and GitOps convergence likewise leave their native mechanisms with their owners.
+The additional proof concerns resource/effect-intent lineage, authority and
+cross-session recovery. Do not claim that native target correctness is a new
+Vuoro mechanism or a general exactly-once guarantee.
+
 ## Delivery sequence and repository ownership
 
 Each slice must name its installed component versions and actual owner APIs before

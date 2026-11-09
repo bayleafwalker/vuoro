@@ -31,6 +31,25 @@ external admission and support claims still require their applicable isolation,
 recovery, authority and qualification evidence. No existing qualification or
 observed deployment follows from this direction update.
 
+## 9 November 2026 decision-feedback amendment
+
+The operator requested landing the corrected
+[decision-record and lane-feedback plan](2026-11-09-decision-records-and-lane-feedback.md).
+Decision emission, deterministic next-observation rules, lanectl's existing
+capacity loop and rediscovery measurement may proceed concurrently under their
+own input and authority requirements. B's protected-publication proof, a
+cockpit and a model-comparison sample are not prerequisites for this work.
+This supersedes the serial reading of the first delivery rule, D's dependency
+and the dependency chain below for these independent capabilities. B's effect
+correctness and the distribution's qualification gates remain required within
+their stated scope.
+
+Cheap agents and bounded decision consumers receive source-linked projections;
+the operator view is secondary. Correctness is qualified through fault cases;
+efficiency reports directional cost and burden unless stronger evidence exists.
+Record depth and analysis overhead follow the new plan's effect-class budgets.
+This changes planning order, not implementation or deployment status.
+
 ## Product outcome
 
 Carry a human objective across agents, sessions, providers and environments through an operation that the responsible authority accepts, retaining the work identity, authority, evidence, knowledge and recovery information needed to explain and continue it. The operating outcome is reliable household services with declining operator effort. Vuoro supplies the portable contracts and operated workflow; domain products own their domain experience and truth.
@@ -104,7 +123,7 @@ These work items are in scope for planning now. The collected evidence refines i
 
 ### D. Make delegation, evidence and learning useful across sessions
 
-**Owner:** Vuoro contracts and projections; native runtimes own execution/delegation internals; Auditctl owns evidence judgements; Sprintctl owns work lifecycle. **Depends on:** B's accepted workflow and owner contracts.
+**Owner:** Vuoro contracts and projections; native runtimes own execution/delegation internals; Auditctl owns evidence judgements; Sprintctl owns work lifecycle. **Depends on:** relevant owner contracts and available observations. B's accepted workflow is required for claims about that protected workflow; independent decision, capacity and rediscovery work follows the 9 November amendment above.
 
 Specify and demonstrate portable records for objective, work, participant identity, session/attempt, delegation, messages/handoffs, artifact versions, evidence class, policy revision, verification profile, acceptance and continuation point. Record delivery, acknowledgement, completion and acceptance as distinct states. Bound delegated authority and preserve each actor's separate authority. A takeover grants authority to the successor only through its own authorization; it does not transfer predecessor credentials.
 
