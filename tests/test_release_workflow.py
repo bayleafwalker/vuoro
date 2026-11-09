@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
+import subprocess
+import yaml
 
 import pytest
 
@@ -51,15 +54,20 @@ def _assert_python_release_order(workflow: str) -> None:
     ):
         assert f'payload = archive.read(member)' in workflow
         assert member in workflow
-    assert 'assert target.read_bytes() == payload' in workflow
+    assert 'assert reread == archive.read(member)' in workflow
+    assert 'record_hash = records.get(member)' in workflow
+    assert 'assert actual == encoded.rstrip("=")' in workflow
     assert 'if [[ "$package" == "vuoro-service" ]]' in workflow
     assert 'tenant-runtime-schema-map sha256: %s\\ntenant-runtime-schema-map.schema: %s\\ntenant-runtime-schema-map.schema sha256: %s\\n' in workflow
     assert 'assets+=("$schema_map" "$schema_map_schema")' in workflow
     assert workflow.count("${{ steps.publication.outputs.wheel }}") == 3
     assert "subject-path: \"${{ steps.publication.outputs.wheel }}\"" in workflow
-    assert workflow.count("uses: actions/attest@v4") == 3
-    assert 'subject-path: "${{ steps.publication.outputs.schema_map }}"' in workflow
-    assert 'subject-path: "${{ steps.publication.outputs.schema_map_schema }}"' in workflow
+    assert workflow.count("uses: actions/attest@v4") == 2
+    assert 'subject-path: |\n            ${{ steps.publication.outputs.schema_map }}\n            ${{ steps.publication.outputs.schema_map_schema }}' in workflow
+    assert 'archive.read(member)' in workflow
+    assert 'assert reread == archive.read(member)' in workflow
+    assert 'records.get(member)' in workflow
+    assert 'assert actual == encoded.rstrip("=")' in workflow
     assert "if: ${{ false }}" not in workflow
     assert 'contents: write' in workflow
     assert 'GH_TOKEN: ${{ github.token }}' in workflow
@@ -86,16 +94,90 @@ def _assert_tenant_schema_assets(workflow: str) -> None:
         assert f'"{member}"' in workflow
     assert "payload = archive.read(member)" in workflow
     assert 'target.write_bytes(payload)' in workflow
-    assert 'assert target.read_bytes() == payload' in workflow
+    assert 'assert reread == archive.read(member)' in workflow
+    assert 'record_hash = records.get(member)' in workflow
+    assert 'assert actual == encoded.rstrip("=")' in workflow
     assert 'if [[ "$package" == "vuoro-service" ]]' in workflow
     assert 'map_sha256="$(sha256sum dist/publish/tenant-runtime-schema-map.json' in workflow
     assert 'schema_sha256="$(sha256sum dist/publish/tenant-runtime-schema-map.schema.json' in workflow
     assert 'tenant-runtime-schema-map sha256: %s\\ntenant-runtime-schema-map.schema: %s\\ntenant-runtime-schema-map.schema sha256: %s\\n' in workflow
     assert 'assets+=("$schema_map" "$schema_map_schema")' in workflow
     assert "- name: Attest the tenant runtime schema map assets\n        if: steps.package.outputs.name == 'vuoro-service'" in workflow
-    assert "- name: Attest the tenant runtime schema map schema\n        if: steps.package.outputs.name == 'vuoro-service'" in workflow
-    assert 'subject-path: "${{ steps.publication.outputs.schema_map }}"' in workflow
-    assert 'subject-path: "${{ steps.publication.outputs.schema_map_schema }}"' in workflow
+    assert 'subject-path: |\n            ${{ steps.publication.outputs.schema_map }}\n            ${{ steps.publication.outputs.schema_map_schema }}' in workflow
+
+
+def test_release_notes_preserve_wheel_digest_line_and_client_text(tmp_path: Path) -> None:
+    workflow = yaml.load(PYTHON_WORKFLOW.read_text(), Loader=yaml.BaseLoader)
+    step = next(
+        item for item in workflow["jobs"]["publish"]["steps"]
+        if item.get("name") == "Create the draft GitHub release with the selected wheel"
+    )
+    script = step["run"]
+    wheel = tmp_path / "dist/publish/vuoro_service-1.2.3-py3-none-any.whl"
+    wheel.parent.mkdir(parents=True)
+    wheel.write_bytes(b"test wheel")
+    (wheel.parent / "tenant-runtime-schema-map.json").write_text("{}\n")
+    (wheel.parent / "tenant-runtime-schema-map.schema.json").write_text("{}\n")
+    fakebin = tmp_path / "bin"
+    fakebin.mkdir()
+    capture = tmp_path / "captured-notes"
+    gh = fakebin / "gh"
+    gh.write_text(
+        "#!/usr/bin/env python3\n"
+        "import os, sys\n"
+        "args = sys.argv[1:]\n"
+        "with open(os.environ['NOTES_CAPTURE'], 'wb') as out:\n"
+        "    out.write(args[args.index('--notes') + 1].encode())\n"
+    )
+    gh.chmod(0o755)
+
+    def run(package: str, source: str = script) -> bytes:
+        prepared = source.replace('${{ steps.package.outputs.name }}', package)
+        prepared = prepared.replace('${{ steps.publication.outputs.wheel }}', str(wheel))
+        prepared = prepared.replace('${{ steps.publication.outputs.wheel_name }}', wheel.name)
+        prepared = prepared.replace('${{ steps.publication.outputs.sha256 }}', 'a' * 64)
+        prepared = prepared.replace('${{ steps.publication.outputs.schema_map }}', str(wheel.parent / "tenant-runtime-schema-map.json"))
+        prepared = prepared.replace('${{ steps.publication.outputs.schema_map_sha256 }}', 'b' * 64)
+        prepared = prepared.replace('${{ steps.publication.outputs.schema_map_schema }}', str(wheel.parent / "tenant-runtime-schema-map.schema.json"))
+        prepared = prepared.replace('${{ steps.publication.outputs.schema_map_schema_sha256 }}', 'c' * 64)
+        env = os.environ | {
+            "PATH": f"{fakebin}:{os.environ['PATH']}",
+            "GITHUB_REF_NAME": f"{package}-v1.2.3",
+            "GITHUB_REPOSITORY": "owner/repo",
+            "NOTES_CAPTURE": str(capture),
+            "GITHUB_OUTPUT": str(tmp_path / "output"),
+        }
+        env.update({
+            "sha256": "a" * 64,
+            "schema_map": str(wheel.parent / "tenant-runtime-schema-map.json"),
+            "schema_map_sha256": "b" * 64,
+            "schema_map_schema": str(wheel.parent / "tenant-runtime-schema-map.schema.json"),
+            "schema_map_schema_sha256": "c" * 64,
+        })
+        env.pop("BASH_ENV", None)
+        result = subprocess.run(["/run/current-system/sw/bin/bash", "--noprofile", "--norc", "-euo", "pipefail", "-c", prepared], env=env, capture_output=True)
+        assert result.returncode == 0, result.stderr.decode()
+        return capture.read_bytes()
+
+    client_expected = (
+        f"tag: vuoro-client-v1.2.3\ndistribution: vuoro-client\nwheel: {wheel.name}\n"
+        f"sha256: {'a' * 64}\n"
+    ).encode().rstrip(b"\n")
+    service_expected = (
+        f"tag: vuoro-service-v1.2.3\ndistribution: vuoro-service\nwheel: {wheel.name}\n"
+        f"sha256: {'a' * 64}\n"
+        f"tenant-runtime-schema-map: tenant-runtime-schema-map.json\n"
+        f"tenant-runtime-schema-map sha256: {'b' * 64}\n"
+        f"tenant-runtime-schema-map.schema: tenant-runtime-schema-map.schema.json\n"
+        f"tenant-runtime-schema-map.schema sha256: {'c' * 64}\n"
+    ).encode().rstrip(b"\n")
+    assert run("vuoro-client") == client_expected
+    assert run("vuoro-service") == service_expected
+
+    buggy = script.replace("notes+=$'\\n'", "notes+=")
+    assert buggy != script
+    with pytest.raises(AssertionError):
+        assert run("vuoro-service", buggy) == service_expected
 
 
 def test_service_schema_map_assets_are_wheel_derived_hashed_attested_and_attached() -> None:
@@ -105,10 +187,11 @@ def test_service_schema_map_assets_are_wheel_derived_hashed_attested_and_attache
     mutants = (
         workflow.replace('"vuoro_service/tenant-runtime-schema-map.json"', '"missing-map.json"'),
         workflow.replace('"vuoro_service/tenant-runtime-schema-map.schema.json"', '"missing-schema.json"'),
-        workflow.replace('assert target.read_bytes() == payload', 'assert target.read_bytes() != payload'),
+        workflow.replace('assert reread == archive.read(member)', 'assert reread != archive.read(member)'),
+        workflow.replace('assert actual == encoded.rstrip("=")', 'assert actual != encoded.rstrip("=")'),
         workflow.replace('tenant-runtime-schema-map sha256: %s', 'tenant-runtime-schema-map hash: %s'),
         workflow.replace('assets+=("$schema_map" "$schema_map_schema")', 'assets+=("$schema_map")'),
-        workflow.replace('subject-path: "${{ steps.publication.outputs.schema_map_schema }}"', 'subject-path: "${{ steps.publication.outputs.wheel }}"'),
+        workflow.replace('${{ steps.publication.outputs.schema_map_schema }}', '${{ steps.publication.outputs.wheel }}'),
         workflow.replace("        if: steps.package.outputs.name == 'vuoro-service'\n        uses: actions/attest@v4", "        uses: actions/attest@v4", 1),
     )
     for mutant in mutants:
