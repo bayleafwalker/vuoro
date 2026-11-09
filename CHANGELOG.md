@@ -11,7 +11,10 @@ recorded here.
   their prose evidence; the current row is drift-checked against the Sprintctl
   adapter pin and its compatibility constants. Each service release attaches
   the map and schema extracted byte-for-byte from the gated wheel, lists both
-  SHA-256 digests in release notes and attests the assets. Published 0.1.105
+  SHA-256 digests in release notes and attests the assets. Extraction reads
+  each wheel member through `ZipFile.read` (checking its CRC), compares the
+  written file bytes with a fresh member read, and verifies the bytes' SHA-256
+  against that member's SHA-256 entry in wheel `RECORD`. Published 0.1.105
   predates the map; the next service release is the first carrying it in both
   the wheel and standalone release assets.
 

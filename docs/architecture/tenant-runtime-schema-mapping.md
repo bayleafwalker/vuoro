@@ -3,9 +3,11 @@
 Status: **implemented** (2026-11-09). The mapping ships as service package data at
 `packages/vuoro-service/src/vuoro_service/tenant-runtime-schema-map.json`,
 with the adjacent JSON Schema and the standalone map and schema assets attached
-to each `vuoro-service` GitHub release. The assets are extracted from the gated
-service wheel, checked byte-for-byte against its contents, SHA-256 listed in
-release notes, and attested. The mapping is exposed through
+to each `vuoro-service` GitHub release. During extraction, `ZipFile.read`
+checks each wheel member's CRC; the workflow then compares the written file's
+bytes with a fresh read of that member and verifies its SHA-256 against the
+member's SHA-256 entry in the wheel's `RECORD`. Their file SHA-256 digests are
+listed in release notes, and the assets are attested. The mapping is exposed through
 `vuoro_service.tenant_schema.lookup_tenant_schema`. It changes no release pin or
 deployment. It states a contract that
 `vuoro-cloud` needs and this repository must own.
