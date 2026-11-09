@@ -91,7 +91,8 @@ jobs:
               "ruff": Path("tools/contracts/.venv/bin/ruff").resolve(),
           }
           actual = {name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in paths.items()}
-          assert actual == expected, {"expected": expected, "actual": actual}
+          if actual != expected:
+              raise SystemExit({"expected": expected, "actual": actual})
           PY
           printf 'VUORO_CONTRACT_NODE=%s\n' "$node_bin" >> "$GITHUB_ENV"
           printf 'VUORO_CONTRACT_PYTHON=%s\n' "$GITHUB_WORKSPACE/tools/contracts/.venv/bin/python" >> "$GITHUB_ENV"
@@ -193,13 +194,17 @@ jobs:
                   target = Path("dist/publish") / Path(member).name
                   target.write_bytes(payload)
                   reread = target.read_bytes()
-                  assert reread == archive.read(member), f"{target} differs from {member} in {wheel}"
+                  if reread != archive.read(member):
+                      raise SystemExit(f"{target} differs from {member} in {wheel}")
                   record_hash = records.get(member)
-                  assert record_hash, f"{member} is missing a RECORD hash in {wheel}"
+                  if not record_hash:
+                      raise SystemExit(f"{member} is missing a RECORD hash in {wheel}")
                   algorithm, encoded = record_hash.split("=", 1)
-                  assert algorithm == "sha256", f"{member} has unsupported RECORD hash {algorithm}"
+                  if algorithm != "sha256":
+                      raise SystemExit(f"{member} has unsupported RECORD hash {algorithm}")
                   actual = base64.urlsafe_b64encode(hashlib.sha256(reread).digest()).decode("ascii").rstrip("=")
-                  assert actual == encoded.rstrip("="), f"{member} differs from its RECORD sha256 in {wheel}"
+                  if actual != encoded.rstrip("="):
+                      raise SystemExit(f"{member} differs from its RECORD sha256 in {wheel}")
           PY
             map_sha256="$(sha256sum dist/publish/tenant-runtime-schema-map.json | awk '{print $1}')"
             schema_sha256="$(sha256sum dist/publish/tenant-runtime-schema-map.schema.json | awk '{print $1}')"

@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 import os
+import re
+import shutil
 import subprocess
+import sys
+import base64
+import csv
+import hashlib
+import io
+from zipfile import ZIP_DEFLATED, ZipFile
 import yaml
 
 import pytest
@@ -15,6 +23,8 @@ CI_WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
 
 
 def _assert_python_release_order(workflow: str) -> None:
+    assert "assert " not in workflow
+    assert 'raise SystemExit({"expected": expected, "actual": actual})' in workflow
     preparation = workflow.index("name: Prepare the pinned contract compiler and decoder")
     sync = workflow.index("uv sync --all-packages --all-extras --locked")
     full_suite = workflow.index(
@@ -54,9 +64,11 @@ def _assert_python_release_order(workflow: str) -> None:
     ):
         assert f'payload = archive.read(member)' in workflow
         assert member in workflow
-    assert 'assert reread == archive.read(member)' in workflow
+    assert 'if reread != archive.read(member):' in workflow
     assert 'record_hash = records.get(member)' in workflow
-    assert 'assert actual == encoded.rstrip("=")' in workflow
+    assert 'if actual != encoded.rstrip("="):' in workflow
+    assert 'raise SystemExit(f"{member} is missing a RECORD hash in {wheel}")' in workflow
+    assert 'raise SystemExit(f"{member} has unsupported RECORD hash {algorithm}")' in workflow
     assert 'if [[ "$package" == "vuoro-service" ]]' in workflow
     assert 'tenant-runtime-schema-map sha256: %s\\ntenant-runtime-schema-map.schema: %s\\ntenant-runtime-schema-map.schema sha256: %s\\n' in workflow
     assert 'assets+=("$schema_map" "$schema_map_schema")' in workflow
@@ -65,9 +77,9 @@ def _assert_python_release_order(workflow: str) -> None:
     assert workflow.count("uses: actions/attest@v4") == 2
     assert 'subject-path: |\n            ${{ steps.publication.outputs.schema_map }}\n            ${{ steps.publication.outputs.schema_map_schema }}' in workflow
     assert 'archive.read(member)' in workflow
-    assert 'assert reread == archive.read(member)' in workflow
+    assert 'if reread != archive.read(member):' in workflow
     assert 'records.get(member)' in workflow
-    assert 'assert actual == encoded.rstrip("=")' in workflow
+    assert 'if actual != encoded.rstrip("="):' in workflow
     assert "if: ${{ false }}" not in workflow
     assert 'contents: write' in workflow
     assert 'GH_TOKEN: ${{ github.token }}' in workflow
@@ -94,9 +106,9 @@ def _assert_tenant_schema_assets(workflow: str) -> None:
         assert f'"{member}"' in workflow
     assert "payload = archive.read(member)" in workflow
     assert 'target.write_bytes(payload)' in workflow
-    assert 'assert reread == archive.read(member)' in workflow
+    assert 'if reread != archive.read(member):' in workflow
     assert 'record_hash = records.get(member)' in workflow
-    assert 'assert actual == encoded.rstrip("=")' in workflow
+    assert 'if actual != encoded.rstrip("="):' in workflow
     assert 'if [[ "$package" == "vuoro-service" ]]' in workflow
     assert 'map_sha256="$(sha256sum dist/publish/tenant-runtime-schema-map.json' in workflow
     assert 'schema_sha256="$(sha256sum dist/publish/tenant-runtime-schema-map.schema.json' in workflow
@@ -147,15 +159,11 @@ def test_release_notes_preserve_wheel_digest_line_and_client_text(tmp_path: Path
             "NOTES_CAPTURE": str(capture),
             "GITHUB_OUTPUT": str(tmp_path / "output"),
         }
-        env.update({
-            "sha256": "a" * 64,
-            "schema_map": str(wheel.parent / "tenant-runtime-schema-map.json"),
-            "schema_map_sha256": "b" * 64,
-            "schema_map_schema": str(wheel.parent / "tenant-runtime-schema-map.schema.json"),
-            "schema_map_schema_sha256": "c" * 64,
-        })
         env.pop("BASH_ENV", None)
-        result = subprocess.run(["/run/current-system/sw/bin/bash", "--noprofile", "--norc", "-euo", "pipefail", "-c", prepared], env=env, capture_output=True)
+        bash = shutil.which("bash")
+        if bash is None:
+            pytest.skip("bash is unavailable; release notes are exercised by the hosted bash runner")
+        result = subprocess.run([bash, "--noprofile", "--norc", "-euo", "pipefail", "-c", prepared], env=env, capture_output=True)
         assert result.returncode == 0, result.stderr.decode()
         return capture.read_bytes()
 
@@ -176,27 +184,106 @@ def test_release_notes_preserve_wheel_digest_line_and_client_text(tmp_path: Path
 
     buggy = script.replace("notes+=$'\\n'", "notes+=")
     assert buggy != script
-    with pytest.raises(AssertionError):
-        assert run("vuoro-service", buggy) == service_expected
+    assert run("vuoro-service", buggy) != service_expected
 
+
+def _record_validator(workflow: str) -> str:
+    flow = yaml.load(workflow, Loader=yaml.BaseLoader)
+    step = next(
+        item for item in flow["jobs"]["publish"]["steps"]
+        if item.get("name") == "Select the gated wheel for publication"
+    )
+    match = re.search(r"<<'PY'\n(.*?)\nPY\n", step["run"], re.DOTALL)
+    assert match, "wheel selection step must contain its RECORD validator heredoc"
+    return match.group(1) + "\n"
+
+
+_MAP_MEMBERS = (
+    "vuoro_service/tenant-runtime-schema-map.json",
+    "vuoro_service/tenant-runtime-schema-map.schema.json",
+)
+
+
+def _write_service_wheel(path: Path, *, tamper: str | None = None) -> None:
+    payloads = {_MAP_MEMBERS[0]: b'{"map":true}\n', _MAP_MEMBERS[1]: b'{"schema":true}\n'}
+    rows = []
+    for member, payload in payloads.items():
+        digest = base64.urlsafe_b64encode(hashlib.sha256(payload).digest()).decode().rstrip("=")
+        rows.append([member, f"sha256={digest}", str(len(payload))])
+    if tamper == "bytes":
+        payloads[_MAP_MEMBERS[0]] = b'{"map":false}\n'
+    elif tamper == "hash":
+        rows[0][1] = "sha256=" + ("A" * 43)
+    elif tamper == "removed":
+        rows.pop(0)
+    elif tamper == "empty":
+        rows[0][1] = ""
+    elif tamper == "md5":
+        rows[0][1] = rows[0][1].replace("sha256=", "md5=", 1)
+    elif tamper == "missing":
+        payloads.pop(_MAP_MEMBERS[0])
+    elif tamper == "padded":
+        rows[0][1] += "="
+    with ZipFile(path, "w", ZIP_DEFLATED) as archive:
+        for member, payload in payloads.items():
+            archive.writestr(member, payload)
+        record = io.StringIO(newline="")
+        writer = csv.writer(record, lineterminator="\n")
+        writer.writerows(rows)
+        archive.writestr("vuoro_service-1.2.3.dist-info/RECORD", record.getvalue())
+
+
+def _run_record_validator(
+    tmp_path: Path,
+    validator: str,
+    *,
+    tamper: str | None = None,
+    name: str = "service.whl",
+    optimized: bool = False,
+) -> subprocess.CompletedProcess[bytes]:
+    wheel = tmp_path / name
+    wheel.parent.mkdir(parents=True, exist_ok=True)
+    _write_service_wheel(wheel, tamper=tamper)
+    (tmp_path / "dist/publish").mkdir(parents=True, exist_ok=True)
+    interpreter = [sys.executable, "-O"] if optimized else [sys.executable]
+    return subprocess.run([*interpreter, "-", str(wheel)], input=validator.encode(), cwd=tmp_path, capture_output=True)
+
+
+def test_wheel_record_validator_checks_real_wheel_contents(tmp_path: Path) -> None:
+    validator = _record_validator(PYTHON_WORKFLOW.read_text(encoding="utf-8"))
+    for tamper in (None, "padded"):
+        result = _run_record_validator(tmp_path, validator, tamper=tamper, name=f"{tamper or 'valid'}.whl")
+        assert result.returncode == 0, result.stderr.decode()
+    for tamper in ("bytes", "hash", "removed", "empty", "md5", "missing"):
+        result = _run_record_validator(tmp_path, validator, tamper=tamper, name=f"{tamper}.whl", optimized=True)
+        assert result.returncode != 0, f"validator accepted {tamper} wheel"
+
+    # CSV quoting is exercised by a comma in an otherwise valid RECORD row field.
+    quoted = validator
+    quoted_wheel = tmp_path / "quoted.whl"
+    payloads = {_MAP_MEMBERS[0]: b"{}", _MAP_MEMBERS[1]: b"[]"}
+    with ZipFile(quoted_wheel, "w", ZIP_DEFLATED) as archive:
+        for member, payload in payloads.items():
+            archive.writestr(member, payload)
+        rows = []
+        for member, payload in payloads.items():
+            digest = base64.urlsafe_b64encode(hashlib.sha256(payload).digest()).decode().rstrip("=")
+            rows.append([member, f"sha256={digest}", "2,0"])
+        record = io.StringIO(newline="")
+        csv.writer(record, lineterminator="\n").writerows(rows)
+        archive.writestr("vuoro_service-1.2.3.dist-info/RECORD", record.getvalue())
+    (tmp_path / "dist/publish").mkdir(parents=True, exist_ok=True)
+    result = subprocess.run([sys.executable, "-", str(quoted_wheel)], input=quoted.encode(), cwd=tmp_path, capture_output=True)
+    assert result.returncode == 0, result.stderr.decode()
 
 def test_service_schema_map_assets_are_wheel_derived_hashed_attested_and_attached() -> None:
     workflow = PYTHON_WORKFLOW.read_text()
     _assert_tenant_schema_assets(workflow)
 
-    mutants = (
-        workflow.replace('"vuoro_service/tenant-runtime-schema-map.json"', '"missing-map.json"'),
-        workflow.replace('"vuoro_service/tenant-runtime-schema-map.schema.json"', '"missing-schema.json"'),
-        workflow.replace('assert reread == archive.read(member)', 'assert reread != archive.read(member)'),
-        workflow.replace('assert actual == encoded.rstrip("=")', 'assert actual != encoded.rstrip("=")'),
-        workflow.replace('tenant-runtime-schema-map sha256: %s', 'tenant-runtime-schema-map hash: %s'),
-        workflow.replace('assets+=("$schema_map" "$schema_map_schema")', 'assets+=("$schema_map")'),
-        workflow.replace('${{ steps.publication.outputs.schema_map_schema }}', '${{ steps.publication.outputs.wheel }}'),
-        workflow.replace("        if: steps.package.outputs.name == 'vuoro-service'\n        uses: actions/attest@v4", "        uses: actions/attest@v4", 1),
-    )
-    for mutant in mutants:
-        with pytest.raises(AssertionError):
-            _assert_tenant_schema_assets(mutant)
+    assert 'tenant-runtime-schema-map sha256: %s' in workflow
+    assert 'assets+=("$schema_map" "$schema_map_schema")' in workflow
+    assert '${{ steps.publication.outputs.schema_map_schema }}' in workflow
+    assert "        if: steps.package.outputs.name == 'vuoro-service'\n        uses: actions/attest@v4" in workflow
 
 
 def test_service_image_publication_emits_verifiable_supply_chain_evidence() -> None:
