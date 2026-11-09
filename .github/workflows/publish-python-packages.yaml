@@ -165,7 +165,11 @@ jobs:
           echo "wheel_name=$wheel_name" >> "$GITHUB_OUTPUT"
           echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
           if [[ "$package" == "vuoro-service" ]]; then
-            python - "$wheel" <<'PY'
+            "$qualified_python" - "$wheel" <<'PY'
+          import base64
+          import hashlib
+          import csv
+          import io
           from pathlib import Path
           import sys
           from zipfile import ZipFile
@@ -176,11 +180,26 @@ jobs:
               "vuoro_service/tenant-runtime-schema-map.schema.json",
           )
           with ZipFile(wheel) as archive:
+              record_name = next(
+                  name for name in archive.namelist()
+                  if name.endswith(".dist-info/RECORD")
+              )
+              records = {
+                  row[0]: row[1]
+                  for row in csv.reader(io.TextIOWrapper(archive.open(record_name), encoding="utf-8"))
+              }
               for member in members:
                   payload = archive.read(member)
                   target = Path("dist/publish") / Path(member).name
                   target.write_bytes(payload)
-                  assert target.read_bytes() == payload, f"{target} differs from {member} in {wheel}"
+                  reread = target.read_bytes()
+                  assert reread == archive.read(member), f"{target} differs from {member} in {wheel}"
+                  record_hash = records.get(member)
+                  assert record_hash, f"{member} is missing a RECORD hash in {wheel}"
+                  algorithm, encoded = record_hash.split("=", 1)
+                  assert algorithm == "sha256", f"{member} has unsupported RECORD hash {algorithm}"
+                  actual = base64.urlsafe_b64encode(hashlib.sha256(reread).digest()).decode("ascii").rstrip("=")
+                  assert actual == encoded.rstrip("="), f"{member} differs from its RECORD sha256 in {wheel}"
           PY
             map_sha256="$(sha256sum dist/publish/tenant-runtime-schema-map.json | awk '{print $1}')"
             schema_sha256="$(sha256sum dist/publish/tenant-runtime-schema-map.schema.json | awk '{print $1}')"
@@ -199,12 +218,9 @@ jobs:
         if: steps.package.outputs.name == 'vuoro-service'
         uses: actions/attest@v4
         with:
-          subject-path: "${{ steps.publication.outputs.schema_map }}"
-      - name: Attest the tenant runtime schema map schema
-        if: steps.package.outputs.name == 'vuoro-service'
-        uses: actions/attest@v4
-        with:
-          subject-path: "${{ steps.publication.outputs.schema_map_schema }}"
+          subject-path: |
+            ${{ steps.publication.outputs.schema_map }}
+            ${{ steps.publication.outputs.schema_map_schema }}
       - name: Attest the selected gated wheel
         uses: actions/attest@v4
         with:
@@ -228,9 +244,9 @@ jobs:
             "$tag" "$package" "$wheel_name" "$sha256")
           assets=("$wheel")
           if [[ "$package" == "vuoro-service" ]]; then
-            notes+=$(printf 'tenant-runtime-schema-map: %s\ntenant-runtime-schema-map sha256: %s\ntenant-runtime-schema-map.schema: %s\ntenant-runtime-schema-map.schema sha256: %s\n' \
+            notes+=$'\n'"$(printf 'tenant-runtime-schema-map: %s\ntenant-runtime-schema-map sha256: %s\ntenant-runtime-schema-map.schema: %s\ntenant-runtime-schema-map.schema sha256: %s\n' \
               "$(basename "$schema_map")" "$schema_map_sha256" \
-              "$(basename "$schema_map_schema")" "$schema_map_schema_sha256")
+              "$(basename "$schema_map_schema")" "$schema_map_schema_sha256")"
             assets+=("$schema_map" "$schema_map_schema")
           fi
           gh release create "$tag" \
