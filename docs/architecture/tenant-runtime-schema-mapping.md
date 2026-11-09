@@ -1,9 +1,11 @@
 # Tenant runtime to work schema mapping
 
-Status: **implemented** (2026-11-08). This repository publishes the versioned
-mapping as service package data at
+Status: **implemented** (2026-11-09). The mapping ships as service package data at
 `packages/vuoro-service/src/vuoro_service/tenant-runtime-schema-map.json`,
-validated by the adjacent JSON Schema and exposed through
+with the adjacent JSON Schema and the standalone map and schema assets attached
+to each `vuoro-service` GitHub release. The assets are extracted from the gated
+service wheel, checked byte-for-byte against its contents, SHA-256 listed in
+release notes, and attested. The mapping is exposed through
 `vuoro_service.tenant_schema.lookup_tenant_schema`. It changes no release pin or
 deployment. It states a contract that
 `vuoro-cloud` needs and this repository must own.
@@ -54,7 +56,10 @@ relative to the 0.1.96 tag, whose adapter pin selects Sprintctl 0.20.0. The
 0.1.95 CHANGELOG phrase “work schemas 23 to 25” describes migrations added;
 Sprintctl 0.19.0 accepts schema 25 only.
 
-The 0.1.105 owner declares schema 34 current and accepts 32–34; migration from
+The published 0.1.105 wheel predates the mapping and does not contain it. The
+next `vuoro-service` release is the first release carrying the map and schema
+both inside its wheel and as standalone release assets. The 0.1.105 owner
+declares schema 34 current and accepts 32–34; migration from
 0.1.104's schema 31 is explicit. The map does not claim separate qualification
 of historical schema 32/33 catalog shapes. This is source/package contract
 information, not deployment or field acceptance.
@@ -67,7 +72,9 @@ validator, so the missing row blocks the whole publish workflow by design.
 
 The repo-local criteria are implemented and covered by
 `packages/vuoro-service/tests/test_tenant_schema.py` and
-`scripts/validate_release_contract.py`.
+`scripts/validate_release_contract.py`. The service release workflow attaches
+both wheel-derived JSON files, records their SHA-256 digests in release notes,
+and attests each asset.
 
 The tests validate JSON Schema conformance, cross-field range invariants, unique
 and ordered service versions, all released triples and adjacent-release migration

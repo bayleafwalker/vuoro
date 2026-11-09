@@ -9,9 +9,11 @@ recorded here.
   package data, with a checked-in JSON Schema and a pure lookup helper for
   semantic versions and pinned image identities. Historical entries identify
   their prose evidence; the current row is drift-checked against the Sprintctl
-  adapter pin and its compatibility constants. The service release workflow
-  still needs to attach the mapping and schema as release assets for direct
-  vuoro-cloud consumption.
+  adapter pin and its compatibility constants. Each service release attaches
+  the map and schema extracted byte-for-byte from the gated wheel, lists both
+  SHA-256 digests in release notes and attests the assets. Published 0.1.105
+  predates the map; the next service release is the first carrying it in both
+  the wheel and standalone release assets.
 
 - vuoro-client 0.1.8 sends each invocation's request ID in both the v1 JSON
   envelope and `X-Request-ID`, fixing gateway identity correlation for
