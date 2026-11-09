@@ -26,6 +26,7 @@ def _assert_python_release_order(workflow: str) -> None:
     )
     served_gate = workflow.index("scripts/validate_served_conformance.py")
     selection = workflow.index("name: Select the gated wheel for publication")
+    schema_assets = workflow.index("from zipfile import ZipFile")
     tag_gate = workflow.index("name: Validate the selected gated wheel against its tag")
     attestation = workflow.index("name: Attest the selected gated wheel")
     release_create = workflow.index("name: Create the draft GitHub release with the selected wheel")
@@ -34,7 +35,7 @@ def _assert_python_release_order(workflow: str) -> None:
     )
 
     assert preparation < sync < build < full_suite < release_gate < served_gate
-    assert served_gate < selection < tag_gate < attestation < release_create < release_finalize
+    assert served_gate < selection < schema_assets < tag_gate < attestation < release_create < release_finalize
     assert workflow.count("uv build --package") == 6
     assert "uv build --package vuoro-contracts --wheel --out-dir dist/vuoro-contracts --no-create-gitignore" in workflow
     assert 'dist/vuoro-contracts/*.whl' in workflow
@@ -44,9 +45,21 @@ def _assert_python_release_order(workflow: str) -> None:
     assert 'cp -- "${wheels[0]}" "$wheel"' in workflow
     assert 'sha256="$(sha256sum "$wheel" | awk \'{print $1}\')"' in workflow
     assert 'echo "sha256=$sha256" >> "$GITHUB_OUTPUT"' in workflow
+    for member in (
+        "vuoro_service/tenant-runtime-schema-map.json",
+        "vuoro_service/tenant-runtime-schema-map.schema.json",
+    ):
+        assert f'payload = archive.read(member)' in workflow
+        assert member in workflow
+    assert 'assert target.read_bytes() == payload' in workflow
+    assert 'if [[ "$package" == "vuoro-service" ]]' in workflow
+    assert 'tenant-runtime-schema-map sha256: %s\\ntenant-runtime-schema-map.schema: %s\\ntenant-runtime-schema-map.schema sha256: %s\\n' in workflow
+    assert 'assets+=("$schema_map" "$schema_map_schema")' in workflow
     assert workflow.count("${{ steps.publication.outputs.wheel }}") == 3
     assert "subject-path: \"${{ steps.publication.outputs.wheel }}\"" in workflow
-    assert workflow.count("uses: actions/attest@v4") == 1
+    assert workflow.count("uses: actions/attest@v4") == 3
+    assert 'subject-path: "${{ steps.publication.outputs.schema_map }}"' in workflow
+    assert 'subject-path: "${{ steps.publication.outputs.schema_map_schema }}"' in workflow
     assert "if: ${{ false }}" not in workflow
     assert 'contents: write' in workflow
     assert 'GH_TOKEN: ${{ github.token }}' in workflow
@@ -63,6 +76,44 @@ def _assert_python_release_order(workflow: str) -> None:
     assert "packages-dir:" not in workflow
     assert "id-token: write" in workflow  # required by actions/attest
     assert 'gh release edit "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --draft=false' in workflow
+
+
+def _assert_tenant_schema_assets(workflow: str) -> None:
+    for member in (
+        "vuoro_service/tenant-runtime-schema-map.json",
+        "vuoro_service/tenant-runtime-schema-map.schema.json",
+    ):
+        assert f'"{member}"' in workflow
+    assert "payload = archive.read(member)" in workflow
+    assert 'target.write_bytes(payload)' in workflow
+    assert 'assert target.read_bytes() == payload' in workflow
+    assert 'if [[ "$package" == "vuoro-service" ]]' in workflow
+    assert 'map_sha256="$(sha256sum dist/publish/tenant-runtime-schema-map.json' in workflow
+    assert 'schema_sha256="$(sha256sum dist/publish/tenant-runtime-schema-map.schema.json' in workflow
+    assert 'tenant-runtime-schema-map sha256: %s\\ntenant-runtime-schema-map.schema: %s\\ntenant-runtime-schema-map.schema sha256: %s\\n' in workflow
+    assert 'assets+=("$schema_map" "$schema_map_schema")' in workflow
+    assert "- name: Attest the tenant runtime schema map assets\n        if: steps.package.outputs.name == 'vuoro-service'" in workflow
+    assert "- name: Attest the tenant runtime schema map schema\n        if: steps.package.outputs.name == 'vuoro-service'" in workflow
+    assert 'subject-path: "${{ steps.publication.outputs.schema_map }}"' in workflow
+    assert 'subject-path: "${{ steps.publication.outputs.schema_map_schema }}"' in workflow
+
+
+def test_service_schema_map_assets_are_wheel_derived_hashed_attested_and_attached() -> None:
+    workflow = PYTHON_WORKFLOW.read_text()
+    _assert_tenant_schema_assets(workflow)
+
+    mutants = (
+        workflow.replace('"vuoro_service/tenant-runtime-schema-map.json"', '"missing-map.json"'),
+        workflow.replace('"vuoro_service/tenant-runtime-schema-map.schema.json"', '"missing-schema.json"'),
+        workflow.replace('assert target.read_bytes() == payload', 'assert target.read_bytes() != payload'),
+        workflow.replace('tenant-runtime-schema-map sha256: %s', 'tenant-runtime-schema-map hash: %s'),
+        workflow.replace('assets+=("$schema_map" "$schema_map_schema")', 'assets+=("$schema_map")'),
+        workflow.replace('subject-path: "${{ steps.publication.outputs.schema_map_schema }}"', 'subject-path: "${{ steps.publication.outputs.wheel }}"'),
+        workflow.replace("        if: steps.package.outputs.name == 'vuoro-service'\n        uses: actions/attest@v4", "        uses: actions/attest@v4", 1),
+    )
+    for mutant in mutants:
+        with pytest.raises(AssertionError):
+            _assert_tenant_schema_assets(mutant)
 
 
 def test_service_image_publication_emits_verifiable_supply_chain_evidence() -> None:
@@ -265,8 +316,8 @@ def test_python_release_is_github_only_and_publishes_the_created_release() -> No
         ),
         lambda workflow: workflow.replace("            --verify-tag \\\n", ""),
         lambda workflow: workflow.replace(
-            "            \"$wheel\"\n",
-            "            --clobber \"$wheel\"\n",
+            "            \"${assets[@]}\"\n",
+            "            --clobber \"${assets[@]}\"\n",
         ),
         lambda workflow: workflow.replace("  contents: write", "  contents: read"),
         lambda workflow: workflow.replace("  id-token: write", "  id-token: read"),
