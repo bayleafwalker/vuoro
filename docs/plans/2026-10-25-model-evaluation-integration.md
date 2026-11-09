@@ -17,6 +17,23 @@ are coordinated by the
 This extends [product delivery](2026-10-17-product-delivery-plan.md), not the
 October 15 [product direction](../direction/2026-10-15-product-direction.md).
 
+## 9 November 2026 scope amendment
+
+The [decision-record and lane-feedback plan](2026-11-09-decision-records-and-lane-feedback.md)
+makes these model trials an optional consumer of decision history. Its
+deterministic observation, capacity-allocation and rediscovery loops do not wait
+for these sample sizes or a model comparison. The trial thresholds below still
+bound their named evaluation/adoption claims; this amendment does not qualify
+Jev for dispatch or weaken existing authority/data boundaries.
+
+Log the actual choice mechanism and its selection probability when known, not
+Jev confidence or a reconstructed probability. Compare efficiency only where
+case volume and configuration stability support it; otherwise retain directional
+cost, quota, rework and operator-burden observations. Model, harness and realized
+environment form a joint execution configuration: resource changes can alter
+which strategies succeed. Correctness remains a separate fault-test obligation.
+No offline policy evaluation or confidence-sequence service is a dependency.
+
 ## What already exists
 
 [Accepted-outcome learning](../architecture/accepted-outcome-learning.md)
