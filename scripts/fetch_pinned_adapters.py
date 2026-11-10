@@ -19,7 +19,7 @@ _LOCK_KINDS = {"adapter", "owner-dependency", "shared-dependency"}
 _CANONICAL_VUORO_SOURCE_REPOSITORY = "https://github.com/bayleafwalker/vuoro"
 _SHARED_DEPENDENCY_DISTRIBUTIONS = {"vuoro-schema-runtime", "vuoro-adapter-kit"}
 _REQUIRED_DOMAINS = {"work", "audit", "knowledge"}
-_ADMITTED_DOMAINS = _REQUIRED_DOMAINS
+_ADMITTED_DOMAINS = _REQUIRED_DOMAINS | {"lane"}
 _DESCRIPTOR_FIELDS = {
     "domain", "lock_id", "dependency_lock_ids", "adapter_module", "register",
     "api_version", "schema_version",
@@ -172,12 +172,19 @@ def artifact_pins(manifest: object) -> list[tuple[str, dict[str, str]]]:
     return pins
 
 
+def validate_interpreter(manifest: dict, version_info=None) -> None:
+    current = sys.version_info if version_info is None else version_info
+    if any(item.get("domain") == "lane" for item in manifest.get("runtime_descriptors", [])) and tuple(current[:2]) < (3, 13):
+        raise SystemExit("lane owner requires Python >=3.13; choose a compatible image base")
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = argv or sys.argv[1:]
     if len(argv) != 2:
         raise SystemExit("usage: fetch_pinned_adapters.py MANIFEST DESTINATION")
     manifest_path, destination = map(Path, argv)
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    validate_interpreter(manifest)
     destination.mkdir(parents=True, exist_ok=True)
     for label, adapter in artifact_pins(manifest):
         url = adapter["artifact_url"]

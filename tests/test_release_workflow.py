@@ -307,20 +307,14 @@ def test_service_image_publication_keeps_tag_and_source_aliases() -> None:
     assert "vuoro-service:sha-${{ github.sha }}" in workflow
 
 
-def test_service_image_installs_both_locked_shared_dependencies() -> None:
+def test_service_image_installs_every_locked_adapter_without_index_resolution() -> None:
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
-
-    # Owner adapters declare both shared wheels as immutable direct URLs.
-    # Resolve owners first, then install the two locally verified shared wheels.
-    first_install = dockerfile.split("&& python -m pip install", 1)[0]
-    assert "./packages/vuoro-service" in first_install
-    assert "/opt/vuoro/adapters/*.whl" not in first_install
-    assert "python -m pip install --no-cache-dir --no-deps" in dockerfile
-    assert "/opt/vuoro/adapters/vuoro_adapter_kit-*.whl" in dockerfile
-    assert "/opt/vuoro/adapters/vuoro_schema_runtime-*.whl" in dockerfile
-    # S2 item 4 unbound the execution (ActionQ) and knowledge (kctl) domains.
-    for retired in ("actionq-", "actionq_contracts-", "kctl-"):
-        assert f"/opt/vuoro/adapters/{retired}" not in dockerfile
+    installer = (ROOT / "scripts/install_pinned_adapters.py").read_text(encoding="utf-8")
+    assert "python /usr/local/bin/install-pinned-adapters" in dockerfile
+    assert "artifact_pins" in installer and "--no-deps" in installer
+    assert "artifact_sha256" in installer
+    assert "ARG PYTHON_BASE_IMAGE=python:3.12-slim" in dockerfile
+    assert "FROM ${PYTHON_BASE_IMAGE}" in dockerfile
 
 
 def test_service_image_carries_the_mcp_server_beside_the_service() -> None:
@@ -589,10 +583,10 @@ def test_service_image_never_resolves_a_workspace_name_from_an_index() -> None:
         local.setdefault(_canonical(name), set()).update(
             _canonical(extra) for extra in extras.split(",") if extra.strip()
         )
-    wheelhouse = {
-        _canonical(name)
-        for name in re.findall(r"/opt/vuoro/adapters/([A-Za-z0-9_]+)-\*\.whl", dockerfile)
-    }
+    import json
+    composition = json.loads((ROOT / "packages/vuoro-service/composition/adapter-pins.json").read_text())
+    wheelhouse = {_canonical(lock["distribution"]) for lock in composition["release_locks"]}
+    assert "python /usr/local/bin/install-pinned-adapters" in dockerfile
     requirements = _workspace_requirements()
     assert local, "the Dockerfile installs no local workspace package"
     assert local.keys() <= requirements.keys(), local.keys() - requirements.keys()

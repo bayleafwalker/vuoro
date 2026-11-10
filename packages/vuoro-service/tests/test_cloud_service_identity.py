@@ -380,6 +380,8 @@ def test_private_delivery_factory_closes_store_when_real_composition_mount_is_di
             pass
 
     class FakeManifest:
+        adapters = tuple(SimpleNamespace(domain=name) for name in ("work", "audit", "knowledge"))
+
         @staticmethod
         def pin(domain):
             return SimpleNamespace(

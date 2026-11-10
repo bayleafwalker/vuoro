@@ -58,11 +58,11 @@ def _filename(lock: dict) -> str:
 
 
 def _count(domains: frozenset[str]) -> str:
-    return "three" if domains == _DOMAINS else "two"
+    return "four" if "lane" in domains else ("three" if domains == _DOMAINS else "two")
 
 
 def _names(domains: frozenset[str]) -> str:
-    return "work, audit and knowledge" if domains == _DOMAINS else "work and audit"
+    return "work, audit, knowledge and lane" if "lane" in domains else ("work, audit and knowledge" if domains == _DOMAINS else "work and audit")
 
 
 def _pinned(manifest: dict, domains: frozenset[str] = _DOMAINS) -> list[dict]:
@@ -111,6 +111,8 @@ def _pinned(manifest: dict, domains: frozenset[str] = _DOMAINS) -> list[dict]:
             }
         )
     descriptors = manifest.get("runtime_descriptors")
+    if domains == _DOMAINS and isinstance(descriptors, list) and any(isinstance(item, dict) and item.get("domain") == "lane" for item in descriptors):
+        domains = domains | {"lane"}
     if (
         not isinstance(descriptors, list)
         or len(descriptors) != len(domains)
@@ -195,6 +197,8 @@ def main(argv: list[str] | None = None) -> int:
         )
     manifest_path, wheel_dir, output = map(Path, argv)
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if any(item.get("domain") == "lane" for item in manifest.get("runtime_descriptors", [])) and sys.version_info[:2] < (3, 13):
+        raise SystemExit("lane owner requires Python >=3.13")
 
     failures: list[str] = []
     attested: list[dict] = []
