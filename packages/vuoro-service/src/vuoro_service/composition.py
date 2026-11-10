@@ -1,4 +1,4 @@
-"""Pinned three-domain (work, audit, knowledge) Vuoro service composition.
+"""Pinned Vuoro service composition with required work, audit and knowledge owners.
 
 The service accepts domain adapters only through the checked-in composition
 manifest. Deployment supplies runtime DSNs and an environment-bound identity
@@ -53,11 +53,12 @@ from vuoro_service.project_binding import (
     load_project_bindings,
 )
 
-#: Every deployable composition pins exactly these domains. ``knowledge`` is
+#: Every deployable composition pins these required domains. An immutable release
+#: may additionally pin the lanectl lane-event owner; runtime overlays cannot add it. ``knowledge`` is
 #: the released vuoro-workspace owner adapter
 #: (docs/architecture/knowledge-workspace-composition.md).
 _REQUIRED_DOMAINS = frozenset({"work", "audit", "knowledge"})
-_ADMITTED_DOMAINS = _REQUIRED_DOMAINS
+_ADMITTED_DOMAINS = _REQUIRED_DOMAINS | {"lane"}
 _KNOWLEDGE_ADAPTER_MODULE = "vuoro_workspace.vuoro_adapter"
 _KNOWLEDGE_REGISTER = "register_knowledge_catalog"
 _DEPLOYABLE_ENVIRONMENT_CLASSES = frozenset({"development", "production"})
@@ -377,7 +378,7 @@ class CompositionManifest:
         domains = {descriptor.domain for descriptor in descriptors}
         if not _REQUIRED_DOMAINS <= domains <= _ADMITTED_DOMAINS:
             raise CompositionError(
-                "composition must pin exactly work, audit and knowledge"
+                "composition must pin work, audit and knowledge; only the lane adapter is additionally admitted"
             )
         if len(descriptors) != len(domains):
             raise CompositionError("composition contains duplicate runtime domains")
@@ -1189,6 +1190,20 @@ def _compose_knowledge(
     return _compatibility("knowledge", record, pin)
 
 
+
+def _compose_lane(pin: AdapterPin, registry: CatalogRegistry, environ: Mapping[str, str]) -> DomainCompatibility:
+    """Compose the released lane owner; its migrations and semantics stay native."""
+    if (pin.adapter_module != "lanectl.vuoro_adapter" or pin.register != "register_lane_catalog"
+            or pin.distribution != "lanectl" or pin.api_version != "v1" or pin.schema_version != "1"):
+        raise CompositionError("lane: manifest does not select the supported owner adapter contract")
+    from lanectl.stream_store import StreamStore, StreamError
+    try:
+        store = StreamStore(Path(_runtime_env("VUORO_LANE_DATABASE", environ)))
+    except StreamError as error:
+        raise CompositionError("lane: owner database is unavailable or incompatible; run owner migration separately") from error
+    _load_function(pin)(registry, store)
+    return DomainCompatibility(api_version=pin.api_version, schema_version=pin.schema_version, state="compatible")
+
 def create_composed_app(
     *,
     manifest_path: Path | None = None,
@@ -1408,6 +1423,8 @@ def create_composed_app(
     domains["knowledge"] = _compose_knowledge(
         manifest.pin("knowledge"), registry, environ
     )
+    if any(pin.domain == "lane" for pin in manifest.adapters):
+        domains["lane"] = _compose_lane(manifest.pin("lane"), registry, environ)
     incompatible = [name for name, state in domains.items() if state.state != "compatible"]
     if incompatible:
         raise CompositionError("runtime compatibility failed for: " + ", ".join(incompatible))
