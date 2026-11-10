@@ -2,7 +2,7 @@
 
 The checked-in manifest pins the released vuoro-workspace 0.1.1 owner. These
 tests prove that the runtime gate, the fetcher and the attester all require
-exactly work, audit and knowledge and refuse anything else. The served
+work, audit and knowledge and refuse anything else. The served
 knowledge operations themselves are exercised end to end in
 packages/vuoro-workspace/tests/test_vuoro_adapter_served.py.
 """
@@ -83,13 +83,13 @@ def _drop(domain: str):
 
 @pytest.mark.parametrize("mutation, runtime_message, script_message", [
     (lambda raw: raw["runtime_descriptors"].append({**KNOWLEDGE_DESCRIPTOR}), "duplicate runtime domains",
-     "duplicate|exactly three|exactly work, audit and knowledge"),
+     "duplicate|exactly three|work, audit and knowledge"),
     (lambda raw: [d for d in raw["runtime_descriptors"] if d["domain"] == "knowledge"][0].update(domain="search"),
-     "exactly work, audit and knowledge", "exactly work, audit and knowledge"),
+     "work, audit and knowledge", "work, audit and knowledge"),
     # Knowledge is required: a manifest without it is refused everywhere.
-    (_drop("knowledge"), "exactly work, audit and knowledge",
-     "exactly three|exactly work, audit and knowledge"),
-    (_drop("audit"), "exactly work, audit and knowledge", "exactly three|exactly work, audit and knowledge"),
+    (_drop("knowledge"), "work, audit and knowledge",
+     "exactly three|work, audit and knowledge"),
+    (_drop("audit"), "work, audit and knowledge", "exactly three|work, audit and knowledge"),
 ])
 def test_domain_admission_is_closed_everywhere(tmp_path: Path, mutation, runtime_message, script_message) -> None:
     raw = _three_domain()
