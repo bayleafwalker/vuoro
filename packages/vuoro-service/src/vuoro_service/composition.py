@@ -13,6 +13,7 @@ import hashlib
 import importlib
 import json
 import re
+import sys
 import time
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
@@ -1196,6 +1197,8 @@ def _compose_lane(pin: AdapterPin, registry: CatalogRegistry, environ: Mapping[s
     if (pin.adapter_module != "lanectl.vuoro_adapter" or pin.register != "register_lane_catalog"
             or pin.distribution != "lanectl" or pin.api_version != "v1" or pin.schema_version != "1"):
         raise CompositionError("lane: manifest does not select the supported owner adapter contract")
+    if sys.version_info[:2] < (3, 13):
+        raise CompositionError("lane: owner requires Python >=3.13")
     from lanectl.stream_store import StreamStore, StreamError
     try:
         store = StreamStore(Path(_runtime_env("VUORO_LANE_DATABASE", environ)))

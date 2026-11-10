@@ -1,4 +1,6 @@
-FROM python:3.12-slim
+ARG PYTHON_BASE_IMAGE=python:3.12-slim
+FROM ${PYTHON_BASE_IMAGE}
+ARG VUORO_COMPOSITION_FILE=packages/vuoro-service/composition/adapter-pins.json
 
 # The released work owner's declared-change preview parses an untrusted diff
 # with `git apply --numstat` in an isolated temporary directory. The slim base
@@ -17,8 +19,9 @@ WORKDIR /srv/vuoro
 
 COPY scripts/fetch_pinned_adapters.py /usr/local/bin/fetch-pinned-adapters
 COPY scripts/attest_installed_composition.py /usr/local/bin/attest-installed-composition
+COPY scripts/install_pinned_adapters.py /usr/local/bin/install-pinned-adapters
 COPY scripts/validate_service_image_preview.py /usr/local/bin/validate-service-image-preview
-COPY packages/vuoro-service/composition/adapter-pins.json /opt/vuoro/composition/adapter-pins.json
+COPY ${VUORO_COMPOSITION_FILE} /opt/vuoro/composition/adapter-pins.json
 COPY packages/vuoro-service/composition/project-bindings.json /opt/vuoro/composition/project-bindings.json
 RUN python /usr/local/bin/fetch-pinned-adapters /opt/vuoro/composition/adapter-pins.json /opt/vuoro/adapters
 
@@ -54,12 +57,8 @@ RUN python -m pip install --no-cache-dir --require-hashes --no-deps \
         -r /opt/vuoro/image-requirements.txt \
     && python -m pip install --no-cache-dir --no-deps \
         ./packages/vuoro-service ./packages/vuoro-evidence ./packages/vuoro-mcp-edge \
-    && python -m pip install --no-cache-dir --no-deps \
-        /opt/vuoro/adapters/auditctl-*.whl \
-        /opt/vuoro/adapters/sprintctl-*.whl \
-        /opt/vuoro/adapters/vuoro_adapter_kit-*.whl \
-        /opt/vuoro/adapters/vuoro_schema_runtime-*.whl \
-        /opt/vuoro/adapters/vuoro_workspace-*.whl \
+    && python /usr/local/bin/install-pinned-adapters \
+        /opt/vuoro/composition/adapter-pins.json /opt/vuoro/adapters \
     && python -m pip check \
     && python /usr/local/bin/attest-installed-composition \
         /opt/vuoro/composition/adapter-pins.json \

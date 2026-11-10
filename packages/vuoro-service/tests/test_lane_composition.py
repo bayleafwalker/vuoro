@@ -43,6 +43,7 @@ def test_existing_composition_stays_three_owners_and_lane_requires_a_release_pin
 
 def test_lane_runtime_uses_owner_readiness_and_never_migrates(monkeypatch):
     calls = []
+    monkeypatch.setattr("vuoro_service.composition.sys", SimpleNamespace(version_info=(3, 13)))
     class Error(RuntimeError):
         pass
     def store(path):
@@ -65,3 +66,9 @@ def test_lane_cannot_substitute_a_foreign_registration_or_schema():
         setattr(pin, field, value)
         with pytest.raises(CompositionError, match='supported owner adapter'):
             _compose_lane(pin, None, {})
+
+
+def test_lane_runtime_refuses_python312_before_importing_owner(monkeypatch):
+    monkeypatch.setattr('vuoro_service.composition.sys',SimpleNamespace(version_info=(3,12)))
+    with pytest.raises(CompositionError,match='Python >=3.13'):
+        _compose_lane(lane_pin(),None,{'VUORO_LANE_DATABASE':'/state/owner.sqlite'})
