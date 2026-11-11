@@ -11,6 +11,7 @@ import pytest
 from vuoro_service.composition import (
     CompositionError,
     CompositionManifest,
+    PrivateDeliveryCapacityError,
     _bind_work_resource_visibility,
     _bounded_store_lease_factory,
     _load_project_binding_for_composition,
@@ -158,6 +159,38 @@ def test_private_delivery_store_leases_have_a_fixed_connection_bound() -> None:
         thread.join(timeout=2)
         assert not thread.is_alive()
     assert len(opened) == 3
+
+
+def test_private_delivery_store_lease_capacity_timeout_does_not_open_connection() -> None:
+    opened = []
+
+    class Store:
+        def __init__(self):
+            self.repo_id = None
+            self.conn = SimpleNamespace(close=lambda: None)
+
+    class WorkPg:
+        @staticmethod
+        def get_connection(_dsn):
+            opened.append(Store())
+            return opened[-1]
+
+    lease = _bounded_store_lease_factory(
+        work_pg=WorkPg,
+        work_dsn="postgresql://work",
+        repository_ids=frozenset({"repo-a", "repo-b"}),
+        max_connections=1,
+        acquire_timeout=0.05,
+    )
+
+    with lease("repo-a"):
+        with pytest.raises(PrivateDeliveryCapacityError):
+            with lease("repo-b"):
+                pytest.fail("capacity timeout should prevent opening a connection")
+        assert len(opened) == 1
+
+    with lease("repo-b"):
+        assert len(opened) == 2
 
 
 def test_checked_in_manifest_pins_work_audit_and_knowledge() -> None:

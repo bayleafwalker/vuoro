@@ -90,6 +90,10 @@ class CompositionError(RuntimeError):
     """The immutable release composition or runtime configuration is invalid."""
 
 
+class PrivateDeliveryCapacityError(RuntimeError):
+    """Private-delivery connection capacity was unavailable before the deadline."""
+
+
 @dataclass(frozen=True)
 class ReleaseLock:
     """Immutable identity of one wheel installed in this service release.
@@ -1036,17 +1040,24 @@ def _bounded_store_lease_factory(
     work_dsn: str,
     repository_ids: frozenset[str],
     max_connections: int = 2,
+    acquire_timeout: float = 5.0,
 ) -> Callable[[str], Any]:
     """Create private-delivery store leases with a fixed concurrent limit."""
     if max_connections < 1:
         raise ValueError("private delivery connection limit must be positive")
+    if acquire_timeout < 0:
+        raise ValueError("private delivery connection acquire timeout must be non-negative")
     capacity = threading.BoundedSemaphore(max_connections)
 
     @contextmanager
     def store_lease_for_repo(repo_id: str):
         if repo_id not in repository_ids:
             raise ValueError("private delivery repo is outside the hosted binding")
-        capacity.acquire()
+        acquired = capacity.acquire(timeout=acquire_timeout)
+        if not acquired:
+            raise PrivateDeliveryCapacityError(
+                "private delivery connection capacity unavailable"
+            )
         store = None
         try:
             store = work_pg.get_connection(work_dsn)
