@@ -184,9 +184,8 @@ def test_private_delivery_store_lease_capacity_timeout_does_not_open_connection(
     )
 
     with lease("repo-a"):
-        with pytest.raises(PrivateDeliveryCapacityError):
-            with lease("repo-b"):
-                pytest.fail("capacity timeout should prevent opening a connection")
+        with pytest.raises(PrivateDeliveryCapacityError), lease("repo-b"):
+            pytest.fail("capacity timeout should prevent opening a connection")
         assert len(opened) == 1
 
     with lease("repo-b"):
