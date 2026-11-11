@@ -3,31 +3,161 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import threading
 from pathlib import Path
-
-import pytest
 from types import SimpleNamespace
 
+import pytest
 from vuoro_service.composition import (
     CompositionError,
     CompositionManifest,
+    _bind_work_resource_visibility,
+    _bounded_store_lease_factory,
+    _load_project_binding_for_composition,
+    _load_project_bindings_file,
+    _load_work_resource_observation_authorizer,
+    _member_work_application_factory,
+    _runtime_env,
+    _runtime_path,
+    _validate_identity_mode,
     create_composed_app,
     load_identities,
     verify_adapter_artifacts,
     verify_installed_composition,
-    _bind_work_resource_visibility,
-    _load_work_resource_observation_authorizer,
-    _load_project_binding_for_composition,
-    _load_project_bindings_file,
-    _runtime_env,
-    _runtime_path,
-    _validate_identity_mode,
 )
 from vuoro_service.identity import Identity, InvocationContext
-from vuoro_service.project_binding import load_project_bindings
-
+from vuoro_service.project_binding import (
+    ProjectBinding,
+    ProjectMember,
+    compose_authorized_project_application,
+    load_project_bindings,
+)
 
 ROOT = Path(__file__).parents[1]
+
+
+@pytest.mark.parametrize("member_count", [1, 6])
+def test_project_members_share_one_connection_and_keep_fixed_repo_scope(member_count: int) -> None:
+    opened = []
+
+    class Store:
+        def __init__(self):
+            self.conn = object()
+            self.repo_id = None
+            self.remote_schema_version = 1
+
+    class WorkApplication:
+        def __init__(self, store):
+            self.store = store
+
+        @staticmethod
+        def postgres(store):
+            return WorkApplication(store)
+
+        def invoke(self):
+            return self.store.repo_id
+
+    class WorkPg:
+        @staticmethod
+        def get_connection(_dsn):
+            store = Store()
+            opened.append(store)
+            return store
+
+    class ProjectApplication:
+        def invoke(self, *_args):
+            return {}
+
+    owner_store = WorkPg.get_connection("postgresql://work")
+    owner_store.repo_id = "owner"
+    binding = ProjectBinding(
+        project_id="a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+        home_repo="repo-0",
+        members=tuple(ProjectMember(f"repo-{index}") for index in range(member_count)),
+        source_repository="https://example.test/project",
+        source_revision="a" * 40,
+        source_path="project.toml",
+        source_sha256="b" * 64,
+    )
+    captured = {}
+
+    def make_project_application(_project_id, members):
+        captured["members"] = members
+        return ProjectApplication()
+
+    guarded = compose_authorized_project_application(
+        binding,
+        make_member_application=_member_work_application_factory(owner_store, WorkApplication),
+        make_project_application=make_project_application,
+    )
+
+    assert guarded.binding is binding
+    assert len(opened) == 1
+    members = dict(captured["members"])
+    assert {app.store.conn for app in members.values()} == {owner_store.conn}
+
+    barrier = threading.Barrier(member_count)
+    observed = {}
+
+    def invoke(repo_id, application):
+        barrier.wait()
+        observed[repo_id] = application.invoke()
+
+    threads = [
+        threading.Thread(target=invoke, args=(repo_id, application))
+        for repo_id, application in members.items()
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=2)
+        assert not thread.is_alive()
+    assert observed == {repo_id: repo_id for repo_id in members}
+
+
+def test_private_delivery_store_leases_have_a_fixed_connection_bound() -> None:
+    opened = []
+    admitted = threading.Event()
+    release = threading.Event()
+
+    class Store:
+        def __init__(self):
+            self.repo_id = None
+            self.conn = SimpleNamespace(close=lambda: None)
+
+    class WorkPg:
+        @staticmethod
+        def get_connection(_dsn):
+            store = Store()
+            opened.append(store)
+            if len(opened) == 2:
+                admitted.set()
+            return store
+
+    lease = _bounded_store_lease_factory(
+        work_pg=WorkPg,
+        work_dsn="postgresql://work",
+        repository_ids=frozenset({"repo-a", "repo-b", "repo-c"}),
+        max_connections=2,
+    )
+
+    def hold(repo_id):
+        with lease(repo_id):
+            release.wait(timeout=2)
+
+    threads = [
+        threading.Thread(target=hold, args=(repo_id,))
+        for repo_id in ("repo-a", "repo-b", "repo-c")
+    ]
+    for thread in threads:
+        thread.start()
+    assert admitted.wait(timeout=2)
+    assert len(opened) == 2
+    release.set()
+    for thread in threads:
+        thread.join(timeout=2)
+        assert not thread.is_alive()
+    assert len(opened) == 3
 
 
 def test_checked_in_manifest_pins_work_audit_and_knowledge() -> None:
