@@ -388,7 +388,7 @@ def test_actual_old_closure_refusal_explicit34_cli_migration_and_runtime_ddl_den
         response = client.get('/api/meta/v1/handshake', headers={'X-Vuoro-Client-Protocol': '1'})
         assert response.status_code == 200, response.json()
         handshake = response.json()
-        assert handshake['service_version'] == '0.1.105' and handshake['compatibility']['state'] == 'compatible'
+        assert handshake['service_version'] == '0.1.106' and handshake['compatibility']['state'] == 'compatible'
         assert all(x['state'] == 'compatible' for x in handshake['compatibility']['domains'].values())
         catalog = client.get('/api/catalog/v1', headers={'X-Vuoro-Client-Protocol': '1'}).json()
         assert len(catalog['operations']) == CATALOG_TOTAL
