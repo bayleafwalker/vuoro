@@ -22,6 +22,20 @@ recorded here.
   envelope and `X-Request-ID`, fixing gateway identity correlation for
   generated and caller-supplied IDs.
 
+## vuoro-service 0.1.106
+
+- Prepares merged #321 Lane owner composition and #322 bounded work
+  connections. Work composition uses one shared owner connection across
+  project members, permits at most two private-delivery leases, and waits up
+  to five seconds to acquire a connection.
+- Keeps the Sprintctl 0.28.1 and vuoro-workspace 0.1.1 owner pins. Work schema
+  34 remains current, schemas 32–34 remain compatible, and no migration from
+  0.1.105 is required. This remains source/package preparation, not deployment
+  or field acceptance.
+- Adds the tenant runtime to work schema map and its checked-in JSON Schema to
+  the service wheel and standalone release assets, with both asset digests
+  listed and attested in release notes.
+
 - vuoro-service 0.1.105 release-preparation candidate carries the private
   Cloud service-identity verifier and owner-only loopback app from merged
   source. The routes remain default-off, no private ingress/TLS issuer is

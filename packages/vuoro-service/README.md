@@ -3,8 +3,9 @@
 Modular HTTP and process shell that composes immutable, released owner
 adapters. Domain state machines and migrations remain in their owner packages.
 
-Service 0.1.105 is a release-preparation candidate based on merged Vuoro
-source. It pins the published Sprintctl 0.28.1 artifact and vuoro-workspace
+Service 0.1.106 is a release-preparation candidate based on merged Vuoro
+source. It composes the optional Lane owner and pins the published Sprintctl
+0.28.1 artifact and vuoro-workspace
 0.1.1. Sprintctl 0.28.1 migrates work schema 29 through 34, declares schemas 32–34 compatible,
 and rejects schema 31; moving from the prior schema-31 owner requires the
 explicit 31→34 migration. The workspace owner keeps knowledge schema 1. The published owner also exposes an outcome-report
@@ -16,6 +17,10 @@ compatibility without migrating. Run the released owner's explicit migration
 command with a migration role before starting the new composition; the serving
 runtime role remains unable to execute DDL. No deployment or field acceptance
 is established by this source candidate.
+
+The work composition shares one owner connection across project members. It
+allows at most two private-delivery leases and waits up to five seconds to
+acquire a connection.
 
 Compared with the released 0.1.102 catalog, the 0.28 owner adds
 `work.lease.currentness-v1` and the mutating `work.lease.report-outcome-v2`.

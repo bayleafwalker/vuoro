@@ -8,7 +8,7 @@ deployment_status = "unknown"
 composition_manifest = "packages/vuoro-service/composition/adapter-pins.json"
 service_package = "packages/vuoro-service/pyproject.toml"
 service_distribution = "vuoro-service"
-service_version = "0.1.105"
+service_version = "0.1.106"
 image_policy = "immutable-digest-required"
 
 [support]
