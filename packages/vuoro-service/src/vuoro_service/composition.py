@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import base64
 import binascii
+import copy
 import hashlib
 import importlib
 import json
 import re
 import sys
+import threading
 import time
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
@@ -86,6 +88,10 @@ _SHARED_DEPENDENCY_DISTRIBUTIONS = frozenset(
 
 class CompositionError(RuntimeError):
     """The immutable release composition or runtime configuration is invalid."""
+
+
+class PrivateDeliveryCapacityError(RuntimeError):
+    """Private-delivery connection capacity was unavailable before the deadline."""
 
 
 @dataclass(frozen=True)
@@ -1001,6 +1007,72 @@ def _json_object_without_duplicates(pairs: list[tuple[str, object]]) -> dict[str
     return value
 
 
+def _member_store_view(work_store: Any, repo_id: str) -> Any:
+    """Return an independently scoped view over the owner's connection.
+
+    Sprintctl stores its repository scope on the store object.  A shallow copy
+    gives each long-lived member application its own fixed scope while retaining
+    the one underlying database connection.  Never retarget ``work_store`` for
+    a request: member views may be invoked concurrently.
+    """
+    member_store = copy.copy(work_store)
+    member_store.repo_id = repo_id
+    return member_store
+
+
+def _member_work_application_factory(
+    work_store: Any, work_application_type: Any
+) -> Callable[[str], Any]:
+    """Build fixed-scope member applications without opening member connections."""
+    def make_member_application(repo_id: str) -> Any:
+        member_store = _member_store_view(work_store, repo_id)
+        member_store.remote_schema_version = getattr(
+            work_store, "remote_schema_version", None
+        )
+        return work_application_type.postgres(member_store)
+
+    return make_member_application
+
+
+def _bounded_store_lease_factory(
+    *,
+    work_pg: Any,
+    work_dsn: str,
+    repository_ids: frozenset[str],
+    max_connections: int = 2,
+    acquire_timeout: float = 5.0,
+) -> Callable[[str], Any]:
+    """Create private-delivery store leases with a fixed concurrent limit."""
+    if max_connections < 1:
+        raise ValueError("private delivery connection limit must be positive")
+    if acquire_timeout < 0:
+        raise ValueError("private delivery connection acquire timeout must be non-negative")
+    capacity = threading.BoundedSemaphore(max_connections)
+
+    @contextmanager
+    def store_lease_for_repo(repo_id: str):
+        if repo_id not in repository_ids:
+            raise ValueError("private delivery repo is outside the hosted binding")
+        acquired = capacity.acquire(timeout=acquire_timeout)
+        if not acquired:
+            raise PrivateDeliveryCapacityError(
+                "private delivery connection capacity unavailable"
+            )
+        store = None
+        try:
+            store = work_pg.get_connection(work_dsn)
+            store.repo_id = repo_id
+            yield store
+        finally:
+            try:
+                if store is not None:
+                    store.conn.close()
+            finally:
+                capacity.release()
+
+    return store_lease_for_repo
+
+
 def _mount_private_recipient_delivery(
     app: Any,
     *,
@@ -1059,16 +1131,11 @@ def _mount_private_recipient_delivery(
             "pinned Sprintctl adapter does not include private delivery routes"
         ) from error
 
-    @contextmanager
-    def store_lease_for_repo(repo_id: str):
-        if repo_id not in repository_ids:
-            raise ValueError("private delivery repo is outside the hosted binding")
-        store = work_pg.get_connection(work_dsn)
-        store.repo_id = repo_id
-        try:
-            yield store
-        finally:
-            store.conn.close()
+    store_lease_for_repo = _bounded_store_lease_factory(
+        work_pg=work_pg,
+        work_dsn=work_dsn,
+        repository_ids=repository_ids,
+    )
 
     # The hosting composition must inject its trusted network guard. This
     # runtime has no data-plane primitive that can prove a Kubernetes
@@ -1332,11 +1399,9 @@ def create_composed_app(
         "VUORO_WORK_RUNTIME_DSN", environ, aliases=("VUORO_WORK_DSN",)
     )
 
-    def make_member_application(repo_id: str) -> WorkApplication:
-        member_store = work_pg.get_connection(work_dsn)
-        member_store.repo_id = repo_id
-        member_store.remote_schema_version = getattr(work_store, "remote_schema_version", None)
-        return WorkApplication.postgres(member_store)
+    make_member_application = _member_work_application_factory(
+        work_store, WorkApplication
+    )
 
     def make_project_application(
         project_id: str, members: tuple[tuple[str, WorkApplication], ...]
