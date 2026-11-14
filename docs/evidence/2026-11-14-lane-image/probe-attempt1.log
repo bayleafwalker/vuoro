@@ -1,0 +1,12 @@
+{"check": "actual pinned three-owner catalog registration, no database opened", "pass": true}
+{"check": "runtime refuses unmigrated owner without creating database or catalog entries", "pass": true}
+Traceback (most recent call last):
+  File "/qualification/probe.py", line 73, in <module>
+    _compose_lane(replace(pin, **{field: value}), registry, {'VUORO_LANE_DATABASE': str(database)})
+                  ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/dataclasses.py", line 1645, in replace
+    return _replace(obj, **changes)
+  File "/usr/local/lib/python3.13/dataclasses.py", line 1679, in _replace
+    return self.__class__(**changes)
+           ~~~~~~~~~~~~~~^^^^^^^^^^^
+TypeError: AdapterPin.__init__() got an unexpected keyword argument 'register'

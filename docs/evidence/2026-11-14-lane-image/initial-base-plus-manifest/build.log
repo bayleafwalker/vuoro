@@ -1,0 +1,441 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 4.20kB done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/python@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90
+#2 DONE 0.7s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.1s
+
+#4 [internal] load build context
+#4 DONE 0.0s
+
+#5 [ 1/17] FROM docker.io/library/python@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90
+#5 resolve docker.io/library/python@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90 0.0s done
+#5 CACHED
+
+#4 [internal] load build context
+#4 transferring context: 2.51MB 0.0s done
+#4 DONE 0.2s
+
+#6 [ 2/17] RUN apt-get update     && apt-get install -y --no-install-recommends git     && rm -rf /var/lib/apt/lists/*
+#6 0.416 Hit:1 http://deb.debian.org/debian trixie InRelease
+#6 0.421 Get:2 http://deb.debian.org/debian trixie-updates InRelease [47.3 kB]
+#6 0.441 Get:3 http://deb.debian.org/debian-security trixie-security InRelease [43.4 kB]
+#6 0.455 Get:4 http://deb.debian.org/debian trixie/main amd64 Packages [9678 kB]
+#6 0.587 Get:5 http://deb.debian.org/debian trixie-updates/main amd64 Packages [1108 B]
+#6 0.599 Get:6 http://deb.debian.org/debian-security trixie-security/main amd64 Packages [304 kB]
+#6 1.053 Fetched 10.1 MB in 1s (13.6 MB/s)
+#6 1.053 Reading package lists...
+#6 1.402 Reading package lists...
+#6 1.704 Building dependency tree...
+#6 1.751 Reading state information...
+#6 1.827 The following additional packages will be installed:
+#6 1.827   git-man libbrotli1 libcom-err2 libcurl3t64-gnutls liberror-perl libexpat1
+#6 1.827   libgdbm-compat4t64 libgnutls30t64 libgssapi-krb5-2 libidn2-0 libk5crypto3
+#6 1.827   libkeyutils1 libkrb5-3 libkrb5support0 libldap2 libnghttp2-14 libnghttp3-9
+#6 1.827   libngtcp2-16 libngtcp2-crypto-gnutls8 libp11-kit0 libperl5.40 libpsl5t64
+#6 1.827   librtmp1 libsasl2-2 libsasl2-modules-db libssh2-1t64 libtasn1-6
+#6 1.828   libunistring5 perl perl-modules-5.40
+#6 1.828 Suggested packages:
+#6 1.828   gettext-base git-doc git-email git-gui gitk gitweb git-cvs git-mediawiki
+#6 1.828   git-svn gnutls-bin krb5-doc krb5-user sensible-utils perl-doc
+#6 1.828   libterm-readline-gnu-perl | libterm-readline-perl-perl make
+#6 1.828   libtap-harness-archive-perl
+#6 1.828 Recommended packages:
+#6 1.828   patch less ssh-client krb5-locales libldap-common publicsuffix
+#6 1.828   libsasl2-modules
+#6 1.935 The following NEW packages will be installed:
+#6 1.935   git git-man libbrotli1 libcom-err2 libcurl3t64-gnutls liberror-perl
+#6 1.935   libexpat1 libgdbm-compat4t64 libgnutls30t64 libgssapi-krb5-2 libidn2-0
+#6 1.935   libk5crypto3 libkeyutils1 libkrb5-3 libkrb5support0 libldap2 libnghttp2-14
+#6 1.935   libnghttp3-9 libngtcp2-16 libngtcp2-crypto-gnutls8 libp11-kit0 libperl5.40
+#6 1.935   libpsl5t64 librtmp1 libsasl2-2 libsasl2-modules-db libssh2-1t64 libtasn1-6
+#6 1.935   libunistring5 perl perl-modules-5.40
+#6 1.971 0 upgraded, 31 newly installed, 0 to remove and 1 not upgraded.
+#6 1.971 Need to get 23.6 MB of archives.
+#6 1.971 After this operation, 119 MB of additional disk space will be used.
+#6 1.971 Get:1 http://deb.debian.org/debian-security trixie-security/main amd64 libexpat1 amd64 2.9.0-1~deb13u1 [126 kB]
+#6 1.996 Get:2 http://deb.debian.org/debian trixie/main amd64 perl-modules-5.40 all 5.40.1-6+deb13u1 [3014 kB]
+#6 2.052 Get:3 http://deb.debian.org/debian trixie/main amd64 libgdbm-compat4t64 amd64 1.24-2 [50.3 kB]
+#6 2.052 Get:4 http://deb.debian.org/debian trixie/main amd64 libperl5.40 amd64 5.40.1-6+deb13u1 [4326 kB]
+#6 2.093 Get:5 http://deb.debian.org/debian trixie/main amd64 perl amd64 5.40.1-6+deb13u1 [268 kB]
+#6 2.095 Get:6 http://deb.debian.org/debian-security trixie-security/main amd64 libbrotli1 amd64 1.1.0-2+deb13u1 [304 kB]
+#6 2.099 Get:7 http://deb.debian.org/debian trixie/main amd64 libunistring5 amd64 1.3-2 [477 kB]
+#6 2.120 Get:8 http://deb.debian.org/debian trixie/main amd64 libidn2-0 amd64 2.3.8-2 [109 kB]
+#6 2.122 Get:9 http://deb.debian.org/debian trixie/main amd64 libp11-kit0 amd64 0.25.5-3 [425 kB]
+#6 2.124 Get:10 http://deb.debian.org/debian trixie/main amd64 libtasn1-6 amd64 4.20.0-2+deb13u1 [50.1 kB]
+#6 2.137 Get:11 http://deb.debian.org/debian trixie/main amd64 libgnutls30t64 amd64 3.8.9-3+deb13u4 [1469 kB]
+#6 2.165 Get:12 http://deb.debian.org/debian trixie/main amd64 libkrb5support0 amd64 1.21.3-5+deb13u1 [33.1 kB]
+#6 2.165 Get:13 http://deb.debian.org/debian trixie/main amd64 libcom-err2 amd64 1.47.2-3+b12 [25.0 kB]
+#6 2.165 Get:14 http://deb.debian.org/debian trixie/main amd64 libk5crypto3 amd64 1.21.3-5+deb13u1 [81.2 kB]
+#6 2.166 Get:15 http://deb.debian.org/debian trixie/main amd64 libkeyutils1 amd64 1.6.3-6 [9456 B]
+#6 2.167 Get:16 http://deb.debian.org/debian trixie/main amd64 libkrb5-3 amd64 1.21.3-5+deb13u1 [326 kB]
+#6 2.173 Get:17 http://deb.debian.org/debian trixie/main amd64 libgssapi-krb5-2 amd64 1.21.3-5+deb13u1 [138 kB]
+#6 2.176 Get:18 http://deb.debian.org/debian trixie/main amd64 libsasl2-modules-db amd64 2.1.28+dfsg1-9 [19.8 kB]
+#6 2.176 Get:19 http://deb.debian.org/debian trixie/main amd64 libsasl2-2 amd64 2.1.28+dfsg1-9 [57.5 kB]
+#6 2.178 Get:20 http://deb.debian.org/debian trixie/main amd64 libldap2 amd64 2.6.10+dfsg-1 [194 kB]
+#6 2.182 Get:21 http://deb.debian.org/debian trixie/main amd64 libnghttp2-14 amd64 1.64.0-1.1+deb13u1 [76.2 kB]
+#6 2.186 Get:22 http://deb.debian.org/debian trixie/main amd64 libnghttp3-9 amd64 1.8.0-1 [67.7 kB]
+#6 2.187 Get:23 http://deb.debian.org/debian trixie/main amd64 libngtcp2-16 amd64 1.11.0-1+deb13u1 [132 kB]
+#6 2.189 Get:24 http://deb.debian.org/debian trixie/main amd64 libngtcp2-crypto-gnutls8 amd64 1.11.0-1+deb13u1 [29.5 kB]
+#6 2.190 Get:25 http://deb.debian.org/debian trixie/main amd64 libpsl5t64 amd64 0.21.2-1.1+b1 [57.2 kB]
+#6 2.190 Get:26 http://deb.debian.org/debian trixie/main amd64 librtmp1 amd64 2.4+20151223.gitfa8646d.1-2+b5 [58.8 kB]
+#6 2.196 Get:27 http://deb.debian.org/debian trixie/main amd64 libssh2-1t64 amd64 1.11.1-1+deb13u2 [245 kB]
+#6 2.201 Get:28 http://deb.debian.org/debian-security trixie-security/main amd64 libcurl3t64-gnutls amd64 8.14.1-2+deb13u7 [385 kB]
+#6 2.208 Get:29 http://deb.debian.org/debian trixie/main amd64 liberror-perl all 0.17030-1 [26.9 kB]
+#6 2.209 Get:30 http://deb.debian.org/debian trixie/main amd64 git-man all 1:2.47.3-0+deb13u1 [2205 kB]
+#6 2.253 Get:31 http://deb.debian.org/debian trixie/main amd64 git amd64 1:2.47.3-0+deb13u1 [8862 kB]
+#6 2.508 debconf: unable to initialize frontend: Dialog
+#6 2.508 debconf: (TERM is not set, so the dialog frontend is not usable.)
+#6 2.508 debconf: falling back to frontend: Readline
+#6 2.508 debconf: unable to initialize frontend: Readline
+#6 2.508 debconf: (Can't locate Term/ReadLine.pm in @INC (you may need to install the Term::ReadLine module) (@INC entries checked: /etc/perl /usr/local/lib/x86_64-linux-gnu/perl/5.40.1 /usr/local/share/perl/5.40.1 /usr/lib/x86_64-linux-gnu/perl5/5.40 /usr/share/perl5 /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl/5.40 /usr/share/perl/5.40 /usr/local/lib/site_perl) at /usr/share/perl5/Debconf/FrontEnd/Readline.pm line 8, <STDIN> line 31.)
+#6 2.508 debconf: falling back to frontend: Teletype
+#6 2.511 debconf: unable to initialize frontend: Teletype
+#6 2.511 debconf: (This frontend requires a controlling tty.)
+#6 2.511 debconf: falling back to frontend: Noninteractive
+#6 3.114 Fetched 23.6 MB in 0s (49.0 MB/s)
+#6 3.141 Selecting previously unselected package libexpat1:amd64.
+#6 3.141 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 5658 files and directories currently installed.)
+#6 3.154 Preparing to unpack .../00-libexpat1_2.9.0-1~deb13u1_amd64.deb ...
+#6 3.748 Unpacking libexpat1:amd64 (2.9.0-1~deb13u1) ...
+#6 3.788 Selecting previously unselected package perl-modules-5.40.
+#6 3.789 Preparing to unpack .../01-perl-modules-5.40_5.40.1-6+deb13u1_all.deb ...
+#6 3.795 Unpacking perl-modules-5.40 (5.40.1-6+deb13u1) ...
+#6 3.983 Selecting previously unselected package libgdbm-compat4t64:amd64.
+#6 3.985 Preparing to unpack .../02-libgdbm-compat4t64_1.24-2_amd64.deb ...
+#6 3.991 Unpacking libgdbm-compat4t64:amd64 (1.24-2) ...
+#6 4.040 Selecting previously unselected package libperl5.40:amd64.
+#6 4.041 Preparing to unpack .../03-libperl5.40_5.40.1-6+deb13u1_amd64.deb ...
+#6 4.047 Unpacking libperl5.40:amd64 (5.40.1-6+deb13u1) ...
+#6 4.221 Selecting previously unselected package perl.
+#6 4.222 Preparing to unpack .../04-perl_5.40.1-6+deb13u1_amd64.deb ...
+#6 4.228 Unpacking perl (5.40.1-6+deb13u1) ...
+#6 4.293 Selecting previously unselected package libbrotli1:amd64.
+#6 4.294 Preparing to unpack .../05-libbrotli1_1.1.0-2+deb13u1_amd64.deb ...
+#6 4.300 Unpacking libbrotli1:amd64 (1.1.0-2+deb13u1) ...
+#6 4.352 Selecting previously unselected package libunistring5:amd64.
+#6 4.354 Preparing to unpack .../06-libunistring5_1.3-2_amd64.deb ...
+#6 4.359 Unpacking libunistring5:amd64 (1.3-2) ...
+#6 4.417 Selecting previously unselected package libidn2-0:amd64.
+#6 4.418 Preparing to unpack .../07-libidn2-0_2.3.8-2_amd64.deb ...
+#6 4.424 Unpacking libidn2-0:amd64 (2.3.8-2) ...
+#6 4.470 Selecting previously unselected package libp11-kit0:amd64.
+#6 4.472 Preparing to unpack .../08-libp11-kit0_0.25.5-3_amd64.deb ...
+#6 4.477 Unpacking libp11-kit0:amd64 (0.25.5-3) ...
+#6 4.531 Selecting previously unselected package libtasn1-6:amd64.
+#6 4.532 Preparing to unpack .../09-libtasn1-6_4.20.0-2+deb13u1_amd64.deb ...
+#6 4.538 Unpacking libtasn1-6:amd64 (4.20.0-2+deb13u1) ...
+#6 4.582 Selecting previously unselected package libgnutls30t64:amd64.
+#6 4.584 Preparing to unpack .../10-libgnutls30t64_3.8.9-3+deb13u4_amd64.deb ...
+#6 4.589 Unpacking libgnutls30t64:amd64 (3.8.9-3+deb13u4) ...
+#6 4.658 Selecting previously unselected package libkrb5support0:amd64.
+#6 4.659 Preparing to unpack .../11-libkrb5support0_1.21.3-5+deb13u1_amd64.deb ...
+#6 4.665 Unpacking libkrb5support0:amd64 (1.21.3-5+deb13u1) ...
+#6 4.709 Selecting previously unselected package libcom-err2:amd64.
+#6 4.710 Preparing to unpack .../12-libcom-err2_1.47.2-3+b12_amd64.deb ...
+#6 4.716 Unpacking libcom-err2:amd64 (1.47.2-3+b12) ...
+#6 4.759 Selecting previously unselected package libk5crypto3:amd64.
+#6 4.761 Preparing to unpack .../13-libk5crypto3_1.21.3-5+deb13u1_amd64.deb ...
+#6 4.767 Unpacking libk5crypto3:amd64 (1.21.3-5+deb13u1) ...
+#6 4.816 Selecting previously unselected package libkeyutils1:amd64.
+#6 4.818 Preparing to unpack .../14-libkeyutils1_1.6.3-6_amd64.deb ...
+#6 4.824 Unpacking libkeyutils1:amd64 (1.6.3-6) ...
+#6 4.867 Selecting previously unselected package libkrb5-3:amd64.
+#6 4.868 Preparing to unpack .../15-libkrb5-3_1.21.3-5+deb13u1_amd64.deb ...
+#6 4.874 Unpacking libkrb5-3:amd64 (1.21.3-5+deb13u1) ...
+#6 4.932 Selecting previously unselected package libgssapi-krb5-2:amd64.
+#6 4.933 Preparing to unpack .../16-libgssapi-krb5-2_1.21.3-5+deb13u1_amd64.deb ...
+#6 4.939 Unpacking libgssapi-krb5-2:amd64 (1.21.3-5+deb13u1) ...
+#6 4.977 Selecting previously unselected package libsasl2-modules-db:amd64.
+#6 4.978 Preparing to unpack .../17-libsasl2-modules-db_2.1.28+dfsg1-9_amd64.deb ...
+#6 4.984 Unpacking libsasl2-modules-db:amd64 (2.1.28+dfsg1-9) ...
+#6 5.025 Selecting previously unselected package libsasl2-2:amd64.
+#6 5.026 Preparing to unpack .../18-libsasl2-2_2.1.28+dfsg1-9_amd64.deb ...
+#6 5.032 Unpacking libsasl2-2:amd64 (2.1.28+dfsg1-9) ...
+#6 5.077 Selecting previously unselected package libldap2:amd64.
+#6 5.078 Preparing to unpack .../19-libldap2_2.6.10+dfsg-1_amd64.deb ...
+#6 5.084 Unpacking libldap2:amd64 (2.6.10+dfsg-1) ...
+#6 5.132 Selecting previously unselected package libnghttp2-14:amd64.
+#6 5.133 Preparing to unpack .../20-libnghttp2-14_1.64.0-1.1+deb13u1_amd64.deb ...
+#6 5.139 Unpacking libnghttp2-14:amd64 (1.64.0-1.1+deb13u1) ...
+#6 5.185 Selecting previously unselected package libnghttp3-9:amd64.
+#6 5.186 Preparing to unpack .../21-libnghttp3-9_1.8.0-1_amd64.deb ...
+#6 5.192 Unpacking libnghttp3-9:amd64 (1.8.0-1) ...
+#6 5.237 Selecting previously unselected package libngtcp2-16:amd64.
+#6 5.238 Preparing to unpack .../22-libngtcp2-16_1.11.0-1+deb13u1_amd64.deb ...
+#6 5.244 Unpacking libngtcp2-16:amd64 (1.11.0-1+deb13u1) ...
+#6 5.291 Selecting previously unselected package libngtcp2-crypto-gnutls8:amd64.
+#6 5.293 Preparing to unpack .../23-libngtcp2-crypto-gnutls8_1.11.0-1+deb13u1_amd64.deb ...
+#6 5.299 Unpacking libngtcp2-crypto-gnutls8:amd64 (1.11.0-1+deb13u1) ...
+#6 5.343 Selecting previously unselected package libpsl5t64:amd64.
+#6 5.345 Preparing to unpack .../24-libpsl5t64_0.21.2-1.1+b1_amd64.deb ...
+#6 5.351 Unpacking libpsl5t64:amd64 (0.21.2-1.1+b1) ...
+#6 5.395 Selecting previously unselected package librtmp1:amd64.
+#6 5.397 Preparing to unpack .../25-librtmp1_2.4+20151223.gitfa8646d.1-2+b5_amd64.deb ...
+#6 5.402 Unpacking librtmp1:amd64 (2.4+20151223.gitfa8646d.1-2+b5) ...
+#6 5.448 Selecting previously unselected package libssh2-1t64:amd64.
+#6 5.450 Preparing to unpack .../26-libssh2-1t64_1.11.1-1+deb13u2_amd64.deb ...
+#6 5.455 Unpacking libssh2-1t64:amd64 (1.11.1-1+deb13u2) ...
+#6 5.502 Selecting previously unselected package libcurl3t64-gnutls:amd64.
+#6 5.504 Preparing to unpack .../27-libcurl3t64-gnutls_8.14.1-2+deb13u7_amd64.deb ...
+#6 5.510 Unpacking libcurl3t64-gnutls:amd64 (8.14.1-2+deb13u7) ...
+#6 5.554 Selecting previously unselected package liberror-perl.
+#6 5.556 Preparing to unpack .../28-liberror-perl_0.17030-1_all.deb ...
+#6 5.562 Unpacking liberror-perl (0.17030-1) ...
+#6 5.598 Selecting previously unselected package git-man.
+#6 5.599 Preparing to unpack .../29-git-man_1%3a2.47.3-0+deb13u1_all.deb ...
+#6 5.605 Unpacking git-man (1:2.47.3-0+deb13u1) ...
+#6 5.680 Selecting previously unselected package git.
+#6 5.681 Preparing to unpack .../30-git_1%3a2.47.3-0+deb13u1_amd64.deb ...
+#6 5.690 Unpacking git (1:2.47.3-0+deb13u1) ...
+#6 5.888 Setting up libexpat1:amd64 (2.9.0-1~deb13u1) ...
+#6 5.905 Setting up libkeyutils1:amd64 (1.6.3-6) ...
+#6 5.923 Setting up libgdbm-compat4t64:amd64 (1.24-2) ...
+#6 5.940 Setting up libbrotli1:amd64 (1.1.0-2+deb13u1) ...
+#6 5.958 Setting up libnghttp2-14:amd64 (1.64.0-1.1+deb13u1) ...
+#6 5.975 Setting up libcom-err2:amd64 (1.47.2-3+b12) ...
+#6 5.993 Setting up libkrb5support0:amd64 (1.21.3-5+deb13u1) ...
+#6 6.010 Setting up libsasl2-modules-db:amd64 (2.1.28+dfsg1-9) ...
+#6 6.029 Setting up libp11-kit0:amd64 (0.25.5-3) ...
+#6 6.047 Setting up libunistring5:amd64 (1.3-2) ...
+#6 6.064 Setting up libk5crypto3:amd64 (1.21.3-5+deb13u1) ...
+#6 6.081 Setting up libsasl2-2:amd64 (2.1.28+dfsg1-9) ...
+#6 6.098 Setting up libnghttp3-9:amd64 (1.8.0-1) ...
+#6 6.115 Setting up perl-modules-5.40 (5.40.1-6+deb13u1) ...
+#6 6.133 Setting up libtasn1-6:amd64 (4.20.0-2+deb13u1) ...
+#6 6.150 Setting up git-man (1:2.47.3-0+deb13u1) ...
+#6 6.168 Setting up libngtcp2-16:amd64 (1.11.0-1+deb13u1) ...
+#6 6.186 Setting up libkrb5-3:amd64 (1.21.3-5+deb13u1) ...
+#6 6.202 Setting up libssh2-1t64:amd64 (1.11.1-1+deb13u2) ...
+#6 6.219 Setting up libldap2:amd64 (2.6.10+dfsg-1) ...
+#6 6.237 Setting up libidn2-0:amd64 (2.3.8-2) ...
+#6 6.254 Setting up libperl5.40:amd64 (5.40.1-6+deb13u1) ...
+#6 6.271 Setting up perl (5.40.1-6+deb13u1) ...
+#6 6.297 Setting up libgssapi-krb5-2:amd64 (1.21.3-5+deb13u1) ...
+#6 6.314 Setting up libgnutls30t64:amd64 (3.8.9-3+deb13u4) ...
+#6 6.332 Setting up libpsl5t64:amd64 (0.21.2-1.1+b1) ...
+#6 6.350 Setting up liberror-perl (0.17030-1) ...
+#6 6.367 Setting up librtmp1:amd64 (2.4+20151223.gitfa8646d.1-2+b5) ...
+#6 6.385 Setting up libngtcp2-crypto-gnutls8:amd64 (1.11.0-1+deb13u1) ...
+#6 6.415 Setting up libcurl3t64-gnutls:amd64 (8.14.1-2+deb13u7) ...
+#6 6.433 Setting up git (1:2.47.3-0+deb13u1) ...
+#6 6.459 Processing triggers for libc-bin (2.41-12+deb13u4) ...
+#6 DONE 7.0s
+
+#7 [ 3/17] WORKDIR /srv/vuoro
+#7 DONE 0.1s
+
+#8 [ 4/17] COPY scripts/fetch_pinned_adapters.py /usr/local/bin/fetch-pinned-adapters
+#8 DONE 0.2s
+
+#9 [ 5/17] COPY scripts/attest_installed_composition.py /usr/local/bin/attest-installed-composition
+#9 DONE 0.1s
+
+#10 [ 6/17] COPY scripts/install_pinned_adapters.py /usr/local/bin/install-pinned-adapters
+#10 DONE 0.2s
+
+#11 [ 7/17] COPY scripts/validate_service_image_preview.py /usr/local/bin/validate-service-image-preview
+#11 DONE 0.1s
+
+#12 [ 8/17] COPY packages/vuoro-service/composition/lane-adapter-pins.json /opt/vuoro/composition/adapter-pins.json
+#12 DONE 0.1s
+
+#13 [ 9/17] COPY packages/vuoro-service/composition/project-bindings.json /opt/vuoro/composition/project-bindings.json
+#13 DONE 0.1s
+
+#14 [10/17] RUN python /usr/local/bin/fetch-pinned-adapters /opt/vuoro/composition/adapter-pins.json /opt/vuoro/adapters
+#14 DONE 3.1s
+
+#15 [11/17] COPY README.md pyproject.toml uv.lock ./
+#15 DONE 0.2s
+
+#16 [12/17] COPY deploy/image/requirements.txt /opt/vuoro/image-requirements.txt
+#16 DONE 0.1s
+
+#17 [13/17] COPY packages/vuoro-service ./packages/vuoro-service
+#17 DONE 0.1s
+
+#18 [14/17] COPY packages/vuoro-mcp-edge ./packages/vuoro-mcp-edge
+#18 DONE 0.1s
+
+#19 [15/17] COPY packages/vuoro-evidence ./packages/vuoro-evidence
+#19 DONE 0.1s
+
+#20 [16/17] RUN python -m pip install --no-cache-dir --require-hashes --no-deps         -r /opt/vuoro/image-requirements.txt     && python -m pip install --no-cache-dir --no-deps         ./packages/vuoro-service ./packages/vuoro-evidence ./packages/vuoro-mcp-edge     && python /usr/local/bin/install-pinned-adapters         /opt/vuoro/composition/adapter-pins.json /opt/vuoro/adapters     && python -m pip check     && python /usr/local/bin/attest-installed-composition         /opt/vuoro/composition/adapter-pins.json         /opt/vuoro/adapters         /opt/vuoro/composition/installed-composition.json
+#20 0.991 Ignoring colorama: markers 'sys_platform == "win32"' don't match your environment
+#20 0.994 Collecting operator-projection @ https://github.com/bayleafwalker/agentops/releases/download/operator-projection-v0.2.5/operator_projection-0.2.5-py3-none-any.whl (from -r /opt/vuoro/image-requirements.txt (line 201))
+#20 1.469   Downloading operator_projection-0.2.5-py3-none-any.whl (44 kB)
+#20 1.482 Ignoring tzdata: markers 'sys_platform == "win32"' don't match your environment
+#20 1.482 Collecting vuoro-client @ https://github.com/bayleafwalker/vuoro/releases/download/vuoro-client-v0.1.2/vuoro_client-0.1.2-py3-none-any.whl#sha256=7a4f32d4e2531a1abc99f5dc017fb8f6f22c4a1ef191079b98808be897081660 (from -r /opt/vuoro/image-requirements.txt (line 663))
+#20 1.806   Downloading vuoro_client-0.1.2-py3-none-any.whl (16 kB)
+#20 1.856 Collecting annotated-doc==0.0.4 (from -r /opt/vuoro/image-requirements.txt (line 3))
+#20 1.903   Downloading annotated_doc-0.0.4-py3-none-any.whl (5.3 kB)
+#20 1.918 Collecting annotated-types==0.7.0 (from -r /opt/vuoro/image-requirements.txt (line 6))
+#20 1.929   Downloading annotated_types-0.7.0-py3-none-any.whl (13 kB)
+#20 1.951 Collecting anyio==4.14.2 (from -r /opt/vuoro/image-requirements.txt (line 9))
+#20 1.967   Downloading anyio-4.14.2-py3-none-any.whl (125 kB)
+#20 1.999 Collecting attrs==26.1.0 (from -r /opt/vuoro/image-requirements.txt (line 12))
+#20 2.011   Downloading attrs-26.1.0-py3-none-any.whl (67 kB)
+#20 2.137 Collecting boto3==1.43.113 (from -r /opt/vuoro/image-requirements.txt (line 15))
+#20 2.150   Downloading boto3-1.43.113-py3-none-any.whl (140 kB)
+#20 2.268 Collecting botocore==1.43.113 (from -r /opt/vuoro/image-requirements.txt (line 18))
+#20 2.280   Downloading botocore-1.43.113-py3-none-any.whl (16.1 MB)
+#20 2.508      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.1/16.1 MB 70.9 MB/s  0:00:00
+#20 2.545 Collecting certifi==2026.6.17 (from -r /opt/vuoro/image-requirements.txt (line 21))
+#20 2.557   Downloading certifi-2026.6.17-py3-none-any.whl (133 kB)
+#20 2.613 Collecting cffi==2.1.1 (from -r /opt/vuoro/image-requirements.txt (line 24))
+#20 2.625   Downloading cffi-2.1.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (221 kB)
+#20 2.643 Collecting click==8.4.2 (from -r /opt/vuoro/image-requirements.txt (line 100))
+#20 2.655   Downloading click-8.4.2-py3-none-any.whl (119 kB)
+#20 2.761 Collecting cryptography==50.0.0 (from -r /opt/vuoro/image-requirements.txt (line 106))
+#20 2.776   Downloading cryptography-50.0.0-cp311-abi3-manylinux_2_34_x86_64.whl (4.7 MB)
+#20 2.900      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.7/4.7 MB 36.9 MB/s  0:00:00
+#20 2.936 Collecting fastapi==0.139.2 (from -r /opt/vuoro/image-requirements.txt (line 147))
+#20 2.949   Downloading fastapi-0.139.2-py3-none-any.whl (130 kB)
+#20 2.971 Collecting h11==0.16.0 (from -r /opt/vuoro/image-requirements.txt (line 150))
+#20 2.982   Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+#20 2.998 Collecting httpcore==1.0.9 (from -r /opt/vuoro/image-requirements.txt (line 153))
+#20 3.017   Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+#20 3.047 Collecting httptools==0.8.0 (from -r /opt/vuoro/image-requirements.txt (line 156))
+#20 3.063   Downloading httptools-0.8.0-cp313-cp313-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (486 kB)
+#20 3.094 Collecting httpx==0.28.1 (from -r /opt/vuoro/image-requirements.txt (line 186))
+#20 3.107   Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+#20 3.122 Collecting idna==3.18 (from -r /opt/vuoro/image-requirements.txt (line 189))
+#20 3.137   Downloading idna-3.18-py3-none-any.whl (65 kB)
+#20 3.152 Collecting jmespath==1.1.0 (from -r /opt/vuoro/image-requirements.txt (line 192))
+#20 3.163   Downloading jmespath-1.1.0-py3-none-any.whl (20 kB)
+#20 3.180 Collecting jsonschema==4.26.0 (from -r /opt/vuoro/image-requirements.txt (line 195))
+#20 3.192   Downloading jsonschema-4.26.0-py3-none-any.whl (90 kB)
+#20 3.207 Collecting jsonschema-specifications==2025.9.1 (from -r /opt/vuoro/image-requirements.txt (line 198))
+#20 3.219   Downloading jsonschema_specifications-2025.9.1-py3-none-any.whl (18 kB)
+#20 3.234 Collecting psycopg==3.3.6 (from -r /opt/vuoro/image-requirements.txt (line 203))
+#20 3.248   Downloading psycopg-3.3.6-py3-none-any.whl (215 kB)
+#20 3.333 Collecting psycopg-binary==3.3.6 (from -r /opt/vuoro/image-requirements.txt (line 206))
+#20 3.346   Downloading psycopg_binary-3.3.6-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (5.2 MB)
+#20 3.410      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.2/5.2 MB 82.2 MB/s  0:00:00
+#20 3.426 Collecting pycparser==3.0 (from -r /opt/vuoro/image-requirements.txt (line 251))
+#20 3.441   Downloading pycparser-3.0-py3-none-any.whl (48 kB)
+#20 3.500 Collecting pydantic==2.13.4 (from -r /opt/vuoro/image-requirements.txt (line 254))
+#20 3.512   Downloading pydantic-2.13.4-py3-none-any.whl (472 kB)
+#20 3.851 Collecting pydantic-core==2.46.4 (from -r /opt/vuoro/image-requirements.txt (line 257))
+#20 3.870   Downloading pydantic_core-2.46.4-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.1 MB)
+#20 3.905      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.1/2.1 MB 57.4 MB/s  0:00:00
+#20 3.923 Collecting pyjwt==2.13.0 (from -r /opt/vuoro/image-requirements.txt (line 323))
+#20 3.935   Downloading pyjwt-2.13.0-py3-none-any.whl (31 kB)
+#20 3.950 Collecting python-dateutil==2.9.0.post0 (from -r /opt/vuoro/image-requirements.txt (line 326))
+#20 3.962   Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+#20 3.979 Collecting python-dotenv==1.2.2 (from -r /opt/vuoro/image-requirements.txt (line 329))
+#20 3.991   Downloading python_dotenv-1.2.2-py3-none-any.whl (22 kB)
+#20 4.018 Collecting pyyaml==6.0.3 (from -r /opt/vuoro/image-requirements.txt (line 332))
+#20 4.030   Downloading pyyaml-6.0.3-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (801 kB)
+#20 4.038      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 801.6/801.6 kB 104.4 MB/s  0:00:00
+#20 4.058 Collecting referencing==0.37.0 (from -r /opt/vuoro/image-requirements.txt (line 372))
+#20 4.069   Downloading referencing-0.37.0-py3-none-any.whl (26 kB)
+#20 4.201 Collecting rpds-py==2026.6.3 (from -r /opt/vuoro/image-requirements.txt (line 375))
+#20 4.212   Downloading rpds_py-2026.6.3-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (365 kB)
+#20 4.232 Collecting s3transfer==0.19.2 (from -r /opt/vuoro/image-requirements.txt (line 465))
+#20 4.243   Downloading s3transfer-0.19.2-py3-none-any.whl (90 kB)
+#20 4.259 Collecting six==1.17.0 (from -r /opt/vuoro/image-requirements.txt (line 468))
+#20 4.270   Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+#20 4.289 Collecting starlette==1.3.1 (from -r /opt/vuoro/image-requirements.txt (line 471))
+#20 4.300   Downloading starlette-1.3.1-py3-none-any.whl (73 kB)
+#20 4.317 Collecting typing-extensions==4.16.0 (from -r /opt/vuoro/image-requirements.txt (line 474))
+#20 4.328   Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+#20 4.342 Collecting typing-inspection==0.4.2 (from -r /opt/vuoro/image-requirements.txt (line 477))
+#20 4.353   Downloading typing_inspection-0.4.2-py3-none-any.whl (14 kB)
+#20 4.371 Collecting urllib3==2.8.0 (from -r /opt/vuoro/image-requirements.txt (line 483))
+#20 4.382   Downloading urllib3-2.8.0-py3-none-any.whl (135 kB)
+#20 4.403 Collecting uvicorn==0.51.0 (from -r /opt/vuoro/image-requirements.txt (line 486))
+#20 4.414   Downloading uvicorn-0.51.0-py3-none-any.whl (73 kB)
+#20 4.443 Collecting uvloop==0.22.1 (from -r /opt/vuoro/image-requirements.txt (line 489))
+#20 4.459   Downloading uvloop-0.22.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (4.4 MB)
+#20 4.510      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.4/4.4 MB 84.6 MB/s  0:00:00
+#20 4.556 Collecting watchfiles==1.2.0 (from -r /opt/vuoro/image-requirements.txt (line 515))
+#20 4.569   Downloading watchfiles-1.2.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (454 kB)
+#20 4.638 Collecting websockets==16.1.1 (from -r /opt/vuoro/image-requirements.txt (line 592))
+#20 4.653   Downloading websockets-16.1.1-cp313-cp313-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (187 kB)
+#20 4.706 Installing collected packages: websockets, watchfiles, vuoro-client, uvloop, uvicorn, urllib3, typing-inspection, typing-extensions, starlette, six, s3transfer, rpds-py, referencing, pyyaml, python-dotenv, python-dateutil, pyjwt, pydantic-core, pydantic, pycparser, psycopg-binary, psycopg, operator-projection, jsonschema-specifications, jsonschema, jmespath, idna, httpx, httptools, httpcore, h11, fastapi, cryptography, click, cffi, certifi, botocore, boto3, attrs, anyio, annotated-types, annotated-doc
+#20 6.570 
+#20 6.572 Successfully installed annotated-doc-0.0.4 annotated-types-0.7.0 anyio-4.14.2 attrs-26.1.0 boto3-1.43.113 botocore-1.43.113 certifi-2026.6.17 cffi-2.1.1 click-8.4.2 cryptography-50.0.0 fastapi-0.139.2 h11-0.16.0 httpcore-1.0.9 httptools-0.8.0 httpx-0.28.1 idna-3.18 jmespath-1.1.0 jsonschema-4.26.0 jsonschema-specifications-2025.9.1 operator-projection-0.2.5 psycopg-3.3.6 psycopg-binary-3.3.6 pycparser-3.0 pydantic-2.13.4 pydantic-core-2.46.4 pyjwt-2.13.0 python-dateutil-2.9.0.post0 python-dotenv-1.2.2 pyyaml-6.0.3 referencing-0.37.0 rpds-py-2026.6.3 s3transfer-0.19.2 six-1.17.0 starlette-1.3.1 typing-extensions-4.16.0 typing-inspection-0.4.2 urllib3-2.8.0 uvicorn-0.51.0 uvloop-0.22.1 vuoro-client-0.1.2 watchfiles-1.2.0 websockets-16.1.1
+#20 6.573 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#20 6.573 
+#20 6.573 [notice] A new release of pip is available: 26.2.2 -> 26.3
+#20 6.573 [notice] To update, run: pip install --upgrade pip
+#20 7.403 Processing ./packages/vuoro-service
+#20 7.404   Installing build dependencies: started
+#20 8.741   Installing build dependencies: finished with status 'done'
+#20 8.742   Getting requirements to build wheel: started
+#20 8.943   Getting requirements to build wheel: finished with status 'done'
+#20 8.944   Preparing metadata (pyproject.toml): started
+#20 9.237   Preparing metadata (pyproject.toml): finished with status 'done'
+#20 9.239 Processing ./packages/vuoro-evidence
+#20 9.240   Installing build dependencies: started
+#20 10.10   Installing build dependencies: finished with status 'done'
+#20 10.10   Getting requirements to build wheel: started
+#20 10.30   Getting requirements to build wheel: finished with status 'done'
+#20 10.30   Preparing metadata (pyproject.toml): started
+#20 10.59   Preparing metadata (pyproject.toml): finished with status 'done'
+#20 10.59 Processing ./packages/vuoro-mcp-edge
+#20 10.59   Installing build dependencies: started
+#20 11.44   Installing build dependencies: finished with status 'done'
+#20 11.44   Getting requirements to build wheel: started
+#20 11.64   Getting requirements to build wheel: finished with status 'done'
+#20 11.64   Preparing metadata (pyproject.toml): started
+#20 11.93   Preparing metadata (pyproject.toml): finished with status 'done'
+#20 11.93 Building wheels for collected packages: vuoro-service, vuoro-evidence, vuoro-mcp-edge
+#20 11.93   Building wheel for vuoro-service (pyproject.toml): started
+#20 12.00   Building wheel for vuoro-service (pyproject.toml): finished with status 'done'
+#20 12.00   Created wheel for vuoro-service: filename=vuoro_service-0.1.106-py3-none-any.whl size=112769 sha256=9c14f13595713842d04ba3b4f50e12a1d142536ef1c3055fe9902b762a4ede3a
+#20 12.00   Stored in directory: /tmp/pip-ephem-wheel-cache-j9vqt6eu/wheels/31/cb/b6/02ef1c57e39b91e28222e259753dbc06fbc0a12a43d6dfd217
+#20 12.01   Building wheel for vuoro-evidence (pyproject.toml): started
+#20 12.08   Building wheel for vuoro-evidence (pyproject.toml): finished with status 'done'
+#20 12.08   Created wheel for vuoro-evidence: filename=vuoro_evidence-0.1.0-py3-none-any.whl size=44650 sha256=db8e519c6c352891568448be8b2311393b54e9e5dfeee99e89d7b43e7f240227
+#20 12.08   Stored in directory: /tmp/pip-ephem-wheel-cache-j9vqt6eu/wheels/2a/80/4f/8ebd968fbd4d4c6034dfb36b64ada36b35294ac87871581a78
+#20 12.08   Building wheel for vuoro-mcp-edge (pyproject.toml): started
+#20 12.16   Building wheel for vuoro-mcp-edge (pyproject.toml): finished with status 'done'
+#20 12.16   Created wheel for vuoro-mcp-edge: filename=vuoro_mcp_edge-0.1.9-py3-none-any.whl size=87288 sha256=1131b2f797491edc84c4ece3ac64e693d7a3b3783f515b7f07fb668fb300711d
+#20 12.16   Stored in directory: /tmp/pip-ephem-wheel-cache-j9vqt6eu/wheels/d9/e7/1b/9456682a04e5b88f0dd9c5604404b82b2d4a906d649f12640e
+#20 12.16 Successfully built vuoro-service vuoro-evidence vuoro-mcp-edge
+#20 12.19 Installing collected packages: vuoro-service, vuoro-mcp-edge, vuoro-evidence
+#20 12.32 
+#20 12.32 Successfully installed vuoro-evidence-0.1.0 vuoro-mcp-edge-0.1.9 vuoro-service-0.1.106
+#20 12.32 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#20 12.33 
+#20 12.33 [notice] A new release of pip is available: 26.2.2 -> 26.3
+#20 12.33 [notice] To update, run: pip install --upgrade pip
+#20 13.20 Processing /opt/vuoro/adapters/sprintctl-0.28.1-py3-none-any.whl
+#20 13.21 Processing /opt/vuoro/adapters/vuoro_adapter_kit-0.2.2-py3-none-any.whl
+#20 13.21 Processing /opt/vuoro/adapters/vuoro_schema_runtime-0.1.0-py3-none-any.whl
+#20 13.21 Processing /opt/vuoro/adapters/auditctl-0.1.9-py3-none-any.whl
+#20 13.21 Processing /opt/vuoro/adapters/vuoro_workspace-0.1.1-py3-none-any.whl
+#20 13.21 Processing /opt/vuoro/adapters/lanectl-0.2.12-py3-none-any.whl
+#20 13.25 Installing collected packages: vuoro-workspace, vuoro-schema-runtime, vuoro-adapter-kit, sprintctl, lanectl, auditctl
+#20 13.68 
+#20 13.69 Successfully installed auditctl-0.1.9 lanectl-0.2.12 sprintctl-0.28.1 vuoro-adapter-kit-0.2.2 vuoro-schema-runtime-0.1.0 vuoro-workspace-0.1.1
+#20 13.69 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#20 14.23 No broken requirements found.
+#20 14.45 composition attestation passed for 6 pinned distributions
+#20 DONE 14.9s
+
+#21 [17/17] RUN python /usr/local/bin/validate-service-image-preview
+#21 0.474 declared preview image: parsed, redacted, and fail-closed
+#21 DONE 0.6s
+
+#22 exporting to image
+#22 exporting layers
+#22 exporting layers 2.6s done
+#22 exporting manifest sha256:00c0d30beb15ff70500a62989ff420716e877a3850b778f008525a1a957d02ad 0.0s done
+#22 exporting config sha256:b3c51d978ebe1b90c3d6dd110ff6db631f3a149cd69a04628e8ff79e997e8604 0.0s done
+#22 exporting attestation manifest sha256:44844a7cfa32cfd92a25fc1f60e389ebeaed0412d9e53382e53f74aa40c3beaa 0.0s done
+#22 exporting manifest list sha256:368dc86e653f8f4fe6b172142f13dc252bdb75a7ac37f6b49728f921bc397e61
+#22 exporting manifest list sha256:368dc86e653f8f4fe6b172142f13dc252bdb75a7ac37f6b49728f921bc397e61 0.0s done
+#22 naming to docker.io/library/lanectl-vuoro-lane-qual-20261114:c54399e done
+#22 unpacking to docker.io/library/lanectl-vuoro-lane-qual-20261114:c54399e
+#22 unpacking to docker.io/library/lanectl-vuoro-lane-qual-20261114:c54399e 3.1s done
+#22 DONE 5.9s

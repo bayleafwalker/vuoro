@@ -232,7 +232,7 @@
       },
       "evidence_source": {
         "kind": "adapter_pin_and_compatibility_constants",
-        "reference": "packages/vuoro-service/composition/adapter-pins.json; sprintctl 0.28.1 pg_migrations CURRENT/MINIMUM/MAXIMUM_SCHEMA_VERSION"
+        "reference": "packages/vuoro-service/composition/adapter-pins.json at tag commit dfd65808d045ad2c2c4f773815dd5825e57a1361; sprintctl 0.28.1 pg_migrations CURRENT/MINIMUM/MAXIMUM_SCHEMA_VERSION"
       }
     }
   ]

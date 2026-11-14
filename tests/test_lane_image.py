@@ -28,6 +28,29 @@ def manifest(lane=True):
     return raw
 
 
+def test_released_lane_manifest_is_an_additive_consumable_image_closure():
+    """The real release data must agree across loader, fetcher and attester."""
+    from vuoro_service.composition import CompositionManifest
+
+    default = manifest(False)
+    path = ROOT / 'packages/vuoro-service/composition/lane-adapter-pins.json'
+    selected = json.loads(path.read_text())
+    assert selected['release_locks'][:-1] == default['release_locks']
+    assert selected['runtime_descriptors'][:-1] == default['runtime_descriptors']
+    assert {pin.domain for pin in CompositionManifest.load(path).adapters} == {
+        'work', 'audit', 'knowledge', 'lane'}
+    fetch = module('fetch_pinned_adapters')
+    attest = module('attest_installed_composition')
+    fetched = {pin['distribution'] for _, pin in fetch.artifact_pins(selected)}
+    attested = {pin['distribution'] for pin in attest._pinned(selected)}
+    assert fetched == attested == {
+        'sprintctl', 'auditctl', 'vuoro-workspace', 'vuoro-adapter-kit',
+        'vuoro-schema-runtime', 'lanectl'}
+    with pytest.raises(SystemExit, match='Python >=3.13'):
+        fetch.validate_interpreter(selected, (3, 12))
+    fetch.validate_interpreter(selected, (3, 13))
+
+
 def test_fetch_and_attest_accept_exact_optional_pins_but_interpreter_floor_is_explicit():
     fetch=module('fetch_pinned_adapters')
     attest=module('attest_installed_composition')

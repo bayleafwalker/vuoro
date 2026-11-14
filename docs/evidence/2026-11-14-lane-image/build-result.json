@@ -1,0 +1,28 @@
+{
+  "command": [
+    "docker",
+    "build",
+    "--progress=plain",
+    "--build-arg",
+    "PYTHON_BASE_IMAGE=python@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90",
+    "--build-arg",
+    "VUORO_COMPOSITION_FILE=packages/vuoro-service/composition/lane-adapter-pins.json",
+    "--label",
+    "io.lanectl.qualification=vuoro-2903-20261114",
+    "--label",
+    "org.opencontainers.image.revision=74f132a981816264c6ff9f0efbc10c81a9be625b",
+    "--tag",
+    "lanectl-vuoro-lane-qual-20261114:74f132a",
+    "/tmp/vuoro-lane-image-qualified-source-20261114/context"
+  ],
+  "returncode": 0,
+  "elapsed_s": 21.152,
+  "source_commit": "74f132a981816264c6ff9f0efbc10c81a9be625b",
+  "lane_manifest_sha256": "d8d0ec671de91be6e1b187c0e77b945d99f63f214ce4aef3fca6389f744fab43",
+  "complete": true,
+  "image_id": "sha256:a29aa4f2baf467575be11833cba003a873d2edcfada4e17c63895e633ff40c91",
+  "image_labels": {
+    "io.lanectl.qualification": "vuoro-2903-20261114",
+    "org.opencontainers.image.revision": "74f132a981816264c6ff9f0efbc10c81a9be625b"
+  }
+}

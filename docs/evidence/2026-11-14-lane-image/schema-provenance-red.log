@@ -1,0 +1,31 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_________ test_historic_rows_match_adapter_pin_history_where_available _________
+
+    def test_historic_rows_match_adapter_pin_history_where_available():
+        # Full triples independently verified from the released owner wheels.
+        verified = {
+            "0.1.94": (22, 22, 22), "0.1.95": (25, 25, 25),
+            "0.1.96": (27, 27, 27), "0.1.97": (27, 27, 27),
+            "0.1.98": (28, 28, 28), "0.1.99": (28, 28, 28),
+            "0.1.100": (29, 29, 29), "0.1.101": (29, 29, 29),
+            "0.1.102": (30, 30, 30), "0.1.103": (31, 31, 31),
+            "0.1.104": (31, 31, 31), "0.1.105": (34, 32, 34),
+            "0.1.106": (34, 32, 34),
+        }
+        rows = {row["service_version"]: row for row in _mapping()["releases"]}
+        for release, (target, minimum, maximum) in verified.items():
+            row = rows[release]
+            assert (row["work_schema_target"], row["lowest_supported_schema"], row["accepted_schema_range"]["minimum"], row["accepted_schema_range"]["maximum"]) == (target, minimum, minimum, maximum)
+        if not (ROOT / ".git").exists():
+            pytest.skip("not a git checkout; adapter pin history is unavailable")
+        for row in _mapping()["releases"]:
+            reference = row["evidence_source"]["reference"]
+>           commit = reference.split("tag commit ", 1)[1].split(";", 1)[0]
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           IndexError: list index out of range
+
+packages/vuoro-service/tests/test_tenant_schema.py:83: IndexError
+=========================== short test summary info ============================
+FAILED packages/vuoro-service/tests/test_tenant_schema.py::test_historic_rows_match_adapter_pin_history_where_available
+1 failed in 0.10s

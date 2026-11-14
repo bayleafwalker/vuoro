@@ -1,0 +1,93 @@
+{
+  "schema_version": "test-context/v1",
+  "id": "vuoro-lane-image-v012-20261114",
+  "owner_repo": "vuoro",
+  "subject": "Optional released lane-owner image composition and disposable owner protocol",
+  "contract_ref": {
+    "doc_id": "vuoro/docs/architecture/lane-event-composition.md",
+    "revision": "git:c54399e6f673cda06f1fc67e83ee4fe71ac7e0c4"
+  },
+  "source_of_truth": "lanectl StreamStore owns lane events; immutable manifest owns catalog selection; production authority remains unchanged JSONL",
+  "depth": 2,
+  "backends": [
+    "SQLite WAL on disposable container tmpfs"
+  ],
+  "actors": [
+    "migration caller",
+    "two synthetic authorized principals",
+    "unauthorized synthetic identities"
+  ],
+  "initial_state": [
+    "Actual digest-identified Python3.13 image with six hash-verified owner/shared wheels",
+    "No owner database before explicit migration",
+    "Three baseline domains use registration-only fixtures with no database access"
+  ],
+  "operations": [
+    {
+      "name": "explicit migration then runtime composition",
+      "actors": [
+        "migration caller"
+      ]
+    },
+    {
+      "name": "lane.stream.read-v1",
+      "actors": "*"
+    },
+    {
+      "name": "lane.stream.append-v1",
+      "actors": [
+        "two synthetic authorized principals"
+      ],
+      "synchronization": "two threads meet at barrier before separate SQLite connections append expected revision zero"
+    }
+  ],
+  "consistency": {
+    "target": "application-invariant",
+    "object": "atomic scoped stream append, expected revision and principal-bound replay"
+  },
+  "assumptions": {
+    "isolation": "Synthetic typed invocation contexts stand in for verified identities; baseline three-owner registration never opens databases. No authentication or full HTTP startup claim.",
+    "clock": "No lease or wall-clock timing claim; thread barrier bounds the two-writer race.",
+    "fairness": "Both worker threads reach the barrier within5s; one SQLite transaction completes before the other validates expected revision."
+  },
+  "bounds": {
+    "threads": 2,
+    "probe_groups": 11,
+    "container_network": "none",
+    "container_uid": 65532
+  },
+  "invariants": [
+    "Default three-owner manifest is unchanged",
+    "Exactly two lane operations are added and every baseline definition is preserved",
+    "Runtime never creates an unmigrated owner database",
+    "Changed payload, stale revision and scope failures do not append events",
+    "Only one concurrent expected-revision-zero append wins",
+    "Snapshot paging excludes later appends",
+    "Only pinned checksum-verified wheels reach installer"
+  ],
+  "faults": [
+    "missing owner database",
+    "unsupported registration/schema",
+    "tampered and missing released wheel",
+    "synthetic Python3.12 floor input",
+    "missing authority/workspace/principal/repository",
+    "changed idempotent payload and different principal",
+    "stale revision",
+    "invalid batch",
+    "two concurrent writers",
+    "incompatible restored schema",
+    "four catalog oracle mutations"
+  ],
+  "oracles": [
+    "actual registry input/result validation and registered owner handlers",
+    "exact baseline definition equality plus two scoped lane operations",
+    "expected refusal codes and unchanged stream contents",
+    "SQLite online backup restored through the actual owner constructor"
+  ],
+  "implementation_anchors": [
+    "lanectl@b56f9cf:src/lanectl/stream_store.py:StreamStore.append",
+    "lanectl@b56f9cf:src/lanectl/vuoro_adapter.py:register_lane_catalog",
+    "vuoro@c54399e:packages/vuoro-service/src/vuoro_service/composition.py:_compose_lane",
+    "vuoro@c54399e:scripts/install_pinned_adapters.py:install"
+  ]
+}

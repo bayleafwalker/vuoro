@@ -1,0 +1,85 @@
+{
+  "schema_version": "verification-result/v1",
+  "context_id": "vuoro-lane-image-v012-20261114",
+  "contract_ref": {
+    "doc_id": "vuoro/docs/architecture/lane-event-composition.md",
+    "revision": "git:c54399e6f673cda06f1fc67e83ee4fe71ac7e0c4"
+  },
+  "implementation_sha": "74f132a981816264c6ff9f0efbc10c81a9be625b",
+  "depth": 2,
+  "environment": {
+    "backend": "SQLite WAL on disposable tmpfs in actual image",
+    "isolation": "network none, read-only root, UID65532, no capabilities, no-new-privileges",
+    "tool_versions": {
+      "python": "3.13.18",
+      "image": "sha256:a29aa4f2baf467575be11833cba003a873d2edcfada4e17c63895e633ff40c91",
+      "lane": "0.2.12",
+      "service": "0.1.106"
+    }
+  },
+  "execution": {
+    "histories": 1,
+    "bounds": {
+      "threads": 2,
+      "check_groups": 11,
+      "catalog_operations": 152
+    },
+    "faults_exercised": [
+      "missing owner database",
+      "unsupported registration/schema",
+      "tampered and missing released wheel",
+      "synthetic Python3.12 floor input",
+      "missing authority/workspace/principal/repository",
+      "changed idempotent payload and different principal",
+      "stale revision",
+      "invalid batch",
+      "two concurrent writers",
+      "incompatible restored schema",
+      "four catalog oracle mutations"
+    ]
+  },
+  "claims": [
+    {
+      "property": "actual pinned six-wheel installation and unchanged baseline catalog plus exact lane operations",
+      "result": "example-tested",
+      "evidence": [
+        "build-result.json",
+        "runtime-result.json",
+        "probe-final.log"
+      ]
+    },
+    {
+      "property": "expected revision concurrent append has exactly one winner within two-thread history",
+      "result": "concurrency-tested",
+      "evidence": [
+        "probe-final.log",
+        "probe.py"
+      ]
+    },
+    {
+      "property": "migration, scope, replay, atomic batch, snapshot and disposable backup/restore controls",
+      "result": "example-tested",
+      "evidence": [
+        "probe-final.log",
+        "runtime-result.json"
+      ]
+    },
+    {
+      "property": "full composed HTTP boot, real identity/gateway path, all existing owner database compatibility, production persistence and durability",
+      "result": "unknown",
+      "evidence": [
+        "README.md"
+      ]
+    }
+  ],
+  "counterexamples": [],
+  "notes": [
+    "Exact committed-source image built in21.152s; native dependency closure installed and pip check/attestation succeeded. Initial base-plus-manifest proof retained separately.",
+    "Python3.12 refusal exercised helper with explicit synthetic version tuple, not a Python3.12 container.",
+    "One bounded concurrency history does not prove general linearizability.",
+    "Local image is retained for independent review; no registry push, production rollout or event-authority switch.",
+    "First probe fixture attempted to dataclass.replace a computed AdapterPin property; TypeError before later tests. Corrected the nested descriptor in the fixture only; actual image unchanged. See probe-attempt1.log. This was not a product counterexample.",
+    "Full exact-input source suite:3869passed,153skipped,17warnings. Skips are not claimed as qualification. Tool inventory and input invariance checks passed; full-qualified-suite-r3.json records orchestration.",
+    "The source0.1.106schema-map reference omitted its tag commit, breaking an unchanged full-history test. Verified public tag dfd65808d045ad2c2c4f773815dd5825e57a1361 and corrected only that evidence reference; original failing log retained."
+  ]
+}

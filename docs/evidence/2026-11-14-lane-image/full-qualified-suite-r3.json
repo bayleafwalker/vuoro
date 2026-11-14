@@ -1,0 +1,25 @@
+{
+  "returncode": 0,
+  "elapsed_s": 298.424,
+  "command": [
+    "/projects/dev/_wt/vuoro-lane-image-20261114/.venv/bin/python",
+    "-m",
+    "pytest",
+    "-q"
+  ],
+  "python": "3.13.16",
+  "ignored_or_filtered_tests": false,
+  "postgres16_required": true,
+  "contract_tool_guard": "exact executable and full inventory guard passed",
+  "input_sha256_before": {
+    "packages/vuoro-service/composition/lane-adapter-pins.json": "d8d0ec671de91be6e1b187c0e77b945d99f63f214ce4aef3fca6389f744fab43",
+    "packages/vuoro-service/src/vuoro_service/tenant-runtime-schema-map.json": "e22c85902f2672f878ba92274f4edf28fba2908c8fe76ec68a0b71eadcf941d2",
+    "tests/test_lane_image.py": "2283fa80b98b54ed8cc01aeb2e3c2e87620467795a63911384dee2be19133fe2"
+  },
+  "input_sha256_after": {
+    "packages/vuoro-service/composition/lane-adapter-pins.json": "d8d0ec671de91be6e1b187c0e77b945d99f63f214ce4aef3fca6389f744fab43",
+    "packages/vuoro-service/src/vuoro_service/tenant-runtime-schema-map.json": "e22c85902f2672f878ba92274f4edf28fba2908c8fe76ec68a0b71eadcf941d2",
+    "tests/test_lane_image.py": "2283fa80b98b54ed8cc01aeb2e3c2e87620467795a63911384dee2be19133fe2"
+  },
+  "inputs_unchanged": true
+}
