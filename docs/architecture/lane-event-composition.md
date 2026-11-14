@@ -56,8 +56,8 @@ index resolution, runs `pip check`, and records installed-composition
 attestation. The same generic installer covers the unchanged default closure
 and an additional lane owner; there is no hardcoded wheel list that omits the
 optional package. The alternate Python image and new manifest require the
-normal image qualification before promotion. This source change has not built,
-published or deployed a qualified lane image.
+normal image qualification before promotion. No lane image has been published
+or deployed by this source change.
 
 The [14November local image proof](../evidence/2026-11-14-lane-image/README.md)
 records the exact-source optional build and its bounded controls. It is separate
