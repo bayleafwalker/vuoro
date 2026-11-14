@@ -134,3 +134,60 @@ block otherwise permitted native work. Failed sanitization/authorization
 withholds the affected export and records the failure; unrelated permitted
 work continues. No schema migration is introduced here. Later migrations
 follow the owner's compatibility, backup and forward-recovery procedures.
+
+## Proposed basis-tracked revalidation follow-through (14 November 2026)
+
+The [HLA consumer plan](https://github.com/bayleafwalker/homelab-analytics/blob/main/docs/plans/2026-11-14-basis-tracked-revalidation.md)
+defines a paired frozen-fixture qualification of `electricity_contract_keep_or_switch`
+against full recomputation. HLA owns its assessment method, dependency declarations,
+reporting inputs and domain decisions. This is an owner planning amendment;
+source landing establishes neither shared enforcement nor installed capability.
+
+Extend the existing `EvidenceItem.validity`, `ValidityWindow.component_digests`
+and immutable references within `EvidenceSet`. Keep applicability mode (a claim
+about a historical snapshot or current inputs) separate from dependency membership
+and digests. These are consumer semantics to qualify, not new values for the
+existing `ValidityWindow.basis` enum or a universal basis schema. A manifest of
+supplied sources does not prove consumption, compliance or source authenticity.
+
+HLA's proposed corpus covers source/method changes, partial coverage, schema
+changes and missing references; cheap correctness checks always run. Keep its
+source trace and assessment causes separate. Dependency additions/removals,
+expiry and negative-read cases remain pending shared-owner qualification; this
+does not expand HLA's consumer corpus. Only qualified complete declarations or
+qualified complete observations may justify skips. Inferred edges and ordinary
+observations may widen the affected set, never justify exclusions. Correct
+lineage remains useful without measured reuse savings; total overhead decides
+whether to enable the optional reuse optimization.
+
+Before shared adoption, qualify complete dependency membership, method identity,
+current-source assurance and mixed-version behavior through the existing owners.
+Missing, inaccessible or unqualified inputs cannot establish current applicability;
+unknown legacy basis is not an empty, successfully checked dependency set. For
+input-dependent validity, current [`expiry_of`](../../packages/vuoro-evidence/src/vuoro_evidence/core/reducer.py)
+only expires supplied mismatches, while Sprintctl's owner evaluator reports
+missing inputs as unknown. Resolving that difference is deferred owner work;
+this amendment changes neither evaluator nor a v1 contract.
+
+Reuse Sprintctl's `WorkRelease`/Release, closed continuation checkpoint and
+terminal `Decision`. Owner reference-set equality does not establish the bytes
+behind a mutable source URL. A Vuoro rerun `Decision` does not accept work.
+Historical acceptance and evidence remain immutable; later evaluation derives
+current applicability and records new evidence. It does not reopen terminal work.
+
+Any enforcement extension needs an explicit versioned profile/operation, source
+assurance and actual catalog support, plus refusal by incapable consumers. Do not
+treat retained arbitrary metadata as enforced semantics or recompute historical
+digests under new canonicalization. Shared wire changes follow the existing
+EC-00 path; no additional lifecycle, store or acceptance writer is introduced.
+
+### Planning backlog
+
+| Planning key | Owner scope | Recommended priority | Dependencies | Acceptance | Live work binding |
+| --- | --- | --- | --- | --- | --- |
+| VU-BR1 | Qualify basis applicability through existing evidence contracts and owner projections | 3 (1 highest; recommendation only) | HLA paired correctness fixture; exact owner contract/capability review; Sprintctl acceptance integration if used | Missing/changed/expired/method-changed inputs remain distinct; no false currentness on incomplete membership; historical Decisions/digests survive; unsupported versions refuse the new claim | Unknown; pending repository-scoped served reconciliation |
+
+`VU-BR1` is a planning key, not a served item or readiness claim. Reconcile existing
+work before binding or creating an item, and pin the implemented plan revision.
+Rollback disables reuse/new profile consumers, restores full recomputation and
+preserves lineage and owner Decisions. Savings are not a prerequisite for lineage.
