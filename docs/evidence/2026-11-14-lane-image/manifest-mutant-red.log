@@ -1,0 +1,22 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____ test_released_lane_manifest_is_an_additive_consumable_image_closure ______
+
+    def test_released_lane_manifest_is_an_additive_consumable_image_closure():
+        """The real release data must agree across loader, fetcher and attester."""
+        from vuoro_service.composition import CompositionManifest
+    
+        default = manifest(False)
+        path = ROOT / 'packages/vuoro-service/composition/lane-adapter-pins.json'
+        selected = json.loads(path.read_text())
+>       assert selected['release_locks'][:-1] == default['release_locks']
+E       AssertionError: assert [{'artifact_s...'0.1.1', ...}] == [{'artifact_s...'0.1.1', ...}]
+E         
+E         At index 0 diff: {'lock_id': 'work-adapter', 'lock_kind': 'adapter', 'source_repository': 'https://github.com/bayleafwalker/sprintctl', 'source_revision': '1d68c683edac12dd99368728a5ce931f8d5e11b1', 'artifact_url': 'https://github.com/bayleafwalker/sprintctl/releases/download/v0.28.1/sprintctl-0.28.1-py3-none-any.whl', 'artifact_sha256': '2fda3650362db562b08f9fc76d902953c63b1d8a2b11ae7b6b522e93f4921728', 'distribution': 'sprintctl', 'distribution_version': '0.0.0'} != {'lock_id': 'work-adapter', 'lock_kind': 'adapter', 'source_repository': 'https://github.com/bayleafwal...
+E         
+E         ...Full output truncated (2 lines hidden), use '-vv' to show
+
+tests/test_lane_image.py:38: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_lane_image.py::test_released_lane_manifest_is_an_additive_consumable_image_closure
+1 failed in 0.37s

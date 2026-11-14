@@ -1,0 +1,11 @@
+{
+  "source_commit": "74f132a981816264c6ff9f0efbc10c81a9be625b",
+  "original_default_manifest_sha256": "2a0b52ad6d9f6086ed5352cd66f497b187fb703f107e8e2947997dfad24f1693",
+  "lane_manifest_sha256": "d8d0ec671de91be6e1b187c0e77b945d99f63f214ce4aef3fca6389f744fab43",
+  "base_image_pin": "python@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90",
+  "base_image_id": "sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90",
+  "target_image": "lanectl-vuoro-lane-qual-20261114:74f132a",
+  "scope": "exact committed source archive; default composition unchanged; source/SQLite qualification only",
+  "work": "vuoro#2903",
+  "reservation": 502
+}

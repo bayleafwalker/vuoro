@@ -39,12 +39,13 @@ manifest on Python 3.12.
 
 After releasing the owner's wheel and preparing a reviewed manifest containing
 its exact source revision, URL and SHA-256, place that manifest inside the build
-context, for example at `composition/lane-adapter-pins.json`, then build:
+context. The reviewed optional manifest is
+`packages/vuoro-service/composition/lane-adapter-pins.json` (lanectl0.2.12); build:
 
 ```sh
 docker build \
   --build-arg PYTHON_BASE_IMAGE=python:3.13-slim \
-  --build-arg VUORO_COMPOSITION_FILE=composition/lane-adapter-pins.json \
+  --build-arg VUORO_COMPOSITION_FILE=packages/vuoro-service/composition/lane-adapter-pins.json \
   --tag vuoro-service:lane-candidate .
 ```
 
@@ -57,3 +58,7 @@ and an additional lane owner; there is no hardcoded wheel list that omits the
 optional package. The alternate Python image and new manifest require the
 normal image qualification before promotion. This source change has not built,
 published or deployed a qualified lane image.
+
+The [14November local image proof](../evidence/2026-11-14-lane-image/README.md)
+records the exact-source optional build and its bounded controls. It is separate
+from a deployed or persistent hosted composition.

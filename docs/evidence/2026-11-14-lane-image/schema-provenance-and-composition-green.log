@@ -1,0 +1,4 @@
+..s...................                                                   [100%]
+=========================== short test summary info ============================
+SKIPPED [1] packages/vuoro-service/tests/test_tenant_schema.py:58: pinned work owner wheel is not installed
+21 passed, 1 skipped in 0.32s

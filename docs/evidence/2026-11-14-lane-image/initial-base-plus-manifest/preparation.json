@@ -1,0 +1,11 @@
+{
+  "source_commit": "c54399e6f673cda06f1fc67e83ee4fe71ac7e0c4",
+  "original_default_manifest_sha256": "2a0b52ad6d9f6086ed5352cd66f497b187fb703f107e8e2947997dfad24f1693",
+  "lane_manifest_sha256": "d8d0ec671de91be6e1b187c0e77b945d99f63f214ce4aef3fca6389f744fab43",
+  "base_image_pin": "python@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90",
+  "base_image_id": "sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90",
+  "target_image": "lanectl-vuoro-lane-qual-20261114:c54399e",
+  "scope": "ephemeral build context from exact canonical source plus separate optional lane manifest; no repo/default/deployment changes",
+  "work": "vuoro#2903",
+  "reservation": 502
+}

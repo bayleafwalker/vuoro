@@ -1,0 +1,14 @@
+{
+  "exact_owned_container_names": [
+    "lanectl-vuoro-lane-probe-20261114",
+    "lanectl-vuoro-lane-probe-20261114-r2",
+    "lanectl-vuoro-lane-probe-20261114-final",
+    "lanectl-vuoro-lane-exact-source-probe-20261114"
+  ],
+  "inventory_exit": 0,
+  "remaining": [],
+  "temporary_state": "each container used private tmpfs removed with the container",
+  "image_retained": "sha256:a29aa4f2baf467575be11833cba003a873d2edcfada4e17c63895e633ff40c91",
+  "scope": "no broad cleanup, pruning, production mutations or registry publication",
+  "final_probe_exit": 0
+}
