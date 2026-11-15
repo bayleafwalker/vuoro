@@ -62,3 +62,43 @@ or deployed by this source change.
 The [14November local image proof](../evidence/2026-11-14-lane-image/README.md)
 records the exact-source optional build and its bounded controls. It is separate
 from a deployed or persistent hosted composition.
+
+## Separate optional-image publication
+
+`publish-lane-service-image.yaml` builds the reviewed lane manifest explicitly on
+`python:3.13-slim` for `linux/amd64`. The existing default image publisher and its
+tags remain unchanged. Service tags and manual dispatch first publish only
+`lane-candidate-sha-<commit>`, with build provenance and an SBOM. Candidate
+publication is not a qualification result.
+Manual dispatch selects `main` or a `vuoro-service-v*` tag. Other refs are
+rejected before a registry effect, including names colliding with reserved
+source and candidate aliases.
+
+After GitHub attestation, `scripts/publish_lane_image.py` verifies the exact
+registry output digest and its source/workflow identity. It pulls and runs that
+digest, checks the selected manifest SHA-256, all installed pins and recomputed
+wheel/file attestation, and runs the existing provenance, dependency, preview and
+MCP entrypoint checks. Index inspection requires one linux/amd64 runtime and
+attached BuildKit provenance and SPDX SBOM manifests bound to that runtime.
+Only success permits `lane-<ref>` and `lane-sha-<commit>`
+aliases. Each alias is reread and must retain the same top-level index digest,
+including its attached attestations. PR CI also builds and checks the optional
+closure without publishing.
+
+The publication receipt records the source, qualified digest, platform,
+manifest, checks and each alias result. Alias updates are separate registry
+effects: a failure can leave a candidate or one changed alias. An attempted
+update with no confirmed response remains uncertain in the receipt; it is not
+reported as absent or rolled back. Runs for the same commit are serialized.
+GitHub may replace an older pending run with a newer one; a cancelled pending
+run has no publication receipt and establishes no qualification.
+The Python base tag remains mutable, so this is exact-artifact qualification,
+not a claim of reproducible builds. Build provenance records the base material.
+The fresh installed-composition check executes the shipped attester and compares
+its records with the reviewed manifest and actual installed versions; it is a
+drift check, not an independent audit of a hostile interpreter. The existing
+provenance checker additionally rejects workspace packages resolved from an index.
+
+These public artifacts provide no hosted storage, tenant migration, gateway
+forwarding, deployment or authority cutover. Those retain their owner contracts
+and separate qualification requirements.

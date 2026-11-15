@@ -766,6 +766,38 @@ jobs:
       - name: Check the image serves the MCP edge
         run: docker run --rm vuoro-service:ci mcp-serve --help
 
+  lane-service-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v4
+      - name: Build the optional lane composition
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: vuoro-service:lane-ci
+          build-args: |
+            PYTHON_BASE_IMAGE=python:3.13-slim
+            VUORO_COMPOSITION_FILE=packages/vuoro-service/composition/lane-adapter-pins.json
+          cache-from: type=gha,scope=lane-service-image
+          cache-to: type=gha,scope=lane-service-image,mode=max
+      - name: Check exact optional closure and existing image invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest_sha=$(sha256sum packages/vuoro-service/composition/lane-adapter-pins.json | cut -d ' ' -f1)
+          docker run -i --rm --entrypoint python vuoro-service:lane-ci \
+            - "$manifest_sha" < scripts/validate_lane_service_image.py
+          mapfile -t names < <(python3 scripts/validate_service_image.py workspace-names)
+          docker run -i --rm --entrypoint python vuoro-service:lane-ci \
+            - check "${names[@]}" < scripts/validate_service_image.py
+          docker run --rm --entrypoint python vuoro-service:lane-ci -m pip check
+          docker run -i --rm --entrypoint python vuoro-service:lane-ci - < scripts/validate_service_image_preview.py
+          docker run --rm vuoro-service:lane-ci mcp-serve --help
+
   mcp-strict-client:
     # The resultType/cacheScope regression reached production because
     # claude.ai is a lenient MCP client and Claude Code a strict one.  Run a
