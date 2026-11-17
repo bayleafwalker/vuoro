@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+from difflib import get_close_matches
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -20,6 +22,21 @@ from .evidence import evidence_item_draft, evidence_ref
 from .resolve import recheck, resolve_context
 from .retrieval import get, search
 from .validate import has_errors, validate
+
+
+class _Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        match = re.search(r"invalid choice: '([^']+)'", message)
+        if match:
+            typo = match.group(1)
+            for action in self._actions:
+                choices = getattr(action, "choices", None)
+                if isinstance(choices, dict):
+                    suggestion = get_close_matches(typo, choices, n=1, cutoff=0.6)
+                    if suggestion:
+                        message += f"\ndid you mean {suggestion[0]}?"
+                        break
+        super().error(message)
 
 
 def _emit(value: Any) -> None:
@@ -32,7 +49,12 @@ def _roots(args: argparse.Namespace) -> list[Path]:
 
 
 def _cmd_validate(args: argparse.Namespace) -> int:
-    catalog = build_catalog(_roots(args))
+    roots = _roots(args)
+    if not args.root and not (Path.cwd() / "knowledge.toml").is_file():
+        args._parser.error("no knowledge root found in the current directory; pass --root <repository>")
+    for root in roots:
+        print(f"Scanning knowledge root: {Path(root).resolve()}", file=sys.stderr)
+    catalog = build_catalog(roots)
     problems = validate(catalog)
     shown = [p for p in problems if p.severity == "error" or not args.errors_only]
     _emit(
@@ -151,11 +173,17 @@ def _cmd_recheck(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="vuoro-knowledge", description=__doc__.split("\n")[0])
-    sub = parser.add_subparsers(dest="command", required=True)
+    from . import __version__
+
+    parser = _Parser(prog="vuoro-knowledge", description=__doc__.split("\n")[0],
+                     epilog="Examples:\n  vuoro-knowledge validate --root .\n  vuoro-knowledge search lease --root .",
+                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    sub = parser.add_subparsers(dest="command", parser_class=_Parser)
 
     def command(name: str, help_text: str) -> argparse.ArgumentParser:
         p = sub.add_parser(name, help=help_text)
+        p.set_defaults(_parser=parser)
         p.add_argument("--root", action="append", help="repository checkout to catalog (repeatable)")
         return p
 
@@ -213,7 +241,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.command is None:
+        parser.print_help()
+        return 0
     return args.func(args)
 
 

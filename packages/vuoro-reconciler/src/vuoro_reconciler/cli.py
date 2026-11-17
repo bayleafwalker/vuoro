@@ -23,7 +23,9 @@ from collections.abc import Sequence
 from typing import TextIO
 import argparse
 import asyncio
+from difflib import get_close_matches
 import importlib
+import re
 import sys
 import json
 from datetime import datetime, timezone
@@ -32,6 +34,7 @@ from .verification import PreflightRefused
 
 from .acceptance import AcceptanceRefused, OperatorAcceptance
 from .intents import EffectIntent, IntentSource
+from . import __version__
 
 __all__ = ["main", "visible"]
 
@@ -67,9 +70,27 @@ def _load_source(spec: str) -> IntentSource:
     return factory()
 
 
+class _Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        match = re.search(r"invalid choice: '([^']+)'", message)
+        if match:
+            typo = match.group(1)
+            for action in self._actions:
+                choices = getattr(action, "choices", None)
+                if isinstance(choices, dict):
+                    suggestion = get_close_matches(typo, choices, n=1, cutoff=0.6)
+                    if suggestion:
+                        message += f"\ndid you mean {suggestion[0]}?"
+                        break
+        super().error(message)
+
+
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="vuoro-reconciler")
-    commands = parser.add_subparsers(dest="command", required=True)
+    parser = _Parser(prog="vuoro-reconciler", description="Review and verify proposed effect intents.",
+                     epilog="Examples:\n  vuoro-reconciler verify --help\n  vuoro-reconciler accept --help",
+                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    commands = parser.add_subparsers(dest="command", parser_class=_Parser)
     for name in ("accept", "reject"):
         command = commands.add_parser(name, help=f"{name} a proposed effect intent")
         command.add_argument("intent_id")
@@ -195,7 +216,11 @@ def main(
     stdout: TextIO | None = None,
     validation_runtime=None,
 ) -> int:
-    arguments = _parser().parse_args(argv)
+    parser = _parser()
+    arguments = parser.parse_args(argv)
+    if arguments.command is None:
+        parser.print_help()
+        return 0
     if intent_source is None:
         if not arguments.intent_source:
             raise SystemExit("--intent-source is required")

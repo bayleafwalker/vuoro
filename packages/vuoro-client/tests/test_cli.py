@@ -9,10 +9,10 @@ from vuoro_client import __version__
 from vuoro_client.cli import build_parser, main
 
 
-def test_parser_is_transport_generic() -> None:
+def test_parser_describes_recovery_cli_surface() -> None:
     parser = build_parser()
     assert parser.prog == "vuoro"
-    assert "schema-described operations" in parser.description
+    assert "recovery records" in parser.description
 
 
 def test_version_is_available_without_service_imports(

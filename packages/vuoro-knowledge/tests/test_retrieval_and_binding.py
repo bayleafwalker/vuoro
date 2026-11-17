@@ -132,6 +132,22 @@ def test_cli_resolve_and_recheck(estate, tmp_path, capsys):
 def test_cli_validate_exit_code(tmp_path, write, capsys):
     write("r/a.md", "---\ndoc_id: a-doc\npurpose: wiki\n---\n")
     assert main(["validate", "--root", str(tmp_path / "r")]) == 1
+    assert f"Scanning knowledge root: {tmp_path / 'r'}" in capsys.readouterr().err
+
+
+def test_cli_validate_requires_explicit_root_outside_knowledge_root(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(SystemExit) as error:
+        main(["validate"])
+    assert error.value.code == 2
+    assert "no knowledge root found" in capsys.readouterr().err
+
+
+def test_cli_validate_uses_current_knowledge_root_when_marked(tmp_path, monkeypatch, write, capsys):
+    monkeypatch.chdir(tmp_path)
+    write("knowledge.toml", 'schema = "vuoro-knowledge-repo/v1"\n')
+    assert main(["validate"]) == 0
+    assert f"Scanning knowledge root: {tmp_path}" in capsys.readouterr().err
 
 
 def test_tampered_manifest_is_refused(estate):

@@ -2,7 +2,8 @@
 from __future__ import annotations
 import argparse
 import asyncio
-from importlib.metadata import version
+from difflib import get_close_matches
+from importlib.metadata import PackageNotFoundError, version
 import json
 import os
 import shutil
@@ -10,6 +11,7 @@ import signal
 from pathlib import Path
 import sys
 import tempfile
+import re
 
 from .fixture import fixture
 from .preflight import QUALIFIED_VERSIONS, diagnose
@@ -17,6 +19,28 @@ from .preflight import QUALIFIED_VERSIONS, diagnose
 
 class DemoInterrupted(Exception):
     """Normal signal requested cancellation, without interrupting cleanup."""
+
+
+def _version() -> str:
+    try:
+        return version("vuoro-demo")
+    except PackageNotFoundError:
+        return "0.1.2"
+
+
+class _Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        match = re.search(r"invalid choice: '([^']+)'", message)
+        if match:
+            typo = match.group(1)
+            for action in self._actions:
+                choices = getattr(action, "choices", None)
+                if isinstance(choices, dict):
+                    suggestion = get_close_matches(typo, choices, n=1, cutoff=0.6)
+                    if suggestion:
+                        message += f"\ndid you mean {suggestion[0]}?"
+                        break
+        super().error(message)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -29,8 +53,11 @@ def main(argv: list[str] | None = None) -> int:
         value = json.load(sys.stdin)
         asyncio.run(worker(value["endpoint"], value["token"], value["item"]))
         return 0
-    parser = argparse.ArgumentParser(prog="vuoro")
-    sub = parser.add_subparsers(dest="command", required=True)
+    parser = _Parser(prog="vuoro", description="Run and inspect the disposable Vuoro settlement demo.",
+                     epilog="Examples:\n  vuoro doctor\n  vuoro demo --help",
+                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--version", action="version", version=f"%(prog)s {_version()}")
+    sub = parser.add_subparsers(dest="command", parser_class=_Parser)
     sub.add_parser("private-workflow", help="Run an owned local Sovite task through Work and Evidence acceptance (install private extra)")
     doctor = sub.add_parser("doctor", help="Check disposable-demo prerequisites without starting it")
     doctor.add_argument("--pg-bin", type=Path)
@@ -42,6 +69,9 @@ def main(argv: list[str] | None = None) -> int:
     demo.add_argument("--omit-required-check", action="store_true")
     demo.add_argument("--wrong-artifact-digest", action="store_true")
     args = parser.parse_args(argv)
+    if args.command is None:
+        parser.print_help()
+        return 0
     if args.command == "doctor":
         report = diagnose(args.pg_bin)
         if args.json:

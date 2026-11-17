@@ -5,12 +5,29 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 from datetime import datetime, timezone
+from difflib import get_close_matches
 import json
 import os
 from pathlib import Path
+import re
 
 from vuoro_client import __version__
 from vuoro_client.recovery import RecoveryLog
+
+
+class _Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        match = re.search(r"invalid choice: '([^']+)'", message)
+        if match:
+            typo = match.group(1)
+            for action in self._actions:
+                choices = getattr(action, "choices", None)
+                if isinstance(choices, dict):
+                    suggestion = get_close_matches(typo, choices, n=1, cutoff=0.6)
+                    if suggestion:
+                        message += f"\ndid you mean {suggestion[0]}?"
+                        break
+        super().error(message)
 
 
 def _default_recovery_root() -> Path:
@@ -21,20 +38,22 @@ def _default_recovery_root() -> Path:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = _Parser(
         prog="vuoro",
-        description="Invoke schema-described operations on a Vuoro service.",
+        description="Export and maintain local Vuoro incident recovery records.",
+        epilog="Examples:\n  vuoro recovery --help\n  vuoro recovery export --incident INC-123",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--version", action="version", version=f"%(prog)s {__version__}"
     )
-    commands = parser.add_subparsers(dest="command")
+    commands = parser.add_subparsers(dest="command", parser_class=_Parser)
 
     recovery = commands.add_parser(
         "recovery",
         help="Bootstrap/disaster-recovery escape hatch: export-only, incident-scoped",
     )
-    recovery_commands = recovery.add_subparsers(dest="recovery_command")
+    recovery_commands = recovery.add_subparsers(dest="recovery_command", parser_class=_Parser)
 
     begin = recovery_commands.add_parser(
         "begin", help="Open (or resume) an incident-scoped recovery namespace"

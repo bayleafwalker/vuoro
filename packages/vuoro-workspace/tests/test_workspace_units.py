@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import io
+import os
+from pathlib import Path
+import subprocess
+import sys
 from datetime import datetime, timezone
 
 import pytest
@@ -12,6 +16,25 @@ from vuoro_workspace.extraction import extract
 from vuoro_workspace.ids import is_ulid, request_digest
 from vuoro_workspace.objectstore import ObjectStore, artifact_key, resolve_media_type
 from vuoro_workspace.store import _decode_cursor, _encode_cursor
+
+
+def test_cli_help_does_not_import_psycopg():
+    source = Path(__file__).resolve().parents[1] / "src"
+    code = """
+import importlib.abc
+import sys
+class BlockPsycopg(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == 'psycopg' or fullname.startswith('psycopg.'):
+            raise ModuleNotFoundError('blocked for CLI help test')
+sys.meta_path.insert(0, BlockPsycopg())
+from vuoro_workspace.cli import main
+main(['--help'])
+"""
+    env = dict(os.environ, PYTHONPATH=str(source))
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env)
+    assert result.returncode == 0, result.stderr
+    assert "Examples:" in result.stdout
 
 
 def test_ulids_are_valid_unique_and_monotonic():

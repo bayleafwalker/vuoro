@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
+from difflib import get_close_matches
 import json
 import os
 from pathlib import Path
+import re
 import sys
 from typing import Any
 
@@ -21,6 +23,21 @@ from .migration import JOB_STATES
 from .result import DiagnosticResult, default_attestation_path, default_manifest_path, parse_work_ref
 
 _EXIT = {"ok": 0, "attention": 1, "error": 2}
+
+
+class _Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        match = re.search(r"invalid choice: '([^']+)'", message)
+        if match:
+            typo = match.group(1)
+            for action in self._actions:
+                choices = getattr(action, "choices", None)
+                if isinstance(choices, dict):
+                    suggestion = get_close_matches(typo, choices, n=1, cutoff=0.6)
+                    if suggestion:
+                        message += f"\ndid you mean {suggestion[0]}?"
+                        break
+        super().error(message)
 
 
 def _common(parser: argparse.ArgumentParser) -> None:
@@ -37,11 +54,14 @@ def _served(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="vuoro-ops", description=__doc__.splitlines()[0])
+    parser = _Parser(prog="vuoro-ops", usage="%(prog)s [--version] <command> ...",
+                     description=__doc__.splitlines()[0],
+                     epilog="Examples:\n  vuoro-ops role-probe --help\n  vuoro-ops migration-preflight --help",
+                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
-    commands = parser.add_subparsers(dest="command", required=True)
+    commands = parser.add_subparsers(dest="command", metavar="COMMAND", parser_class=_Parser)
 
-    uncertain = commands.add_parser("uncertain-effects", help="classify redeemed-but-unreported effect attempts")
+    uncertain = commands.add_parser("uncertain-effects", help="classify unreported effect attempts")
     _common(uncertain)
     source = uncertain.add_mutually_exclusive_group(required=True)
     source.add_argument("--profile", type=Path, help="read attempts through work.effect.attempt-get-v1")
@@ -51,7 +71,7 @@ def build_parser() -> argparse.ArgumentParser:
     uncertain.add_argument("--attempt-ids-file", type=Path, help="one attempt id per line")
     uncertain.add_argument("--journal", type=Path, help="installed reconciler execution journal directory")
 
-    outcome = commands.add_parser("provider-outcome-check", help="establish one attempt's provider outcome read-only")
+    outcome = commands.add_parser("provider-outcome-check", help="check one provider outcome read-only")
     _common(outcome)
     outcome_source = outcome.add_mutually_exclusive_group(required=True)
     outcome_source.add_argument("--profile", type=Path)
@@ -76,7 +96,7 @@ def build_parser() -> argparse.ArgumentParser:
             probe.add_argument("--expected-operation-count", type=int)
             probe.add_argument("--expected-from-image", help="derive the expected catalog inside this image")
 
-    preflight = commands.add_parser("migration-preflight", help="recovery class for a candidate image + target schema")
+    preflight = commands.add_parser("migration-preflight", help="classify candidate image recovery")
     _common(preflight)
     preflight.add_argument("--candidate-image", required=True, help="immutable image ref (@sha256:...)")
     preflight.add_argument("--prior-image", required=True, help="image serving now, the revert target")
@@ -92,7 +112,7 @@ def build_parser() -> argparse.ArgumentParser:
     preflight.add_argument("--startup-proof-script", type=Path,
                            default=Path(__file__).resolve().parents[5] / "scripts" / "verify_pre_migration_startup.py")
 
-    export = commands.add_parser("recovery-export", help="export one incident's RecoveryLog with the composition stamp")
+    export = commands.add_parser("recovery-export", help="export an incident recovery log")
     _common(export)
     export.add_argument("--incident-id", required=True)
     export.add_argument("--root", type=Path, help="recovery root (default: VUORO_RECOVERY_ROOT or ~/.vuoro/recovery)")
@@ -200,7 +220,11 @@ def dispatch(args: argparse.Namespace) -> DiagnosticResult:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.command is None:
+        parser.print_help()
+        return 0
     try:
         result = dispatch(args)
     except (OSError, ValueError) as error:
