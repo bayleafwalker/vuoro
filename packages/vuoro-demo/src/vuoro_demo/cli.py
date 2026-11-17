@@ -2,14 +2,17 @@
 from __future__ import annotations
 import argparse
 import asyncio
-from importlib.metadata import version
+from difflib import get_close_matches
+from importlib.metadata import PackageNotFoundError, version
 import json
 import os
 import shutil
 import signal
 from pathlib import Path
 import sys
+import textwrap
 import tempfile
+import re
 
 from .fixture import fixture
 from .preflight import QUALIFIED_VERSIONS, diagnose
@@ -17,6 +20,55 @@ from .preflight import QUALIFIED_VERSIONS, diagnose
 
 class DemoInterrupted(Exception):
     """Normal signal requested cancellation, without interrupting cleanup."""
+
+
+def _version() -> str:
+    try:
+        return version("vuoro-demo")
+    except PackageNotFoundError:
+        return "0.1.2"
+
+
+class _Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        match = re.search(r"invalid choice: '([^']+)'", message)
+        if match:
+            typo = match.group(1)
+            for action in self._actions:
+                choices = getattr(action, "choices", None)
+                if isinstance(choices, dict):
+                    suggestion = get_close_matches(typo, choices, n=1, cutoff=0.6)
+                    if suggestion:
+                        message += f"\ndid you mean {suggestion[0]}?"
+                        break
+        super().error(message)
+
+    def format_help(self) -> str:
+        if self._subparsers is None or not self._subparsers._group_actions:
+            return super().format_help()
+        formatter = self._get_formatter()
+        formatter.add_usage(self.usage, self._actions, self._mutually_exclusive_groups)
+        formatter.add_text(self.description)
+        formatter.start_section("Start here")
+        formatter.add_text("Use --help for the command map and --version for the installed release.")
+        formatter.end_section()
+        commands = self._subparsers._group_actions[0]
+        groups = {"Daily use": [], "Inspect": [], "Change": [], "Maintain": [], "Plumbing": [], "Other": []}
+        category = {"doctor": "Inspect", "demo": "Change", "private-workflow": "Daily use"}
+        helps = {action.dest: action.help or "" for action in commands._choices_actions}
+        for name in commands.choices:
+            groups[category.get(name, "Other")].append((name, helps.get(name, "")))
+        for group, rows in groups.items():
+            if not rows:
+                continue
+            formatter.start_section(group)
+            formatter.add_text("\n".join(f"{name:<17} {purpose}" for name, purpose in rows))
+            formatter.end_section()
+        formatter.start_section("Examples")
+        formatter.add_text(textwrap.dedent("\n".join(self.epilog.splitlines()[1:])).strip())
+        formatter.end_section()
+        formatter.add_text(f"Run '{self.prog} <command> --help' for command options.")
+        return formatter.format_help()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -29,19 +81,25 @@ def main(argv: list[str] | None = None) -> int:
         value = json.load(sys.stdin)
         asyncio.run(worker(value["endpoint"], value["token"], value["item"]))
         return 0
-    parser = argparse.ArgumentParser(prog="vuoro")
-    sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("private-workflow", help="Run an owned local Sovite task through Work and Evidence acceptance (install private extra)")
-    doctor = sub.add_parser("doctor", help="Check disposable-demo prerequisites without starting it")
+    parser = _Parser(prog="vuoro", description="Run and inspect the disposable Vuoro settlement demo.",
+                     epilog="Examples:\n  vuoro doctor\n  vuoro demo --receipt /tmp/demo-receipt.json",
+                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--version", action="version", version=f"%(prog)s {_version()}")
+    sub = parser.add_subparsers(dest="command", parser_class=_Parser)
+    sub.add_parser("private-workflow", help="Run the optional Sovite workflow (private extra required)")
+    doctor = sub.add_parser("doctor", help="Check demo prerequisites without starting it")
     doctor.add_argument("--pg-bin", type=Path)
     doctor.add_argument("--json", action="store_true", help="Emit vuoro-demo-preflight/v1 JSON")
-    demo = sub.add_parser("demo", help="Run only an owned disposable loopback fixture")
+    demo = sub.add_parser("demo", help="Run the owned disposable loopback fixture")
     demo.add_argument("--pg-bin", type=Path)
     demo.add_argument("--receipt", type=Path, required=True)
     demo.add_argument("--omit-required-verification", action="store_true")
     demo.add_argument("--omit-required-check", action="store_true")
     demo.add_argument("--wrong-artifact-digest", action="store_true")
     args = parser.parse_args(argv)
+    if args.command is None:
+        parser.print_help()
+        return 0
     if args.command == "doctor":
         report = diagnose(args.pg_bin)
         if args.json:

@@ -5,6 +5,13 @@ See the package README for what this does and does not do.
 
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("vuoro-reconciler")
+except PackageNotFoundError:
+    __version__ = "0+unknown"
+
 from .acceptance import AcceptanceRefused, AutoAcceptConfig, OperatorAcceptance
 from .diff_policy import DiffPolicy
 from .intents import Acceptor, EffectIntent, IntentSource, OperatorAcceptor, PolicyAcceptor
@@ -26,6 +33,7 @@ from .reconciler import (
 from .signing import SigningKey
 
 __all__ = [
+    "__version__",
     "AcceptanceRefused",
     "Acceptor",
     "AutoAcceptConfig",

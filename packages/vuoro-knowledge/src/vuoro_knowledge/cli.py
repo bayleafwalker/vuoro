@@ -10,8 +10,11 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+from difflib import get_close_matches
 import json
+import re
 import sys
+import textwrap
 from pathlib import Path
 from typing import Any
 
@@ -22,17 +25,69 @@ from .retrieval import get, search
 from .validate import has_errors, validate
 
 
+class _Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        match = re.search(r"invalid choice: '([^']+)'", message)
+        if match:
+            typo = match.group(1)
+            for action in self._actions:
+                choices = getattr(action, "choices", None)
+                if isinstance(choices, dict):
+                    suggestion = get_close_matches(typo, choices, n=1, cutoff=0.6)
+                    if suggestion:
+                        message += f"\ndid you mean {suggestion[0]}?"
+                        break
+        super().error(message)
+
+    def format_help(self) -> str:
+        if self._subparsers is None or not self._subparsers._group_actions:
+            return super().format_help()
+        formatter = self._get_formatter()
+        formatter.add_usage(self.usage, self._actions, self._mutually_exclusive_groups)
+        formatter.add_text(self.description)
+        formatter.start_section("Start here")
+        formatter.add_text("Choose a command, then pass --root for each checkout to read.")
+        formatter.end_section()
+        groups = {"Daily use": [], "Inspect": [], "Change": [], "Maintain": [], "Plumbing": [], "Other": []}
+        category = {"search": "Daily use", "get": "Daily use", "validate": "Inspect",
+                    "build": "Maintain", "resolve": "Change", "recheck": "Inspect"}
+        commands = self._subparsers._group_actions[0]
+        helps = {action.dest: action.help or "" for action in commands._choices_actions}
+        for name in commands.choices:
+            groups[category.get(name, "Other")].append((name, helps.get(name, "")))
+        for group, rows in groups.items():
+            if not rows:
+                continue
+            formatter.start_section(group)
+            formatter.add_text("\n".join(f"{name:<9} {purpose}" for name, purpose in rows))
+            formatter.end_section()
+        formatter.start_section("Examples")
+        formatter.add_text(textwrap.dedent("\n".join(self.epilog.splitlines()[1:])).strip())
+        formatter.end_section()
+        formatter.add_text(f"Run '{self.prog} <command> --help' for command options.")
+        return formatter.format_help()
+
+
 def _emit(value: Any) -> None:
     json.dump(value, sys.stdout, indent=2, ensure_ascii=False, sort_keys=False)
     sys.stdout.write("\n")
 
 
 def _roots(args: argparse.Namespace) -> list[Path]:
-    return [Path(r) for r in (args.root or ["."])]
+    return [Path(r) for r in (args.root or [])]
+
+
+def _require_roots(args: argparse.Namespace) -> list[Path]:
+    if not args.root:
+        args._parser.error("pass --root <repository> for every checkout to read")
+    roots = _roots(args)
+    for root in roots:
+        print(f"Reading knowledge root: {root.resolve()}", file=sys.stderr)
+    return roots
 
 
 def _cmd_validate(args: argparse.Namespace) -> int:
-    catalog = build_catalog(_roots(args))
+    catalog = build_catalog(_require_roots(args))
     problems = validate(catalog)
     shown = [p for p in problems if p.severity == "error" or not args.errors_only]
     _emit(
@@ -48,7 +103,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
 
 def _cmd_build(args: argparse.Namespace) -> int:
-    catalog = build_catalog(_roots(args))
+    catalog = build_catalog(_require_roots(args))
     data = catalog.to_dict()
     data["problems"] = [p.to_dict() for p in validate(catalog)]
     if args.no_text:
@@ -64,7 +119,7 @@ def _cmd_build(args: argparse.Namespace) -> int:
 
 
 def _cmd_search(args: argparse.Namespace) -> int:
-    catalog = build_catalog(_roots(args))
+    catalog = build_catalog(_require_roots(args))
     filters = {
         "purpose": args.purpose,
         "lifecycle": args.lifecycle,
@@ -77,7 +132,7 @@ def _cmd_search(args: argparse.Namespace) -> int:
 
 
 def _cmd_get(args: argparse.Namespace) -> int:
-    catalog = build_catalog(_roots(args))
+    catalog = build_catalog(_require_roots(args))
     try:
         _emit(get(catalog, args.doc_id, section=args.section, revision=args.revision, max_lines=args.max_lines))
     except KeyError as exc:
@@ -108,7 +163,7 @@ def _request(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _cmd_resolve(args: argparse.Namespace) -> int:
-    catalog = build_catalog(_roots(args))
+    catalog = build_catalog(_require_roots(args))
     try:
         manifest = resolve_context(catalog, _request(args))
     except ValueError as exc:
@@ -137,7 +192,7 @@ def _cmd_resolve(args: argparse.Namespace) -> int:
 
 
 def _cmd_recheck(args: argparse.Namespace) -> int:
-    catalog = build_catalog(_roots(args))
+    catalog = build_catalog(_require_roots(args))
     manifest = json.loads(Path(args.manifest).read_text())
     try:
         result = recheck(catalog, manifest)
@@ -151,24 +206,30 @@ def _cmd_recheck(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="vuoro-knowledge", description=__doc__.split("\n")[0])
-    sub = parser.add_subparsers(dest="command", required=True)
+    from . import __version__
+
+    parser = _Parser(prog="vuoro-knowledge", description="Resolve Git-authored repository knowledge.",
+                     epilog="Examples:\n  vuoro-knowledge validate --root .\n  vuoro-knowledge search lease --root .",
+                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    sub = parser.add_subparsers(dest="command", parser_class=_Parser)
 
     def command(name: str, help_text: str) -> argparse.ArgumentParser:
         p = sub.add_parser(name, help=help_text)
+        p.set_defaults(_parser=parser)
         p.add_argument("--root", action="append", help="repository checkout to catalog (repeatable)")
         return p
 
-    p = command("validate", "check identity, references, lifecycle and contradictions")
+    p = command("validate", "Check document identity, references and metadata")
     p.add_argument("--errors-only", action="store_true")
     p.set_defaults(func=_cmd_validate)
 
-    p = command("build", "write the rebuildable catalog projection")
+    p = command("build", "Write the rebuildable catalog projection")
     p.add_argument("--out")
     p.add_argument("--no-text", action="store_true", help="omit document text")
     p.set_defaults(func=_cmd_build)
 
-    p = command("search", "knowledge.search")
+    p = command("search", "Find documents by text and metadata")
     p.add_argument("query")
     p.add_argument("--purpose", action="append")
     p.add_argument("--lifecycle", action="append")
@@ -178,14 +239,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--limit", type=int, default=10)
     p.set_defaults(func=_cmd_search)
 
-    p = command("get", "knowledge.get")
+    p = command("get", "Read one document or section")
     p.add_argument("doc_id")
     p.add_argument("--section")
     p.add_argument("--revision")
     p.add_argument("--max-lines", type=int, default=400)
     p.set_defaults(func=_cmd_get)
 
-    p = command("resolve", "knowledge.resolve_context; writes a context manifest")
+    p = command("resolve", "Write a work-context source manifest")
     p.add_argument("--request", help="JSON request file")
     p.add_argument("--topic")
     p.add_argument("--subject", dest="subjects", action="append")
@@ -205,7 +266,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--item-id", help="also print a work.evidence.append-v1 item draft")
     p.set_defaults(func=_cmd_resolve)
 
-    p = command("recheck", "compare a recorded manifest with current sources")
+    p = command("recheck", "Compare a manifest with current sources")
     p.add_argument("manifest")
     p.add_argument("--full", action="store_true")
     p.set_defaults(func=_cmd_recheck)
@@ -213,7 +274,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.command is None:
+        parser.print_help()
+        return 0
     return args.func(args)
 
 

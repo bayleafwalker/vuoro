@@ -24,6 +24,32 @@ def git(root: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
+def test_every_catalog_command_requires_explicit_root(tmp_path: Path, monkeypatch, capsys, estate) -> None:
+    monkeypatch.chdir(tmp_path)
+    for args in (["build"], ["search", "lease"], ["get", "doc"], ["resolve"], ["recheck", "manifest.json"]):
+        if args[0] == "recheck":
+            manifest = resolve_context(
+                build_catalog([estate["vuoro"]]), {"subjects": ["knowledge-resolution"], "as_of": "2026-10-05"}
+            )
+            Path("manifest.json").write_text(json.dumps(manifest))
+        with pytest.raises(SystemExit) as exc:
+            main(list(args))
+        assert exc.value.code == 2
+        assert "pass --root <repository>" in capsys.readouterr().err
+
+
+def test_top_level_help_is_grouped_and_wrapped(monkeypatch, capsys) -> None:
+    monkeypatch.setenv("COLUMNS", "80")
+    with pytest.raises(SystemExit) as exc:
+        main(["--help"])
+    assert exc.value.code == 0
+    output = capsys.readouterr().out
+    assert "Start here:" in output and "Examples:" in output
+    assert "Find documents by text and metadata" in output
+    assert "knowledge.search" not in output and "knowledge.get" not in output
+    assert all(len(line) <= 80 for line in output.splitlines())
+
+
 RUNBOOK = """---
 doc_id: rb-doc
 purpose: runbook
@@ -132,6 +158,24 @@ def test_cli_resolve_and_recheck(estate, tmp_path, capsys):
 def test_cli_validate_exit_code(tmp_path, write, capsys):
     write("r/a.md", "---\ndoc_id: a-doc\npurpose: wiki\n---\n")
     assert main(["validate", "--root", str(tmp_path / "r")]) == 1
+    assert f"Reading knowledge root: {tmp_path / 'r'}" in capsys.readouterr().err
+
+
+def test_cli_validate_requires_explicit_root_outside_knowledge_root(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(SystemExit) as error:
+        main(["validate"])
+    assert error.value.code == 2
+    assert "pass --root <repository>" in capsys.readouterr().err
+
+
+def test_cli_validate_still_requires_explicit_root_when_marked(tmp_path, monkeypatch, write, capsys):
+    monkeypatch.chdir(tmp_path)
+    write("knowledge.toml", 'schema = "vuoro-knowledge-repo/v1"\n')
+    with pytest.raises(SystemExit) as error:
+        main(["validate"])
+    assert error.value.code == 2
+    assert "pass --root <repository>" in capsys.readouterr().err
 
 
 def test_tampered_manifest_is_refused(estate):
@@ -142,3 +186,13 @@ def test_tampered_manifest_is_refused(estate):
     manifest["conflicts"] = []
     with pytest.raises(ValueError):
         recheck(catalog, manifest)
+
+
+def test_cli_help_lists_unmapped_commands_under_other():
+    from vuoro_knowledge.cli import build_parser
+
+    parser = build_parser()
+    parser._subparsers._group_actions[0].add_parser("extra", help="An unmapped command")
+    text = parser.format_help()
+    assert "Other:" in text
+    assert "extra     An unmapped command" in text

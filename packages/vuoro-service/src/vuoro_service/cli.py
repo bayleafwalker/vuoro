@@ -3,26 +3,63 @@
 from __future__ import annotations
 
 import argparse
+from difflib import get_close_matches
+import re
 import sys
 from collections.abc import Sequence
 
 from vuoro_service import __version__
 
 
+class _Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        match = re.search(r"invalid choice: '([^']+)'", message)
+        if match:
+            typo = match.group(1)
+            for action in self._actions:
+                choices = getattr(action, "choices", None)
+                if isinstance(choices, dict):
+                    suggestion = get_close_matches(typo, choices, n=1, cutoff=0.6)
+                    if suggestion:
+                        message += f"\ndid you mean {suggestion[0]}?"
+                        break
+        super().error(message)
+
+    def format_help(self) -> str:
+        if self._subparsers is None or not self._subparsers._group_actions:
+            return super().format_help()
+        commands = self._subparsers._group_actions[0]
+        helps = {action.dest: action.help or "" for action in commands._choices_actions}
+        category = {"serve": "Daily use", "mcp-serve": "Plumbing"}
+        groups: dict[str, list[tuple[str, str]]] = {"Daily use": [], "Plumbing": [], "Other": []}
+        for name in commands.choices:
+            groups[category.get(name, "Other")].append((name, helps.get(name, "")))
+        width = max(len(name) for name in commands.choices)
+        lines = [self.format_usage().rstrip(), "", self.description or "", "", "Start here:",
+                 "  Run the service locally or expose its MCP protocol server."]
+        for heading, rows in groups.items():
+            if rows:
+                lines += ["", f"{heading}:", *(f"  {name:<{width}}  {text}" for name, text in rows)]
+        lines += ["", "Examples:", "  vuoro-service serve --port 8000",
+                  "  vuoro-service mcp-serve --port 8081", "",
+                  "Run 'vuoro-service <command> --help' for command options.", ""]
+        return "\n".join(lines)
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="vuoro-service")
+    parser = _Parser(prog="vuoro-service", description="Run the Vuoro service runtime.")
     parser.add_argument(
         "--version", action="version", version=f"%(prog)s {__version__}"
     )
-    commands = parser.add_subparsers(dest="command")
+    commands = parser.add_subparsers(dest="command", parser_class=_Parser)
 
-    serve = commands.add_parser("serve", help="Run the reusable HTTP service")
+    serve = commands.add_parser("serve", help="Run the HTTP service")
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8000)
 
     mcp_serve = commands.add_parser(
         "mcp-serve",
-        help="Run the MCP protocol server (requires the vuoro-mcp-edge package)",
+        help="Run the MCP server (requires vuoro-mcp-edge)",
     )
     mcp_serve.add_argument("--host", default="127.0.0.1")
     mcp_serve.add_argument("--port", type=int, default=8081)

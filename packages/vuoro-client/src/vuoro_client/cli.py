@@ -5,13 +5,58 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 from datetime import datetime, timezone
+from difflib import get_close_matches
 import json
 import os
 from pathlib import Path
+import re
 
 from vuoro_client import __version__
 from vuoro_client.recovery import RecoveryLog
 
+
+class _Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        match = re.search(r"invalid choice: '([^']+)'", message)
+        if match:
+            typo = match.group(1)
+            for action in self._actions:
+                choices = getattr(action, "choices", None)
+                if isinstance(choices, dict):
+                    suggestion = get_close_matches(typo, choices, n=1, cutoff=0.6)
+                    if suggestion:
+                        message += f"\ndid you mean {suggestion[0]}?"
+                        break
+        super().error(message)
+
+    def format_help(self) -> str:
+        if not self._subparsers or not self._subparsers._group_actions:
+            return super().format_help()
+        commands = self._subparsers._group_actions[0]
+        rows = [(action.dest, action.help or "") for action in commands._choices_actions]
+        nested = self.prog.endswith(" recovery")
+        if nested:
+            usage = "usage: vuoro-client recovery [--help] <command> ..."
+            purpose = "Start here: local, incident-scoped recovery records."
+            groups = [("Daily use", rows)]
+            pointer = "Run 'vuoro-client recovery <command> --help' for command options."
+        else:
+            usage = "usage: vuoro-client [--version] <command> ..."
+            purpose = self.description
+            groups = [("Start here", [("", "Use recovery for local, incident-scoped records.")]),
+                      ("Maintain", rows)]
+            pointer = "Run 'vuoro-client <command> --help' for command options."
+        output = [usage, "", purpose]
+        for heading, rows in groups:
+            output.extend(["", heading + ":"])
+            width = max((len(name) for name, _ in rows), default=0)
+            output.extend(f"  {name:<{width}}  {text}" if name else f"  {text}"
+                          for name, text in rows)
+        output.extend(["", "Examples:",
+                       "  vuoro-client recovery begin --incident INC-123",
+                       "  vuoro-client recovery export --incident INC-123",
+                       "", pointer, ""])
+        return "\n".join(output)
 
 def _default_recovery_root() -> Path:
     override = os.environ.get("VUORO_RECOVERY_ROOT")
@@ -21,28 +66,32 @@ def _default_recovery_root() -> Path:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="vuoro",
-        description="Invoke schema-described operations on a Vuoro service.",
+    parser = _Parser(
+        prog="vuoro-client",
+        description="Export and maintain local Vuoro incident recovery records.",
+        epilog="Examples:\n  vuoro-client recovery begin --incident INC-123\n  vuoro-client recovery export --incident INC-123",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--version", action="version", version=f"%(prog)s {__version__}"
     )
-    commands = parser.add_subparsers(dest="command")
+    commands = parser.add_subparsers(dest="command", parser_class=_Parser)
 
     recovery = commands.add_parser(
         "recovery",
-        help="Bootstrap/disaster-recovery escape hatch: export-only, incident-scoped",
+        help="Open or export local incident records",
+        description="Start here — recovery is a local, export-only escape hatch.",
     )
-    recovery_commands = recovery.add_subparsers(dest="recovery_command")
+    recovery.prog = "vuoro-client recovery"
+    recovery_commands = recovery.add_subparsers(dest="recovery_command", parser_class=_Parser)
 
     begin = recovery_commands.add_parser(
-        "begin", help="Open (or resume) an incident-scoped recovery namespace"
+        "begin", help="Open or resume a recovery incident"
     )
     begin.add_argument("--incident", required=True)
 
     observe = recovery_commands.add_parser(
-        "observe", help="Append an observation to a recovery incident"
+        "observe", help="Record an incident observation"
     )
     observe.add_argument("--incident", required=True)
     observe.add_argument("--summary", required=True)
@@ -50,7 +99,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     request_command = recovery_commands.add_parser(
         "request-command",
-        help="Append a requested command (never applied automatically) to a recovery incident",
+        help="Record a command request (never applied automatically)",
     )
     request_command.add_argument("--incident", required=True)
     request_command.add_argument("--summary", required=True)
@@ -63,7 +112,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     export = recovery_commands.add_parser(
-        "export", help="Render every record in a recovery incident as JSON"
+        "export", help="Export every incident record as JSON"
     )
     export.add_argument("--incident", required=True)
 

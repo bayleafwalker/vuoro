@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import io
+import os
+from pathlib import Path
+import subprocess
+import sys
 from datetime import datetime, timezone
 
 import pytest
@@ -12,6 +16,49 @@ from vuoro_workspace.extraction import extract
 from vuoro_workspace.ids import is_ulid, request_digest
 from vuoro_workspace.objectstore import ObjectStore, artifact_key, resolve_media_type
 from vuoro_workspace.store import _decode_cursor, _encode_cursor
+
+
+def test_cli_help_does_not_import_psycopg():
+    source = Path(__file__).resolve().parents[1] / "src"
+    code = """
+import importlib.abc
+import sys
+class BlockPsycopg(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == 'psycopg' or fullname.startswith('psycopg.'):
+            raise ModuleNotFoundError('blocked for CLI help test')
+sys.meta_path.insert(0, BlockPsycopg())
+from vuoro_workspace.cli import main
+main(['--help'])
+"""
+    env = dict(os.environ, PYTHONPATH=str(source))
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env)
+    assert result.returncode == 0, result.stderr
+    assert "Examples:" in result.stdout
+
+
+def test_lazy_exports_are_identical_submodule_objects():
+    import vuoro_workspace
+    from vuoro_workspace import errors, migrations, objectstore, store
+
+    from vuoro_workspace import ids
+
+    expected = {
+        "WorkspaceError": (errors, "WorkspaceError"), "new_ulid": (ids, "new_ulid"),
+        "CURRENT_SCHEMA_VERSION": (migrations, "CURRENT_SCHEMA_VERSION"),
+        "DEFAULT_SCHEMA": (migrations, "DEFAULT_SCHEMA"),
+        "compatibility": (migrations, "compatibility"), "migrate_schema": (migrations, "migrate_schema"),
+        "require_compatible_schema": (migrations, "require_compatible_schema"),
+        "startup_schema_handshake": (migrations, "startup_schema_handshake"),
+        "FsObjectStore": (objectstore, "FsObjectStore"), "ObjectInfo": (objectstore, "ObjectInfo"),
+        "ObjectStore": (objectstore, "ObjectStore"), "S3ObjectStore": (objectstore, "S3ObjectStore"),
+        "sniff_media_type": (objectstore, "sniff_media_type"),
+        "ADMIN": (store, "ADMIN"), "CONTRIBUTE": (store, "CONTRIBUTE"), "READ": (store, "READ"),
+        "REVIEW": (store, "REVIEW"), "ROLES": (store, "ROLES"),
+        "Principal": (store, "Principal"), "WorkspaceStore": (store, "WorkspaceStore"),
+    }
+    for name, (module, attribute) in expected.items():
+        assert getattr(vuoro_workspace, name) is getattr(module, attribute)
 
 
 def test_ulids_are_valid_unique_and_monotonic():
