@@ -27,6 +27,7 @@ from difflib import get_close_matches
 import importlib
 import re
 import sys
+import textwrap
 import json
 from datetime import datetime, timezone
 
@@ -84,15 +85,43 @@ class _Parser(argparse.ArgumentParser):
                         break
         super().error(message)
 
+    def format_help(self) -> str:
+        if self._subparsers is None or not self._subparsers._group_actions:
+            return super().format_help()
+        formatter = self._get_formatter()
+        formatter.add_usage(self.usage, self._actions, self._mutually_exclusive_groups)
+        formatter.add_text(self.description)
+        formatter.start_section("Start here")
+        formatter.add_text("Review an intent before accepting or rejecting it.")
+        formatter.end_section()
+        groups = {"Daily use": [], "Inspect": [], "Change": [], "Maintain": [], "Plumbing": [], "Other": []}
+        commands = self._subparsers._group_actions[0]
+        category = {"verify": "Inspect", "accept": "Change", "reject": "Change"}
+        helps = {action.dest: action.help or "" for action in commands._choices_actions}
+        for name in commands.choices:
+            groups[category.get(name, "Other")].append((name, helps.get(name, "")))
+        for group, rows in groups.items():
+            if not rows:
+                continue
+            formatter.start_section(group)
+            formatter.add_text("\n".join(f"{name:<8} {purpose}" for name, purpose in rows))
+            formatter.end_section()
+        formatter.start_section("Examples")
+        formatter.add_text(textwrap.dedent("\n".join(self.epilog.splitlines()[1:])).strip())
+        formatter.end_section()
+        formatter.add_text(f"Run '{self.prog} <command> --help' for command options.")
+        return formatter.format_help()
+
 
 def _parser() -> argparse.ArgumentParser:
-    parser = _Parser(prog="vuoro-reconciler", description="Review and verify proposed effect intents.",
-                     epilog="Examples:\n  vuoro-reconciler verify --help\n  vuoro-reconciler accept --help",
+    parser = _Parser(prog="vuoro-reconciler", description="Review proposed effect intents.",
+                     epilog="Examples:\n  vuoro-reconciler verify INTENT --run-id RUN --receipt-id ITEM\n  vuoro-reconciler accept INTENT --operator SUBJECT --intent-source FACTORY",
                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     commands = parser.add_subparsers(dest="command", parser_class=_Parser)
     for name in ("accept", "reject"):
-        command = commands.add_parser(name, help=f"{name} a proposed effect intent")
+        purpose = "Accept a proposed effect intent" if name == "accept" else "Reject a proposed effect intent"
+        command = commands.add_parser(name, help=purpose)
         command.add_argument("intent_id")
         command.add_argument("--operator", required=True, help="the operator's subject")
         command.add_argument("--intent-source", help="module:factory returning an IntentSource")
@@ -102,7 +131,7 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument("--verification-item-id", help="protected verifier evidence item")
         if name == "reject":
             command.add_argument("--reason", required=True)
-    verify = commands.add_parser("verify", help="execute trusted artifact checks and prepare native evidence capture")
+    verify = commands.add_parser("verify", help="Run trusted checks and prepare evidence capture")
     verify.add_argument("intent_id")
     verify.add_argument("--intent-source", help="module:factory returning a protected native source")
     verify.add_argument("--validation-runtime", help="module:factory returning the configured trusted reconciler")

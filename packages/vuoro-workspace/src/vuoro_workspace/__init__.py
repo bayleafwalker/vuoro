@@ -10,7 +10,7 @@ from importlib.metadata import PackageNotFoundError, version
 try:
     __version__ = version("vuoro-workspace")
 except PackageNotFoundError:
-    __version__ = "0.1.1"
+    __version__ = "0+unknown"
 
 _EXPORT_MODULES = {
     "WorkspaceError": "errors",

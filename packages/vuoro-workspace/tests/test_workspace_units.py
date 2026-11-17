@@ -37,6 +37,30 @@ main(['--help'])
     assert "Examples:" in result.stdout
 
 
+def test_lazy_exports_are_identical_submodule_objects():
+    import vuoro_workspace
+    from vuoro_workspace import errors, migrations, objectstore, store
+
+    from vuoro_workspace import ids
+
+    expected = {
+        "WorkspaceError": (errors, "WorkspaceError"), "new_ulid": (ids, "new_ulid"),
+        "CURRENT_SCHEMA_VERSION": (migrations, "CURRENT_SCHEMA_VERSION"),
+        "DEFAULT_SCHEMA": (migrations, "DEFAULT_SCHEMA"),
+        "compatibility": (migrations, "compatibility"), "migrate_schema": (migrations, "migrate_schema"),
+        "require_compatible_schema": (migrations, "require_compatible_schema"),
+        "startup_schema_handshake": (migrations, "startup_schema_handshake"),
+        "FsObjectStore": (objectstore, "FsObjectStore"), "ObjectInfo": (objectstore, "ObjectInfo"),
+        "ObjectStore": (objectstore, "ObjectStore"), "S3ObjectStore": (objectstore, "S3ObjectStore"),
+        "sniff_media_type": (objectstore, "sniff_media_type"),
+        "ADMIN": (store, "ADMIN"), "CONTRIBUTE": (store, "CONTRIBUTE"), "READ": (store, "READ"),
+        "REVIEW": (store, "REVIEW"), "ROLES": (store, "ROLES"),
+        "Principal": (store, "Principal"), "WorkspaceStore": (store, "WorkspaceStore"),
+    }
+    for name, (module, attribute) in expected.items():
+        assert getattr(vuoro_workspace, name) is getattr(module, attribute)
+
+
 def test_ulids_are_valid_unique_and_monotonic():
     ids = [new_ulid() for _ in range(2000)]
     assert all(is_ulid(i) for i in ids)

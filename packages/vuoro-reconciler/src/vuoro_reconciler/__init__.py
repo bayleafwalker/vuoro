@@ -10,7 +10,7 @@ from importlib.metadata import PackageNotFoundError, version
 try:
     __version__ = version("vuoro-reconciler")
 except PackageNotFoundError:
-    __version__ = "0.1.0"
+    __version__ = "0+unknown"
 
 from .acceptance import AcceptanceRefused, AutoAcceptConfig, OperatorAcceptance
 from .diff_policy import DiffPolicy
