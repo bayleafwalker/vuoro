@@ -10,3 +10,17 @@ CREATE SCHEMA audit AUTHORIZATION audit_migration;
 
 GRANT USAGE ON SCHEMA work TO work_runtime;
 GRANT USAGE ON SCHEMA audit TO audit_runtime;
+
+CREATE ROLE knowledge_migration LOGIN PASSWORD 'local-evaluation-only';
+CREATE ROLE knowledge_runtime LOGIN PASSWORD 'local-evaluation-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
+CREATE SCHEMA knowledge AUTHORIZATION knowledge_migration;
+GRANT CREATE ON DATABASE vuoro TO work_migration, audit_migration, knowledge_migration;
+GRANT USAGE ON SCHEMA knowledge TO knowledge_runtime;
+ALTER DEFAULT PRIVILEGES FOR ROLE work_migration IN SCHEMA work
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO work_runtime;
+ALTER DEFAULT PRIVILEGES FOR ROLE work_migration IN SCHEMA work
+    GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO work_runtime;
+ALTER DEFAULT PRIVILEGES FOR ROLE knowledge_migration IN SCHEMA knowledge
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO knowledge_runtime;
+ALTER DEFAULT PRIVILEGES FOR ROLE knowledge_migration IN SCHEMA knowledge
+    GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO knowledge_runtime;
