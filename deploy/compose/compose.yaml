@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:18
+    image: postgres:16
     environment:
       POSTGRES_DB: vuoro
       POSTGRES_USER: vuoro_admin
@@ -11,12 +11,32 @@ services:
       timeout: 3s
       retries: 20
     volumes:
+      - postgres-data:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/10-vuoro-roles.sql:ro
+
+  migrate:
+    profiles: [migration]
+    build:
+      context: ../..
+    image: ${VUORO_COMPOSE_IMAGE:-vuoro-service:local}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        sprintctl remote-schema migrate --url "$$WORK_MIGRATION_DSN" --json
+        auditctl-central-schema migrate --dsn-env AUDIT_MIGRATION_DSN --schema audit --migration-role audit_migration --runtime-role audit_runtime
+        vuoro-workspace migrate --dsn "$$KNOWLEDGE_MIGRATION_DSN" --schema knowledge
+    environment:
+      WORK_MIGRATION_DSN: postgresql://work_migration:local-evaluation-only@postgres:5432/vuoro?options=-csearch_path%3Dwork
+      AUDIT_MIGRATION_DSN: postgresql://audit_migration:local-evaluation-only@postgres:5432/vuoro
+      KNOWLEDGE_MIGRATION_DSN: postgresql://knowledge_migration:local-evaluation-only@postgres:5432/vuoro
 
   vuoro-service:
     build:
       context: ../..
-    image: vuoro-service:local
+    image: ${VUORO_COMPOSE_IMAGE:-vuoro-service:local}
     depends_on:
       postgres:
         condition: service_healthy
@@ -25,10 +45,20 @@ services:
       VUORO_ENVIRONMENT_CLASS: development
       VUORO_IDENTITIES_FILE: /run/vuoro/identities.json
       VUORO_WORK_REPOSITORY_ID: local-evaluation
-      VUORO_WORK_RUNTIME_DSN: postgresql://work_runtime:local-evaluation-only@postgres:5432/vuoro
+      VUORO_WORK_RESOURCE_OBSERVERS_FILE: /run/vuoro/work-resource-observers.json
+      VUORO_WORK_RUNTIME_DSN: postgresql://work_runtime:local-evaluation-only@postgres:5432/vuoro?options=-csearch_path%3Dwork
       VUORO_AUDIT_RUNTIME_DSN: postgresql://audit_runtime:local-evaluation-only@postgres:5432/vuoro
       VUORO_AUDIT_SCHEMA: audit
+      VUORO_KNOWLEDGE_RUNTIME_DSN: postgresql://knowledge_runtime:local-evaluation-only@postgres:5432/vuoro
+      VUORO_KNOWLEDGE_RUNTIME_ROLE: knowledge_runtime
+      VUORO_KNOWLEDGE_OBJECT_STORE: fs:/tmp/knowledge-objects
     ports:
-      - "8080:8080"
+      - "127.0.0.1:${VUORO_COMPOSE_PORT:-8080}:8080"
     volumes:
       - ${VUORO_COMPOSE_IDENTITIES_FILE:?set VUORO_COMPOSE_IDENTITIES_FILE to a local development identity registry}:/run/vuoro/identities.json:ro
+      - ./work-resource-observers.json:/run/vuoro/work-resource-observers.json:ro
+      - knowledge-objects:/tmp
+
+volumes:
+  postgres-data:
+  knowledge-objects:
