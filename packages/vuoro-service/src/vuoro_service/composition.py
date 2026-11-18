@@ -1267,8 +1267,21 @@ def _compose_lane(pin: AdapterPin, registry: CatalogRegistry, environ: Mapping[s
     if sys.version_info[:2] < (3, 13):
         raise CompositionError("lane: owner requires Python >=3.13")
     from lanectl.stream_store import StreamStore, StreamError
+    database = environ.get("VUORO_LANE_DATABASE")
+    dsn = environ.get("VUORO_LANE_POSTGRES_DSN")
+    if bool(database) == bool(dsn):
+        raise CompositionError("lane: configure exactly one of VUORO_LANE_DATABASE or VUORO_LANE_POSTGRES_DSN")
     try:
-        store = StreamStore(Path(_runtime_env("VUORO_LANE_DATABASE", environ)))
+        if dsn:
+            try:
+                from lanectl.stream_postgres import PostgresStreamStore
+                from psycopg import connect
+                from psycopg.rows import tuple_row
+            except ImportError as error:
+                raise CompositionError("lane: the pinned adapter does not provide PostgreSQL storage") from error
+            store = PostgresStreamStore(lambda: connect(dsn, row_factory=tuple_row))
+        else:
+            store = StreamStore(Path(database))
     except StreamError as error:
         raise CompositionError("lane: owner database is unavailable or incompatible; run owner migration separately") from error
     _load_function(pin)(registry, store)
