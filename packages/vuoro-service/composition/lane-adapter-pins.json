@@ -55,11 +55,11 @@
       "lock_id": "lanectl",
       "lock_kind": "adapter",
       "source_repository": "https://github.com/bayleafwalker/lanectl",
-      "source_revision": "b56f9cf4a7d9741069436f83e298f5dbde7e687b",
-      "artifact_url": "https://github.com/bayleafwalker/lanectl/releases/download/v0.2.12/lanectl-0.2.12-py3-none-any.whl",
-      "artifact_sha256": "934f03933acbe2548752cdb9a25799669504921df51ce9b5bbb438a59dd0ac30",
+      "source_revision": "044cfa94f3a87043ecce81975ffeacf86a54ae8b",
+      "artifact_url": "https://github.com/bayleafwalker/lanectl/releases/download/v0.3.1/lanectl-0.3.1-py3-none-any.whl",
+      "artifact_sha256": "e2e7a1332e5121c0d8a84215e6d69382af07038f5ee3612c2c9b4f1ebb070292",
       "distribution": "lanectl",
-      "distribution_version": "0.2.12"
+      "distribution_version": "0.3.1"
     }
   ],
   "runtime_descriptors": [

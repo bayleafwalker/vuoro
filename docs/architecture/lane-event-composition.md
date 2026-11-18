@@ -41,7 +41,7 @@ manifest on Python 3.12.
 After releasing the owner's wheel and preparing a reviewed manifest containing
 its exact source revision, URL and SHA-256, place that manifest inside the build
 context. The reviewed optional manifest is
-`packages/vuoro-service/composition/lane-adapter-pins.json` (lanectl0.2.12); build:
+`packages/vuoro-service/composition/lane-adapter-pins.json` (LANECTL 0.3.1); build:
 
 ```sh
 docker build \
