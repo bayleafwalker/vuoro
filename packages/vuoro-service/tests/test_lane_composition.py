@@ -72,3 +72,45 @@ def test_lane_runtime_refuses_python312_before_importing_owner(monkeypatch):
     monkeypatch.setattr('vuoro_service.composition.sys',SimpleNamespace(version_info=(3,12)))
     with pytest.raises(CompositionError,match='Python >=3.13'):
         _compose_lane(lane_pin(),None,{'VUORO_LANE_DATABASE':'/state/owner.sqlite'})
+
+
+def test_lane_postgres_is_explicit_and_uses_the_pinned_owner(monkeypatch):
+    calls = []
+
+    class StoreError(RuntimeError):
+        pass
+
+    monkeypatch.setattr("vuoro_service.composition.sys", SimpleNamespace(version_info=(3, 13)))
+    monkeypatch.setitem(sys.modules, "lanectl.stream_store", SimpleNamespace(
+        StreamStore=lambda path: pytest.fail("SQLite selected for PostgreSQL"),
+        StreamError=StoreError,
+    ))
+    monkeypatch.setattr("vuoro_service.composition._load_function", lambda pin:
+                        lambda registry, store: calls.append((registry, store)))
+    postgres = {"VUORO_LANE_POSTGRES_DSN": "dbname=qualification"}
+    for config in ({}, {**postgres, "VUORO_LANE_DATABASE": "/state/owner.sqlite"}):
+        with pytest.raises(CompositionError, match="exactly one"):
+            _compose_lane(lane_pin(), "catalog", config)
+    monkeypatch.setitem(sys.modules, "lanectl.stream_postgres", None)
+    with pytest.raises(CompositionError, match="pinned adapter"):
+        _compose_lane(lane_pin(), "catalog", postgres)
+    assert not calls
+
+    row_factory = object()
+
+    def connect(dsn, **options):
+        calls.append((dsn, options))
+        return "connection"
+
+    def store(connect):
+        assert connect() == "connection"
+        return "postgres-owner"
+
+    monkeypatch.setitem(sys.modules, "psycopg", SimpleNamespace(connect=connect))
+    monkeypatch.setitem(sys.modules, "psycopg.rows", SimpleNamespace(tuple_row=row_factory))
+    monkeypatch.setitem(sys.modules, "lanectl.stream_postgres", SimpleNamespace(PostgresStreamStore=store))
+    assert _compose_lane(lane_pin(), "catalog", postgres).state == "compatible"
+    assert calls == [
+        ("dbname=qualification", {"row_factory": row_factory}),
+        ("catalog", "postgres-owner"),
+    ]

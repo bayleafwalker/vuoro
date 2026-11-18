@@ -8,8 +8,9 @@ and full source/artifact identities appear in the release composition manifest.
 
 The lane descriptor selects distribution `lanectl`, module
 `lanectl.vuoro_adapter`, registration `register_lane_catalog`, API `v1`, schema
-`1`. `VUORO_LANE_DATABASE` supplies only the runtime database location. Startup
-constructs the owner's already-migrated store and refuses unavailable or
+`1`. Set exactly one of `VUORO_LANE_DATABASE` (SQLite path) or
+`VUORO_LANE_POSTGRES_DSN` (PostgreSQL connection with a compatible pinned owner).
+Startup constructs the owner's already-migrated store and refuses unavailable or
 incompatible storage. Migrations, lane event validation, stream partitions,
 optimistic concurrency and idempotency remain in lanectl's owner package; Vuoro
 neither schedules lanes nor chooses models nor settles work on their behalf.
