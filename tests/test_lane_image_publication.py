@@ -38,7 +38,7 @@ def closure():
 
 def test_exact_optional_installed_closure_is_accepted(closure):
     result = module('validate_lane_service_image').validate(*closure)
-    assert result['verified'] and result['installed_versions']['lanectl'] == '0.2.12'
+    assert result['verified'] and result['installed_versions']['lanectl'] == '0.3.1'
 
 
 @pytest.mark.parametrize('fault', ['python', 'manifest', 'default', 'missing', 'duplicate',
