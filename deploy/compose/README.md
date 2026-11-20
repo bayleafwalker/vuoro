@@ -78,7 +78,8 @@ compose() { docker compose -f deploy/compose/compose.yaml "$@"; }
 
 compose stop vuoro-service &&
 compose exec -T postgres pg_dump -U vuoro_admin -d vuoro --format=custom   > "$backup/workspace.dump" &&
-compose run --pull never --no-deps --rm -T --user 0 --entrypoint tar   vuoro-service -C /tmp -cf - . > "$backup/knowledge.tar" &&
+compose run --pull never --no-deps --rm -T --user 0 --entrypoint tar \
+  vuoro-service -C /tmp -cf - knowledge-objects > "$backup/knowledge.tar" &&
 (cd "$backup" && sha256sum workspace.dump knowledge.tar > SHA256SUMS)
 ```
 
@@ -91,13 +92,15 @@ the target project's database passwords and identity configuration before
 running these commands. Keep each repository ID and retained principal ID
 consistent with the source. The database bootstrap creates the target roles
 with their target passwords and the restore preserves schema ownership and
-grants. Use a backup you created or received through a trusted channel.
+grants. Use a backup you created or received through a trusted channel. The
+preflight checks the bundle structure and checksums. Use Python 3.11 or newer
+and keep the backup directory private until both restore commands finish.
 
 ```bash
 export COMPOSE_PROJECT_NAME=vuoro-restore
 export VUORO_COMPOSE_PORT=8081
 # Set backup to the absolute path stored in the backup variable in the source shell.
-(cd "$backup" && sha256sum --check SHA256SUMS) &&
+python3 deploy/compose/verify-backup.py "$backup" &&
 compose up -d --wait postgres &&
 compose exec -T postgres pg_restore -U vuoro_admin -d vuoro   --clean --if-exists --single-transaction < "$backup/workspace.dump" &&
 compose run --pull never --no-deps --rm -T --user 0 --entrypoint tar   vuoro-service -C /tmp -xpf - < "$backup/knowledge.tar" &&
