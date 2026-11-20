@@ -72,6 +72,7 @@ def fixture(root: Path, pg_bin: Path | None, *, state: dict, configure=None):
             pass
         else:
             raise AssertionError("runtime unexpectedly has DDL authority")
+        pg.require_compatible_schema(store)
         registry = CatalogRegistry()
         application = WorkApplication.postgres(store)
         register_work_catalog(registry, application)
