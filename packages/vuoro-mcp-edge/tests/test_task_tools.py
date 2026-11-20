@@ -137,7 +137,7 @@ def test_mcp_create_and_http_retry_share_the_owner_receipt(keys):
             ))
 
         async def exercise():
-            args = {**ARGS, "sprint_id": sprint}
+            args = {**ARGS, "sprint_id": sprint, "require_review": True}
             try:
                 async with httpx.AsyncClient(
                     base_url="http://edge", transport=httpx.ASGITransport(app=edge),
@@ -160,6 +160,10 @@ def test_mcp_create_and_http_retry_share_the_owner_receipt(keys):
                     replay = await api.post("/api/invoke/v1", json=envelope, headers=headers())
                     assert replay.status_code == 200, replay.text
                     assert replay.json()["result"]["item"]["id"] == result["item_id"]
+                    assert replay.json()["result"]["review_release_digest"] == result["review_release_digest"]
+                    release = pg.current_release(owner, result["item_id"])
+                    assert release["release_digest"] == result["review_release_digest"]
+                    assert release["acceptance_contract"]["review_protocol"] == "browser-outcome-v1"
                     envelope["arguments"]["title"] = "A different task"
                     conflict = await api.post("/api/invoke/v1", json=envelope, headers=headers())
                     assert conflict.status_code == 409, conflict.text
