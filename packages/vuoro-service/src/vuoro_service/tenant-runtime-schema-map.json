@@ -234,6 +234,24 @@
         "kind": "adapter_pin_and_compatibility_constants",
         "reference": "packages/vuoro-service/composition/adapter-pins.json at tag commit dfd65808d045ad2c2c4f773815dd5825e57a1361; sprintctl 0.28.1 pg_migrations CURRENT/MINIMUM/MAXIMUM_SCHEMA_VERSION"
       }
+    },
+    {
+      "service_version": "0.1.107",
+      "work_schema_target": 34,
+      "lowest_supported_schema": 32,
+      "accepted_schema_range": {
+        "minimum": 32,
+        "maximum": 34
+      },
+      "migration_required_from_previous": false,
+      "owner_release": {
+        "distribution": "sprintctl",
+        "version": "0.30.0"
+      },
+      "evidence_source": {
+        "kind": "adapter_pin_and_compatibility_constants",
+        "reference": "packages/vuoro-service/composition/adapter-pins.json at commit 2496af7; Sprintctl v0.30.0 tag commit 3616062a029332ecee5dad7b4d6d8602315df63f pg_migrations CURRENT/MINIMUM/MAXIMUM_SCHEMA_VERSION"
+      }
     }
   ]
 }
