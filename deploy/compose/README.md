@@ -108,3 +108,36 @@ curl --fail --retry 10 --retry-all-errors http://127.0.0.1:8081/api/meta/v1/hand
 After startup, use an authorized client to compare a known task and Knowledge
 object with the source backup. If any restore step fails, keep that target
 offline and retry with fresh target volumes.
+
+## Upgrade a running Compose workspace
+
+Prepare the new image and a complete backup before the upgrade. Record the
+currently running image digest and keep both images locally available. Use
+the same Compose project, port, identities, and database credentials. This
+procedure keeps the PostgreSQL major version and both volumes in place.
+
+Check the new and prior service versions in the
+[tenant runtime schema map](../../packages/vuoro-service/src/vuoro_service/tenant-runtime-schema-map.json).
+When the Work schema target changes, determine whether the prior image
+accepts the target schema. Check Audit and Knowledge compatibility as well.
+Use the backup recovery procedure if the prior image cannot serve the
+upgraded data.
+
+With the source stopped after the backup, set `next_image` to the verified
+immutable image reference and run the migration job before starting traffic.
+
+```bash
+export VUORO_COMPOSE_IMAGE="$next_image"
+compose run --pull never --rm migrate &&
+compose up -d --no-build --pull never vuoro-service &&
+curl --fail --retry 10 --retry-all-errors \
+  "http://127.0.0.1:${VUORO_COMPOSE_PORT:-8080}/api/meta/v1/handshake"
+```
+
+Confirm the handshake names the expected service version, then read a known
+task or sprint through an authenticated client before resuming writes. For a
+compatible image rollback, stop the service, set `VUORO_COMPOSE_IMAGE` to the
+prior digest, and repeat the start and read checks. If a migration or readback
+fails, keep traffic stopped while you determine whether to roll back the image
+or restore the backup into a fresh project. Rolling back the image does not
+revert database changes.
