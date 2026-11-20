@@ -90,6 +90,8 @@ class Identity:
     #: Original OAuth resource/scopes only when verified in a gateway assertion.
     oauth_resource: str | None = None
     oauth_scopes: frozenset[str] | None = None
+    #: Verified provenance for a dedicated workspace browser review request.
+    browser_work_review: bool = False
 
     def __post_init__(self) -> None:
         if self.expires_at is not None and (

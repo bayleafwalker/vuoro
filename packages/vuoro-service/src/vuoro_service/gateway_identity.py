@@ -405,6 +405,20 @@ class GatewayAssertionIdentityResolver:
                 or re.fullmatch(r"[\x21-\x7e]+", oauth_resource) is None
             ):
                 raise IdentityResolutionError("gateway OAuth provenance is invalid")
+        browser_work_review = claims.get("browser_work_review") is True
+        if (
+            ("browser_work_review" in claims and not browser_work_review)
+            or ("work:review.accept" in authorities) != browser_work_review
+            or browser_work_review and (
+                set(authorities) != {"work:review.accept"}
+                or len(repo_ids) != 1
+                or client_id is not None or grant_id is not None
+                or oauth_resource is not None or oauth_scopes is not None
+                or proof is not None
+                or "invocation_id" in claims or "attempt_id" in claims
+            )
+        ):
+            raise IdentityResolutionError("gateway work review provenance is invalid")
         invocation_present = "invocation_id" in claims
         attempt_present = "attempt_id" in claims
         if invocation_present != attempt_present:
@@ -491,6 +505,7 @@ class GatewayAssertionIdentityResolver:
             gateway_subject=subject,
             oauth_resource=oauth_resource,
             oauth_scopes=oauth_scopes,
+            browser_work_review=browser_work_review,
             client_id=client_id,
             grant_id=grant_id,
             invocation_id=invocation_id,

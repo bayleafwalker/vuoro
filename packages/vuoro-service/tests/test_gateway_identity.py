@@ -147,6 +147,39 @@ def test_gateway_assertion_resolver_accepts_cloud_contract(tmp_path: Path) -> No
 
 
 
+def test_browser_work_review_identity_is_single_purpose(tmp_path: Path) -> None:
+    path, private = _key_file(tmp_path)
+    resolve = _resolver(path)
+    identity = resolve(_request(_token(
+        private, authorities=["work:review.accept"], repo_ids=["repo-a"],
+        browser_work_review=True,
+    )))
+    assert identity.browser_work_review is True
+    assert identity.authorities == frozenset({"work:review.accept"})
+    assert identity.repo_ids == frozenset({"repo-a"})
+    assert identity.principal_id == f"{CLOUD_ISSUER}:{USER_SUBJECT}:0"
+
+
+@pytest.mark.parametrize("overrides", [
+    {"browser_work_review": True, "authorities": ["work:write"]},
+    {"browser_work_review": True, "authorities": ["work:review.accept", "work:read"]},
+    {"browser_work_review": True, "repo_ids": ["repo-a", "repo-b"]},
+    {"browser_work_review": 1},
+    {"browser_work_review": None},
+    {"browser_work_review": False},
+    {"browser_work_review": True, "client_id": "claude-connector", "grant_id": "grant-1"},
+    {"browser_work_review": True, "invocation_id": "inv_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+     "attempt_id": "att_01ARZ3NDEKTSV4RRFFQ69G5FAV"},
+    {},
+])
+def test_browser_work_review_refuses_ambiguous_provenance(tmp_path: Path, overrides) -> None:
+    path, private = _key_file(tmp_path)
+    claims = {"authorities": ["work:review.accept"], "repo_ids": ["repo-a"], **overrides}
+    with pytest.raises(IdentityResolutionError):
+        _resolver(path)(_request(_token(private, **claims)))
+
+
+
 def test_optional_verified_oauth_scope_and_resource_provenance(tmp_path: Path) -> None:
     path, private = _key_file(tmp_path)
     identity = _resolver(path)(_request(_token(private, client_id="client", grant_id="grant",
