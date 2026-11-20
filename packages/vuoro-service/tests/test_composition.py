@@ -356,8 +356,8 @@ def test_checked_in_adapter_artifact_urls_are_source_named_or_exact_semver_relea
         assert pin.source_revision[:7] in tag or exact_owner_semver
 
 
-def test_checked_in_work_pin_is_the_schema34_review_release() -> None:
-    # Sprintctl 0.30.0 adds task creation and independent review on schema34.
+def test_checked_in_work_pin_is_the_schema35_archive_release() -> None:
+    # Sprintctl 0.31.0 adds portable work history and restore on schema 35.
     # Source, wheel URL and digest advance together.
     pin = CompositionManifest.load(ROOT / "composition" / "adapter-pins.json").pin("work")
     assert (
@@ -366,16 +366,16 @@ def test_checked_in_work_pin_is_the_schema34_review_release() -> None:
         pin.api_version,
         pin.schema_version,
     ) == (
-        "3616062a029332ecee5dad7b4d6d8602315df63f",
-        "0.30.0",
+        "a85d1af6b020837a2330c1d7cdb0795f54606f54",
+        "0.31.0",
         "work-api/v1",
         "work-schema/v1",
     )
     assert pin.artifact_url.endswith(
-        "/v0.30.0/sprintctl-0.30.0-py3-none-any.whl"
+        "/v0.31.0/sprintctl-0.31.0-py3-none-any.whl"
     )
     assert pin.artifact_sha256 == (
-        "465cfdfb3bcb0919e99d4d344653182db08168120acf6cc75b17a5912bb0b3cc"
+        "9e5f71cfda17fff3314fe01371399834647662873c8f3731d1a05573047ceb87"
     )
     assert [
         (item.lock_id, item.lock_kind, item.distribution, item.distribution_version)
