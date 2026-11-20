@@ -4,7 +4,13 @@ services:
     environment:
       POSTGRES_DB: vuoro
       POSTGRES_USER: vuoro_admin
-      POSTGRES_PASSWORD: local-evaluation-only
+      POSTGRES_PASSWORD: ${VUORO_COMPOSE_ADMIN_PASSWORD:?set the PostgreSQL administrator password}
+      VUORO_COMPOSE_WORK_MIGRATION_PASSWORD: ${VUORO_COMPOSE_WORK_MIGRATION_PASSWORD:?set the work_migration password}
+      VUORO_COMPOSE_WORK_RUNTIME_PASSWORD: ${VUORO_COMPOSE_WORK_RUNTIME_PASSWORD:?set the work_runtime password}
+      VUORO_COMPOSE_AUDIT_MIGRATION_PASSWORD: ${VUORO_COMPOSE_AUDIT_MIGRATION_PASSWORD:?set the audit_migration password}
+      VUORO_COMPOSE_AUDIT_RUNTIME_PASSWORD: ${VUORO_COMPOSE_AUDIT_RUNTIME_PASSWORD:?set the audit_runtime password}
+      VUORO_COMPOSE_KNOWLEDGE_MIGRATION_PASSWORD: ${VUORO_COMPOSE_KNOWLEDGE_MIGRATION_PASSWORD:?set the knowledge_migration password}
+      VUORO_COMPOSE_KNOWLEDGE_RUNTIME_PASSWORD: ${VUORO_COMPOSE_KNOWLEDGE_RUNTIME_PASSWORD:?set the knowledge_runtime password}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U vuoro_admin -d vuoro"]
       interval: 5s
@@ -29,9 +35,9 @@ services:
         auditctl-central-schema migrate --dsn-env AUDIT_MIGRATION_DSN --schema audit --migration-role audit_migration --runtime-role audit_runtime
         vuoro-workspace migrate --dsn "$$KNOWLEDGE_MIGRATION_DSN" --schema knowledge
     environment:
-      WORK_MIGRATION_DSN: postgresql://work_migration:local-evaluation-only@postgres:5432/vuoro?options=-csearch_path%3Dwork
-      AUDIT_MIGRATION_DSN: postgresql://audit_migration:local-evaluation-only@postgres:5432/vuoro
-      KNOWLEDGE_MIGRATION_DSN: postgresql://knowledge_migration:local-evaluation-only@postgres:5432/vuoro
+      WORK_MIGRATION_DSN: postgresql://work_migration:${VUORO_COMPOSE_WORK_MIGRATION_PASSWORD:?set the work_migration password}@postgres:5432/vuoro?options=-csearch_path%3Dwork
+      AUDIT_MIGRATION_DSN: postgresql://audit_migration:${VUORO_COMPOSE_AUDIT_MIGRATION_PASSWORD:?set the audit_migration password}@postgres:5432/vuoro
+      KNOWLEDGE_MIGRATION_DSN: postgresql://knowledge_migration:${VUORO_COMPOSE_KNOWLEDGE_MIGRATION_PASSWORD:?set the knowledge_migration password}@postgres:5432/vuoro
 
   vuoro-service:
     build:
@@ -46,10 +52,10 @@ services:
       VUORO_IDENTITIES_FILE: /run/vuoro/identities.json
       VUORO_WORK_REPOSITORY_ID: local-evaluation
       VUORO_WORK_RESOURCE_OBSERVERS_FILE: /run/vuoro/work-resource-observers.json
-      VUORO_WORK_RUNTIME_DSN: postgresql://work_runtime:local-evaluation-only@postgres:5432/vuoro?options=-csearch_path%3Dwork
-      VUORO_AUDIT_RUNTIME_DSN: postgresql://audit_runtime:local-evaluation-only@postgres:5432/vuoro
+      VUORO_WORK_RUNTIME_DSN: postgresql://work_runtime:${VUORO_COMPOSE_WORK_RUNTIME_PASSWORD:?set the work_runtime password}@postgres:5432/vuoro?options=-csearch_path%3Dwork
+      VUORO_AUDIT_RUNTIME_DSN: postgresql://audit_runtime:${VUORO_COMPOSE_AUDIT_RUNTIME_PASSWORD:?set the audit_runtime password}@postgres:5432/vuoro
       VUORO_AUDIT_SCHEMA: audit
-      VUORO_KNOWLEDGE_RUNTIME_DSN: postgresql://knowledge_runtime:local-evaluation-only@postgres:5432/vuoro
+      VUORO_KNOWLEDGE_RUNTIME_DSN: postgresql://knowledge_runtime:${VUORO_COMPOSE_KNOWLEDGE_RUNTIME_PASSWORD:?set the knowledge_runtime password}@postgres:5432/vuoro
       VUORO_KNOWLEDGE_RUNTIME_ROLE: knowledge_runtime
       VUORO_KNOWLEDGE_OBJECT_STORE: fs:/tmp/knowledge-objects
     ports:
