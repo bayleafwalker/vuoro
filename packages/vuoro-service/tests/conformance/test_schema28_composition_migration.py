@@ -36,8 +36,8 @@ pytestmark = pytest.mark.essential_safety
 
 # Runtime catalog includes compatibility-derived owner features; the registration-only
 # catalog gate has a separate revision.
-CATALOG_REVISION = 'f1ced0795fad1ef55b30805d80955fb8a04d2554c9adaea52a2794441a01fd26'
-CATALOG_TOTAL = 150
+CATALOG_REVISION = 'd66088f598a2b182ef617c0b63088fb0dcde5699b149cf5508f9bc47652a8a1c'
+CATALOG_TOTAL = 154
 INBOX_OPERATIONS = ('work.agent.register-v1', 'work.agent.observe-v1', 'work.agent.retire-v1',
                     'work.agent.list-v1', 'work.agent.describe-v1', 'work.message.send-v1',
                     'work.message.read-v1', 'work.message.status-v1', 'work.message.receipt-v1',
