@@ -126,6 +126,10 @@ accepts the target schema. Check Audit and Knowledge compatibility as well.
 Use the backup recovery procedure if the prior image cannot serve the
 upgraded data.
 
+Vuoro Service 0.1.108 migrates Work from schema 34 to 35. For a rollback to
+0.1.107 after migration, restore the pre-upgrade backup into a fresh Compose
+project and start it with the recorded 0.1.107 image digest.
+
 With the source stopped after the backup, set `next_image` to the verified
 immutable image reference and run the migration job before starting traffic.
 

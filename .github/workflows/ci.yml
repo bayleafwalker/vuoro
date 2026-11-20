@@ -624,7 +624,7 @@ jobs:
           uv pip install --python /tmp/vuoro-schema31-owner/bin/python \
             'click>=8.1' 'psycopg[binary]>=3.1,<4'
           uv pip check --python /tmp/vuoro-schema31-owner/bin/python
-      - name: Schema-34 published owner CLI preserves schema-29 rows and privileges
+      - name: Schema-35 published owner CLI preserves schema-29 rows and privileges
         shell: bash
         env:
           PGPASSWORD: m14-ci-only

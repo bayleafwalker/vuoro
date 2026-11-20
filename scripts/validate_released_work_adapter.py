@@ -28,9 +28,9 @@ _EXPECTED_ADAPTER_KIT = (
     "https://github.com/bayleafwalker/vuoro/releases/download/"
     "vuoro-adapter-kit-v0.2.2/vuoro_adapter_kit-0.2.2-py3-none-any.whl"
 )
-_EXPECTED_WORK_OPERATION_COUNT = 127
+_EXPECTED_WORK_OPERATION_COUNT = 130
 _EXPECTED_WORK_METADATA_SHA256 = (
-    "c245e1290e5525cf810f423f9fb2d39ec2ef6c5d47a824c0f190c7c6aab7a9f5"
+    "280cbbeea4b0e18a32079e90dffef00461498b24c497fb3b8a10a52446e9a695"
 )
 
 
@@ -73,6 +73,9 @@ def _assert_owner_metadata() -> None:
         "work.request.dependent-withdraw-v1", "work.request.events-v1",
         "work.request.progress-v1", "work.request.report-performed-v1",
         "work.request.attest-v1", "work.request.decline-v1", "work.request.supersede-v1",
+    } <= operations.keys()
+    assert {
+        "work.archive.export-v1", "work.archive.restore-v1", "work.archive.restored-source-v1",
     } <= operations.keys()
     continuation = operations["work.request.continuation-v1"]
     assert continuation["required_authority"] == "work:read"
@@ -138,11 +141,11 @@ async def _exercise() -> None:
         )
         # The production service seeds this from its read-only schema
         # handshake before registration. The disposable owner fixture is
-        # explicitly at the composition's schema 34 current schema.
+        # explicitly at the composition's schema 35 current schema.
         class SchemaQualifiedStore:
             def __init__(self, store):
                 self._store = store
-                self.remote_schema_version = 34
+                self.remote_schema_version = 35
 
             def __getattr__(self, name):
                 return getattr(self._store, name)
