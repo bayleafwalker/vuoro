@@ -498,7 +498,7 @@ def test_actual_old_closure_refusal_explicit34_cli_migration_and_runtime_ddl_den
         request_page = invoke('work.request.list-v1', {'limit': 20}, 'x' * 40)
         assert request_page['requests'] == [] and request_page['next_after_request_id'] is None
 
-        # Exercise the released 0.28.1 owner through the composed service with
+        # Exercise the released 0.30.0 owner through the composed service with
         # only the separately provisioned DML runtime role. Byte-limited pages
         # may be short but each cursor must advance to the last returned note.
         parent = invoke('work.run.register-v1', {

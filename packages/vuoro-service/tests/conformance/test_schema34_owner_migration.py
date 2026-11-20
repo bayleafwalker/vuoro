@@ -180,7 +180,7 @@ def test_published_29_to_34_explicit_migration_preserves_rows_and_acls():
     import sprintctl
 
     assert Path(sprintctl.__file__).resolve().is_relative_to(Path(new_prefix).resolve())
-    assert sprintctl.__version__ == "0.28.1"
+    assert sprintctl.__version__ == "0.30.0"
     from sprintctl import pg_migrations
 
     assert (
