@@ -120,6 +120,7 @@ def _rows_and_acls(url):
                 "operator_request_delivery",
                 "operator_request_delivery_key",
                 "agent_capability_revision",
+                "work_archive_restore",
             ):
                 continue
             data = conn.execute(
@@ -146,7 +147,7 @@ def _rows_and_acls(url):
         }
 
 
-def test_published_29_to_34_explicit_migration_preserves_rows_and_acls():
+def test_published_29_to_35_explicit_migration_preserves_rows_and_acls():
     names = (
         "VUORO_SCHEMA34_MIGRATION_DSN",
         "VUORO_SCHEMA34_RUNTIME_DSN",
@@ -306,6 +307,7 @@ def test_published_29_to_34_explicit_migration_preserves_rows_and_acls():
                 conn.execute("SELECT to_regclass(%s)", (f"work.{table}",)).fetchone()[0]
                 == table
             )
+        assert conn.execute("SELECT count(*) FROM work.work_archive_restore").fetchone()[0] == 0
     after, new_acls = _rows_and_acls(migration)
     assert after == before and new_acls["schema"] == acls["schema"]
     assert all(
