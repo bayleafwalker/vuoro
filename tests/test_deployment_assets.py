@@ -31,3 +31,43 @@ def test_base_requires_an_immutable_image_replacement() -> None:
     deployment = (BASE / "deployment.yaml").read_text(encoding="utf-8")
     assert "@sha256:" in deployment
     assert "REPLACE_IN_OVERLAY" in (BASE / "runtime-config.yaml").read_text(encoding="utf-8")
+
+
+def test_compose_backup_preflight_accepts_only_complete_verified_files(tmp_path) -> None:
+    import hashlib
+    import subprocess
+    import sys
+    import tarfile
+
+    dump = tmp_path / "workspace.dump"
+    dump.write_bytes(b"PGDMP fixture")
+    archive = tmp_path / "knowledge.tar"
+    manifest = tmp_path / "SHA256SUMS"
+    verifier = ROOT / "deploy" / "compose" / "verify-backup.py"
+
+    def write_archive(name: str) -> None:
+        with tarfile.open(archive, "w") as tar:
+            entry = tarfile.TarInfo(name)
+            entry.type = tarfile.DIRTYPE
+            tar.addfile(entry)
+
+    def write_checksums() -> None:
+        manifest.write_text("".join(
+            f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n"
+            for path in (dump, archive)
+        ), encoding="ascii")
+
+    def run():
+        return subprocess.run([sys.executable, str(verifier), str(tmp_path)],
+                              capture_output=True, text=True)
+
+    write_archive("knowledge-objects")
+    write_checksums()
+    assert run().returncode == 0
+    dump.write_bytes(b"PGDMP modified")
+    assert "checksum mismatch" in run().stderr
+    write_archive("unrelated-directory")
+    write_checksums()
+    assert "unexpected entry" in run().stderr
+    manifest.write_text(manifest.read_text() * 2)
+    assert "duplicate checksum entry" in run().stderr
