@@ -14,9 +14,16 @@ from vuoro_workspace import FsObjectStore
 from vuoro_workspace.vuoro_adapter import KnowledgeApplication, register_knowledge_catalog
 
 
-EXPECTED_TOTAL = 150
-EXPECTED_REVISION = "d9c1e0a8b20a5c26ab6b846506024384da6fcc345939a0f789b77c0b3d8c5ecb"
-EXPECTED_DOMAIN_COUNTS = {"work": 126, "audit": 5, "knowledge": 19}
+EXPECTED_TOTAL = 154
+EXPECTED_REVISION = "30d810f98d77922a2fa9487702cbf861018eeab76cb40a5f85723373456414cc"
+EXPECTED_DOMAIN_COUNTS = {"work": 130, "audit": 5, "knowledge": 19}
+
+REVIEW_ADDITIONS = {
+    "work.item.create-v1": "a0498424a8d4380269b1d07b78a204f09aaf443a7b6aced84e2c7b710dc79954",
+    "work.outcome.accept-v1": "604b3ddbff7954381a12ab875d8b1cf953c94e204b047f749a826c1d5d14a84c",
+    "work.outcome.review-queue-v1": "70e992e558af39736fe9db20e4e9ac29b53a40f26494cdc0b73e814260831dcf",
+    "work.outcome.review-v1": "a44310177d0af82bbba9e4982c288b7722404e9cb4363efba91bbe5aa3e5fc70",
+}
 
 
 class WorkStub:
@@ -51,9 +58,19 @@ def main() -> int:
     spec = importlib.util.spec_from_file_location("service103_catalog_guard", path)
     guard = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(guard)
-    baseline=json.loads(guard.BASELINE.read_text());review=json.loads(guard.REVIEW.read_text())
-    guard.validate(catalog, baseline, review)
-    assert guard.falsify_actual_catalog(catalog, baseline, review)==9
+    additions = {
+        entry["name"]: guard.digest(entry)
+        for entry in catalog["operations"] if entry["name"] in REVIEW_ADDITIONS
+    }
+    assert additions == REVIEW_ADDITIONS, additions
+    legacy_catalog = {
+        **catalog,
+        "operations": [entry for entry in catalog["operations"] if entry["name"] not in REVIEW_ADDITIONS],
+    }
+    baseline = json.loads(guard.BASELINE.read_text())
+    review = json.loads(guard.REVIEW.read_text())
+    guard.validate(legacy_catalog, baseline, review)
+    assert guard.falsify_actual_catalog(legacy_catalog, baseline, review) == 9
     return 0
 
 
