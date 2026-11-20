@@ -56,3 +56,55 @@ Stop the stack with `docker compose -f deploy/compose/compose.yaml down`.
 For a disposable project whose database and Knowledge objects can be deleted,
 run the same command with `--volumes`. Preserve any evaluation evidence you
 need before deleting those volumes.
+
+## Back up and restore a Compose workspace
+
+Use the same Vuoro image digest and PostgreSQL major version for the initial
+restore. Keep the identity configuration and the selected image digest separately under
+operator control.
+These commands assume the Compose database and Knowledge volume have no
+writers other than the service.
+
+Stop the service before capturing both files. Keep the backup private because
+it contains workspace data. Run these commands from the repository root with
+the source project environment loaded.
+
+```bash
+umask 077
+backup_root="$HOME/.local/state/vuoro-backups"
+install -d -m 700 "$backup_root"
+backup=$(mktemp -d "$backup_root/workspace.XXXXXXXX")
+compose() { docker compose -f deploy/compose/compose.yaml "$@"; }
+
+compose stop vuoro-service &&
+compose exec -T postgres pg_dump -U vuoro_admin -d vuoro --format=custom   > "$backup/workspace.dump" &&
+compose run --pull never --no-deps --rm -T --user 0 --entrypoint tar   vuoro-service -C /tmp -cf - . > "$backup/knowledge.tar" &&
+(cd "$backup" && sha256sum workspace.dump knowledge.tar > SHA256SUMS)
+```
+
+Treat the backup as complete only after all commands succeed and
+`SHA256SUMS` exists. Restart the source with
+`compose up -d --no-build vuoro-service` when you are ready.
+
+Restore into a fresh project and unused port with the service stopped. Load
+the target project's database passwords and identity configuration before
+running these commands. Keep each repository ID and retained principal ID
+consistent with the source. The database bootstrap creates the target roles
+with their target passwords and the restore preserves schema ownership and
+grants. Use a backup you created or received through a trusted channel.
+
+```bash
+export COMPOSE_PROJECT_NAME=vuoro-restore
+export VUORO_COMPOSE_PORT=8081
+# Set backup to the absolute path stored in the backup variable in the source shell.
+(cd "$backup" && sha256sum --check SHA256SUMS) &&
+compose up -d --wait postgres &&
+compose exec -T postgres pg_restore -U vuoro_admin -d vuoro   --clean --if-exists --single-transaction < "$backup/workspace.dump" &&
+compose run --pull never --no-deps --rm -T --user 0 --entrypoint tar   vuoro-service -C /tmp -xpf - < "$backup/knowledge.tar" &&
+compose up -d --no-build vuoro-service &&
+curl --fail --retry 10 --retry-all-errors http://127.0.0.1:8081/api/meta/v1/handshake
+```
+
+After startup, use an authorized client to compare a known task and Knowledge
+object with the source backup. If any restore step fails, keep that target
+offline and retry with fresh target volumes.
