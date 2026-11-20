@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from .idempotency import IDEMPOTENCY_KEY_SCHEMA, require_key
@@ -20,6 +21,9 @@ _DEFINITION = {
         "properties": {
             "sprint_id": {"type": "integer", "minimum": 1},
             **{name: {"type": "string", "minLength": 1} for name in _TEXT_FIELDS},
+            "require_review": {
+                "type": "boolean", "description": "Require independent browser acceptance of the outcome.",
+            },
             "priority": {"type": "integer", "minimum": 1, "maximum": 9},
             "idempotency_key": IDEMPOTENCY_KEY_SCHEMA,
         },
@@ -46,6 +50,8 @@ def _parse(arguments: dict[str, Any]) -> dict[str, Any]:
         value = arguments["priority"]
         if type(value) is not int or not 1 <= value <= 9:
             raise ToolFailure("invalid-arguments", "priority must be an integer between 1 and 9")
+    if "require_review" in arguments and type(arguments["require_review"]) is not bool:
+        raise ToolFailure("invalid-arguments", "require_review must be a boolean")
     require_key(arguments)
     return arguments
 
@@ -65,7 +71,13 @@ def build_toolset(context: ToolsetContext) -> ToolSet | None:
         item = result.get("item") if isinstance(result, dict) else None
         if not isinstance(item, dict) or type(item.get("id")) is not int or item["id"] < 1:
             raise ToolFailure("owner-response-invalid", "The work owner returned no task ID")
-        return {"item_id": item["id"]}
+        task = {"item_id": item["id"]}
+        if arguments.get("require_review"):
+            digest = result.get("review_release_digest")
+            if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+                raise ToolFailure("owner-response-invalid", "The work owner returned no review release")
+            task["review_release_digest"] = digest
+        return task
 
     return ToolSet(
         "task",
