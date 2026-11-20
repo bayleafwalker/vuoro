@@ -36,8 +36,8 @@ pytestmark = pytest.mark.essential_safety
 
 # Runtime catalog includes compatibility-derived owner features; the registration-only
 # catalog gate has a separate revision.
-CATALOG_REVISION = 'f1ced0795fad1ef55b30805d80955fb8a04d2554c9adaea52a2794441a01fd26'
-CATALOG_TOTAL = 150
+CATALOG_REVISION = 'd66088f598a2b182ef617c0b63088fb0dcde5699b149cf5508f9bc47652a8a1c'
+CATALOG_TOTAL = 154
 INBOX_OPERATIONS = ('work.agent.register-v1', 'work.agent.observe-v1', 'work.agent.retire-v1',
                     'work.agent.list-v1', 'work.agent.describe-v1', 'work.message.send-v1',
                     'work.message.read-v1', 'work.message.status-v1', 'work.message.receipt-v1',
@@ -388,7 +388,7 @@ def test_actual_old_closure_refusal_explicit34_cli_migration_and_runtime_ddl_den
         response = client.get('/api/meta/v1/handshake', headers={'X-Vuoro-Client-Protocol': '1'})
         assert response.status_code == 200, response.json()
         handshake = response.json()
-        assert handshake['service_version'] == '0.1.106' and handshake['compatibility']['state'] == 'compatible'
+        assert handshake['service_version'] == '0.1.107' and handshake['compatibility']['state'] == 'compatible'
         assert all(x['state'] == 'compatible' for x in handshake['compatibility']['domains'].values())
         catalog = client.get('/api/catalog/v1', headers={'X-Vuoro-Client-Protocol': '1'}).json()
         assert len(catalog['operations']) == CATALOG_TOTAL
@@ -498,7 +498,7 @@ def test_actual_old_closure_refusal_explicit34_cli_migration_and_runtime_ddl_den
         request_page = invoke('work.request.list-v1', {'limit': 20}, 'x' * 40)
         assert request_page['requests'] == [] and request_page['next_after_request_id'] is None
 
-        # Exercise the released 0.28.1 owner through the composed service with
+        # Exercise the released 0.30.0 owner through the composed service with
         # only the separately provisioned DML runtime role. Byte-limited pages
         # may be short but each cursor must advance to the last returned note.
         parent = invoke('work.run.register-v1', {
