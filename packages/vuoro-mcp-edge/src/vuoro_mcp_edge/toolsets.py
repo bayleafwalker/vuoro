@@ -46,6 +46,7 @@ BUCKET_AUTHORITIES: dict[str, str] = {
     "effect-read": "work.effect.get",
     "record": "work:evidence",
     "coordinate": "work:claim",
+    "task-create": "work:task.create",
     "propose": "effect:propose",
 }
 
