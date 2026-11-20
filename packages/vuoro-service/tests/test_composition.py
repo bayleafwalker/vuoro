@@ -828,10 +828,10 @@ def test_load_and_verify_accept_a_shared_filename_with_an_identical_digest(tmp_p
 
     source = ROOT / "composition" / "adapter-pins.json"
     raw = json.loads(source.read_text(encoding="utf-8"))
-    artifact = tmp_path / "sprintctl-0.28.1-py3-none-any.whl"
+    work_lock = next(lock for lock in raw["release_locks"] if lock["lock_id"] == "work-adapter")
+    artifact = tmp_path / work_lock["artifact_url"].rsplit("/", 1)[-1]
     artifact.write_bytes(b"same-filename-same-digest")
     digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-    work_lock = next(lock for lock in raw["release_locks"] if lock["lock_id"] == "work-adapter")
     work_lock["artifact_sha256"] = digest
     duplicate = dict(work_lock, lock_id="work-adapter-dup", lock_kind="owner-dependency",
                       distribution="sprintctl-dup")
@@ -845,7 +845,7 @@ def test_load_and_verify_accept_a_shared_filename_with_an_identical_digest(tmp_p
     manifest = CompositionManifest.load(path)
     filenames = {lock.artifact_url.rsplit("/", 1)[-1] for lock in manifest.release_locks
                  if lock.lock_id in ("work-adapter", "work-adapter-dup")}
-    assert filenames == {"sprintctl-0.28.1-py3-none-any.whl"}
+    assert filenames == {artifact.name}
 
     # verify_adapter_artifacts checks every lock in the manifest, so isolate
     # the two colliding locks (rather than staging real wheels for the whole
@@ -864,10 +864,10 @@ def test_load_and_verify_reject_a_shared_filename_with_a_differing_digest(tmp_pa
 
     source = ROOT / "composition" / "adapter-pins.json"
     raw = json.loads(source.read_text(encoding="utf-8"))
-    artifact = tmp_path / "sprintctl-0.28.1-py3-none-any.whl"
+    work_lock = next(lock for lock in raw["release_locks"] if lock["lock_id"] == "work-adapter")
+    artifact = tmp_path / work_lock["artifact_url"].rsplit("/", 1)[-1]
     artifact.write_bytes(b"same-filename-differing-digest")
     digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-    work_lock = next(lock for lock in raw["release_locks"] if lock["lock_id"] == "work-adapter")
     work_lock["artifact_sha256"] = digest
     duplicate = dict(work_lock, lock_id="work-adapter-dup", lock_kind="owner-dependency",
                       distribution="sprintctl-dup", artifact_sha256="f" * 64)
