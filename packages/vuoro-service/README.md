@@ -3,6 +3,10 @@
 Modular HTTP and process shell that composes immutable, released owner
 adapters. Domain state machines and migrations remain in their owner packages.
 
+Service 0.1.108 adds browser-administrator work archive export and restore
+through Sprintctl 0.31.0. Restore requires work schema 35 and retains source
+acceptance receipts as historical data.
+
 Service 0.1.107 pins Sprintctl 0.30.0 and serves retry-safe task creation,
 the independent outcome review queue and detail, and exact-report acceptance.
 The browser review gateway grants a workspace- and repository-bound reviewer

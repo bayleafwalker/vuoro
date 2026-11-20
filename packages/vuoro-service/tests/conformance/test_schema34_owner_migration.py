@@ -1,4 +1,4 @@
-"""Published schema29 -> schema34 owner migration; disposable roles only."""
+"""Published schema29 -> schema35 owner migration; disposable roles only."""
 
 from __future__ import annotations
 
@@ -180,14 +180,14 @@ def test_published_29_to_34_explicit_migration_preserves_rows_and_acls():
     import sprintctl
 
     assert Path(sprintctl.__file__).resolve().is_relative_to(Path(new_prefix).resolve())
-    assert sprintctl.__version__ == "0.30.0"
+    assert sprintctl.__version__ == "0.31.0"
     from sprintctl import pg_migrations
 
     assert (
         pg_migrations.MINIMUM_SCHEMA_VERSION,
         pg_migrations.CURRENT_SCHEMA_VERSION,
         pg_migrations.MAXIMUM_SCHEMA_VERSION,
-    ) == (32, 34, 34)
+    ) == (32, 35, 35)
     old_identity = _run(
         [
             old_python,
@@ -286,20 +286,21 @@ def test_published_29_to_34_explicit_migration_preserves_rows_and_acls():
     result = json.loads(migrated.stdout)
     assert (
         result["from_version"] == 31
-        and result["to_version"] == 34
-        and result["applied_versions"] == [32, 33, 34]
+        and result["to_version"] == 35
+        and result["applied_versions"] == [32, 33, 34, 35]
     )
     replay = cli(new_cli, "migrate", migration)
     assert (
         replay.returncode == 0 and json.loads(replay.stdout)["applied_versions"] == []
     )
     with psycopg.connect(runtime) as conn:
-        assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == 34
+        assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == 35
         for table in (
             "operator_request_recipient_binding",
             "operator_request_delivery",
             "operator_request_delivery_key",
             "agent_capability_revision",
+            "work_archive_restore",
         ):
             assert (
                 conn.execute("SELECT to_regclass(%s)", (f"work.{table}",)).fetchone()[0]
@@ -320,7 +321,7 @@ def test_published_29_to_34_explicit_migration_preserves_rows_and_acls():
     # Only the version marker is varied in this disposable migrated fixture; this
     # is not a claim that schema32/33 were produced by their historical migrations.
     with psycopg.connect(migration) as conn:
-        for version in (31, 32, 33, 34):
+        for version in (31, 32, 33, 34, 35, 36):
             conn.execute("UPDATE schema_version SET version=%s", (version,))
             conn.commit()
             boundary = cli(new_cli, "check", runtime)
@@ -329,9 +330,11 @@ def test_published_29_to_34_explicit_migration_preserves_rows_and_acls():
                 assert (
                     boundary.returncode != 0 and payload["reason"] == "schema-too-old"
                 )
+            elif version == 36:
+                assert boundary.returncode != 0 and payload["reason"] == "schema-too-new"
             else:
                 assert boundary.returncode == 0 and payload["compatible"] is True
-        conn.execute("UPDATE schema_version SET version=34")
+        conn.execute("UPDATE schema_version SET version=35")
         conn.commit()
     with psycopg.connect(runtime) as conn:
         definitions = conn.execute(
