@@ -3,8 +3,17 @@
 Modular HTTP and process shell that composes immutable, released owner
 adapters. Domain state machines and migrations remain in their owner packages.
 
-Service 0.1.106 is a release-preparation candidate based on merged Vuoro
-source. It composes the optional Lane owner and pins the published Sprintctl
+Service 0.1.107 pins Sprintctl 0.30.0 and serves retry-safe task creation,
+the independent outcome review queue and detail, and exact-report acceptance.
+The browser review gateway grants a workspace- and repository-bound reviewer
+identity. Task creation has its own authority for API and MCP clients.
+
+Work schema 34 remains current, and schemas 32–34 remain compatible. The
+schema target is unchanged from 0.1.106. See the
+[Compose setup and recovery guide](../../deploy/compose/README.md) for a
+disposable install and the backup, restore, upgrade and rollback procedures.
+
+Service 0.1.106 composes the optional Lane owner and pins the published Sprintctl
 0.28.1 artifact and vuoro-workspace
 0.1.1. Sprintctl 0.28.1 migrates work schema 29 through 34, declares schemas 32–34 compatible,
 and rejects schema 31; moving from the prior schema-31 owner requires the

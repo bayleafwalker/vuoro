@@ -22,6 +22,17 @@ recorded here.
   envelope and `X-Request-ID`, fixing gateway identity correlation for
   generated and caller-supplied IDs.
 
+## vuoro-service 0.1.107
+
+- Pins the published, attested Sprintctl 0.30.0 wheel in both image profiles.
+  Work schema 34 remains current and schemas 32–34 remain compatible.
+- Adds retry-safe task creation and independent browser outcome review. The
+  Work owner binds acceptance to the exact report, release and evidence.
+- Adds a capability-gated MCP task creation tool and initializes the Work
+  catalog from the observed PostgreSQL schema before serving.
+- Documents Compose install, backup, restore, upgrade and image rollback with
+  separate database credentials for runtime and migration roles.
+
 ## vuoro-service 0.1.106
 
 - Prepares merged #321 Lane owner composition and #322 bounded work
