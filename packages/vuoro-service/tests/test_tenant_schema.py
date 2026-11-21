@@ -26,7 +26,7 @@ def test_tenant_schema_map_matches_its_checked_in_json_schema():
 
 def test_releases_are_complete_ordered_and_migration_flags_compare_adjacent_releases():
     rows = _mapping()["releases"]
-    expected = [f"0.1.{n}" for n in range(94, 109)]
+    expected = [f"0.1.{n}" for n in range(94, 110)]
     assert [r["service_version"] for r in rows] == expected
     for row, previous in zip(rows[1:], rows[:-1]):
         if row["work_schema_target"] is not None and previous["work_schema_target"] is not None:
@@ -70,7 +70,7 @@ def test_historic_rows_match_adapter_pin_history_where_available():
         "0.1.100": (29, 29, 29), "0.1.101": (29, 29, 29),
         "0.1.102": (30, 30, 30), "0.1.103": (31, 31, 31),
         "0.1.104": (31, 31, 31), "0.1.105": (34, 32, 34),
-        "0.1.106": (34, 32, 34), "0.1.107": (34, 32, 34), "0.1.108": (35, 32, 35),
+        "0.1.106": (34, 32, 34), "0.1.107": (34, 32, 34), "0.1.108": (35, 32, 35), "0.1.109": (35, 32, 35),
     }
     rows = {row["service_version"]: row for row in _mapping()["releases"]}
     for release, (target, minimum, maximum) in verified.items():
@@ -130,7 +130,7 @@ def test_lookup_accepts_version_and_pinned_release_form():
     assert lookup_tenant_schema("vuoro-service-v0.1.105@sha256:" + "a" * 64)["service_version"] == "0.1.105"
 
 def test_lookup_explains_unknown_and_malformed_versions():
-    with pytest.raises(UnknownServiceVersionError, match="no tenant work-schema mapping.*0.1.109"):
-        lookup_tenant_schema("0.1.109")
+    with pytest.raises(UnknownServiceVersionError, match="no tenant work-schema mapping.*0.1.110"):
+        lookup_tenant_schema("0.1.110")
     with pytest.raises(ValueError, match="expected a service version"):
         lookup_tenant_schema("vuoro-service-v0.1.105@sha256:not-a-digest")
