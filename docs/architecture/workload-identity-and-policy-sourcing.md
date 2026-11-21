@@ -55,7 +55,7 @@ revocation proof before it could change that conclusion.
 ## Sourcing decision and qualification questions
 
 Keep issuer selection with the provisioned gateway/OIDC owner and leave
-workload identity as **unselected** until the EE-06 reference workflow names a
+hosted workload identity **unselected** until the EE-06 reference workflow names a
 runtime-specific decision that changes authorization. At that point compare
 existing short-lived gateway assertions, issuer-backed OAuth token exchange,
 WIMSE profiles and any provider-issued identity against the actual enforcement
@@ -85,3 +85,58 @@ gateway/owner enforcement boundaries, expose the missing runtime-attestation
 claim and copied-token/host residuals, and leave both component choices open
 until a real reference workflow demonstrates their need and gives them a
 falsifiable acceptance test.
+
+## In-cluster API reference
+
+LANECTL already uses the Sprintctl-owned `work.public.item-v1` operation to
+read owner settlement in the `lanectl` repository. A dedicated read-only
+observer can qualify that call with a projected Kubernetes token. The
+scheduled coordinator keeps its existing runner credential for claim,
+heartbeat and settlement writes. The hosted gateway and MCP edge retain
+their request-specific assertion and proof contract.
+
+The Vuoro service adds an optional `VUORO_KUBERNETES_IDENTITY_FILE` alongside
+the local bearer registry. A file describes one explicit binding using the
+`vuoro-kubernetes-identity/v1` schema. For example:
+
+```json
+{
+  "schema_version": "vuoro-kubernetes-identity/v1",
+  "environment": "example-shared",
+  "api_server": "https://kubernetes.default.svc",
+  "ca_file": "/run/kubernetes-reviewer/ca.crt",
+  "reviewer_token_file": "/run/kubernetes-reviewer/token",
+  "issuer": "https://cluster.example.com",
+  "audience": "https://vuoro-shared.example.com/kubernetes",
+  "service_account": "system:serviceaccount:lanectl:settlement-reader",
+  "service_account_uid": "dcbdb702-279d-48b6-9b65-fd37f88a5547",
+  "principal_id": "cluster-workload:lanectl-settlement-reader:1",
+  "workspace_id": "lanectl-pilot",
+  "repo_id": "lanectl"
+}
+```
+
+The operator binds the ServiceAccount incarnation and a dedicated principal
+to one repository and workspace. The resolver checks the asserted issuer,
+exact username, single purpose-specific audience and expiry, then asks the
+configured Kubernetes API server to authenticate the same token. It requires
+the matching ServiceAccount UID and a validated Pod binding in the review
+response. The shell permits only the repository-scoped read operation and
+retains the normal catalog and owner checks. Hosted configuration refuses
+this mode.
+
+Grant the service reviewer only `create` on `authentication.k8s.io`
+`tokenreviews`. Mount the Kubernetes API CA and a rotatable API-audience
+reviewer token. Use metadata-level audit for TokenReview so request and
+response bodies carrying tokens stay out of audit logs. A TLS or review
+outage refuses workload requests. At most eight reviews run concurrently per
+service process. A saturated reviewer returns HTTP 503. Existing static credentials continue to
+resolve as before.
+
+A workload token remains a bearer credential while the Pod exists. Copies
+can succeed until Kubernetes rejects the token. Reviews run on each request,
+so Vuoro adds no cache window to the Kubernetes revocation interval. Binding
+a recreated ServiceAccount requires a new UID and a fresh principal epoch.
+The reference verification is source-level. A deployed identity still needs
+a live positive read and negative cases for a different ServiceAccount,
+repository, operation and a deleted Pod.
