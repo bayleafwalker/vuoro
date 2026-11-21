@@ -48,6 +48,7 @@ from vuoro_service.identity import (
     InvocationContext,
     StaticBearerIdentityResolver,
 )
+from vuoro_service.kubernetes_identity import KubernetesIdentityResolver
 from vuoro_service.project_binding import (
     ProjectAuthorizationError,
     ProjectBinding,
@@ -786,8 +787,10 @@ def _load_project_binding_for_composition(
 
 
 def _validate_identity_mode(
-    project_binding: ProjectBinding, *, gateway_key_configured: bool
+    project_binding: ProjectBinding, *, gateway_key_configured: bool, kubernetes_configured: bool = False
 ) -> None:
+    if kubernetes_configured and (project_binding.environment is not None or gateway_key_configured):
+        raise CompositionError("Kubernetes identity mode cannot be combined with hosted gateway mode")
     if project_binding.environment is not None and not gateway_key_configured:
         raise CompositionError(
             "hosted project bindings require gateway assertion identity mode"
@@ -1386,8 +1389,10 @@ def create_composed_app(
         ),
     )
     gateway_key_value = environ.get("VUORO_GATEWAY_PUBLIC_KEY_FILE")
+    kubernetes_identity_file = environ.get("VUORO_KUBERNETES_IDENTITY_FILE")
     _validate_identity_mode(
-        project_binding, gateway_key_configured=gateway_key_value is not None
+        project_binding, gateway_key_configured=gateway_key_value is not None,
+        kubernetes_configured=kubernetes_identity_file is not None,
     )
     if gateway_key_value is not None:
         if identity_path is not None or "VUORO_IDENTITIES_FILE" in environ:
@@ -1408,6 +1413,14 @@ def create_composed_app(
             identity_path or Path(_runtime_env("VUORO_IDENTITIES_FILE", environ)),
             environment=environment_name,
         )
+        if kubernetes_identity_file is not None:
+            try:
+                path = Path(kubernetes_identity_file)
+                if not path.is_absolute():
+                    raise ValueError("Kubernetes identity configuration path must be absolute")
+                resolver = KubernetesIdentityResolver(resolver, config_path=path, environment=environment_name)
+            except (OSError, ValueError, UnicodeError):
+                raise CompositionError("invalid Kubernetes identity configuration") from None
     work_dsn = _runtime_env(
         "VUORO_WORK_RUNTIME_DSN", environ, aliases=("VUORO_WORK_DSN",)
     )

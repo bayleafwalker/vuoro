@@ -716,6 +716,13 @@ def test_hosted_binding_cannot_fall_back_to_static_identity_mode() -> None:
     _validate_identity_mode(local, gateway_key_configured=False)
 
 
+@pytest.mark.parametrize("hosted,gateway", [(True, True), (True, False), (False, True)])
+def test_kubernetes_mode_is_unavailable_for_hosted_gateway_compositions(hosted, gateway):
+    binding = SimpleNamespace(environment=_HOSTED_ENVIRONMENT if hosted else None)
+    with pytest.raises(CompositionError, match="cannot be combined with hosted"):
+        _validate_identity_mode(binding, gateway_key_configured=gateway, kubernetes_configured=True)
+
+
 def test_startup_loader_rejects_many_projects(tmp_path: Path) -> None:
     path = tmp_path / "bindings.json"
     documents = _hosted_binding()
