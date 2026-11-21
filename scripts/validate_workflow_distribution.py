@@ -400,6 +400,11 @@ def validate(contract, composition):
 def main():
     try:
         contract = tomllib.loads((ROOT / "deploy/reference-distribution.toml").read_text())
+        package = tomllib.loads((ROOT / contract["service_package"]).read_text())["project"]
+        if (contract["service_distribution"], contract["service_version"]) != (
+            package["name"], package["version"]
+        ):
+            raise ValueError("reference distribution service name and version must match the package metadata")
         composition = json.loads((ROOT / contract["composition_manifest"]).read_text())
         validate(contract, composition)
     except (OSError, ValueError, KeyError, TypeError) as exc:
