@@ -54,8 +54,9 @@ client --OAuth--> vuoro.cloud gateway --X-Vuoro-Identity + X-Request-Id--> POST 
   with one assertion while a captured call cannot be replayed),
   `X-Vuoro-Client-Protocol: 1`, the invocation `request_id` set to that
   request id, and `repo_id` set to one repository in the assertion. The
-  `list_ready_work` and `describe_work` tools accept an optional `repo_id`:
-  omission defaults to the only authorized repository, while multiple
+  `list_ready_work`, `describe_work`, `create_task`, `claim_work`, `heartbeat`,
+  and `report_outcome` accept `repo_id` in their arguments. Omitting it
+  selects the only authorized repository, while multiple
   authorized repositories require an explicit selection (`repo-id-required`).
   An unbound assertion is `workspace-unbound`; a selected repository outside
   the assertion is `repo-not-authorized`. All are tool errors before an
