@@ -47,10 +47,13 @@ def test_task_creation_requires_owner_capability_and_narrow_authority(
         base_url="http://shell", timeout=1, transport=httpx.MockTransport(shell)
     )
     toolset = build_toolset(ToolsetContext(env={}, work_source=None, runs=store))
-    client = edge_client(keys[0], FakeShell(), toolsets=(toolset,))
+    client = edge_client(
+        keys[0], FakeShell(), toolsets=(toolset,),
+        allowed_repo_ids=frozenset({"repo-a", "repo-b"}),
+    )
 
-    def post(body):
-        signed = assertion(keys[1], authorities=authorities)
+    def post(body, repo_ids=("repo-a",)):
+        signed = assertion(keys[1], authorities=authorities, repo_ids=list(repo_ids))
         return client.post(MCP_PATH, headers=identity_headers(signed), json=body).json()
 
     tools = post(rpc("tools/list"))["result"]["tools"]
@@ -73,8 +76,17 @@ def test_task_creation_requires_owner_capability_and_narrow_authority(
         assert "X-Vuoro-Identity" in headers
 
     invalid = post(call("create_task", {**ARGS, "repo_id": "other"}))
-    assert invalid["result"]["structuredContent"]["error"]["code"] == "invalid-arguments"
+    assert invalid["result"]["structuredContent"]["error"]["code"] == "repo-not-authorized"
     assert len(writes) == 2
+
+    multiple = ("repo-a", "repo-b")
+    unspecified = post(call("create_task", ARGS), multiple)
+    assert unspecified["result"]["structuredContent"]["error"]["code"] == "repo-id-required"
+    assert len(writes) == 2
+    selected = post(call("create_task", {**ARGS, "repo_id": "repo-b"}), multiple)
+    assert selected["result"]["structuredContent"] == {"item_id": 42}
+    assert writes[-1][0]["repo_id"] == "repo-b"
+    assert writes[-1][0]["arguments"] == ARGS
 
 
 @pytest.mark.skipif(
