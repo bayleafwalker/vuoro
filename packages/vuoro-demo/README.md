@@ -25,15 +25,17 @@ it starts no database or service and creates no fixture state. A ready report
 does not prove settlement, available disk space, or a working live deployment.
 Only the demo's receipt records its executed scenario and cleanup outcome.
 
-For a checkoutless run of the **existing source-pinned demo**, use the public
-revision below. This historical revision exposes `demo`, not the new `doctor`
-command. `uvx` builds the optional consumer from that exact Git revision and
-installs its hash-pinned released owner/client dependencies; this is a source
-install, not a published `vuoro-demo` release wheel.
+For a run outside a checkout, install the [published Vuoro Demo 0.1.2
+wheel](https://github.com/bayleafwalker/vuoro/releases/tag/vuoro-demo-v0.1.2)
+in a fresh environment. The installation checks the wheel's SHA-256 and
+uses its hash-pinned owner and client dependencies.
 
 ```sh
-uvx --from 'vuoro-demo @ git+https://github.com/bayleafwalker/vuoro.git@56248feb9c0ce155cc3337ef5f7e90e1c9e4d79b#subdirectory=packages/vuoro-demo' \
-  vuoro demo --pg-bin /path/to/postgresql16/bin --receipt proof.json
+uv venv --python 3.12 .vuoro-demo-env
+uv pip install --no-config --python .vuoro-demo-env/bin/python \
+  'https://github.com/bayleafwalker/vuoro/releases/download/vuoro-demo-v0.1.2/vuoro_demo-0.1.2-py3-none-any.whl#sha256=bac061fd2225875dbdc80b491dfd236ac9dbd61e98f9471ca5f2497944dbf2b5'
+.vuoro-demo-env/bin/vuoro doctor --pg-bin /path/to/postgresql16/bin
+.vuoro-demo-env/bin/vuoro demo --pg-bin /path/to/postgresql16/bin --receipt proof.json
 ```
 
 Use a fresh receipt filename. After a successful run, retain `proof.json` as
