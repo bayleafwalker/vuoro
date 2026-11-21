@@ -19,6 +19,10 @@ _DEFINITION = {
     "inputSchema": {
         "type": "object",
         "properties": {
+            "repo_id": {
+                "type": "string", "minLength": 1,
+                "description": "Authorized repository. Required when multiple repositories are authorized.",
+            },
             "sprint_id": {"type": "integer", "minimum": 1},
             **{name: {"type": "string", "minLength": 1} for name in _TEXT_FIELDS},
             "require_review": {

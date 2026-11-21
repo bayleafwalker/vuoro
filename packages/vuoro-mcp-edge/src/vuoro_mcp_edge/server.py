@@ -611,11 +611,12 @@ def create_edge_app(
         else:
             parse, run = tools[name]
             parsed = parse(arguments)
-        # Journal admission selects register_run's repository from the outer
-        # tools/call params. It is transport targeting only: never add it to
-        # the owner's versioned register_run arguments. All other toolsets
-        # retain their existing input and routing behavior.
+        # Repository selection stays outside the versioned owner arguments.
+        # Journal admission reads register_run's selector from outer params.
         selected_repo_id = parsed[1] if name in tools else None
+        if name == "create_task":
+            selected_repo_id = _repo_argument(parsed)
+            parsed = {key: value for key, value in parsed.items() if key != "repo_id"}
         if name == "register_run":
             if set(params) - {"name", "arguments", "repo_id"}:
                 raise _invalid_params(
@@ -628,7 +629,7 @@ def create_edge_app(
             assertion,
             request_id,
             selected_repo_id,
-            require_named_repo=name in tools or name == "register_run",
+            require_named_repo=name in tools or name in {"register_run", "create_task"},
         )
         try:
             structured = await run(parsed, forwarded)
