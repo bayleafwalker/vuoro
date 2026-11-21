@@ -1116,3 +1116,35 @@ def test_claim_work_through_the_server_needs_work_claim(keys) -> None:
     ).json()["result"]
     assert ttl["isError"] is True
     assert ttl["structuredContent"]["error"]["code"] == "invalid-arguments"
+
+
+def test_coordinate_tools_select_repository_before_owner_calls(keys) -> None:
+    owner = _edge_owner()
+    store = SprintctlRecordStore(
+        base_url="http://127.0.0.1:8080", timeout=5.0, transport=_AssertionAsPrincipal(owner)
+    )
+    repo_ids = [REPO_ID, "other-repository"]
+    toolset = build_toolset(_context(store))
+    client = edge_client(
+        keys[0], FakeShell(), toolsets=(toolset,), allowed_repo_ids=frozenset(repo_ids),
+    )
+    def invoke(name, args):
+        signed = assertion(keys[1], authorities=["work:read", "work:claim"], repo_ids=repo_ids)
+        headers = identity_headers(signed)
+        return client.post(MCP_PATH, headers=headers, json=call(name, args)).json()["result"]
+
+    for name, args in (
+        ("claim_work", CLAIM_ARGS), ("heartbeat", HEARTBEAT_ARGS), ("report_outcome", REPORT_ARGS),
+    ):
+        assert invoke(name, args)["structuredContent"]["error"]["code"] == "repo-id-required"
+        foreign = invoke(name, dict(args, repo_id="foreign"))
+        assert foreign["structuredContent"]["error"]["code"] == "repo-not-authorized"
+    assert owner.calls == []
+
+    claimed = invoke("claim_work", dict(CLAIM_ARGS, repo_id=REPO_ID))
+    assert claimed["isError"] is False
+    lease_id = claimed["structuredContent"]["lease"]["lease_id"]
+    heartbeat = invoke("heartbeat", dict(HEARTBEAT_ARGS, lease_id=lease_id, repo_id=REPO_ID))
+    assert heartbeat["isError"] is False
+    reported = invoke("report_outcome", dict(REPORT_ARGS, lease_id=lease_id, repo_id=REPO_ID))
+    assert reported["isError"] is False
