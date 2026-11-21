@@ -119,6 +119,7 @@ def test_mcp_create_and_http_retry_share_the_owner_receipt(keys):
         register_work_catalog(registry, WorkApplication.postgres(owner))
 
         repo = owner.repo_id
+        repo_ids = frozenset({repo, "another-repository"})
         proof_key = secrets.token_bytes(32)
         shell = create_app(
             settings=ServiceSettings(
@@ -127,7 +128,7 @@ def test_mcp_create_and_http_retry_share_the_owner_receipt(keys):
             ),
             registry=registry,
             identity_resolver=resolver(
-                keys[0], allowed_repo_ids=frozenset({repo}),
+                keys[0], allowed_repo_ids=repo_ids,
                 edge_proofs=EdgeProofVerifier(proof_key),
             ),
         )
@@ -139,13 +140,13 @@ def test_mcp_create_and_http_retry_share_the_owner_receipt(keys):
         )
         toolset = build_toolset(ToolsetContext(env={}, work_source=source, runs=store))
         edge = create_edge_app(
-            identity_resolver=resolver(keys[0], allowed_repo_ids=frozenset({repo})),
+            identity_resolver=resolver(keys[0], allowed_repo_ids=repo_ids),
             work_source=source, toolsets=(toolset,),
         )
 
         def headers():
             return identity_headers(assertion(
-                keys[1], authorities=["work:task.create"], repo_ids=[repo],
+                keys[1], authorities=["work:task.create"], repo_ids=sorted(repo_ids),
             ))
 
         async def exercise():
@@ -155,7 +156,8 @@ def test_mcp_create_and_http_retry_share_the_owner_receipt(keys):
                     base_url="http://edge", transport=httpx.ASGITransport(app=edge),
                 ) as client:
                     rpc_result = await client.post(
-                        MCP_PATH, json=call("create_task", args), headers=headers(),
+                        MCP_PATH, json=call("create_task", dict(args, repo_id=repo)),
+                        headers=headers(),
                     )
                     result = rpc_result.json()["result"]["structuredContent"]
                     assert isinstance(result.get("item_id"), int), rpc_result.text
