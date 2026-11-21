@@ -3,6 +3,11 @@
 Modular HTTP and process shell that composes immutable, released owner
 adapters. Domain state machines and migrations remain in their owner packages.
 
+Service 0.1.109 includes MCP Edge 0.1.10 in the runtime image. MCP clients
+can select an authorized repository when creating a task, claiming work,
+sending a heartbeat, or reporting an outcome. Work schema 35 remains the
+target and upgrades from 0.1.108 require no Work schema migration.
+
 Service 0.1.108 adds browser-administrator work archive export and restore
 through Sprintctl 0.31.0. Restore requires work schema 35 and retains source
 acceptance receipts as historical data.
