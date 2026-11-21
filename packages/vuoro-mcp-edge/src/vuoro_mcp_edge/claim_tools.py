@@ -212,6 +212,12 @@ _CLAIM_KEY_SCHEMA: dict[str, Any] = {
     ),
 }
 
+_REPO_ID_INPUT = {
+    "type": "string",
+    "minLength": 1,
+    "description": "Authorized repository. Required when multiple repositories are authorized.",
+}
+
 _CLAIM_WORK_DEFINITION: dict[str, Any] = {
     "name": "claim_work",
     "title": "Claim a work item under a lease",
@@ -237,6 +243,7 @@ _CLAIM_WORK_DEFINITION: dict[str, Any] = {
     "inputSchema": {
         "type": "object",
         "properties": {
+            "repo_id": _REPO_ID_INPUT,
             "item_id": {
                 "type": "integer",
                 "minimum": 1,
@@ -265,7 +272,11 @@ _HEARTBEAT_DEFINITION: dict[str, Any] = {
     ),
     "inputSchema": {
         "type": "object",
-        "properties": {"lease_id": _LEASE_ID_INPUT, "run_id": _RUN_ID_INPUT},
+        "properties": {
+            "repo_id": _REPO_ID_INPUT,
+            "lease_id": _LEASE_ID_INPUT,
+            "run_id": _RUN_ID_INPUT,
+        },
         "required": ["lease_id", "run_id"],
         "additionalProperties": False,
     },
@@ -309,6 +320,7 @@ _REPORT_OUTCOME_DEFINITION: dict[str, Any] = {
     "inputSchema": {
         "type": "object",
         "properties": {
+            "repo_id": _REPO_ID_INPUT,
             "lease_id": _LEASE_ID_INPUT,
             "run_id": _RUN_ID_INPUT,
             "outcome": {"enum": ["succeeded", "failed"]},

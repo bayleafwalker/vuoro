@@ -601,6 +601,11 @@ def create_edge_app(
                 "authority-required",
                 f"the caller's assertion lacks the {scope} scope authority",
             )
+        named_repository = name in {"create_task", "claim_work", "heartbeat", "report_outcome"}
+        selected_repo_id = None
+        if named_repository:
+            selected_repo_id = _repo_argument(arguments)
+            arguments = {key: value for key, value in arguments.items() if key != "repo_id"}
         if name in toolset_specs:
             spec = toolset_specs[name]
             try:
@@ -613,10 +618,8 @@ def create_edge_app(
             parsed = parse(arguments)
         # Repository selection stays outside the versioned owner arguments.
         # Journal admission reads register_run's selector from outer params.
-        selected_repo_id = parsed[1] if name in tools else None
-        if name == "create_task":
-            selected_repo_id = _repo_argument(parsed)
-            parsed = {key: value for key, value in parsed.items() if key != "repo_id"}
+        if name in tools:
+            selected_repo_id = parsed[1]
         if name == "register_run":
             if set(params) - {"name", "arguments", "repo_id"}:
                 raise _invalid_params(
@@ -629,7 +632,7 @@ def create_edge_app(
             assertion,
             request_id,
             selected_repo_id,
-            require_named_repo=name in tools or name in {"register_run", "create_task"},
+            require_named_repo=name in tools or named_repository or name == "register_run",
         )
         try:
             structured = await run(parsed, forwarded)
