@@ -98,7 +98,10 @@ def test_older_and_paged_jobs_endpoints(spec, forge):
     assert forgejo.jobs_for(spec, lambda *_: large) == large
 
     def paged(_, path):
-        return large[:50] if "page=1&" in path else large[50:]
+        # A provider may cap the page size below the requested limit.
+        page = int(path.split("page=")[1].split("&")[0])
+        start = (page - 1) * 25
+        return large[start:start + 25]
 
     assert forgejo.jobs_for(spec, paged) == large
 

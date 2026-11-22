@@ -77,14 +77,14 @@ def jobs_for(spec, read):
         identities = {job["id"] for job in batch}
         if len(identities) != len(batch):
             raise Unavailable("duplicate Forgejo job identity within a page")
-        if identities == jobs.keys() and all(jobs[job["id"]] == job for job in batch):
+        if page == 2 and identities == jobs.keys() and all(
+            jobs[job["id"]] == job for job in batch
+        ):
             # Older Forgejo versions ignore pagination for this endpoint.
             break
         if identities & jobs.keys():
             raise Unavailable("Forgejo jobs pages changed during observation")
         jobs.update((job["id"], job) for job in batch)
-        if len(batch) < 50:
-            break
     else:
         raise Unavailable("Forgejo jobs pagination exceeded bound")
     return list(jobs.values())
