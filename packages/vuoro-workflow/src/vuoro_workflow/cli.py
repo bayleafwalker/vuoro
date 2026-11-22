@@ -7,7 +7,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import codex, store
+from . import codex, store, wake_api
 from .forgejo import Unavailable, observe
 
 REPO = r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
@@ -40,6 +40,8 @@ def parser():
     root.add_argument("--state", type=Path, default=store.default_path())
     root.add_argument("--json", action="store_true", help="emit JSON")
     commands = root.add_subparsers(required=True, dest="command")
+    api = commands.add_parser("wake-api", help="serve a trusted profile on inherited stdio")
+    api.add_argument("--profile", required=True, type=Path)
     watch = commands.add_parser("watch", help="register a bounded exact-run subscription")
     watch.add_argument("--kind", choices=["ci", "promotion"], default="ci")
     watch.add_argument("--origin", required=True, type=matching(ORIGIN))
@@ -71,6 +73,7 @@ def parser():
     delivery = commands.add_parser("codex-deliver", help="deliver to an existing local Codex thread")
     delivery.add_argument("--socket", required=True, type=Path)
     delivery.add_argument("--thread", required=True, type=matching(THREAD))
+    delivery.add_argument("--instance", type=matching(r"[A-Za-z0-9_.-]{1,100}"))
     delivery.add_argument("--interval", type=positive)
     stop = commands.add_parser("stop", help="stop future observations of a watch")
     stop.add_argument("watch", type=matching(r"[0-9a-f]{64}"))
@@ -127,6 +130,12 @@ def main(argv=None):
     cli = parser()
     args = cli.parse_args(values)
     with store.connect(args.state) as db:
+        if args.command == "wake-api":
+            try:
+                profile = wake_api.load_profile(args.profile)
+            except (OSError, ValueError, wake_api.Rejected) as error:
+                cli.error(f"invalid wake API profile: {error}")
+            return wake_api.serve(wake_api.WakeApi(db, profile))
         if args.command == "watch":
             result = register(args, cli, db)
         elif args.command == "status":
@@ -139,7 +148,7 @@ def main(argv=None):
             result = {"acknowledged": store.acknowledge(db, args.thread, args.event)}
         elif args.command == "codex-deliver":
             while True:
-                result = codex.deliver(db, args.thread, args.socket)
+                result = codex.deliver(db, args.thread, args.socket, instance=args.instance)
                 if args.interval is None:
                     break
                 if result["state"] != "empty":

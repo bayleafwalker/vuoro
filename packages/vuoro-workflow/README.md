@@ -131,3 +131,98 @@ one transaction. When the server may have accepted a turn but its receipt is
 missing, the event stays visible as `claimed-or-uncertain` and is excluded from
 automatic retries. Check the thread for that event ID before acknowledging it
 manually or continuing with the work.
+
+## Shared wake API
+
+`vuoro-workflow --state <database> wake-api --profile <trusted-profile.json>`
+serves newline-delimited JSON-RPC 2.0 requests over stdio. A trusted launcher
+chooses the profile and opens the channel for the caller. The caller can be a
+model, a shell tool, or a harness bridge. An MCP bridge can map its tools to
+these same methods.
+
+The profile binds every request to a workspace, principal, harness instance,
+destination and source allowlist. Keep the profile and database under the
+trusted host user's control. Stdio prevents unbound network callers. This
+process does not isolate mutually untrusted programs that can read or write
+the same local files. A launcher serving mutually untrusted principals needs
+a separate OS identity or equivalent file and channel isolation for each
+principal.
+
+An example profile for an inbox-only client:
+
+```json
+{
+  "identity": {
+    "workspace": "platform",
+    "principal": "release-assistant",
+    "harness": "agent-cli",
+    "instance": "workstation"
+  },
+  "destination": {"kind": "inbox", "instance": "workstation"},
+  "scopes": ["wake.read", "wake.write"],
+  "max_ttl_seconds": 86400,
+  "sources": {
+    "cloud": {
+      "origin": "https://forge.example.org",
+      "repository": "owner/cloud",
+      "policies": {
+        "forgejo.ci.completed/v1": {
+          "workflow": "ci.yaml",
+          "event": "pull_request",
+          "base": "main",
+          "required": ["tests", "merge-gate"]
+        }
+      }
+    }
+  }
+}
+```
+
+Use `"destination": {"kind": "codex", "instance": "workstation", "thread":
+"<uuid>"}` for a trusted local Codex thread. A separately enabled relay makes
+delivery automatic. Launch `codex-deliver --instance workstation` with the
+same socket and thread arguments to consume that provider instance's channel.
+Leave the instance argument unset for direct operator-registered watches.
+The API reports that the destination is eligible for that
+relay without making any claim about whether the relay is running. Inbox
+destinations derive an internal channel from the profile identity and can
+read receipts through the API.
+
+The five methods accept JSON object parameters:
+
+| Method | Scope | Parameters |
+| --- | --- | --- |
+| `wake.capabilities` | `wake.read` | Empty object |
+| `wake.register` | `wake.write` | `template`, `source_alias`, typed `params`, `ttl_seconds`, `idempotency_key` |
+| `wake.get` | `wake.read` | `rule_id` |
+| `wake.receipts` | `wake.read` | `rule_id`, optional `cursor` and `limit` |
+| `wake.cancel` | `wake.write` | `rule_id` |
+
+Send a single bounded object per line with a request ID. The registration
+response returns a durable `rule_id`. Repeat the same idempotency key with
+the same condition and TTL to recover its rule after a lost response. An
+attempt to reuse that key for a different resolved policy, condition or TTL
+fails. Repeating a condition under a new key yields the existing rule with
+its original lifetime. Use a new run identity for a new release attempt.
+`wake.get` returns current rule status without disclosing the host source
+origin or destination. `wake.receipts` returns historical terminal outcomes
+and delivery state with a cursor local to the requested rule. Cancellation
+ends future observations and suppresses events the relay has yet to claim.
+The response reports unresolved delivery claims that might still arrive.
+Reconcile or cancel old rules explicitly when changing a trusted profile.
+
+The CI template takes `{"run": 42, "pr": 7, "head": "<full SHA>"}`. The
+promotion template `forgejo.promotion.completed/v1` takes
+`{"run": 43, "head": "<full SHA>", "ref": "<tag>", "digest": "sha256:<digest>"}`.
+A promotion source policy supplies `workflow`, `event` set to
+`workflow_dispatch`, `required`, `environment`, and optionally
+`digest_input`. The API rejects request fields for origins, credentials,
+destinations, required checks, commands, or free-form instructions.
+
+An optional inexpensive planner can query capabilities and propose a typed
+registration from a user request. For example, “wake me when PR 7's required
+CI finishes” maps to the CI template after the launcher resolves the exact
+run and full commit. The planner must ask for a missing identity or report an
+unsupported condition. It has no authority to write the profile, access
+provider credentials, start turns, or change release gates. Registering and
+evaluating the resulting rule use deterministic code.
