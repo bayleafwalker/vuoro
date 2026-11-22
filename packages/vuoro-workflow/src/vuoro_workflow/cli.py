@@ -7,7 +7,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import store
+from . import codex, store
 from .forgejo import Unavailable, observe
 
 REPO = r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
@@ -63,9 +63,15 @@ def parser():
     reconcile.add_argument("--interval", type=positive, help="poll until stopped")
     inbox = commands.add_parser("inbox", help="read pending events for an owning thread")
     inbox.add_argument("--thread", required=True, type=matching(THREAD))
+    receipts = commands.add_parser("deliveries", help="list automatic delivery receipts")
+    receipts.add_argument("--thread", required=True, type=matching(THREAD))
     ack = commands.add_parser("ack", help="acknowledge a received event")
     ack.add_argument("--thread", required=True, type=matching(THREAD))
     ack.add_argument("event", type=matching(r"[0-9a-f]{64}"))
+    delivery = commands.add_parser("codex-deliver", help="deliver to an existing local Codex thread")
+    delivery.add_argument("--socket", required=True, type=Path)
+    delivery.add_argument("--thread", required=True, type=matching(THREAD))
+    delivery.add_argument("--interval", type=positive)
     stop = commands.add_parser("stop", help="stop future observations of a watch")
     stop.add_argument("watch", type=matching(r"[0-9a-f]{64}"))
     return root
@@ -94,6 +100,9 @@ def emit(value, as_json):
         print(json.dumps(value, sort_keys=True), flush=True)
     elif isinstance(value, list):
         for row in value:
+            if "event" in row:
+                print(f"{row['event']} turn {row['turn'] or 'uncertain'}", flush=True)
+                continue
             spec = row.get("spec", row)
             observation = row.get("observation") or row
             print(
@@ -124,8 +133,18 @@ def main(argv=None):
             result = store.status(db)
         elif args.command == "inbox":
             result = store.inbox(db, args.thread)
+        elif args.command == "deliveries":
+            result = store.deliveries(db, args.thread)
         elif args.command == "ack":
             result = {"acknowledged": store.acknowledge(db, args.thread, args.event)}
+        elif args.command == "codex-deliver":
+            while True:
+                result = codex.deliver(db, args.thread, args.socket)
+                if args.interval is None:
+                    break
+                if result["state"] != "empty":
+                    emit(result, args.json)
+                time.sleep(args.interval)
         elif args.command == "stop":
             result = {"stopped": store.stop(db, args.watch)}
         else:

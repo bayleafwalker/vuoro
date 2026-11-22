@@ -36,6 +36,9 @@ def connect(path):
             id TEXT PRIMARY KEY, watch TEXT NOT NULL, thread TEXT NOT NULL,
             body TEXT NOT NULL, created REAL NOT NULL, acknowledged REAL
         );
+        CREATE TABLE IF NOT EXISTS deliveries (
+            event TEXT PRIMARY KEY, thread TEXT NOT NULL, claimed REAL NOT NULL, turn TEXT
+        );
     """)
     return connection
 
@@ -115,11 +118,55 @@ def status(db):
 
 def inbox(db, thread):
     rows = db.execute(
-        """SELECT body, created FROM outbox
-           WHERE thread = ? AND acknowledged IS NULL ORDER BY created, id""",
+        """SELECT body, created, deliveries.claimed FROM outbox
+           LEFT JOIN deliveries ON deliveries.event = outbox.id
+           WHERE outbox.thread = ? AND acknowledged IS NULL ORDER BY created, id""",
         (thread,),
     )
-    return [{**json.loads(row["body"]), "observed_at": row["created"]} for row in rows]
+    return [
+        {
+            **json.loads(row["body"]), "observed_at": row["created"],
+            "delivery": "claimed-or-uncertain" if row["claimed"] is not None else "pending",
+        }
+        for row in rows
+    ]
+
+
+def deliverable(db, thread):
+    return [event for event in inbox(db, thread) if event["delivery"] == "pending"]
+
+
+def claim_delivery(db, thread, event):
+    with db:
+        return bool(db.execute(
+            """INSERT OR IGNORE INTO deliveries (event, thread, claimed)
+               SELECT id, thread, ? FROM outbox
+               WHERE id = ? AND thread = ? AND acknowledged IS NULL""",
+            (time.time(), event, thread),
+        ).rowcount)
+
+
+def finish_delivery(db, thread, event, turn):
+    with db:
+        updated = db.execute(
+            "UPDATE deliveries SET turn = ? WHERE thread = ? AND event = ? AND turn IS NULL",
+            (turn, thread, event),
+        )
+        if not updated.rowcount:
+            raise ValueError("delivery claim missing")
+        db.execute(
+            """UPDATE outbox SET acknowledged = coalesce(acknowledged, ?)
+               WHERE thread = ? AND id = ?""",
+            (time.time(), thread, event),
+        )
+
+
+def deliveries(db, thread):
+    rows = db.execute(
+        """SELECT event, claimed, turn FROM deliveries WHERE thread = ? ORDER BY claimed, event""",
+        (thread,),
+    )
+    return [dict(row) for row in rows]
 
 
 def acknowledge(db, thread, event):

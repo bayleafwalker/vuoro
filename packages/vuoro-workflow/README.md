@@ -105,3 +105,29 @@ validates the fields, binds the destination thread, and selects supported
 providers and repositories before it registers the rule. The watcher itself
 evaluates typed rules. Arbitrary text conditions, automatic identity inference
 and harness-specific thread resumption are outside this package.
+
+### Opt in to Codex delivery
+
+Install the wheel with its `codex` extra and use
+`contrib/vuoro-workflow-codex@.service` to run the delivery adapter for one
+explicit thread. The template targets a managed local app-server Unix socket.
+For another trusted socket, configure the path in the service override.
+
+```sh
+uv pip install --python ~/.local/share/vuoro-workflow/venv/bin/python '<wheel>[codex]'
+install -Dm644 packages/vuoro-workflow/contrib/vuoro-workflow-codex@.service \
+  ~/.config/systemd/user/vuoro-workflow-codex@.service
+systemctl --user daemon-reload
+systemctl --user enable --now vuoro-workflow-codex@<owning-thread-id>.service
+```
+
+The adapter uses the thread's existing app-server configuration. It supplies
+no approval, sandbox, model or working-directory overrides. Busy threads defer
+delivery. Archived threads, ephemeral threads and threads that reject direct
+input keep their events pending. Inspect receipts with
+`vuoro-workflow --json deliveries --thread <owning-thread-id>`. An acknowledged
+turn ID and event acknowledgement are recorded in
+one transaction. When the server may have accepted a turn but its receipt is
+missing, the event stays visible as `claimed-or-uncertain` and is excluded from
+automatic retries. Check the thread for that event ID before acknowledging it
+manually or continuing with the work.

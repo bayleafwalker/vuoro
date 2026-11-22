@@ -12,6 +12,7 @@ dependencies = []
 
 [project.optional-dependencies]
 test = ["pytest>=8.3,<9"]
+codex = ["websockets>=15,<17"]
 
 [project.scripts]
 vuoro-workflow = "vuoro_workflow.cli:main"

@@ -1179,13 +1179,19 @@ version = "0.1.0"
 source = { editable = "packages/vuoro-workflow" }
 
 [package.optional-dependencies]
+codex = [
+    { name = "websockets" },
+]
 test = [
     { name = "pytest" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" }]
-provides-extras = ["test"]
+requires-dist = [
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" },
+    { name = "websockets", marker = "extra == 'codex'", specifier = ">=15,<17" },
+]
+provides-extras = ["test", "codex"]
 
 [[package]]
 name = "vuoro-workspace"

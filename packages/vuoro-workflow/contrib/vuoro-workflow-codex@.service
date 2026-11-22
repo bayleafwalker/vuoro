@@ -1,0 +1,13 @@
+[Unit]
+Description=Vuoro workflow delivery to Codex thread %i
+After=vuoro-workflow.service
+
+[Service]
+ExecStart=%h/.local/share/vuoro-workflow/venv/bin/vuoro-workflow --json codex-deliver --thread %i --socket %h/.codex/app-server-control/app-server-control.sock --interval 10
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=yes
+UMask=0077
+
+[Install]
+WantedBy=default.target
