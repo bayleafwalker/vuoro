@@ -15,6 +15,7 @@ members = [
     "vuoro-schema-runtime",
     "vuoro-service",
     "vuoro-worker",
+    "vuoro-workflow",
     "vuoro-workspace",
 ]
 overrides = [{ name = "vuoro-client", editable = "packages/vuoro-client" }]
@@ -1170,6 +1171,20 @@ requires-dist = [
     { name = "vuoro-evidence", editable = "packages/vuoro-evidence" },
     { name = "vuoro-service", editable = "packages/vuoro-service" },
 ]
+provides-extras = ["test"]
+
+[[package]]
+name = "vuoro-workflow"
+version = "0.1.0"
+source = { editable = "packages/vuoro-workflow" }
+
+[package.optional-dependencies]
+test = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pytest", marker = "extra == 'test'", specifier = ">=8.3,<9" }]
 provides-extras = ["test"]
 
 [[package]]

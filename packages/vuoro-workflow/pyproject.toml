@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vuoro-workflow"
+version = "0.1.0"
+description = "Durable host-local CI and release workflow observations"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=8.3,<9"]
+
+[project.scripts]
+vuoro-workflow = "vuoro_workflow.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vuoro_workflow"]
