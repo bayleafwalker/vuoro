@@ -1,0 +1,13 @@
+[Unit]
+Description=Vuoro workflow watcher
+After=network.target
+
+[Service]
+ExecStart=%h/.local/share/vuoro-workflow/venv/bin/vuoro-workflow --json reconcile --interval 30
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=yes
+UMask=0077
+
+[Install]
+WantedBy=default.target

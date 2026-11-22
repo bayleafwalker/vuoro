@@ -37,6 +37,7 @@ members = [
   "packages/vuoro-reconciler",
   "packages/vuoro-knowledge",
   "packages/vuoro-workspace",
+  "packages/vuoro-workflow",
 ]
 
 [tool.pytest.ini_options]
@@ -53,5 +54,6 @@ testpaths = [
   "packages/vuoro-reconciler/tests",
   "packages/vuoro-knowledge/tests",
   "packages/vuoro-workspace/tests",
+  "packages/vuoro-workflow/tests",
   "tests",
 ]
