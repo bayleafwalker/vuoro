@@ -40,6 +40,26 @@ to select another path. Watch registration is idempotent for a fixed scope.
 The state is host-persistent. Back up that database separately if it needs to
 survive host replacement.
 
+## Watch a push
+
+For post-merge CI or image publication, use `--event push` and pass the
+run API's `prettyref` value to `--ref`. For a push to the main branch,
+Forgejo reports `main`. Passing `refs/heads/main` for that run produces
+`Forgejo workflow identity mismatch`. Keep the full commit SHA in `--head`
+and use the exact job names returned by the run's jobs endpoint.
+
+```sh
+vuoro-workflow watch \
+  --origin https://forge.example.org --repository owner/repository \
+  --ref main --head <40-hex-sha> \
+  --run <api-run-id> --workflow publish-image.yaml --event push \
+  --required publish --thread <owning-thread-id>
+```
+
+After registration, check `vuoro-workflow --json status` for a matching
+observation. If the ref is wrong, register the corrected rule and stop the
+old watch by ID.
+
 ## Watch a promotion
 
 After the existing approval path dispatches a promotion workflow, register
