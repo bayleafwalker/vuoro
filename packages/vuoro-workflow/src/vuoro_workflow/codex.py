@@ -4,6 +4,7 @@ import json
 import re
 import time
 from pathlib import Path
+from uuid import NAMESPACE_URL, uuid5
 
 from . import store
 
@@ -36,8 +37,16 @@ def message(event):
     )
 
 
-def deliver(db, thread_id, socket_path, connect=None):
-    events = store.deliverable(db, thread_id)
+def destination_channel(thread_id, instance):
+    if instance is None:
+        # Preserve direct thread watches registered through the local operator CLI.
+        return thread_id
+    return str(uuid5(NAMESPACE_URL, f"vuoro:workflow:codex:{instance}:{thread_id}"))
+
+
+def deliver(db, thread_id, socket_path, connect=None, instance=None):
+    channel = destination_channel(thread_id, instance)
+    events = store.deliverable(db, channel)
     if not events:
         return {"state": "empty"}
     if connect is None:
@@ -68,7 +77,7 @@ def deliver(db, thread_id, socket_path, connect=None):
                 resumed = request(socket, 3, "thread/resume", {"threadId": thread_id})["thread"]
                 if resumed["id"] != thread_id or resumed["status"]["type"] != "idle":
                     raise AdapterUnavailable("Codex did not resume the bound thread to idle")
-            if not store.claim_delivery(db, thread_id, event["id"]):
+            if not store.claim_delivery(db, channel, event["id"]):
                 return {"state": "already-claimed"}
             try:
                 turn = request(socket, 4, "turn/start", {
@@ -77,7 +86,7 @@ def deliver(db, thread_id, socket_path, connect=None):
                 })["turn"]["id"]
                 if not isinstance(turn, str) or not re.fullmatch(r"[A-Za-z0-9-]{1,128}", turn):
                     raise AdapterUnavailable("Codex turn acknowledgement is invalid")
-                store.finish_delivery(db, thread_id, event["id"], turn)
+                store.finish_delivery(db, channel, event["id"], turn)
                 return {"state": "delivered", "event": event["id"], "turn": turn}
             except Exception:
                 # A crash or transport failure can follow an accepted turn. Keep the
